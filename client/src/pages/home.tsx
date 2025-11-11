@@ -13,6 +13,7 @@ import { TransactionTimeline } from "@/components/transaction-timeline";
 import { TokenMetadataCard } from "@/components/token-metadata-card";
 import { RugcheckCard } from "@/components/rugcheck-card";
 import { GoPlusCard } from "@/components/goplus-card";
+import { MarketDataCard } from "@/components/market-data-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import type { TokenAnalysisResponse } from "@shared/schema";
@@ -130,6 +131,13 @@ export default function Home() {
                     {analysis.goplusData && (
                       <GoPlusCard 
                         data={analysis.goplusData}
+                        tokenAddress={analysis.tokenAddress}
+                      />
+                    )}
+                    
+                    {analysis.dexscreenerData && (
+                      <MarketDataCard 
+                        data={analysis.dexscreenerData}
                         tokenAddress={analysis.tokenAddress}
                       />
                     )}
