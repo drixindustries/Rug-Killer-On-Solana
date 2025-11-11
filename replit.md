@@ -67,7 +67,8 @@ The frontend, built with React and TypeScript using Vite, features a modern, dat
 **Visual Features**:
 - **BubbleMaps.io Integration**: Embedded iframe on token analysis page showing visual holder distribution
 - **Telegram & Discord Bot Links**: Icon buttons in header and footer, bot showcase section on landing page
-- **Pricing Page**: 4-tier pricing (FREE, PRO $29, WHALE $99, $KILL Holder) with feature comparisons
+- **Pricing Page**: 4-tier pricing (FREE, PRO $29, WHALE $99, $KILL Holder) with feature comparisons and **direct Whop payment buttons**
+- **Subscription Page**: Basic/Premium plans with **instant Whop checkout** (click → redirect to secure Whop payment)
 - **Phantom Wallet Connection**: Full wallet integration with challenge-response signature verification
   - "Connect Wallet" button in header
   - Token balance display
@@ -75,6 +76,7 @@ The frontend, built with React and TypeScript using Vite, features a modern, dat
   - Dropdown menu with wallet info and disconnect option
 - **Bot Showcase**: Dedicated section on landing page highlighting bot commands and features
 - **Enhanced Footer**: Bot links, resource navigation, community section
+- **Payment Flow**: One-click Whop checkout with automatic status detection, loading states, and error handling
 
 ## Previous Implementations
 

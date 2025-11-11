@@ -123,7 +123,7 @@ export default function SubscriptionPage() {
             </div>
           )}
 
-          {hasActivePaidSub && (
+          {hasActivePaidSub && subscription && (
             <div className="mt-6">
               <Badge variant="default" className="text-base px-4 py-2" data-testid="badge-active-subscription">
                 {subscription.tier.charAt(0).toUpperCase() + subscription.tier.slice(1)} Plan Active
@@ -257,7 +257,7 @@ export default function SubscriptionPage() {
           </Card>
         </div>
 
-        {hasActivePaidSub && (
+        {hasActivePaidSub && subscription && (
           <div className="mt-12 max-w-2xl mx-auto">
             <Card data-testid="card-manage-subscription">
               <CardHeader>

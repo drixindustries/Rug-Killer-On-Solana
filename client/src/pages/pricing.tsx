@@ -3,8 +3,19 @@ import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Coins, Crown, Flame, Wallet } from "lucide-react";
-import { Link } from "wouter";
+import { Check, Coins, Crown, Flame, Wallet, Loader2 } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+
+interface Subscription {
+  id: string;
+  userId: string;
+  tier: string;
+  status: string;
+  trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+}
 
 const pricingTiers = [
   {
@@ -24,7 +35,8 @@ const pricingTiers = [
     cta: "Start Free Trial",
     ctaVariant: "outline" as const,
     badge: null,
-    testId: "card-tier-free"
+    testId: "card-tier-free",
+    tier: null
   },
   {
     id: "pro",
@@ -46,7 +58,8 @@ const pricingTiers = [
     cta: "Subscribe to PRO",
     ctaVariant: "default" as const,
     badge: "Popular",
-    testId: "card-tier-pro"
+    testId: "card-tier-pro",
+    tier: "basic" as const
   },
   {
     id: "whale",
@@ -69,7 +82,8 @@ const pricingTiers = [
     cta: "Subscribe to WHALE",
     ctaVariant: "default" as const,
     badge: "Premium",
-    testId: "card-tier-whale"
+    testId: "card-tier-whale",
+    tier: "premium" as const
   },
   {
     id: "kill-holder",
@@ -90,11 +104,63 @@ const pricingTiers = [
     cta: "Connect Wallet",
     ctaVariant: "outline" as const,
     badge: "Exclusive",
-    testId: "card-tier-kill"
+    testId: "card-tier-kill",
+    tier: null
   }
 ];
 
 export default function Pricing() {
+  const { toast } = useToast();
+
+  // Check current subscription status
+  const { data: subscription } = useQuery<Subscription>({
+    queryKey: ['/api/subscription/status'],
+    retry: false,
+  });
+
+  const createSubscriptionMutation = useMutation({
+    mutationFn: async (tier: 'basic' | 'premium') => {
+      const response = await apiRequest('POST', '/api/create-subscription', { tier });
+      const data = await response.json();
+      return data;
+    },
+    onSuccess: async (data) => {
+      // Redirect to Whop checkout
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Subscription Error",
+        description: error.message || "Failed to create subscription. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Helper: Check if subscription is in an active state (Whop statuses)
+  const isActive = (status?: string) => {
+    const activeStatuses = ['valid', 'trialing', 'past_due'];
+    return status && activeStatuses.includes(status);
+  };
+
+  const handleWalletConnect = () => {
+    // Trigger wallet connection modal (if implemented)
+    toast({
+      title: "Connect Wallet",
+      description: "Please connect your Phantom wallet from the header menu to verify your $KILL token holdings.",
+    });
+  };
+
+  const handleFreeTrial = () => {
+    window.location.href = '/api/login';
+  };
+
+  const handleSubscribe = (tier: 'basic' | 'premium') => {
+    createSubscriptionMutation.mutate(tier);
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
@@ -109,42 +175,45 @@ export default function Pricing() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {pricingTiers.map((tier) => {
-              const Icon = tier.icon;
+            {pricingTiers.map((tierData) => {
+              const Icon = tierData.icon;
+              const isCurrentPlan = subscription?.tier === tierData.tier && isActive(subscription?.status);
+              const isPending = createSubscriptionMutation.isPending;
+              
               return (
                 <Card 
-                  key={tier.id} 
-                  className={tier.badge === "Popular" ? "border-primary shadow-lg" : ""}
-                  data-testid={tier.testId}
+                  key={tierData.id} 
+                  className={tierData.badge === "Popular" ? "border-primary shadow-lg" : ""}
+                  data-testid={tierData.testId}
                 >
                   <CardHeader>
-                    {tier.badge && (
-                      <Badge className="w-fit mb-2" data-testid={`badge-${tier.id}`}>
-                        {tier.badge}
+                    {tierData.badge && (
+                      <Badge className="w-fit mb-2" data-testid={`badge-${tierData.id}`}>
+                        {tierData.badge}
                       </Badge>
                     )}
                     <div className="flex items-center gap-2 mb-2">
                       <Icon className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-xl">{tier.name}</CardTitle>
+                      <CardTitle className="text-xl">{tierData.name}</CardTitle>
                     </div>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-bold" data-testid={`text-price-${tier.id}`}>
-                        {tier.price}
+                      <span className="text-4xl font-bold" data-testid={`text-price-${tierData.id}`}>
+                        {tierData.price}
                       </span>
                       <span className="text-sm text-muted-foreground">
-                        / {tier.period}
+                        / {tierData.period}
                       </span>
                     </div>
-                    <CardDescription>{tier.description}</CardDescription>
+                    <CardDescription>{tierData.description}</CardDescription>
                   </CardHeader>
                   
                   <CardContent>
                     <ul className="space-y-2">
-                      {tier.features.map((feature, index) => (
+                      {tierData.features.map((feature, index) => (
                         <li 
                           key={index} 
                           className="flex items-start gap-2 text-sm"
-                          data-testid={`feature-${tier.id}-${index}`}
+                          data-testid={`feature-${tierData.id}-${index}`}
                         >
                           <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                           <span>{feature}</span>
@@ -154,35 +223,44 @@ export default function Pricing() {
                   </CardContent>
                   
                   <CardFooter>
-                    {tier.id === "kill-holder" ? (
+                    {tierData.id === "kill-holder" ? (
                       <Button 
                         className="w-full" 
-                        variant={tier.ctaVariant}
-                        data-testid={`button-cta-${tier.id}`}
+                        variant={tierData.ctaVariant}
+                        onClick={handleWalletConnect}
+                        data-testid={`button-cta-${tierData.id}`}
                       >
                         <Wallet className="h-4 w-4 mr-2" />
-                        {tier.cta}
+                        {tierData.cta}
                       </Button>
-                    ) : tier.id === "free" ? (
-                      <Link href="/subscription" className="w-full">
-                        <Button 
-                          className="w-full" 
-                          variant={tier.ctaVariant}
-                          data-testid={`button-cta-${tier.id}`}
-                        >
-                          {tier.cta}
-                        </Button>
-                      </Link>
+                    ) : tierData.id === "free" ? (
+                      <Button 
+                        className="w-full" 
+                        variant={tierData.ctaVariant}
+                        onClick={handleFreeTrial}
+                        data-testid={`button-cta-${tierData.id}`}
+                      >
+                        {tierData.cta}
+                      </Button>
                     ) : (
-                      <Link href="/subscription" className="w-full">
-                        <Button 
-                          className="w-full" 
-                          variant={tier.ctaVariant}
-                          data-testid={`button-cta-${tier.id}`}
-                        >
-                          {tier.cta}
-                        </Button>
-                      </Link>
+                      <Button 
+                        className="w-full" 
+                        variant={tierData.ctaVariant}
+                        onClick={() => tierData.tier && handleSubscribe(tierData.tier)}
+                        disabled={isPending || Boolean(isCurrentPlan)}
+                        data-testid={`button-cta-${tierData.id}`}
+                      >
+                        {isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Processing...
+                          </>
+                        ) : isCurrentPlan ? (
+                          'Current Plan'
+                        ) : (
+                          tierData.cta
+                        )}
+                      </Button>
                     )}
                   </CardFooter>
                 </Card>
@@ -211,13 +289,19 @@ export default function Pricing() {
                 <div>
                   <h3 className="font-semibold mb-1">What payment methods do you accept?</h3>
                   <p className="text-sm text-muted-foreground">
-                    We accept credit cards via Whop (2.7% + $0.30 fee) and SOL cryptocurrency payments.
+                    We accept credit cards, Apple Pay, Google Pay, and more via Whop secure checkout (includes automatic tax calculation).
                   </p>
                 </div>
                 <div>
                   <h3 className="font-semibold mb-1">What's included in the free trial?</h3>
                   <p className="text-sm text-muted-foreground">
-                    The 7-day free trial includes 3 token analyses per day with basic risk scoring and holder analysis. No credit card required.
+                    The 7-day free trial includes 3 token analyses per day with basic risk scoring and holder analysis. No credit card required to start.
+                  </p>
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-1">How does Whop payment work?</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Clicking "Subscribe" redirects you to Whop's secure hosted checkout. After payment, you'll be automatically redirected back with instant access to your subscription.
                   </p>
                 </div>
               </CardContent>
