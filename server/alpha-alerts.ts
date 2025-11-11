@@ -261,7 +261,7 @@ export class AlphaAlertService {
       `✅ Monitoring ${this.alphaCallers.filter(c => c.enabled).length} top alpha callers\n` +
       `✅ Connected to pump.fun live feed\n` +
       `✅ Quality filters active (RugCheck > 85, No honeypots, Liquidity > $5K)\n\n` +
-      `Contract: \`AAF1h3emV6qDXKGQ1v6km9qqv9Z6Pja9sPhDjrUCRtek\``;
+      `Contract: \`2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt\``;
     
     const DISCORD_WEBHOOK = process.env.ALPHA_DISCORD_WEBHOOK;
     if (DISCORD_WEBHOOK) {

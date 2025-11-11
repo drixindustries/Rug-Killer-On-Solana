@@ -3,6 +3,12 @@
 ## Overview
 Solana Rug Killer is a web application designed to analyze Solana SPL tokens for potential rug pull risks. Its primary purpose is to provide real-time analysis of common indicators like mint/freeze authority, holder concentration, liquidity pool status, and suspicious transaction patterns. The project aims to equip investors with a robust tool for identifying and mitigating risks within the Solana ecosystem, leveraging advanced analytics to protect users from fraudulent schemes and contribute to a safer investment environment.
 
+## Official Token Information
+- **Token Name**: Solana Rug Killer ($RUGK)
+- **Contract Address**: `2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt`
+- **Blockchain**: Solana
+- **Token Deployment**: Launched via Pump.fun platform
+
 ## User Preferences
 - Modern, data-dense dashboard design (inspired by Linear and Dexscreener)
 - Clean, professional aesthetic with subtle interactions

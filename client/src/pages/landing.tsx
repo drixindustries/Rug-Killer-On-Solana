@@ -2,6 +2,7 @@ import { Shield, TrendingUp, Lock, Zap, CheckCircle, AlertTriangle, Eye, Bot } f
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BotShowcase } from "@/components/bot-showcase";
+import { ContractAddress } from "@/components/contract-address";
 
 export default function Landing() {
   return (
@@ -66,6 +67,9 @@ export default function Landing() {
                 <Shield className="w-4 h-4 text-green-500" />
                 <span>Cancel anytime</span>
               </div>
+            </div>
+            <div className="max-w-2xl mx-auto pt-8">
+              <ContractAddress />
             </div>
           </div>
         </section>
