@@ -35,7 +35,8 @@ export function Footer() {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><a href="/pricing" className="hover:text-foreground">Pricing</a></li>
               <li><a href="/subscription" className="hover:text-foreground">Subscription</a></li>
-              <li><a href="https://docs.solana.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Documentation</a></li>
+              <li><a href="/documentation" className="hover:text-foreground">Documentation</a></li>
+              <li><a href="https://docs.solana.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Solana Docs</a></li>
             </ul>
           </div>
           

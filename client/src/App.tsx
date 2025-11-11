@@ -8,6 +8,7 @@ import Home from "@/pages/home";
 import Landing from "@/pages/landing";
 import Subscription from "@/pages/subscription";
 import Pricing from "@/pages/pricing";
+import Documentation from "@/pages/documentation";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -16,12 +17,16 @@ function Router() {
   return (
     <Switch>
       {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
+        <>
+          <Route path="/" component={Landing} />
+          <Route path="/documentation" component={Documentation} />
+        </>
       ) : (
         <>
           <Route path="/" component={Home} />
           <Route path="/subscription" component={Subscription} />
           <Route path="/pricing" component={Pricing} />
+          <Route path="/documentation" component={Documentation} />
         </>
       )}
       <Route component={NotFound} />

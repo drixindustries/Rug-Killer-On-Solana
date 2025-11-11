@@ -88,6 +88,16 @@ export function Header({ onNewAnalysis }: HeaderProps) {
             </Button>
           </Link>
           
+          <Link href="/documentation">
+            <Button 
+              variant="ghost"
+              size="sm"
+              data-testid="button-documentation"
+            >
+              Docs
+            </Button>
+          </Link>
+          
           {walletAddress ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
