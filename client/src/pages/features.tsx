@@ -207,7 +207,7 @@ export default function Features() {
                 <p className="text-xs text-muted-foreground">Catches fake volume patterns</p>
               </div>
               <div>
-                <p className="font-semibold text-sm mb-1">👥 KOL Cabal Bundling</p>
+                <p className="font-semibold text-sm mb-1">Coordinated Pump Groups</p>
                 <p className="text-xs text-muted-foreground">Identifies coordinated pump schemes</p>
               </div>
               <div>
@@ -258,35 +258,35 @@ export default function Features() {
         <div className="text-center mb-8">
           <Badge className="mb-4" data-testid="badge-alpha-alerts">Premium</Badge>
           <h2 className="text-3xl font-bold mb-2">Alpha Alerts System</h2>
-          <p className="text-muted-foreground">Real-time monitoring of top callers and new launches</p>
+          <p className="text-muted-foreground">Real-time monitoring of influential wallets and new launches</p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6">
           <Card data-testid="card-alpha-callers">
             <CardHeader>
               <Flame className="h-8 w-8 mb-2 text-orange-500" />
-              <CardTitle>Alpha Caller Tracking</CardTitle>
+              <CardTitle>Smart Money Tracking</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Monitors transactions from top Solana influencers:
+                Monitor wallet activity from influential traders:
               </p>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <Bell className="h-4 w-4 text-primary" />
-                  <span className="font-mono text-xs">Gemnl</span>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>Configurable wallet watchlist</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Bell className="h-4 w-4 text-primary" />
-                  <span className="font-mono text-xs">ATM.day</span>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>Real-time transaction monitoring</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Bell className="h-4 w-4 text-primary" />
-                  <span className="font-mono text-xs">Alpha Gardner</span>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>Instant buy/sell notifications</span>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-3">
-                Auto-pings Discord/Telegram when they buy new tokens
+                Auto-pings Discord/Telegram when monitored wallets trade
               </p>
             </CardContent>
           </Card>

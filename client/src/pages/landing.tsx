@@ -35,7 +35,7 @@ export default function Landing() {
             </h1>
             <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
               Analyze any Solana token in seconds. Get real-time alerts for new PumpFun launches, 
-              top caller activity, and automated scam detection powered by AI.
+              smart money wallet activity, and automated scam detection powered by AI.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
               <Button 
@@ -116,7 +116,7 @@ export default function Landing() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <CardDescription className="text-base">
-                    Automated detection of honeypots, wash trading, and KOL cabal bundling
+                    Automated detection of honeypots, wash trading, and coordinated pump schemes
                   </CardDescription>
                   <div className="space-y-2 pt-2">
                     <div className="flex items-center gap-2 text-sm">
@@ -142,12 +142,12 @@ export default function Landing() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <CardDescription className="text-base">
-                    Real-time monitoring of top Solana callers and new PumpFun launches
+                    Real-time monitoring of influential wallets and new PumpFun launches
                   </CardDescription>
                   <div className="space-y-2 pt-2">
                     <div className="flex items-center gap-2 text-sm">
                       <CheckCircle className="w-4 h-4 text-green-500" />
-                      <span>Top KOL transaction tracking</span>
+                      <span>Smart money wallet tracking</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <CheckCircle className="w-4 h-4 text-green-500" />

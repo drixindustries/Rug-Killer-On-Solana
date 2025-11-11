@@ -31,7 +31,7 @@ The frontend features a modern, data-dense dashboard using React, TypeScript, Vi
 - **Subscription Codes**: Database-driven redemption system with row-level locking, transaction safety, SQL-based usage counting to prevent race conditions, and Whop webhook protection to prevent downgrades of lifetime subscriptions.
 - **Bots**: Telegram and Discord bots provide token analysis, holder analysis, dev wallet history, and blacklist checks, supporting markdown and rich embeds.
 - **AI Blacklist System**: A rules-based detection engine with 6 automated rules analyzing over 52 risk metrics to identify honeypots, high sell taxes, suspicious authorities, and wash trading patterns. Includes severity scoring, evidence tracking, and dedicated API endpoints.
-- **Alpha Alerts**: Live monitoring service that auto-pings Discord/Telegram channels when detecting: (1) Alpha caller signals from top Solana callers (Gemnl, ATM.day, Alpha Gardner), (2) New token launches from pump.fun WebSocket, (3) Quality-filtered gems (RugCheck > 85, no honeypots, liquidity > $5K). Monitoring-only with no automated trading or private keys.
+- **Alpha Alerts**: Live monitoring service that auto-pings Discord/Telegram channels when detecting: (1) Smart money signals from configurable wallet watchlists, (2) New token launches from pump.fun WebSocket, (3) Quality-filtered gems (RugCheck > 85, no honeypots, liquidity > $5K). Monitoring-only with no automated trading or private keys.
 - **Creator Wallet**: Secure wallet service for pump.fun creator rewards (0.05% of trading volume). Admin-only access with one-time private key generation, Phantom wallet import instructions, and balance monitoring. Stored in `CREATOR_WALLET_PRIVATE_KEY` secret.
 
 ### Feature Specifications

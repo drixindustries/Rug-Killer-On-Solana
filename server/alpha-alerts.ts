@@ -15,12 +15,9 @@ interface AlphaCallerConfig {
   enabled: boolean;
 }
 
-// Top alpha callers on Solana to monitor
-const DEFAULT_ALPHA_CALLERS: AlphaCallerConfig[] = [
-  { wallet: '5s3cEXBY51wVkUtiGgrrha3Su9EpzyNiEyh8n1hMJRTE', name: 'Gemnl', enabled: true },
-  { wallet: 'Ayif4n783bT6b6TvXoVEaQs8ozf4chYJgjnTaGeDpump', name: 'ATM.day', enabled: true },
-  { wallet: 'Ch69ggMM11XUxMKTUVMk52VsPNToo1USqmjRVf9Epump', name: 'Alpha Gardner', enabled: true },
-];
+// Alpha callers can be configured via environment variables or admin interface
+// No default wallets are monitored to avoid legal issues with naming specific individuals/programs
+const DEFAULT_ALPHA_CALLERS: AlphaCallerConfig[] = [];
 
 export class AlphaAlertService {
   private connection: Connection;

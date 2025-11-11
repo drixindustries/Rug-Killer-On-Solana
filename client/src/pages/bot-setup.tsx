@@ -50,7 +50,7 @@ export default function BotSetup() {
             <div>
               <h3 className="font-semibold mb-2">Alpha Alerts</h3>
               <ul className="space-y-1 text-sm text-muted-foreground">
-                <li>• Monitors top Solana alpha callers</li>
+                <li>• Monitors influential wallet activity</li>
                 <li>• Real-time pump.fun launches</li>
                 <li>• Quality filtering (RugCheck {'>'}  85)</li>
                 <li>• Auto-pings Discord/Telegram</li>

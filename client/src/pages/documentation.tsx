@@ -151,7 +151,7 @@ const DocumentationPDF = () => (
           <Text style={pdfStyles.text}>• Everything in PRO tier</Text>
           <Text style={pdfStyles.text}>• Real-time liquidity alerts</Text>
           <Text style={pdfStyles.text}>• REST API access with 10,000 requests/month</Text>
-          <Text style={pdfStyles.text}>• Advanced KOL wallet tracking</Text>
+          <Text style={pdfStyles.text}>• Advanced smart money wallet tracking</Text>
           <Text style={pdfStyles.text}>• Team collaboration (up to 5 users)</Text>
           <Text style={pdfStyles.text}>• Custom webhook integrations</Text>
         </View>
@@ -211,7 +211,7 @@ const DocumentationPDF = () => (
           <Text style={pdfStyles.text}>• High sell tax (severity: 80) - Excessive transaction fees</Text>
           <Text style={pdfStyles.text}>• Suspicious authorities (severity: 75) - Mint/freeze enabled</Text>
           <Text style={pdfStyles.text}>• Wash trading patterns (severity: 70) - Artificial volume</Text>
-          <Text style={pdfStyles.text}>• KOL cabal detection - Coordinated pump schemes</Text>
+          <Text style={pdfStyles.text}>• Coordinated pump scheme detection</Text>
           <Text style={pdfStyles.text}>• Evidence tracking with timestamped entries and deduplication</Text>
         </View>
       </View>
@@ -663,7 +663,7 @@ export default function Documentation() {
                     <li>• Evidence tracking with timestamped entries</li>
                     <li>• Severity scoring (0-100 scale)</li>
                     <li>• Deduplication prevents spam for same wallet+labelType</li>
-                    <li>• KOL cabal detection for coordinated pump schemes</li>
+                    <li>• Coordinated pump scheme detection</li>
                     <li>• Automatic analysis on every token scan</li>
                     <li>• Blacklist info included in bot responses</li>
                   </ul>
@@ -722,7 +722,7 @@ export default function Documentation() {
                     <li>• Everything in PRO</li>
                     <li>• Real-time alerts</li>
                     <li>• API access (10k/mo)</li>
-                    <li>• KOL tracking</li>
+                    <li>• Smart money tracking</li>
                     <li>• Team (5 users)</li>
                     <li>• Custom webhooks</li>
                   </ul>
