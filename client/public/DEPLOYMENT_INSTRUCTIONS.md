@@ -11,9 +11,10 @@
 Before you begin, make sure you have:
 
 1. **Node.js 18+** installed ([Download here](https://nodejs.org/))
-2. **A Solana wallet with 0.05-0.1 SOL**
-3. **Your wallet's private key** (base58 format)
-4. **~15 minutes** for vanity address generation
+2. **A Solana wallet with 0.1 SOL** (Phantom, Solflare, etc.)
+3. **~15 minutes** for vanity address generation
+
+**SECURITY NOTE:** This script generates a fresh burner wallet automatically. You'll transfer 0.1 SOL to it from your main wallet. Your main wallet's private key is NEVER exposed.
 
 ---
 
@@ -31,19 +32,14 @@ Open your terminal in the folder containing the script and run:
 npm install @solana/web3.js @solana/spl-token bs58
 ```
 
-### 3. Get Your Wallet Private Key
+### 3. Have Your Wallet Ready
 
-**From Phantom:**
-1. Open Phantom wallet
-2. Settings → "Show Secret Recovery Phrase" or "Export Private Key"
-3. Copy the base58 private key (long string starting with numbers/letters)
+Make sure you have:
+- Phantom, Solflare, or any Solana wallet
+- At least 0.1 SOL in your wallet
+- Ability to send SOL from your wallet
 
-**From Solflare:**
-1. Settings → "Export Private Key"
-2. Enter password
-3. Copy the base58 key
-
-**⚠️ IMPORTANT:** Your private key is used ONLY locally on your computer. It never leaves your device.
+**SECURITY:** The script will generate a burner wallet for you. You'll simply send 0.1 SOL to it from your main wallet. Your main wallet's private key stays safe in Phantom!
 
 ---
 
@@ -57,14 +53,24 @@ node DEPLOY_RUGK_LOCALLY.js
 
 ### 2. Follow the Prompts
 
-The script will ask you:
+The script will:
 
-**Step 1:** Enter your wallet private key
+**Step 1:** Generate a burner wallet automatically
 ```
-🔐 Enter your wallet private key (base58): [paste your key here]
+🔐 SECURITY: Generating fresh burner wallet for deployment...
+✅ Burner wallet generated: ABC123...xyz
+
+⚠️  ACTION REQUIRED:
+   Transfer 0.1 SOL to this address from your main wallet:
+   ABC123...xyz
 ```
 
-**Step 2:** Confirm deployment
+**Step 2:** Wait for you to transfer SOL
+- Open Phantom/Solflare
+- Send 0.1 SOL to the burner address shown
+- Press ENTER in the script when done
+
+**Step 3:** Confirm deployment
 ```
 ⚠️  Ready to deploy? This will cost ~0.05 SOL. Type "yes" to continue: yes
 ```
@@ -230,15 +236,19 @@ To make $RUGK tradeable:
 
 ✅ **DO:**
 - Run the script on your personal computer
-- Keep your private keys secure
+- Transfer SOL from your main wallet (keeps your main key safe)
 - Import the mint keypair into Phantom immediately
 - Back up the mint keypair securely
+- **Clear your terminal history after deployment:** `history -c` (Linux/Mac) or close terminal (Windows)
+- **Delete the script after successful deployment**
 
 ❌ **DON'T:**
-- Share your private keys with anyone
+- Share the mint keypair with anyone
 - Run the script on public computers
-- Store private keys in plain text files
+- Store keypairs in plain text files
 - Lose the mint keypair (you can't recover it)
+
+**SECURITY BONUS:** The burner wallet approach means your main wallet's private key is never exposed to the script!
 
 ---
 

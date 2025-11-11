@@ -236,22 +236,44 @@ async function main() {
   console.log(`   Vanity: Ending in "${TOKEN_CONFIG.vanitySuffix}"`);
   
   console.log('\n📝 Requirements:');
-  console.log('   ✓ Solana wallet with 0.05-0.1 SOL');
-  console.log('   ✓ Wallet private key (base58 format)');
   console.log('   ✓ ~5-15 minutes for vanity generation');
+  console.log('   ✓ 0.05-0.1 SOL to transfer to burner wallet');
 
-  // Get wallet private key
-  console.log('\n');
-  const privateKeyInput = await askQuestion('🔐 Enter your wallet private key (base58): ');
+  // SECURITY: Generate fresh burner wallet
+  console.log('\n🔐 SECURITY: Generating fresh burner wallet for deployment...');
+  console.log('   (Your main wallet stays safe - you\'ll transfer SOL to this burner)');
   
-  let payerKeypair;
-  try {
-    payerKeypair = Keypair.fromSecretKey(bs58.decode(privateKeyInput.trim()));
-    console.log(`✅ Wallet loaded: ${payerKeypair.publicKey.toBase58()}`);
-  } catch (error) {
-    console.error('❌ Invalid private key format');
+  const payerKeypair = Keypair.generate();
+  const burnerAddress = payerKeypair.publicKey.toBase58();
+  
+  console.log(`\n✅ Burner wallet generated: ${burnerAddress}`);
+  console.log(`\n⚠️  ACTION REQUIRED:`);
+  console.log(`   Transfer 0.1 SOL to this address from your main wallet:`);
+  console.log(`   ${burnerAddress}`);
+  console.log('\n   Use Phantom, Solflare, or any wallet to send SOL.');
+  console.log('   This burner wallet will be used ONLY for deployment.');
+  
+  // Wait for user to transfer SOL
+  await askQuestion('\n✅ Press ENTER after you have transferred SOL to the burner wallet... ');
+  
+  // Check balance
+  let balance = await connection.getBalance(payerKeypair.publicKey);
+  let balanceSOL = balance / LAMPORTS_PER_SOL;
+  
+  if (balanceSOL < 0.05) {
+    console.error(`\n❌ Insufficient balance: ${balanceSOL.toFixed(4)} SOL`);
+    console.error('   Please transfer at least 0.1 SOL and try again.');
     process.exit(1);
   }
+  
+  console.log(`✅ Balance confirmed: ${balanceSOL.toFixed(4)} SOL`);
+  
+  // Save burner keypair for later reference
+  const burnerPrivateKey = bs58.encode(payerKeypair.secretKey);
+  console.log('\n💾 SAVE THIS BURNER KEYPAIR (optional, for recovery only):');
+  console.log(`   Public:  ${burnerAddress}`);
+  console.log(`   Private: ${burnerPrivateKey}`);
+  console.log('\n   (You can discard this after deployment - funds will be minimal)')
 
   // Confirm deployment
   const confirm = await askQuestion('\n⚠️  Ready to deploy? This will cost ~0.05 SOL. Type "yes" to continue: ');
