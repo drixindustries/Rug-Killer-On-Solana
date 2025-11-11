@@ -1,5 +1,6 @@
-import { Shield, Plus } from "lucide-react";
+import { Shield, Plus, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
 
 interface HeaderProps {
   onNewAnalysis?: () => void;
@@ -14,16 +15,29 @@ export function Header({ onNewAnalysis }: HeaderProps) {
           <span className="font-bold text-lg">Solana Rug Detector</span>
         </div>
         
-        {onNewAnalysis && (
-          <Button 
-            onClick={onNewAnalysis}
-            size="sm"
-            data-testid="button-new-analysis"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            New Analysis
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <Link href="/subscription">
+            <Button 
+              variant="ghost"
+              size="sm"
+              data-testid="button-subscription"
+            >
+              <CreditCard className="h-4 w-4 mr-1" />
+              Subscription
+            </Button>
+          </Link>
+          
+          {onNewAnalysis && (
+            <Button 
+              onClick={onNewAnalysis}
+              size="sm"
+              data-testid="button-new-analysis"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Analysis
+            </Button>
+          )}
+        </div>
       </div>
     </header>
   );
