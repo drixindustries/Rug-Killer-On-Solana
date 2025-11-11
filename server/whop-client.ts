@@ -26,7 +26,7 @@ export const WHOP_PLAN_IDS = {
   GROUP: process.env.WHOP_PLAN_ID_GROUP || "",
 };
 
-// Helper to create checkout session
+// Helper to create checkout session using REST API directly
 export async function createWhopCheckout(params: {
   planId: string;
   userId: string;
@@ -36,21 +36,40 @@ export async function createWhopCheckout(params: {
   if (!WHOP_COMPANY_ID) {
     throw new Error("WHOP_COMPANY_ID not configured");
   }
+  
+  if (!WHOP_API_KEY) {
+    throw new Error("WHOP_API_KEY not configured");
+  }
 
   try {
-    const response = await whopClient.payments.createCheckoutSession({
-      planId: params.planId,
-      redirectUrl: `${process.env.REPL_HOME || "http://localhost:5000"}/subscription/success`,
-      metadata: {
-        user_id: params.userId,
-        user_email: params.userEmail || "",
-        ...params.metadata,
+    // Use REST API directly for checkout session creation
+    const response = await fetch('https://api.whop.com/api/v2/checkout_sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${WHOP_API_KEY}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        plan_id: params.planId,
+        redirect_url: `${process.env.REPL_HOME || "http://localhost:5000"}/subscription/success`,
+        metadata: {
+          user_id: params.userId,
+          user_email: params.userEmail || "",
+          ...params.metadata,
+        },
+      }),
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Whop API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    
     return {
-      checkoutUrl: response.purchase_url,
-      sessionId: response.id,
+      checkoutUrl: data.checkout_url,
+      sessionId: data.id,
     };
   } catch (error: any) {
     console.error("Error creating Whop checkout:", error);
