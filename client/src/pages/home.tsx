@@ -18,11 +18,25 @@ import { BubbleMapsCard } from "@/components/bubblemaps-card";
 import { TokenInfoSidebar } from "@/components/token-info-sidebar";
 import { LiquidityBurnCard } from "@/components/liquidity-burn-card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Copy, CheckCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import type { TokenAnalysisResponse } from "@shared/schema";
 
+const CONTRACT_ADDRESS = "AAF1h3emV6qDXKGQ1v6km9qqv9Z6Pja9sPhDjrUCRtek";
+
 export default function Home() {
+  const { toast } = useToast();
   const [analysis, setAnalysis] = useState<TokenAnalysisResponse | null>(null);
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied!",
+      description: "Contract address copied to clipboard",
+    });
+  };
 
   const analyzeMutation = useMutation({
     mutationFn: async (tokenAddress: string) => {
@@ -54,16 +68,64 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="space-y-8">
             {!analysis && (
-              <div className="text-center space-y-4 py-12">
+              <div className="text-center space-y-6 py-12">
                 <h1 className="text-4xl font-bold">Solana Rug Detector</h1>
                 <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                   Analyze Solana tokens for rug pull risks. Check mint authority, freeze authority, 
                   holder distribution, liquidity, and suspicious activity instantly.
                 </p>
+                
+                {/* Official Contract Address */}
+                <div className="flex flex-col items-center gap-3 pt-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                    <span className="text-sm font-semibold text-muted-foreground">Official Contract Address</span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-muted px-4 py-2 rounded-md">
+                    <code className="font-mono text-sm select-all" data-testid="text-contract-address">
+                      {CONTRACT_ADDRESS}
+                    </code>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => copyToClipboard(CONTRACT_ADDRESS)}
+                      data-testid="button-copy-contract"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
               </div>
             )}
 
             <TokenInput onAnalyze={handleAnalyze} isAnalyzing={isLoading} />
+
+            {/* Contract Address Card - Always visible */}
+            {!analysis && (
+              <Card data-testid="card-contract-address">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    Official Contract Address
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2 bg-muted px-3 py-2 rounded-md">
+                    <code className="font-mono text-sm flex-1 select-all" data-testid="text-contract-card">
+                      {CONTRACT_ADDRESS}
+                    </code>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => copyToClipboard(CONTRACT_ADDRESS)}
+                      data-testid="button-copy-contract-card"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* BubbleMaps - Positioned directly below token input for better visibility */}
             {analysis && (
