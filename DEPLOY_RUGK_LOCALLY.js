@@ -12,7 +12,7 @@
  * 
  * Requirements:
  * - Node.js 18+
- * - ~0.05-0.1 SOL in your wallet
+ * - ~0.01 SOL in your wallet (actual cost ~0.003 SOL)
  */
 
 const { 
