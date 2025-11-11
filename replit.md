@@ -75,6 +75,28 @@ The frontend, built with React and TypeScript using Vite, features a modern, dat
 - **API**: `/api/blacklist/check/:wallet`, `/api/blacklist/report`, `/api/blacklist/stats`, `/api/blacklist/top`
 - **Integration**: Automatic analysis on every token scan, blacklist info in responses
 
+### Phase 6: Comprehensive Access Control & Security (COMPLETED ✅)
+- **Zero-Tolerance Access Control**: NO unauthorized access without active subscription OR 10M+ official tokens
+- **Subscription Gating**: Free trial for 7 days, then MUST pay or prove token holdings
+- **Protected Endpoints**: `/api/analyze-token`, `/api/bot/invite-links` require hasActiveAccess
+- **Challenge-Response Wallet Verification**: Prevents ALL signature replay attacks
+  - User requests `GET /api/wallet/challenge` → receives 5-minute nonce
+  - User signs challenge with wallet (Ed25519)
+  - User submits `POST /api/wallet/verify` with {walletAddress, signature, challenge}
+  - Server validates: challenge exists, not expired, not used, signature valid, 10M+ official tokens
+  - Challenge marked as used (single-use enforcement)
+- **Official Token Mint Enforcement**: Server-controlled `OFFICIAL_TOKEN_MINT_ADDRESS` only
+- **Database Schema**: `wallet_challenges` table for anti-replay, `wallet_connections` for eligibility
+- **Security Features**:
+  - Trial status bug fixed (both 'active' and 'trial' allowed)
+  - Token mint bypass prevented (no user-controlled mint address)
+  - Signature replay attacks impossible (challenge-response with expiry)
+  - Wallet verification requires fresh challenge + Ed25519 signature
+  - 24-hour revalidation window for token holders
+  - Auto-expiry when subscription or trial ends
+- **Bot Access Gating**: Telegram/Discord bots accessible only with subscription OR official token holdings
+- **API**: `GET /api/wallet/challenge`, `POST /api/wallet/verify`, `GET /api/wallet`, `GET /api/bot/invite-links`
+
 ## Environment Variables
 
 ### Required for Basic Operation
@@ -102,9 +124,33 @@ The frontend, built with React and TypeScript using Vite, features a modern, dat
 - `HELIUS_API_KEY` - Recommended for better rate limits
 - `STRIPE_WEBHOOK_SECRET` - For webhook signature verification
 
+## Security Posture
+
+### Access Control Logic
+Every protected endpoint enforces:
+1. **Subscription Check**: User has subscription with status='active' OR 'trial' AND currentPeriodEnd > now
+2. **OR Token Holder Check**: User has walletConnection with isEligible=true AND lastVerifiedAt < 24h ago
+3. **Challenge-Response**: Wallet verification requires:
+   - Fresh challenge from `GET /api/wallet/challenge` (5min expiry)
+   - Ed25519 signature of challenge
+   - Validation against `OFFICIAL_TOKEN_MINT_ADDRESS` only
+   - Single-use enforcement (marked as used after verification)
+
+### Protection Layers
+- ✅ **Trial Status**: Both 'active' and 'trial' subscriptions grant access
+- ✅ **Token Mint**: Only `OFFICIAL_TOKEN_MINT_ADDRESS` counts (server-controlled)
+- ✅ **Signature Replay**: Challenge-response prevents reuse of old signatures
+- ✅ **24h Revalidation**: Token holders must reverify every 24 hours
+- ✅ **Auto-Expiry**: Access removed when subscription/trial ends
+
+### Recommended Before Production
+1. **Rate Limiting**: Add rate limiting on `/api/wallet/challenge` to prevent abuse
+2. **Monitoring**: Set up alerts for repeated verification failures
+3. **Environment**: Ensure `OFFICIAL_TOKEN_MINT_ADDRESS` is configured
+
 ## Next Steps
-1. **Set environment variables** for desired features (payments, bots)
-2. **Test crypto payment flow** once PHANTOM_WALLET_ADDRESS is configured
-3. **Test bot commands** once bot tokens are configured
-4. **UI integration** for crypto payments and blacklist features
-5. **ML training** for Phase 2 AI blacklist (currently rules-based)
+1. **Set environment variables** for desired features (payments, bots, token gating)
+2. **Configure OFFICIAL_TOKEN_MINT_ADDRESS** to enable 10M+ token holder access
+3. **Test wallet verification flow** with challenge-response system
+4. **Add rate limiting** to challenge endpoint (recommended for production)
+5. **UI integration** for wallet verification and bot invite links
