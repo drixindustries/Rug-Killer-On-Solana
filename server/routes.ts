@@ -785,7 +785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
-  // CREATOR WALLET ROUTES (Admin Only)
+  // ADMIN ROUTES
   // ========================================
   
   // Admin middleware - checks if user is authorized to manage creator wallet
@@ -804,6 +804,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     next();
   };
+
+  // Check if current user has admin access
+  app.get('/api/admin/check', isAuthenticated, async (req: any, res) => {
+    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim());
+    const userEmail = req.user.claims.email;
+    res.json({ isAdmin: adminEmails.includes(userEmail) });
+  });
+
+  // ========================================
+  // CREATOR WALLET ROUTES (Admin Only)
+  // ========================================
 
   // GET /api/admin/creator-wallet - View creator wallet info (NO private key)
   app.get('/api/admin/creator-wallet', isAdmin, async (req, res) => {

@@ -19,7 +19,8 @@ The frontend features a modern, data-dense dashboard using React, TypeScript, Vi
 - **Backend**: Express.js with TypeScript, using `@solana/web3.js` and `@solana/spl-token` for Solana blockchain interaction.
 - **Data Storage**: PostgreSQL for persistent data (users, subscriptions, subscription codes, code redemptions, wallet connections, crypto payment audit trails, AI blacklist data). In-memory storage (MemStorage) for session data.
 - **Solana Integration**: Connects to Solana mainnet via a configurable RPC URL.
-- **Authentication & Authorization**: Replit Auth blueprint (Google, GitHub, X, Apple, email/password) integrated with Whop for subscription management and token-gated access.
+- **Authentication & Authorization**: Replit Auth blueprint (Google, GitHub, X, Apple, email/password) integrated with Whop for subscription management and token-gated access. Admin access controlled via ADMIN_EMAILS environment variable.
+- **Admin Access**: User menu dropdown in header shows login status, logout option, and admin dashboard link for authorized users (configured via ADMIN_EMAILS secret).
 - **Payment Systems**: Whop for subscription management and crypto payments (Solana only) with 6 confirmations and audit trails.
 - **Subscription Codes**: Database-driven redemption system with row-level locking, transaction safety, SQL-based usage counting to prevent race conditions, and Whop webhook protection to prevent downgrades of lifetime subscriptions.
 - **Bots**: Telegram and Discord bots provide token analysis, holder analysis, dev wallet history, and blacklist checks, supporting markdown and rich embeds.

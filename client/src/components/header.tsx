@@ -1,9 +1,11 @@
-import { Shield, Plus, CreditCard, Wallet, Check } from "lucide-react";
+import { Shield, Plus, CreditCard, Wallet, Check, User, LogOut, Settings } from "lucide-react";
 import { SiTelegram, SiDiscord } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useWallet } from "@/hooks/useWallet";
+import { useAuth } from "@/hooks/useAuth";
+import type { User as UserType } from "@shared/schema";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +33,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
   });
   
   const { walletAddress, connection, isConnecting, connectWallet, disconnectWallet } = useWallet();
+  const { user } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -170,8 +173,67 @@ export function Header({ onNewAnalysis }: HeaderProps) {
               New Analysis
             </Button>
           )}
+
+          {user && (
+            <UserMenu user={user as UserType} />
+          )}
         </div>
       </div>
     </header>
+  );
+}
+
+interface UserMenuProps {
+  user: UserType;
+}
+
+function UserMenu({ user }: UserMenuProps) {
+  // Check if user has admin access
+  const { data: adminCheck } = useQuery<{ isAdmin: boolean }>({
+    queryKey: ['/api/admin/check'],
+    retry: false,
+  });
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button 
+          variant="ghost"
+          size="sm"
+          data-testid="button-user-menu"
+        >
+          <User className="h-4 w-4 mr-1" />
+          {user.email?.split('@')[0] || 'Account'}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <div className="px-2 py-1.5 text-sm">
+          <p className="text-xs text-muted-foreground">
+            {user.email}
+          </p>
+        </div>
+        <DropdownMenuSeparator />
+        {adminCheck?.isAdmin && (
+          <>
+            <DropdownMenuItem asChild>
+              <Link href="/admin">
+                <Settings className="h-4 w-4 mr-2" />
+                Admin Dashboard
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        <DropdownMenuItem 
+          onClick={() => window.location.href = '/api/logout'}
+          data-testid="button-logout"
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Log Out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
