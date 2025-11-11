@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Shield, Zap, TrendingUp, Lock, Database, Bot, Wallet, Copy, CheckCircle, Globe, Code } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-const CONTRACT_ADDRESS = "AAF1h3emV6qDXKGQ1v6km9qqv9Z6Pja9sPhDjrUCRtek";
+import { CONTRACT_ADDRESS } from "@/constants";
 
 export default function About() {
   const { toast } = useToast();
@@ -54,6 +53,7 @@ export default function About() {
                     size="sm"
                     variant="ghost"
                     onClick={() => copyToClipboard(CONTRACT_ADDRESS)}
+                    aria-label="Copy contract address"
                     data-testid="button-copy-about"
                   >
                     <Copy className="w-4 h-4" />

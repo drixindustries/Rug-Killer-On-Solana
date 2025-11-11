@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Download, Shield, Zap, TrendingUp, Lock, Database, Bot, Wallet, Code, AlertTriangle, CheckCircle } from "lucide-react";
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { CONTRACT_ADDRESS } from "@/constants";
 
 // PDF Document Component with comprehensive content
 const pdfStyles = StyleSheet.create({
@@ -76,7 +77,7 @@ const DocumentationPDF = () => (
       <View style={pdfStyles.section}>
         <Text style={pdfStyles.heading}>Project Information</Text>
         <Text style={pdfStyles.subheading}>Official Contract Address</Text>
-        <Text style={pdfStyles.code}>AAF1h3emV6qDXKGQ1v6km9qqv9Z6Pja9sPhDjrUCRtek</Text>
+        <Text style={pdfStyles.code}>{CONTRACT_ADDRESS}</Text>
         <Text style={pdfStyles.text}>
           This is the official vanity Solana address generated for the Solana Rug Killer project. 
           The address features the suffix "rtek" and serves as the project's official contract identifier 
