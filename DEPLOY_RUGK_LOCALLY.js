@@ -121,8 +121,8 @@ async function deployToken(payerKeypair, mintKeypair) {
     
     console.log(`💰 Wallet balance: ${balanceSOL.toFixed(4)} SOL`);
     
-    if (balanceSOL < 0.05) {
-      throw new Error(`Insufficient balance. Need at least 0.05 SOL, have ${balanceSOL.toFixed(4)} SOL`);
+    if (balanceSOL < 0.01) {
+      throw new Error(`Insufficient balance. Need at least 0.01 SOL, have ${balanceSOL.toFixed(4)} SOL`);
     }
 
     // Get rent-exempt balance
@@ -242,7 +242,7 @@ async function main() {
   
   console.log('\n📝 Requirements:');
   console.log('   ✓ ~5-15 minutes for vanity generation');
-  console.log('   ✓ 0.05-0.1 SOL to transfer to burner wallet');
+  console.log('   ✓ 0.01-0.02 SOL to transfer to burner wallet (actual cost ~0.003 SOL)');
 
   // SECURITY: Generate fresh burner wallet
   console.log('\n🔐 SECURITY: Generating fresh burner wallet for deployment...');
@@ -253,10 +253,11 @@ async function main() {
   
   console.log(`\n✅ Burner wallet generated: ${burnerAddress}`);
   console.log(`\n⚠️  ACTION REQUIRED:`);
-  console.log(`   Transfer 0.1 SOL to this address from your main wallet:`);
+  console.log(`   Transfer 0.01 SOL (or more) to this address from your main wallet:`);
   console.log(`   ${burnerAddress}`);
   console.log('\n   Use Phantom, Solflare, or any wallet to send SOL.');
   console.log('   This burner wallet will be used ONLY for deployment.');
+  console.log('   Actual deployment cost is ~0.003 SOL, so 0.01 is plenty.');
   
   // Wait for user to transfer SOL
   await askQuestion('\n✅ Press ENTER after you have transferred SOL to the burner wallet... ');
@@ -265,9 +266,9 @@ async function main() {
   let balance = await connection.getBalance(payerKeypair.publicKey);
   let balanceSOL = balance / LAMPORTS_PER_SOL;
   
-  if (balanceSOL < 0.05) {
+  if (balanceSOL < 0.01) {
     console.error(`\n❌ Insufficient balance: ${balanceSOL.toFixed(4)} SOL`);
-    console.error('   Please transfer at least 0.1 SOL and try again.');
+    console.error('   Please transfer at least 0.01 SOL and try again.');
     process.exit(1);
   }
   
@@ -281,7 +282,7 @@ async function main() {
   console.log('\n   (You can discard this after deployment - funds will be minimal)')
 
   // Confirm deployment
-  const confirm = await askQuestion('\n⚠️  Ready to deploy? This will cost ~0.05 SOL. Type "yes" to continue: ');
+  const confirm = await askQuestion('\n⚠️  Ready to deploy? This will cost ~0.003 SOL. Type "yes" to continue: ');
   
   if (confirm.toLowerCase() !== 'yes') {
     console.log('\n❌ Deployment cancelled');
