@@ -323,18 +323,44 @@ const DocumentationPDF = () => (
           checks, market data, and AI-powered red flags.
         </Text>
 
-        <Text style={pdfStyles.subheading}>Step 4: Connect Phantom Wallet (Optional)</Text>
+        <Text style={pdfStyles.subheading}>Step 4: Connect Phantom Wallet (Optional - Token Holders)</Text>
         <Text style={pdfStyles.text}>
-          If you hold 10M+ official $KILL tokens, click "Connect Wallet" in the header, 
-          sign the challenge with Phantom wallet, and gain instant WHALE tier access 
-          without subscription. Revalidation required every 24 hours.
+          If you hold 10M+ official $KILL tokens, you can gain instant WHALE tier access without 
+          a paid subscription. First, install Phantom from phantom.app if you haven't already.
+        </Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>1. Click "Connect Wallet" button in the header navigation</Text>
+          <Text style={pdfStyles.text}>2. Phantom wallet extension will prompt you to connect</Text>
+          <Text style={pdfStyles.text}>3. Approve the connection request in Phantom</Text>
+          <Text style={pdfStyles.text}>4. Sign the cryptographic challenge message (proves wallet ownership)</Text>
+          <Text style={pdfStyles.text}>5. System validates your token balance (requires 10M+ tokens)</Text>
+          <Text style={pdfStyles.text}>6. Upon success, WHALE tier access is granted for 24 hours</Text>
+          <Text style={pdfStyles.text}>7. Reconnect every 24 hours to maintain access</Text>
+        </View>
+        <Text style={pdfStyles.text}>
+          Security Note: This simply proves you control the wallet without sharing your private key. 
+          We use Ed25519 signature verification with challenge-response protocol to prevent replay attacks. 
+          Your private key never leaves your wallet.
         </Text>
 
-        <Text style={pdfStyles.subheading}>Step 5: Upgrade to PRO or WHALE</Text>
+        <Text style={pdfStyles.subheading}>Step 5: Subscribe via Whop (Recommended for Most Users)</Text>
         <Text style={pdfStyles.text}>
-          Visit /pricing to view detailed tier comparisons. Click "Subscribe" on your 
-          preferred tier to redirect to Whop's secure checkout. Payment processed via 
-          Whop with automatic subscription management and tax compliance.
+          For users without 10M+ tokens, subscribe through Whop for secure payment processing:
+        </Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>1. Navigate to /pricing page from header or visit directly</Text>
+          <Text style={pdfStyles.text}>2. Review tier comparison: PRO ($29/mo) or WHALE ($99/mo)</Text>
+          <Text style={pdfStyles.text}>3. Click "Subscribe" button on your preferred tier card</Text>
+          <Text style={pdfStyles.text}>4. Redirect to Whop's secure hosted checkout page</Text>
+          <Text style={pdfStyles.text}>5. Enter payment details (credit card, debit card, or crypto)</Text>
+          <Text style={pdfStyles.text}>6. Whop processes payment as Merchant of Record (2.7% + $0.30 fee)</Text>
+          <Text style={pdfStyles.text}>7. Automatic tax compliance and receipt generation</Text>
+          <Text style={pdfStyles.text}>8. Instant activation upon successful payment</Text>
+          <Text style={pdfStyles.text}>9. Manage subscription, billing, and cancellation through Whop portal</Text>
+        </View>
+        <Text style={pdfStyles.text}>
+          Alternative: Use redeemable subscription codes for lifetime access. Codes can be purchased 
+          separately and redeemed on the /subscription page.
         </Text>
 
         <Text style={pdfStyles.subheading}>Step 6: Enable Bot Access</Text>
@@ -766,11 +792,24 @@ export default function Documentation() {
               <div className="flex items-start gap-3">
                 <Badge className="mt-1">4</Badge>
                 <div>
-                  <h4 className="font-semibold mb-1">Connect Phantom Wallet (Optional)</h4>
-                  <p className="text-sm text-muted-foreground">
-                    If you hold 10M+ official $KILL tokens, click "Connect Wallet" in the header, 
-                    sign the challenge with Phantom wallet, and gain instant WHALE tier access without 
-                    subscription. Revalidation required every 24 hours.
+                  <h4 className="font-semibold mb-1">Connect Phantom Wallet (Optional - Token Holders)</h4>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    If you hold 10M+ official $KILL tokens, you can gain instant WHALE tier access without 
+                    a paid subscription. First, install Phantom from <a href="https://phantom.app" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">phantom.app</a> if you haven't already.
+                  </p>
+                  <ol className="text-sm text-muted-foreground space-y-1 ml-4 list-decimal">
+                    <li>Click "Connect Wallet" button in the header navigation</li>
+                    <li>Phantom wallet extension will prompt you to connect</li>
+                    <li>Approve the connection request in Phantom</li>
+                    <li>Sign the cryptographic challenge message (proves wallet ownership)</li>
+                    <li>System validates your token balance (requires 10M+ tokens)</li>
+                    <li>Upon success, WHALE tier access is granted for 24 hours</li>
+                    <li>Reconnect every 24 hours to maintain access</li>
+                  </ol>
+                  <p className="text-xs text-muted-foreground mt-2 italic">
+                    <strong>Security Note:</strong> This simply proves you control the wallet without sharing your private key. 
+                    We use Ed25519 signature verification with challenge-response protocol to prevent replay attacks. 
+                    Your private key never leaves your wallet.
                   </p>
                 </div>
               </div>
@@ -778,12 +817,24 @@ export default function Documentation() {
               <div className="flex items-start gap-3">
                 <Badge className="mt-1">5</Badge>
                 <div>
-                  <h4 className="font-semibold mb-1">Upgrade to PRO or WHALE</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Visit <a href="/pricing" className="text-primary hover:underline">/pricing</a> to view 
-                    detailed tier comparisons. Click "Subscribe" on your preferred tier to redirect to Whop's 
-                    secure checkout. Payment processed via Whop with automatic subscription management and 
-                    tax compliance.
+                  <h4 className="font-semibold mb-1">Subscribe via Whop (Recommended for Most Users)</h4>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    For users without 10M+ tokens, subscribe through Whop for secure payment processing:
+                  </p>
+                  <ol className="text-sm text-muted-foreground space-y-1 ml-4 list-decimal">
+                    <li>Navigate to <a href="/pricing" className="text-primary hover:underline">/pricing</a> page from header or visit directly</li>
+                    <li>Review tier comparison: PRO ($29/mo) or WHALE ($99/mo)</li>
+                    <li>Click "Subscribe" button on your preferred tier card</li>
+                    <li>Redirect to Whop's secure hosted checkout page</li>
+                    <li>Enter payment details (credit card, debit card, or crypto)</li>
+                    <li>Whop processes payment as Merchant of Record (2.7% + $0.30 fee)</li>
+                    <li>Automatic tax compliance and receipt generation</li>
+                    <li>Instant activation upon successful payment</li>
+                    <li>Manage subscription, billing, and cancellation through Whop portal</li>
+                  </ol>
+                  <p className="text-xs text-muted-foreground mt-2 italic">
+                    Alternative: Use redeemable subscription codes for lifetime access. Codes can be purchased 
+                    separately and redeemed on the /subscription page.
                   </p>
                 </div>
               </div>
@@ -926,6 +977,30 @@ export default function Documentation() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Bottom PDF Download Section */}
+          <div className="mt-12 text-center p-8 border rounded-lg bg-gradient-to-br from-primary/5 to-primary/10" data-testid="section-pdf-download">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Download className="h-8 w-8 text-primary" />
+              <h2 className="text-2xl font-bold">Download Complete Documentation</h2>
+            </div>
+            <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
+              Get the full Solana Rug Killer documentation in PDF format. Includes detailed guides on wallet 
+              connection, Whop payments, API endpoints, bot commands, and technical specifications.
+            </p>
+            
+            <PDFDownloadLink
+              document={<DocumentationPDF />}
+              fileName="solana-rug-killer-documentation.pdf"
+            >
+              {({ loading }) => (
+                <Button size="lg" disabled={loading} data-testid="button-download-pdf-bottom">
+                  <Download className="h-4 w-4 mr-2" />
+                  {loading ? 'Preparing PDF...' : 'Download PDF Documentation'}
+                </Button>
+              )}
+            </PDFDownloadLink>
+          </div>
         </div>
       </main>
 
