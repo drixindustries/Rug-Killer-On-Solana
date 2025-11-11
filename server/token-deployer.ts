@@ -17,8 +17,6 @@ import {
   createMintToInstruction,
 } from '@solana/spl-token';
 import bs58 from 'bs58';
-import { getCreatorWallet } from './creator-wallet';
-
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
 export interface TokenDeploymentConfig {
@@ -27,6 +25,7 @@ export interface TokenDeploymentConfig {
   decimals: number;
   supply: number;
   description?: string;
+  walletPrivateKey: string; // Base58 encoded private key of the wallet funding deployment
   mintKeypair?: string; // Base58 encoded secret key for vanity address
 }
 
@@ -49,18 +48,18 @@ export class TokenDeployer {
     const steps: string[] = [];
     
     try {
-      // Get creator wallet (payer)
-      const creatorWallet = getCreatorWallet();
-      if (!creatorWallet.isConfigured()) {
+      // Load payer wallet from provided private key
+      let payer: Keypair;
+      try {
+        payer = Keypair.fromSecretKey(bs58.decode(config.walletPrivateKey));
+        steps.push(`✅ Wallet loaded: ${payer.publicKey.toBase58()}`);
+      } catch (error) {
         return {
           success: false,
-          error: 'Creator wallet not configured. Please set up your creator wallet first.',
+          error: 'Invalid wallet private key provided',
           steps,
         };
       }
-
-      const payer = creatorWallet.getKeypair();
-      steps.push('✅ Creator wallet loaded');
 
       // Load or generate mint keypair
       let mintKeypair: Keypair;
@@ -80,8 +79,9 @@ export class TokenDeployer {
         steps.push(`✅ Generated new mint address: ${mintKeypair.publicKey.toBase58()}`);
       }
 
-      // Check creator wallet balance
-      const balance = await creatorWallet.getBalance();
+      // Check wallet balance
+      const balanceLamports = await this.connection.getBalance(payer.publicKey);
+      const balance = balanceLamports / LAMPORTS_PER_SOL;
       if (balance < 0.05) {
         return {
           success: false,

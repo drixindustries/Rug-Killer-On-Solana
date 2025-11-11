@@ -849,6 +849,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========================================
+  // TOKEN DEPLOYMENT ROUTES (Admin Only)
+  // ========================================
+
+  // POST /api/admin/token/deploy - Deploy SPL token (requires wallet private key in request)
+  app.post('/api/admin/token/deploy', isAdmin, async (req, res) => {
+    try {
+      const { getTokenDeployer } = await import('./token-deployer');
+      const deployer = getTokenDeployer();
+      
+      const { 
+        name, 
+        symbol, 
+        decimals, 
+        supply, 
+        description,
+        walletPrivateKey, // User provides this in the request
+        mintKeypair // Optional vanity address keypair
+      } = req.body;
+
+      if (!walletPrivateKey) {
+        return res.status(400).json({ 
+          message: 'Wallet private key required for deployment' 
+        });
+      }
+
+      const result = await deployer.deployToken({
+        name,
+        symbol,
+        decimals,
+        supply,
+        description,
+        walletPrivateKey,
+        mintKeypair,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Token deployment error:", error);
+      res.status(500).json({ 
+        message: "Failed to deploy token",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // GET /api/admin/token/info/:mintAddress - Get token info
+  app.get('/api/admin/token/info/:mintAddress', isAdmin, async (req, res) => {
+    try {
+      const { getTokenDeployer } = await import('./token-deployer');
+      const deployer = getTokenDeployer();
+      const info = await deployer.getTokenInfo(req.params.mintAddress);
+      res.json(info);
+    } catch (error) {
+      console.error("Error fetching token info:", error);
+      res.status(500).json({ message: "Failed to fetch token info" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
