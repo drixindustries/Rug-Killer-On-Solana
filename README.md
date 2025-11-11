@@ -138,6 +138,14 @@ See [BOT_SETUP_GUIDE.md](./BOT_SETUP_GUIDE.md) for detailed instructions on sett
 - [Bot Setup Guide](./BOT_SETUP_GUIDE.md) - Complete guide for Telegram and Discord bot configuration
 - [API Documentation](./docs/API.md) - REST API endpoints and usage
 - [Contributing Guidelines](./CONTRIBUTING.md) - How to contribute to the project
+- [Security Policy](./SECURITY.md) - Security guidelines and vulnerability reporting
+
+## ⚖️ Legal
+
+- **Terms of Service**: https://yourwebsite.com/terms
+- **Privacy Policy**: https://yourwebsite.com/privacy
+
+These legal documents are available in-app at `/terms` and `/privacy` routes for user and bot reference.
 
 ## 🏗️ Tech Stack
 

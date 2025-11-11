@@ -30,7 +30,7 @@ export function Footer() {
   return (
     <footer className="border-t bg-background">
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-6">
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Shield className="h-5 w-5 text-primary" />
@@ -58,9 +58,17 @@ export function Footer() {
             <h3 className="text-sm font-semibold mb-3">Resources</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><a href="/pricing" className="hover:text-foreground">Pricing</a></li>
-              <li><a href="/subscription" className="hover:text-foreground">Subscription</a></li>
               <li><a href="/documentation" className="hover:text-foreground">Documentation</a></li>
+              <li><a href="/about" className="hover:text-foreground">About</a></li>
               <li><a href="https://docs.solana.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Solana Docs</a></li>
+            </ul>
+          </div>
+          
+          <div>
+            <h3 className="text-sm font-semibold mb-3">Legal</h3>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li><a href="/terms" className="hover:text-foreground" data-testid="footer-link-terms">Terms of Service</a></li>
+              <li><a href="/privacy" className="hover:text-foreground" data-testid="footer-link-privacy">Privacy Policy</a></li>
             </ul>
           </div>
           

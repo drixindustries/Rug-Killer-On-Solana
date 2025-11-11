@@ -11,6 +11,8 @@ import Pricing from "@/pages/pricing";
 import Features from "@/pages/features";
 import Documentation from "@/pages/documentation";
 import About from "@/pages/about";
+import Terms from "@/pages/terms";
+import Privacy from "@/pages/privacy";
 import VanityGenerator from "@/pages/vanity-generator";
 import AdminWallet from "@/pages/admin-wallet";
 import Admin from "@/pages/admin";
@@ -29,6 +31,8 @@ function Router() {
           <Route path="/bot-setup" component={BotSetup} />
           <Route path="/documentation" component={Documentation} />
           <Route path="/about" component={About} />
+          <Route path="/terms" component={Terms} />
+          <Route path="/privacy" component={Privacy} />
         </>
       ) : (
         <>
@@ -39,6 +43,8 @@ function Router() {
           <Route path="/bot-setup" component={BotSetup} />
           <Route path="/documentation" component={Documentation} />
           <Route path="/about" component={About} />
+          <Route path="/terms" component={Terms} />
+          <Route path="/privacy" component={Privacy} />
           <Route path="/vanity" component={VanityGenerator} />
           <Route path="/admin" component={Admin} />
           <Route path="/admin/wallet" component={AdminWallet} />
