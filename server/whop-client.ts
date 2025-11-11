@@ -22,8 +22,8 @@ export const whopConfig = {
 
 // Whop plan IDs (set these in environment variables)
 export const WHOP_PLAN_IDS = {
-  BASIC: process.env.WHOP_PLAN_ID_BASIC || "",
-  PREMIUM: process.env.WHOP_PLAN_ID_PREMIUM || "",
+  INDIVIDUAL: process.env.WHOP_PLAN_ID_INDIVIDUAL || "",
+  GROUP: process.env.WHOP_PLAN_ID_GROUP || "",
 };
 
 // Helper to create checkout session
@@ -38,9 +38,9 @@ export async function createWhopCheckout(params: {
   }
 
   try {
-    const response = await whopClient.checkoutSessions.create({
-      plan_id: params.planId,
-      redirect_url: `${process.env.REPL_HOME || "http://localhost:5000"}/subscription/success`,
+    const response = await whopClient.payments.createCheckoutSession({
+      planId: params.planId,
+      redirectUrl: `${process.env.REPL_HOME || "http://localhost:5000"}/subscription/success`,
       metadata: {
         user_id: params.userId,
         user_email: params.userEmail || "",
@@ -49,7 +49,7 @@ export async function createWhopCheckout(params: {
     });
 
     return {
-      checkoutUrl: response.checkout_url,
+      checkoutUrl: response.purchase_url,
       sessionId: response.id,
     };
   } catch (error: any) {
@@ -116,7 +116,7 @@ export function mapWhopStatus(whopStatus: string): string {
 
 // Map plan ID to tier
 export function mapPlanToTier(planId: string): string {
-  if (planId === WHOP_PLAN_IDS.PREMIUM) return "premium";
-  if (planId === WHOP_PLAN_IDS.BASIC) return "basic";
+  if (planId === WHOP_PLAN_IDS.GROUP) return "group";
+  if (planId === WHOP_PLAN_IDS.INDIVIDUAL) return "individual";
   return "free_trial";
 }

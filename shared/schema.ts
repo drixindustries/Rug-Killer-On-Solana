@@ -276,7 +276,7 @@ export type User = typeof users.$inferSelect;
 export const subscriptions = pgTable("subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  tier: varchar("tier").notNull(), // "free_trial", "basic", "premium"
+  tier: varchar("tier").notNull(), // "free_trial", "individual", "group"
   status: varchar("status").notNull(), // Whop states: "valid", "past_due", "cancelled", "expired", "trialing"
   whopMembershipId: varchar("whop_membership_id").unique(), // Canonical Whop membership reference (nullable for free trials)
   whopPlanId: varchar("whop_plan_id"), // Whop plan ID (nullable for free trials)

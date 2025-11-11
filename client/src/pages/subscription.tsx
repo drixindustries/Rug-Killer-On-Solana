@@ -28,7 +28,7 @@ export default function SubscriptionPage() {
   });
 
   const createSubscriptionMutation = useMutation({
-    mutationFn: async (tier: 'basic' | 'premium') => {
+    mutationFn: async (tier: 'individual' | 'group') => {
       const response = await apiRequest('POST', '/api/create-subscription', { tier });
       const data = await response.json();
       return data;
@@ -173,8 +173,8 @@ export default function SubscriptionPage() {
               <Button
                 className="w-full"
                 size="lg"
-                onClick={() => createSubscriptionMutation.mutate('basic')}
-                disabled={createSubscriptionMutation.isPending || (subscription?.tier === 'basic' && isActive(subscription?.status) || false)}
+                onClick={() => createSubscriptionMutation.mutate('individual')}
+                disabled={createSubscriptionMutation.isPending || (subscription?.tier === 'individual' && isActive(subscription?.status) || false)}
                 data-testid="button-subscribe-basic"
               >
                 {createSubscriptionMutation.isPending ? (
@@ -182,7 +182,7 @@ export default function SubscriptionPage() {
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Processing...
                   </>
-                ) : subscription?.tier === 'basic' && isActive(subscription?.status) ? (
+                ) : subscription?.tier === 'individual' && isActive(subscription?.status) ? (
                   'Current Plan'
                 ) : (
                   'Subscribe to Basic'
@@ -238,8 +238,8 @@ export default function SubscriptionPage() {
               <Button
                 className="w-full"
                 size="lg"
-                onClick={() => createSubscriptionMutation.mutate('premium')}
-                disabled={createSubscriptionMutation.isPending || (subscription?.tier === 'premium' && isActive(subscription?.status) || false)}
+                onClick={() => createSubscriptionMutation.mutate('group')}
+                disabled={createSubscriptionMutation.isPending || (subscription?.tier === 'group' && isActive(subscription?.status) || false)}
                 data-testid="button-subscribe-premium"
               >
                 {createSubscriptionMutation.isPending ? (
@@ -247,7 +247,7 @@ export default function SubscriptionPage() {
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Processing...
                   </>
-                ) : subscription?.tier === 'premium' && isActive(subscription?.status) ? (
+                ) : subscription?.tier === 'group' && isActive(subscription?.status) ? (
                   'Current Plan'
                 ) : (
                   'Subscribe to Premium'

@@ -90,7 +90,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tier: "free_trial",
           status: "trialing", // Whop status for trial period
           trialEndsAt,
-          currentPeriodStart: new Date(),
           currentPeriodEnd: trialEndsAt,
         });
         
@@ -318,7 +317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "User email is required" });
       }
 
-      const planId = tier === 'basic' ? WHOP_PLAN_IDS.BASIC : WHOP_PLAN_IDS.PREMIUM;
+      const planId = tier === 'individual' ? WHOP_PLAN_IDS.INDIVIDUAL : WHOP_PLAN_IDS.GROUP;
       
       if (!planId) {
         return res.status(500).json({ 

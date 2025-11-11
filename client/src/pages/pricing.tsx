@@ -59,7 +59,7 @@ const pricingTiers = [
     ctaVariant: "default" as const,
     badge: "Popular",
     testId: "card-tier-pro",
-    tier: "basic" as const
+    tier: "individual" as const
   },
   {
     id: "whale",
@@ -83,7 +83,7 @@ const pricingTiers = [
     ctaVariant: "default" as const,
     badge: "Premium",
     testId: "card-tier-whale",
-    tier: "premium" as const
+    tier: "group" as const
   },
   {
     id: "kill-holder",
@@ -119,7 +119,7 @@ export default function Pricing() {
   });
 
   const createSubscriptionMutation = useMutation({
-    mutationFn: async (tier: 'basic' | 'premium') => {
+    mutationFn: async (tier: 'individual' | 'group') => {
       const response = await apiRequest('POST', '/api/create-subscription', { tier });
       const data = await response.json();
       return data;
@@ -157,7 +157,7 @@ export default function Pricing() {
     window.location.href = '/api/login';
   };
 
-  const handleSubscribe = (tier: 'basic' | 'premium') => {
+  const handleSubscribe = (tier: 'individual' | 'group') => {
     createSubscriptionMutation.mutate(tier);
   };
 
