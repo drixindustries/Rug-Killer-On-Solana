@@ -1,5 +1,5 @@
 import { Shield, Plus, CreditCard, Wallet, Check, User, LogOut, Settings } from "lucide-react";
-import { SiTelegram, SiDiscord } from "react-icons/si";
+import { SiTelegram, SiDiscord, SiGithub } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -44,6 +44,17 @@ export function Header({ onNewAnalysis }: HeaderProps) {
         </div>
         
         <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost"
+            size="icon"
+            asChild
+            data-testid="button-github"
+          >
+            <a href="https://github.com/yourusername/solana-rug-killer" target="_blank" rel="noopener noreferrer" title="View on GitHub">
+              <SiGithub className="h-4 w-4" />
+            </a>
+          </Button>
+          
           {botLinks?.telegram && (
             <Button 
               variant="ghost"
@@ -51,7 +62,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
               asChild
               data-testid="button-telegram-bot"
             >
-              <a href={botLinks.telegram} target="_blank" rel="noopener noreferrer">
+              <a href={botLinks.telegram} target="_blank" rel="noopener noreferrer" title="Join Telegram Bot">
                 <SiTelegram className="h-4 w-4" />
               </a>
             </Button>
@@ -64,7 +75,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
               asChild
               data-testid="button-discord-bot"
             >
-              <a href={botLinks.discord} target="_blank" rel="noopener noreferrer">
+              <a href={botLinks.discord} target="_blank" rel="noopener noreferrer" title="Join Discord Bot">
                 <SiDiscord className="h-4 w-4" />
               </a>
             </Button>
