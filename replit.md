@@ -6,6 +6,8 @@ A comprehensive web application for analyzing Solana tokens to detect potential 
 This application provides real-time analysis of Solana SPL tokens, checking for common rug pull indicators including mint authority, freeze authority, holder concentration, liquidity pool status, and suspicious transaction patterns.
 
 ## Recent Changes (November 11, 2025)
+
+### Phase 1: Token Analysis MVP (Completed)
 - Initial MVP implementation complete with multi-source data aggregation
 - Frontend: React dashboard with exceptional visual design following design_guidelines.md
 - Backend: Solana RPC integration with comprehensive risk analysis
@@ -13,6 +15,19 @@ This application provides real-time analysis of Solana SPL tokens, checking for 
 - Error handling: Graceful fallbacks for RPC rate limits and network errors
 - Market data display: Real-time prices, volume, liquidity from DexScreener
 - Price verification: Jupiter aggregator integration for additional price data
+
+### Phase 2: Authentication & Subscription System (In Progress)
+- PostgreSQL database created with 4 tables:
+  - `users`: User accounts with Replit Auth integration
+  - `sessions`: Session storage for authentication
+  - `subscriptions`: Subscription tiers and status tracking
+  - `wallet_connections`: Solana wallet connections for token-gated access
+- Replit Auth blueprint integrated (Google, GitHub, X, Apple, email/password login)
+- Database schema designed for:
+  - 1-week free trial for all new users
+  - $20/mo tier: Discord + Telegram DMs
+  - $100/mo tier: Discord + Telegram groups
+  - Token-gated access: 10M+ token holders get full access
 
 ## Project Architecture
 

@@ -24,7 +24,7 @@ export default function Home() {
   const analyzeMutation = useMutation({
     mutationFn: async (tokenAddress: string) => {
       const response = await apiRequest("POST", "/api/analyze-token", { tokenAddress });
-      return response as TokenAnalysisResponse;
+      return await response.json() as TokenAnalysisResponse;
     },
     onSuccess: (data) => {
       setAnalysis(data);
