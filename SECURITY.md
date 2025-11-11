@@ -1,5 +1,14 @@
 # Security Policy
 
+## Official Token Information
+
+**IMPORTANT**: The only official Solana Rug Killer token is:
+- **Contract Address**: `2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt`
+- **Symbol**: $RUGK
+- **Blockchain**: Solana
+
+**Beware of scams**: Any other contract addresses claiming to be Solana Rug Killer are fraudulent. Always verify the contract address above before purchasing.
+
 ## Supported Versions
 
 We release patches for security vulnerabilities in the following versions:

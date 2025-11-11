@@ -2,6 +2,14 @@
 
 First off, thank you for considering contributing to Solana Rug Killer! It's people like you that make this tool better for the entire Solana community.
 
+## Official Token
+
+**Solana Rug Killer ($RUGK)**
+- **Contract Address**: `2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt`
+- **Blockchain**: Solana
+
+All references to the official token in code and documentation should use this contract address.
+
 ## Code of Conduct
 
 This project and everyone participating in it is governed by respect, professionalism, and constructive collaboration. By participating, you are expected to uphold this code.

@@ -1,5 +1,14 @@
 # 🤖 Rug Killer Alpha Bot - Complete Setup Guide
 
+## 🪙 Official Token Information
+
+**Solana Rug Killer ($RUGK)**
+- **Contract Address**: `2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt`
+- **Blockchain**: Solana
+- **Deployed via**: Pump.fun
+
+---
+
 ## ✅ Features Already Built
 
 Your bots are **100% ready** with all features:
