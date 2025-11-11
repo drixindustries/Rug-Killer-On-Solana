@@ -2,15 +2,18 @@ import {
   users,
   subscriptions,
   walletConnections,
+  walletChallenges,
   type User,
   type UpsertUser,
   type Subscription,
   type InsertSubscription,
   type WalletConnection,
   type InsertWalletConnection,
+  type WalletChallenge,
+  type InsertWalletChallenge,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull, lt } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required by Replit Auth)
@@ -28,6 +31,11 @@ export interface IStorage {
   getWalletByAddress(walletAddress: string): Promise<WalletConnection | undefined>;
   createWalletConnection(wallet: InsertWalletConnection): Promise<WalletConnection>;
   updateWalletBalance(walletAddress: string, balance: number, isEligible: boolean): Promise<WalletConnection>;
+  
+  // Wallet challenge operations (anti-replay)
+  createChallenge(userId: string): Promise<WalletChallenge>;
+  getChallenge(challenge: string): Promise<WalletChallenge | undefined>;
+  markChallengeUsed(challengeId: string): Promise<WalletChallenge>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -215,6 +223,42 @@ export class DatabaseStorage implements IStorage {
       .where(eq(walletConnections.walletAddress, walletAddress))
       .returning();
     return wallet;
+  }
+
+  // Wallet challenge operations (anti-replay)
+  async createChallenge(userId: string): Promise<WalletChallenge> {
+    // Generate random challenge (nonce)
+    const challenge = `verify-${userId}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
+    
+    const [created] = await db
+      .insert(walletChallenges)
+      .values({
+        userId,
+        challenge,
+        expiresAt,
+      })
+      .returning();
+    return created;
+  }
+
+  async getChallenge(challenge: string): Promise<WalletChallenge | undefined> {
+    const [found] = await db
+      .select()
+      .from(walletChallenges)
+      .where(eq(walletChallenges.challenge, challenge));
+    return found;
+  }
+
+  async markChallengeUsed(challengeId: string): Promise<WalletChallenge> {
+    const [updated] = await db
+      .update(walletChallenges)
+      .set({
+        usedAt: new Date(),
+      })
+      .where(eq(walletChallenges.id, challengeId))
+      .returning();
+    return updated;
   }
 }
 

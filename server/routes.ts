@@ -169,26 +169,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/wallet/challenge - Generate a one-time challenge for wallet verification
+  // This prevents signature replay attacks by requiring fresh signatures
+  app.get('/api/wallet/challenge', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Generate a fresh challenge that expires in 5 minutes
+      const challenge = await storage.createChallenge(userId);
+      
+      res.json({
+        challenge: challenge.challenge,
+        expiresAt: challenge.expiresAt,
+        message: "Sign this message with your wallet to prove ownership. This challenge expires in 5 minutes.",
+      });
+    } catch (error: any) {
+      console.error("Error creating challenge:", error);
+      res.status(500).json({ 
+        message: "Failed to create challenge: " + error.message 
+      });
+    }
+  });
+
   // POST /api/wallet/verify - Verify token holder status (10M+ tokens)
   // Note: Uses isAuthenticated (not hasActiveAccess) to allow users to verify eligibility
+  // SECURITY: Requires signature proof of wallet ownership AND validates official token mint
   app.post('/api/wallet/verify', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { walletAddress, tokenMintAddress } = req.body;
+      const { walletAddress, signature, challenge: challengeStr } = req.body;
+      
+      // SECURITY: Official token mint address - hardcoded to prevent bypass with junk tokens
+      // This should be configured via environment variable in production
+      const OFFICIAL_TOKEN_MINT = process.env.OFFICIAL_TOKEN_MINT_ADDRESS;
+      
+      if (!OFFICIAL_TOKEN_MINT) {
+        return res.status(503).json({
+          message: "Token gating is not configured yet. Please contact support or use a paid subscription."
+        });
+      }
       
       if (!walletAddress) {
         return res.status(400).json({ message: "Wallet address is required" });
       }
-      
-      if (!tokenMintAddress) {
-        return res.status(400).json({ 
-          message: "Token mint address is required. Please provide the SPL token mint address to verify." 
+
+      if (!signature || !challengeStr) {
+        return res.status(400).json({
+          message: "Signature and challenge are required. First call GET /api/wallet/challenge to get a challenge, then sign it with your wallet."
         });
       }
 
-      // Import Solana connection
+      // SECURITY: Validate challenge to prevent replay attacks
+      const challenge = await storage.getChallenge(challengeStr);
+      
+      if (!challenge) {
+        return res.status(403).json({
+          message: "Invalid challenge. Please request a new challenge via GET /api/wallet/challenge."
+        });
+      }
+      
+      if (challenge.userId !== userId) {
+        console.warn(`❌ Challenge mismatch: ${challenge.userId} vs ${userId}`);
+        return res.status(403).json({
+          message: "Challenge was issued to a different user."
+        });
+      }
+      
+      if (challenge.usedAt) {
+        console.warn(`❌ Challenge already used: ${challengeStr} by user ${userId}`);
+        return res.status(403).json({
+          message: "This challenge has already been used. Please request a new challenge."
+        });
+      }
+      
+      const now = new Date();
+      if (challenge.expiresAt < now) {
+        console.warn(`❌ Challenge expired: ${challengeStr} by user ${userId}`);
+        return res.status(403).json({
+          message: "This challenge has expired. Please request a new challenge."
+        });
+      }
+
+      // Import Solana connection and crypto utilities
       const { Connection, PublicKey } = await import('@solana/web3.js');
-      const { getAssociatedTokenAddress, getAccount } = await import('@solana/spl-token');
+      const { getAssociatedTokenAddress, getAccount, getMint } = await import('@solana/spl-token');
+      const nacl = await import('tweetnacl');
+      const bs58 = await import('bs58');
       
       const connection = new Connection(
         process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
@@ -197,7 +263,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         const walletPubkey = new PublicKey(walletAddress);
-        const mintPubkey = new PublicKey(tokenMintAddress);
+        const mintPubkey = new PublicKey(OFFICIAL_TOKEN_MINT);
+        
+        // SECURITY: Verify wallet ownership via signature
+        const messageBytes = new TextEncoder().encode(challengeStr);
+        const signatureBytes = bs58.default.decode(signature);
+        const publicKeyBytes = walletPubkey.toBytes();
+        
+        const isValidSignature = nacl.default.sign.detached.verify(
+          messageBytes,
+          signatureBytes,
+          publicKeyBytes
+        );
+        
+        if (!isValidSignature) {
+          console.warn(`❌ Invalid signature for wallet ${walletAddress} by user ${userId}`);
+          return res.status(403).json({
+            message: "Invalid signature. Please sign the challenge message with the correct wallet."
+          });
+        }
+        
+        // SECURITY: Mark challenge as used to prevent replay
+        await storage.markChallengeUsed(challenge.id);
+        
+        console.log(`✅ Wallet ownership verified: ${walletAddress} by user ${userId} using challenge ${challengeStr}`);
+        
+        // Get token mint info for correct decimals
+        const mintInfo = await getMint(connection, mintPubkey);
+        const decimals = mintInfo.decimals;
         
         // Get associated token account
         const tokenAccount = await getAssociatedTokenAddress(
@@ -207,13 +300,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Get token account info
         const accountInfo = await getAccount(connection, tokenAccount);
-        const balance = Number(accountInfo.amount) / Math.pow(10, 9); // Assuming 9 decimals
+        const balance = Number(accountInfo.amount) / Math.pow(10, decimals);
         
         // Check if eligible (10M+ tokens)
         const isEligible = balance >= 10_000_000;
         
         // Check if wallet connection already exists
         const existing = await storage.getWalletByAddress(walletAddress);
+        
+        // Security: Only allow if wallet not already claimed by another user
+        if (existing && existing.userId !== userId) {
+          return res.status(403).json({
+            message: "This wallet is already connected to another account."
+          });
+        }
         
         let wallet;
         if (existing) {
@@ -229,7 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         
-        console.log(`✅ Wallet verified: ${walletAddress} - ${balance.toLocaleString()} tokens - eligible: ${isEligible}`);
+        console.log(`✅ Wallet verified: ${walletAddress} - ${balance.toLocaleString()} tokens (${decimals} decimals) - eligible: ${isEligible}`);
         
         res.json({
           wallet,
@@ -540,6 +640,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error checking payment:", error);
       res.status(500).json({ message: "Error checking payment: " + error.message });
+    }
+  });
+  
+  // ============================================================================
+  // BOT INVITE LINKS
+  // ============================================================================
+  
+  // GET /api/bot/invite-links - Get Telegram and Discord bot invite links
+  // PROTECTED: Requires active subscription OR 10M+ tokens
+  app.get('/api/bot/invite-links', hasActiveAccess, async (req: any, res) => {
+    try {
+      const links: { telegram?: string; discord?: string; message: string } = {
+        message: "You have access to premium bot features!",
+      };
+      
+      // Telegram bot link (if configured)
+      const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+      if (telegramToken) {
+        // Extract bot username from token (format: BOTID:TOKEN)
+        // For now, return generic link - in production, you'd get username via Telegram API
+        links.telegram = process.env.TELEGRAM_BOT_URL || `https://t.me/YOUR_BOT_USERNAME`;
+      }
+      
+      // Discord bot link (if configured)
+      const discordClientId = process.env.DISCORD_CLIENT_ID;
+      if (discordClientId) {
+        // OAuth2 invite URL with necessary permissions
+        // Permissions: Send Messages (2048), Embed Links (16384), Use Slash Commands (2147483648)
+        const permissions = '2147502080';
+        links.discord = `https://discord.com/api/oauth2/authorize?client_id=${discordClientId}&permissions=${permissions}&scope=bot%20applications.commands`;
+      }
+      
+      if (!links.telegram && !links.discord) {
+        return res.status(503).json({
+          message: "Bot services are not configured yet. Please contact support."
+        });
+      }
+      
+      res.json(links);
+    } catch (error: any) {
+      console.error("Error getting bot invite links:", error);
+      res.status(500).json({ 
+        message: "Failed to get bot invite links: " + error.message 
+      });
     }
   });
   

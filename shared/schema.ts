@@ -302,6 +302,22 @@ export const walletConnections = pgTable("wallet_connections", {
 export type WalletConnection = typeof walletConnections.$inferSelect;
 export type InsertWalletConnection = typeof walletConnections.$inferInsert;
 
+// Wallet verification challenges table (prevents signature replay attacks)
+export const walletChallenges = pgTable("wallet_challenges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  challenge: varchar("challenge").notNull().unique(), // Random nonce
+  expiresAt: timestamp("expires_at").notNull(), // Expires after 5 minutes
+  usedAt: timestamp("used_at"), // null if unused, timestamp if consumed
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_challenge_user").on(table.userId),
+  index("idx_challenge_expires").on(table.expiresAt),
+]);
+
+export type WalletChallenge = typeof walletChallenges.$inferSelect;
+export type InsertWalletChallenge = typeof walletChallenges.$inferInsert;
+
 // ============================================================================
 // CRYPTO PAYMENTS TABLES
 // ============================================================================

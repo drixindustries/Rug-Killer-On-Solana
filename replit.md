@@ -83,6 +83,9 @@ The frontend, built with React and TypeScript using Vite, features a modern, dat
 ### Required for Crypto Payments (SOL only)
 - `PHANTOM_WALLET_ADDRESS` - Your Solana wallet for receiving payments ⚠️ CRITICAL
 
+### Required for Token Gating (10M+ token access)
+- `OFFICIAL_TOKEN_MINT_ADDRESS` - The SPL token mint address for access verification ⚠️ CRITICAL
+
 ### Required for Stripe Subscriptions
 - `STRIPE_SECRET_KEY` - Stripe secret key (sk_test_* or sk_live_*)
 - `VITE_STRIPE_PUBLIC_KEY` - Stripe publishable key
