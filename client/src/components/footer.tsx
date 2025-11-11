@@ -41,7 +41,11 @@ export function Footer() {
             </p>
             <div className="text-xs text-muted-foreground">
               <p className="font-semibold mb-1">Official Token: $RUGK</p>
-              <div className="flex items-center gap-1 bg-muted px-2 py-1 rounded group cursor-pointer" onClick={copyCA}>
+              <div 
+                className="flex items-center gap-1 bg-muted px-2 py-1 rounded group cursor-pointer hover-elevate" 
+                onClick={copyCA}
+                data-testid="button-copy-ca-footer"
+              >
                 <code className="font-mono text-[10px] flex-1 truncate">
                   {CONTRACT_ADDRESS}
                 </code>
