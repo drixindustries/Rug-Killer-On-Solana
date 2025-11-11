@@ -174,7 +174,7 @@ export default function SubscriptionPage() {
                 className="w-full"
                 size="lg"
                 onClick={() => createSubscriptionMutation.mutate('basic')}
-                disabled={createSubscriptionMutation.isPending || (subscription?.tier === 'basic' && isActive(subscription?.status))}
+                disabled={createSubscriptionMutation.isPending || (subscription?.tier === 'basic' && isActive(subscription?.status) || false)}
                 data-testid="button-subscribe-basic"
               >
                 {createSubscriptionMutation.isPending ? (
@@ -239,7 +239,7 @@ export default function SubscriptionPage() {
                 className="w-full"
                 size="lg"
                 onClick={() => createSubscriptionMutation.mutate('premium')}
-                disabled={createSubscriptionMutation.isPending || (subscription?.tier === 'premium' && isActive(subscription?.status))}
+                disabled={createSubscriptionMutation.isPending || (subscription?.tier === 'premium' && isActive(subscription?.status) || false)}
                 data-testid="button-subscribe-premium"
               >
                 {createSubscriptionMutation.isPending ? (
