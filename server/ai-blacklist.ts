@@ -212,7 +212,7 @@ export async function analyzeAndFlag(
             kol.walletAddress,
             'cabal_member',
             65,
-            `Participated in coordinated early buying with ${kolHolders.length - 1} other wallets on ${analysis.tokenMetadata.symbol}`,
+            `Participated in coordinated early buying with ${kolHolders.length - 1} other wallets on ${analysis.metadata.symbol}`,
             'rules_engine'
           );
         }
