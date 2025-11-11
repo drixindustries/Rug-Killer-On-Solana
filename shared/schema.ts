@@ -82,6 +82,23 @@ export interface RugcheckData {
   };
 }
 
+// GoPlus Security Data
+export interface GoPlusSecurityData {
+  is_mintable: string;
+  is_freezable: string;
+  is_scam: string;
+  buy_tax: string;
+  sell_tax: string;
+  transfer_fee_enable: string;
+  can_take_back_ownership: string;
+  is_open_source: string;
+  is_true_token: string;
+  holder_count: string;
+  total_supply: string;
+  liquidity: string;
+  securityRisks: string[];
+}
+
 // Complete Token Analysis Response
 export interface TokenAnalysisResponse {
   tokenAddress: string;
@@ -116,6 +133,7 @@ export interface TokenAnalysisResponse {
   
   // External API data
   rugcheckData?: RugcheckData;
+  goplusData?: GoPlusSecurityData;
 }
 
 // Storage schema (not used for in-memory but kept for consistency)

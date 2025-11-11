@@ -12,6 +12,7 @@ import { HolderDistributionChart } from "@/components/holder-distribution-chart"
 import { TransactionTimeline } from "@/components/transaction-timeline";
 import { TokenMetadataCard } from "@/components/token-metadata-card";
 import { RugcheckCard } from "@/components/rugcheck-card";
+import { GoPlusCard } from "@/components/goplus-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import type { TokenAnalysisResponse } from "@shared/schema";
@@ -122,6 +123,13 @@ export default function Home() {
                     {analysis.rugcheckData && (
                       <RugcheckCard 
                         data={analysis.rugcheckData}
+                        tokenAddress={analysis.tokenAddress}
+                      />
+                    )}
+                    
+                    {analysis.goplusData && (
+                      <GoPlusCard 
+                        data={analysis.goplusData}
                         tokenAddress={analysis.tokenAddress}
                       />
                     )}

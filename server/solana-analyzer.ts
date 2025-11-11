@@ -11,6 +11,7 @@ import type {
   TransactionInfo,
 } from "@shared/schema";
 import { RugcheckService } from "./rugcheck-service";
+import { GoPlusSecurityService } from "./goplus-service";
 
 // Use public Solana RPC endpoint (can be configured later)
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
@@ -18,10 +19,12 @@ const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.s
 export class SolanaTokenAnalyzer {
   private connection: Connection;
   private rugcheckService: RugcheckService;
+  private goplusService: GoPlusSecurityService;
 
   constructor() {
     this.connection = new Connection(SOLANA_RPC_URL, "confirmed");
     this.rugcheckService = new RugcheckService();
+    this.goplusService = new GoPlusSecurityService();
   }
 
   async analyzeToken(tokenAddress: string): Promise<TokenAnalysisResponse> {
@@ -49,8 +52,11 @@ export class SolanaTokenAnalyzer {
       // Get recent transactions (simplified for MVP)
       const recentTransactions = await this.fetchRecentTransactions(mintPubkey);
       
-      // Fetch Rugcheck data (non-blocking)
-      const rugcheckData = await this.rugcheckService.getTokenReport(tokenAddress).catch(() => null);
+      // Fetch external API data (non-blocking, in parallel)
+      const [rugcheckData, goplusData] = await Promise.all([
+        this.rugcheckService.getTokenReport(tokenAddress).catch(() => null),
+        this.goplusService.getTokenSecurity(tokenAddress).catch(() => null),
+      ]);
       
       // Build metadata with safe numeric conversions
       const supply = Number(mintInfo.supply);
@@ -99,6 +105,7 @@ export class SolanaTokenAnalyzer {
         redFlags,
         creationDate: undefined,
         rugcheckData: rugcheckData || undefined,
+        goplusData: goplusData || undefined,
       };
     } catch (error) {
       console.error("Token analysis error:", error);
