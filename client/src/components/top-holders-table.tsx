@@ -1,0 +1,100 @@
+import { useState } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Copy, Check } from "lucide-react";
+import type { HolderInfo } from "@shared/schema";
+
+interface TopHoldersTableProps {
+  holders: HolderInfo[];
+  decimals: number;
+}
+
+export function TopHoldersTable({ holders, decimals }: TopHoldersTableProps) {
+  const [showAll, setShowAll] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+
+  const displayedHolders = showAll ? holders : holders.slice(0, 10);
+
+  const copyToClipboard = async (address: string) => {
+    await navigator.clipboard.writeText(address);
+    setCopiedAddress(address);
+    setTimeout(() => setCopiedAddress(null), 2000);
+  };
+
+  const formatBalance = (balance: number) => {
+    const actual = balance / Math.pow(10, decimals);
+    if (actual >= 1e9) return `${(actual / 1e9).toFixed(2)}B`;
+    if (actual >= 1e6) return `${(actual / 1e6).toFixed(2)}M`;
+    if (actual >= 1e3) return `${(actual / 1e3).toFixed(2)}K`;
+    return actual.toFixed(2);
+  };
+
+  return (
+    <Card className="p-6" data-testid="card-top-holders">
+      <h2 className="text-xl font-semibold mb-4">Top Holders</h2>
+      
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="sticky top-0 bg-card border-b">
+            <tr className="text-sm text-muted-foreground uppercase tracking-wide">
+              <th className="text-left py-3 px-2 font-medium">Rank</th>
+              <th className="text-left py-3 px-2 font-medium">Address</th>
+              <th className="text-right py-3 px-2 font-medium">Balance</th>
+              <th className="text-right py-3 px-2 font-medium">% of Supply</th>
+              <th className="w-12"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayedHolders.map((holder, index) => (
+              <tr
+                key={holder.address}
+                className="border-b last:border-b-0 hover:bg-muted/50"
+                data-testid={`row-holder-${index}`}
+              >
+                <td className="py-3 px-2 text-sm font-medium">
+                  #{holder.rank}
+                </td>
+                <td className="py-3 px-2 font-mono text-sm" data-testid={`text-holder-address-${index}`}>
+                  {holder.address.slice(0, 4)}...{holder.address.slice(-4)}
+                </td>
+                <td className="py-3 px-2 text-sm text-right font-semibold" data-testid={`text-holder-balance-${index}`}>
+                  {formatBalance(holder.balance)}
+                </td>
+                <td className="py-3 px-2 text-sm text-right font-semibold" data-testid={`text-holder-percentage-${index}`}>
+                  {holder.percentage.toFixed(2)}%
+                </td>
+                <td className="py-3 px-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => copyToClipboard(holder.address)}
+                    data-testid={`button-copy-${index}`}
+                    className="h-8 w-8"
+                  >
+                    {copiedAddress === holder.address ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {holders.length > 10 && (
+        <div className="mt-4 text-center">
+          <Button
+            variant="outline"
+            onClick={() => setShowAll(!showAll)}
+            data-testid="button-toggle-holders"
+          >
+            {showAll ? "Show Less" : `Show All ${holders.length} Holders`}
+          </Button>
+        </div>
+      )}
+    </Card>
+  );
+}

@@ -83,9 +83,9 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["var(--font-sans)"],
-        serif: ["var(--font-serif)"],
-        mono: ["var(--font-mono)"],
+        sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+        serif: ["Georgia", "serif"],
+        mono: ["JetBrains Mono", "Consolas", "monospace"],
       },
       keyframes: {
         "accordion-down": {

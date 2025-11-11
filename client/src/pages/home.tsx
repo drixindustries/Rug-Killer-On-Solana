@@ -1,0 +1,147 @@
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { Header } from "@/components/header";
+import { Footer } from "@/components/footer";
+import { TokenInput } from "@/components/token-input";
+import { RiskScoreCard } from "@/components/risk-score-card";
+import { CriticalAlerts } from "@/components/critical-alerts";
+import { MetricsGrid } from "@/components/metrics-grid";
+import { TopHoldersTable } from "@/components/top-holders-table";
+import { HolderDistributionChart } from "@/components/holder-distribution-chart";
+import { TransactionTimeline } from "@/components/transaction-timeline";
+import { TokenMetadataCard } from "@/components/token-metadata-card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card } from "@/components/ui/card";
+import type { TokenAnalysisResponse } from "@shared/schema";
+
+export default function Home() {
+  const [analysis, setAnalysis] = useState<TokenAnalysisResponse | null>(null);
+
+  const analyzeMutation = useMutation({
+    mutationFn: async (tokenAddress: string) => {
+      const response = await apiRequest("POST", "/api/analyze-token", { tokenAddress });
+      return response as TokenAnalysisResponse;
+    },
+    onSuccess: (data) => {
+      setAnalysis(data);
+    },
+  });
+
+  const handleAnalyze = (address: string) => {
+    analyzeMutation.mutate(address);
+  };
+
+  const handleNewAnalysis = () => {
+    setAnalysis(null);
+    analyzeMutation.reset();
+  };
+
+  const isLoading = analyzeMutation.isPending;
+  const error = analyzeMutation.error;
+
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      <Header onNewAnalysis={analysis ? handleNewAnalysis : undefined} />
+      
+      <main className="flex-1">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="space-y-8">
+            {!analysis && (
+              <div className="text-center space-y-4 py-12">
+                <h1 className="text-4xl font-bold">Solana Rug Detector</h1>
+                <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                  Analyze Solana tokens for rug pull risks. Check mint authority, freeze authority, 
+                  holder distribution, liquidity, and suspicious activity instantly.
+                </p>
+              </div>
+            )}
+
+            <TokenInput onAnalyze={handleAnalyze} isAnalyzing={isLoading} />
+
+            {isLoading && (
+              <div className="space-y-6">
+                <Card className="p-8">
+                  <div className="flex flex-col items-center space-y-4">
+                    <Skeleton className="h-24 w-24 rounded-full" />
+                    <Skeleton className="h-16 w-32" />
+                    <Skeleton className="h-4 w-48" />
+                  </div>
+                </Card>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2 space-y-6">
+                    <Skeleton className="h-48" />
+                    <Skeleton className="h-96" />
+                  </div>
+                  <div className="space-y-6">
+                    <Skeleton className="h-64" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <Card className="p-6 border-destructive">
+                <p className="text-destructive font-semibold">Analysis Failed</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {error instanceof Error ? error.message : "Failed to analyze token. Please try again."}
+                </p>
+              </Card>
+            )}
+
+            {analysis && (
+              <div className="space-y-8">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2 space-y-6">
+                    <RiskScoreCard
+                      score={analysis.riskScore}
+                      riskLevel={analysis.riskLevel}
+                      redFlagsCount={analysis.redFlags?.length || 0}
+                      analyzedAt={analysis.analyzedAt}
+                    />
+                    
+                    <CriticalAlerts redFlags={analysis.redFlags || []} />
+                    
+                    <MetricsGrid
+                      totalSupply={analysis.metadata?.supply || 0}
+                      holderCount={analysis.holderCount || 0}
+                      topHolderConcentration={analysis.topHolderConcentration || 0}
+                      liquidityStatus={analysis.liquidityPool?.status || "UNKNOWN"}
+                      creationDate={analysis.creationDate}
+                      decimals={analysis.metadata?.decimals || 0}
+                    />
+                  </div>
+                  
+                  <div className="space-y-6">
+                    <TokenMetadataCard 
+                      metadata={analysis.metadata}
+                      tokenAddress={analysis.tokenAddress}
+                    />
+                    
+                    <TransactionTimeline transactions={analysis.recentTransactions || []} />
+                  </div>
+                </div>
+
+                {analysis.topHolders && analysis.topHolders.length > 0 && (
+                  <>
+                    <TopHoldersTable 
+                      holders={analysis.topHolders}
+                      decimals={analysis.metadata?.decimals || 0}
+                    />
+
+                    <HolderDistributionChart
+                      holders={analysis.topHolders}
+                      totalConcentration={analysis.topHolderConcentration || 0}
+                    />
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+
+      <Footer />
+    </div>
+  );
+}
