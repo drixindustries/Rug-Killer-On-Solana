@@ -21,7 +21,7 @@ import {
   type KolWallet,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, isNull, lt, inArray, desc } from "drizzle-orm";
+import { eq, and, isNull, lt, inArray, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required by Replit Auth)
@@ -138,80 +138,101 @@ export class DatabaseStorage implements IStorage {
   }
 
   async redeemCode(userId: string, code: string): Promise<{ success: boolean; message: string; subscription?: Subscription }> {
-    // Check if code exists and is valid
-    const codeRecord = await this.getSubscriptionCode(code);
-    
-    if (!codeRecord) {
-      return { success: false, message: 'Invalid code' };
-    }
-    
-    if (!codeRecord.isActive) {
-      return { success: false, message: 'This code has been deactivated' };
-    }
-    
-    if (codeRecord.expiresAt && codeRecord.expiresAt < new Date()) {
-      return { success: false, message: 'This code has expired' };
-    }
-    
-    if (codeRecord.maxUses && codeRecord.usedCount >= codeRecord.maxUses) {
-      return { success: false, message: 'This code has reached its maximum uses' };
-    }
-    
-    // Check if user already redeemed this code
-    const [existingRedemption] = await db
-      .select()
-      .from(codeRedemptions)
-      .where(and(
-        eq(codeRedemptions.userId, userId),
-        eq(codeRedemptions.code, code)
-      ));
-    
-    if (existingRedemption) {
-      return { success: false, message: 'You have already redeemed this code' };
-    }
-    
-    // Create or update subscription
-    const existingSubscription = await this.getSubscription(userId);
-    let subscription: Subscription;
-    
-    if (existingSubscription) {
-      // Update existing subscription to lifetime
-      subscription = await this.updateSubscription(existingSubscription.id, {
-        tier: codeRecord.tier,
-        status: 'valid',
-        currentPeriodEnd: new Date('2099-12-31'), // Far future date for lifetime
-      });
-    } else {
-      // Create new subscription
-      subscription = await this.createSubscription({
+    // Use transaction to prevent race conditions
+    return await db.transaction(async (tx) => {
+      // Lock the code row for update to prevent concurrent redemptions
+      const [codeRecord] = await tx
+        .select()
+        .from(subscriptionCodes)
+        .where(eq(subscriptionCodes.code, code))
+        .for('update');
+      
+      if (!codeRecord) {
+        return { success: false, message: 'Invalid code' };
+      }
+      
+      if (!codeRecord.isActive) {
+        return { success: false, message: 'This code has been deactivated' };
+      }
+      
+      if (codeRecord.expiresAt && codeRecord.expiresAt < new Date()) {
+        return { success: false, message: 'This code has expired' };
+      }
+      
+      if (codeRecord.maxUses && codeRecord.usedCount >= codeRecord.maxUses) {
+        return { success: false, message: 'This code has reached its maximum uses' };
+      }
+      
+      // Check if user already redeemed this code
+      const [existingRedemption] = await tx
+        .select()
+        .from(codeRedemptions)
+        .where(and(
+          eq(codeRedemptions.userId, userId),
+          eq(codeRedemptions.code, code)
+        ));
+      
+      if (existingRedemption) {
+        return { success: false, message: 'You have already redeemed this code' };
+      }
+      
+      // Create or update subscription
+      const [existingSubscription] = await tx
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.userId, userId));
+      
+      let subscription: Subscription;
+      
+      if (existingSubscription) {
+        // Update existing subscription to lifetime
+        const [updated] = await tx
+          .update(subscriptions)
+          .set({
+            tier: codeRecord.tier,
+            status: 'valid',
+            currentPeriodEnd: new Date('2099-12-31'),
+            updatedAt: new Date(),
+          })
+          .where(eq(subscriptions.id, existingSubscription.id))
+          .returning();
+        subscription = updated;
+      } else {
+        // Create new subscription
+        const [created] = await tx
+          .insert(subscriptions)
+          .values({
+            userId,
+            tier: codeRecord.tier,
+            status: 'valid',
+            currentPeriodEnd: new Date('2099-12-31'),
+          })
+          .returning();
+        subscription = created;
+      }
+      
+      // Record redemption
+      await tx.insert(codeRedemptions).values({
         userId,
-        tier: codeRecord.tier,
-        status: 'valid',
-        currentPeriodEnd: new Date('2099-12-31'), // Far future date for lifetime
+        codeId: codeRecord.id,
+        code: codeRecord.code,
       });
-    }
-    
-    // Record redemption
-    await db.insert(codeRedemptions).values({
-      userId,
-      codeId: codeRecord.id,
-      code: codeRecord.code,
+      
+      // Increment usage count using SQL to prevent race conditions
+      await tx
+        .update(subscriptionCodes)
+        .set({ 
+          usedCount: sql`${subscriptionCodes.usedCount} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(subscriptionCodes.id, codeRecord.id));
+      
+      return { 
+        success: true, 
+        message: `Successfully activated ${codeRecord.tier} subscription!`,
+        subscription,
+      };
     });
-    
-    // Increment usage count
-    await db
-      .update(subscriptionCodes)
-      .set({ 
-        usedCount: codeRecord.usedCount + 1,
-        updatedAt: new Date(),
-      })
-      .where(eq(subscriptionCodes.id, codeRecord.id));
-    
-    return { 
-      success: true, 
-      message: `Successfully activated ${codeRecord.tier} subscription!`,
-      subscription,
-    };
   }
 
   // Access control - checks subscription OR token holder status

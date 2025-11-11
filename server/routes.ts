@@ -393,6 +393,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (userId) {
             const dbSubscription = await storage.getSubscription(userId);
+            
+            // CRITICAL: Protect lifetime subscriptions from being downgraded by Whop webhooks
+            if (dbSubscription?.tier === 'lifetime') {
+              console.log(`⚠️  Ignoring Whop webhook for user ${userId} - already has lifetime subscription`);
+              break;
+            }
+            
             if (dbSubscription) {
               await storage.updateSubscription(dbSubscription.id, {
                 tier,
@@ -422,6 +429,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const whopMembershipId = membership.id;
           
           const dbSubscription = await storage.getSubscriptionByWhopId(whopMembershipId);
+          
+          // CRITICAL: Protect lifetime subscriptions from being expired by Whop webhooks
+          if (dbSubscription?.tier === 'lifetime') {
+            console.log(`⚠️  Ignoring Whop invalid webhook for lifetime subscription ${whopMembershipId}`);
+            break;
+          }
+          
           if (dbSubscription) {
             await storage.updateSubscription(dbSubscription.id, {
               status: 'expired',
