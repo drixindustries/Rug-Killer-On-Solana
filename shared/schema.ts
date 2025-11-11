@@ -273,8 +273,8 @@ export const subscriptions = pgTable("subscriptions", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   tier: varchar("tier").notNull(), // "free_trial", "basic", "premium"
   status: varchar("status").notNull(), // Whop states: "valid", "past_due", "cancelled", "expired", "trialing"
-  whopMembershipId: varchar("whop_membership_id").notNull().unique(), // Canonical Whop membership reference
-  whopPlanId: varchar("whop_plan_id").notNull(), // Whop plan ID (e.g., "plan_xxxxx")
+  whopMembershipId: varchar("whop_membership_id").unique(), // Canonical Whop membership reference (nullable for free trials)
+  whopPlanId: varchar("whop_plan_id"), // Whop plan ID (nullable for free trials)
   trialEndsAt: timestamp("trial_ends_at"), // For free trial tracking
   currentPeriodEnd: timestamp("current_period_end").notNull(), // Maps to Whop's valid_until
   createdAt: timestamp("created_at").defaultNow(),

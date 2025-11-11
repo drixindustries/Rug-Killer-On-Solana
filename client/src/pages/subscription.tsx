@@ -5,14 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, Loader2, Zap, Users } from "lucide-react";
-import { loadStripe } from "@stripe/stripe-js";
 import { useLocation } from "wouter";
-
-if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
-  throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
-}
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
 interface Subscription {
   id: string;
@@ -41,8 +34,8 @@ export default function SubscriptionPage() {
       return data;
     },
     onSuccess: async (data) => {
-      const stripe = await stripePromise;
-      if (stripe && data.url) {
+      // Redirect to Whop checkout
+      if (data.url) {
         window.location.href = data.url;
       }
     },
@@ -91,8 +84,14 @@ export default function SubscriptionPage() {
     });
   }
 
-  const isOnFreeTrial = subscription?.tier === 'free_trial' && subscription?.status === 'active';
-  const hasActivePaidSub = subscription?.tier !== 'free_trial' && subscription?.status === 'active';
+  // Helper: Check if subscription is in an active state (Whop statuses)
+  const isActive = (status?: string) => {
+    const activeStatuses = ['valid', 'trialing', 'past_due'];
+    return status && activeStatuses.includes(status);
+  };
+  
+  const isOnFreeTrial = subscription?.tier === 'free_trial' && isActive(subscription?.status);
+  const hasActivePaidSub = subscription?.tier !== 'free_trial' && isActive(subscription?.status);
   const trialDaysLeft = subscription?.trialEndsAt 
     ? Math.ceil((new Date(subscription.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : 0;
@@ -175,7 +174,7 @@ export default function SubscriptionPage() {
                 className="w-full"
                 size="lg"
                 onClick={() => createSubscriptionMutation.mutate('basic')}
-                disabled={createSubscriptionMutation.isPending || (subscription?.tier === 'basic' && subscription?.status === 'active')}
+                disabled={createSubscriptionMutation.isPending || (subscription?.tier === 'basic' && isActive(subscription?.status))}
                 data-testid="button-subscribe-basic"
               >
                 {createSubscriptionMutation.isPending ? (
@@ -183,7 +182,7 @@ export default function SubscriptionPage() {
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Processing...
                   </>
-                ) : subscription?.tier === 'basic' && subscription?.status === 'active' ? (
+                ) : subscription?.tier === 'basic' && isActive(subscription?.status) ? (
                   'Current Plan'
                 ) : (
                   'Subscribe to Basic'
@@ -240,7 +239,7 @@ export default function SubscriptionPage() {
                 className="w-full"
                 size="lg"
                 onClick={() => createSubscriptionMutation.mutate('premium')}
-                disabled={createSubscriptionMutation.isPending || (subscription?.tier === 'premium' && subscription?.status === 'active')}
+                disabled={createSubscriptionMutation.isPending || (subscription?.tier === 'premium' && isActive(subscription?.status))}
                 data-testid="button-subscribe-premium"
               >
                 {createSubscriptionMutation.isPending ? (
@@ -248,7 +247,7 @@ export default function SubscriptionPage() {
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Processing...
                   </>
-                ) : subscription?.tier === 'premium' && subscription?.status === 'active' ? (
+                ) : subscription?.tier === 'premium' && isActive(subscription?.status) ? (
                   'Current Plan'
                 ) : (
                   'Subscribe to Premium'

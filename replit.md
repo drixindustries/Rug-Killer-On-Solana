@@ -21,7 +21,7 @@ The frontend, built with React and TypeScript using Vite, features a modern, dat
 - **Solana Integration**: Connects to Solana mainnet via a configurable RPC URL, with graceful handling for public RPC rate limits.
 - **Authentication & Authorization**: Replit Auth blueprint (Google, GitHub, X, Apple, email/password) integrated with Stripe for subscription management. Token-gated access is a planned feature.
 - **Payment Systems**:
-    - **Stripe**: Full subscription system with 1-week free trial, $20/mo Basic, and $100/mo Premium tiers. Includes checkout flow, webhook handling for lifecycle events, and subscription management UI.
+    - **Whop**: Full subscription system with Merchant of Record handling (2.7% + $0.30 fees). Includes 1-week free trial, $20/mo Basic, and $100/mo Premium tiers. Features hosted checkout, webhook handling for lifecycle events, and automatic tax/compliance.
     - **Crypto Payments**: Production-ready Solana payment processing requiring 6 confirmations, with payment address generation, blockchain monitoring, and a full audit trail.
 - **Bots**: Telegram and Discord bots for token analysis, holder analysis, dev wallet history, and blacklist checks, supporting markdown and rich embeds.
 - **AI Blacklist System**: A rules-based detection engine with 6 automated rules analyzing 52+ risk metrics to flag honeypots, high sell taxes, suspicious authorities, and wash trading patterns. It includes severity scoring, evidence tracking, and dedicated API endpoints.
@@ -52,6 +52,17 @@ The frontend, built with React and TypeScript using Vite, features a modern, dat
 - **Discord API**: For Discord bot integration.
 
 ## Recent Implementation (November 11, 2025)
+
+### Phase 7: Stripe→Whop Migration (COMPLETED ✅)
+- **Complete payment migration** from Stripe to Whop
+- **Database schema changes**: Removed Stripe fields, added `whopMembershipId`, `whopPlanId`, `whopUserId`
+- **Status vocabulary alignment**: Migrated to Whop lifecycle ("valid", "trialing", "past_due", "cancelled", "expired")
+- **Access control fix**: Updated `hasActiveAccess` to recognize all Whop statuses
+- **Whop SDK integration**: Client with `createWhopCheckout`, `getWhopMembership`, `cancelWhopMembership` helpers
+- **Webhook handler**: POST /api/whop/webhook for payment.succeeded, membership.went_valid, membership.went_invalid
+- **Frontend updates**: Removed Stripe SDK, direct redirect to Whop hosted checkout
+
+## Previous Implementations
 
 ### Phase 3: Crypto Payment System (COMPLETED ✅)
 - **SOL-only payment processing** with blockchain monitoring
@@ -108,11 +119,12 @@ The frontend, built with React and TypeScript using Vite, features a modern, dat
 ### Required for Token Gating (10M+ token access)
 - `OFFICIAL_TOKEN_MINT_ADDRESS` - The SPL token mint address for access verification ⚠️ CRITICAL
 
-### Required for Stripe Subscriptions
-- `STRIPE_SECRET_KEY` - Stripe secret key (sk_test_* or sk_live_*)
-- `VITE_STRIPE_PUBLIC_KEY` - Stripe publishable key
-- `STRIPE_PRICE_ID_BASIC` - Price ID for $20/mo Basic tier
-- `STRIPE_PRICE_ID_PREMIUM` - Price ID for $100/mo Premium tier
+### Required for Whop Subscriptions
+- `WHOP_API_KEY` - Whop API key from developer dashboard
+- `WHOP_APP_ID` - Whop application ID
+- `WHOP_COMPANY_ID` - Whop company/business ID
+- `WHOP_PLAN_ID_BASIC` - Plan ID for $20/mo Basic tier
+- `WHOP_PLAN_ID_PREMIUM` - Plan ID for $100/mo Premium tier
 
 ### Optional for Bots (graceful skip if not set)
 - `TELEGRAM_BOT_TOKEN` - From @BotFather
@@ -122,7 +134,6 @@ The frontend, built with React and TypeScript using Vite, features a modern, dat
 ### Optional for Performance
 - `SOLANA_RPC_URL` - Custom RPC endpoint (default: public mainnet)
 - `HELIUS_API_KEY` - Recommended for better rate limits
-- `STRIPE_WEBHOOK_SECRET` - For webhook signature verification
 
 ## Security Posture
 
