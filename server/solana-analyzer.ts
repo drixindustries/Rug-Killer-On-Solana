@@ -10,15 +10,18 @@ import type {
   RiskLevel,
   TransactionInfo,
 } from "@shared/schema";
+import { RugcheckService } from "./rugcheck-service";
 
 // Use public Solana RPC endpoint (can be configured later)
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
 
 export class SolanaTokenAnalyzer {
   private connection: Connection;
+  private rugcheckService: RugcheckService;
 
   constructor() {
     this.connection = new Connection(SOLANA_RPC_URL, "confirmed");
+    this.rugcheckService = new RugcheckService();
   }
 
   async analyzeToken(tokenAddress: string): Promise<TokenAnalysisResponse> {
@@ -45,6 +48,9 @@ export class SolanaTokenAnalyzer {
       
       // Get recent transactions (simplified for MVP)
       const recentTransactions = await this.fetchRecentTransactions(mintPubkey);
+      
+      // Fetch Rugcheck data (non-blocking)
+      const rugcheckData = await this.rugcheckService.getTokenReport(tokenAddress).catch(() => null);
       
       // Build metadata with safe numeric conversions
       const supply = Number(mintInfo.supply);
@@ -92,6 +98,7 @@ export class SolanaTokenAnalyzer {
         suspiciousActivityDetected: recentTransactions.some(tx => tx.suspicious),
         redFlags,
         creationDate: undefined,
+        rugcheckData: rugcheckData || undefined,
       };
     } catch (error) {
       console.error("Token analysis error:", error);

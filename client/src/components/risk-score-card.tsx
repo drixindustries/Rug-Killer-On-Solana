@@ -14,16 +14,18 @@ interface RiskScoreCardProps {
 export function RiskScoreCard({ score, riskLevel, redFlagsCount, analyzedAt }: RiskScoreCardProps) {
   const [displayScore, setDisplayScore] = useState(0);
 
+  const safeScore = isNaN(score) || !isFinite(score) ? 100 : Math.min(100, Math.max(0, score));
+
   useEffect(() => {
     const duration = 1000;
     const steps = 60;
-    const increment = score / steps;
+    const increment = safeScore / steps;
     let current = 0;
 
     const timer = setInterval(() => {
       current += increment;
-      if (current >= score) {
-        setDisplayScore(score);
+      if (current >= safeScore) {
+        setDisplayScore(safeScore);
         clearInterval(timer);
       } else {
         setDisplayScore(Math.floor(current));
@@ -31,7 +33,7 @@ export function RiskScoreCard({ score, riskLevel, redFlagsCount, analyzedAt }: R
     }, duration / steps);
 
     return () => clearInterval(timer);
-  }, [score]);
+  }, [safeScore]);
 
   const getRiskColor = () => {
     switch (riskLevel) {
@@ -62,11 +64,15 @@ export function RiskScoreCard({ score, riskLevel, redFlagsCount, analyzedAt }: R
   };
 
   const getProgressColor = () => {
-    if (score < 30) return "bg-green-600";
-    if (score < 50) return "bg-yellow-600";
-    if (score < 70) return "bg-orange-600";
+    if (safeScore < 30) return "bg-green-600";
+    if (safeScore < 50) return "bg-yellow-600";
+    if (safeScore < 70) return "bg-orange-600";
     return "bg-red-600";
   };
+
+  const safeAnalyzedAt = isNaN(analyzedAt) || !isFinite(analyzedAt) || analyzedAt === 0 
+    ? Date.now() 
+    : analyzedAt;
 
   return (
     <Card className="p-8" data-testid="card-risk-score">
@@ -100,7 +106,7 @@ export function RiskScoreCard({ score, riskLevel, redFlagsCount, analyzedAt }: R
         </div>
 
         <div className="text-xs text-muted-foreground" data-testid="text-analyzed-at">
-          Analyzed {new Date(analyzedAt).toLocaleString()}
+          Analyzed {new Date(safeAnalyzedAt).toLocaleString()}
         </div>
       </div>
     </Card>

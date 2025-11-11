@@ -11,6 +11,7 @@ import { TopHoldersTable } from "@/components/top-holders-table";
 import { HolderDistributionChart } from "@/components/holder-distribution-chart";
 import { TransactionTimeline } from "@/components/transaction-timeline";
 import { TokenMetadataCard } from "@/components/token-metadata-card";
+import { RugcheckCard } from "@/components/rugcheck-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import type { TokenAnalysisResponse } from "@shared/schema";
@@ -117,6 +118,13 @@ export default function Home() {
                       metadata={analysis.metadata}
                       tokenAddress={analysis.tokenAddress}
                     />
+                    
+                    {analysis.rugcheckData && (
+                      <RugcheckCard 
+                        data={analysis.rugcheckData}
+                        tokenAddress={analysis.tokenAddress}
+                      />
+                    )}
                     
                     <TransactionTimeline transactions={analysis.recentTransactions || []} />
                   </div>

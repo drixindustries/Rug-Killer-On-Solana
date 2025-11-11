@@ -64,6 +64,24 @@ export interface RiskFlag {
   description: string;
 }
 
+// Rugcheck Data
+export interface RugcheckData {
+  score: number;
+  risks: string[];
+  markets: Array<{
+    name: string;
+    liquidity: number;
+    lpBurn: number;
+  }>;
+  topHolders: Array<{
+    owner: string;
+    pct: number;
+  }>;
+  fileMeta?: {
+    error?: string;
+  };
+}
+
 // Complete Token Analysis Response
 export interface TokenAnalysisResponse {
   tokenAddress: string;
@@ -95,6 +113,9 @@ export interface TokenAnalysisResponse {
   
   // Creation info
   creationDate?: number;
+  
+  // External API data
+  rugcheckData?: RugcheckData;
 }
 
 // Storage schema (not used for in-memory but kept for consistency)
