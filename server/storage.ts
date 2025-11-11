@@ -1,11 +1,17 @@
 import {
   users,
   subscriptions,
+  subscriptionCodes,
+  codeRedemptions,
   walletConnections,
   walletChallenges,
   kolWallets,
   type User,
   type UpsertUser,
+  type SubscriptionCode,
+  type InsertSubscriptionCode,
+  type CodeRedemption,
+  type InsertCodeRedemption,
   type Subscription,
   type InsertSubscription,
   type WalletConnection,
@@ -28,6 +34,10 @@ export interface IStorage {
   getSubscriptionByWhopId(whopMembershipId: string): Promise<Subscription | undefined>;
   createSubscription(subscription: InsertSubscription): Promise<Subscription>;
   updateSubscription(id: string, data: Partial<InsertSubscription>): Promise<Subscription>;
+  
+  // Subscription code operations
+  getSubscriptionCode(code: string): Promise<SubscriptionCode | undefined>;
+  redeemCode(userId: string, code: string): Promise<{ success: boolean; message: string; subscription?: Subscription }>;
   
   // Wallet connection operations
   getWalletConnection(userId: string): Promise<WalletConnection | undefined>;
@@ -118,6 +128,92 @@ export class DatabaseStorage implements IStorage {
     return subscription;
   }
 
+  // Subscription code operations
+  async getSubscriptionCode(code: string): Promise<SubscriptionCode | undefined> {
+    const [subscriptionCode] = await db
+      .select()
+      .from(subscriptionCodes)
+      .where(eq(subscriptionCodes.code, code));
+    return subscriptionCode;
+  }
+
+  async redeemCode(userId: string, code: string): Promise<{ success: boolean; message: string; subscription?: Subscription }> {
+    // Check if code exists and is valid
+    const codeRecord = await this.getSubscriptionCode(code);
+    
+    if (!codeRecord) {
+      return { success: false, message: 'Invalid code' };
+    }
+    
+    if (!codeRecord.isActive) {
+      return { success: false, message: 'This code has been deactivated' };
+    }
+    
+    if (codeRecord.expiresAt && codeRecord.expiresAt < new Date()) {
+      return { success: false, message: 'This code has expired' };
+    }
+    
+    if (codeRecord.maxUses && codeRecord.usedCount >= codeRecord.maxUses) {
+      return { success: false, message: 'This code has reached its maximum uses' };
+    }
+    
+    // Check if user already redeemed this code
+    const [existingRedemption] = await db
+      .select()
+      .from(codeRedemptions)
+      .where(and(
+        eq(codeRedemptions.userId, userId),
+        eq(codeRedemptions.code, code)
+      ));
+    
+    if (existingRedemption) {
+      return { success: false, message: 'You have already redeemed this code' };
+    }
+    
+    // Create or update subscription
+    const existingSubscription = await this.getSubscription(userId);
+    let subscription: Subscription;
+    
+    if (existingSubscription) {
+      // Update existing subscription to lifetime
+      subscription = await this.updateSubscription(existingSubscription.id, {
+        tier: codeRecord.tier,
+        status: 'valid',
+        currentPeriodEnd: new Date('2099-12-31'), // Far future date for lifetime
+      });
+    } else {
+      // Create new subscription
+      subscription = await this.createSubscription({
+        userId,
+        tier: codeRecord.tier,
+        status: 'valid',
+        currentPeriodEnd: new Date('2099-12-31'), // Far future date for lifetime
+      });
+    }
+    
+    // Record redemption
+    await db.insert(codeRedemptions).values({
+      userId,
+      codeId: codeRecord.id,
+      code: codeRecord.code,
+    });
+    
+    // Increment usage count
+    await db
+      .update(subscriptionCodes)
+      .set({ 
+        usedCount: codeRecord.usedCount + 1,
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptionCodes.id, codeRecord.id));
+    
+    return { 
+      success: true, 
+      message: `Successfully activated ${codeRecord.tier} subscription!`,
+      subscription,
+    };
+  }
+
   // Access control - checks subscription OR token holder status
   async hasActiveAccess(userId: string): Promise<{
     hasAccess: boolean;
@@ -131,6 +227,15 @@ export class DatabaseStorage implements IStorage {
     const subscription = await this.getSubscription(userId);
     
     if (subscription) {
+      // Lifetime tier never expires
+      if (subscription.tier === 'lifetime' && subscription.status === 'valid') {
+        return {
+          hasAccess: true,
+          reason: `Lifetime subscription (never expires)`,
+          subscription,
+        };
+      }
+      
       // Check if subscription is valid/trialing AND not expired
       const periodEnd = subscription.currentPeriodEnd || subscription.trialEndsAt;
       

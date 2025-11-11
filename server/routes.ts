@@ -684,6 +684,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Subscription code redemption
+  const redeemCodeSchema = z.object({
+    code: z.string().min(1).max(50).trim().toUpperCase(),
+  });
+
+  app.post('/api/redeem-code', isAuthenticated, async (req: any, res) => {
+    try {
+      const { code } = redeemCodeSchema.parse(req.body);
+      const userId = req.user.claims.sub;
+
+      const result = await storage.redeemCode(userId, code);
+
+      if (!result.success) {
+        return res.status(400).json({ message: result.message });
+      }
+
+      return res.json({
+        message: result.message,
+        subscription: result.subscription,
+      });
+    } catch (error) {
+      console.error("Code redemption error:", error);
+      return res.status(500).json({
+        error: "Redemption failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
   // Vanity address generator routes
   const vanityEstimateSchema = z.object({
     pattern: z.string().min(1).max(10),

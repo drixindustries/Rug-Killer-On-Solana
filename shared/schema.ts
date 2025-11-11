@@ -293,6 +293,40 @@ export const subscriptions = pgTable("subscriptions", {
 export type Subscription = typeof subscriptions.$inferSelect;
 export type InsertSubscription = typeof subscriptions.$inferInsert;
 
+// Subscription codes table (for lifetime access codes)
+export const subscriptionCodes = pgTable("subscription_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code").notNull().unique(),
+  tier: varchar("tier").notNull(), // "lifetime", "individual", "group"
+  maxUses: integer("max_uses").default(1), // null for unlimited
+  usedCount: integer("used_count").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  expiresAt: timestamp("expires_at"), // null for no expiration
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_code").on(table.code),
+  index("idx_code_active").on(table.isActive),
+]);
+
+export type SubscriptionCode = typeof subscriptionCodes.$inferSelect;
+export type InsertSubscriptionCode = typeof subscriptionCodes.$inferInsert;
+
+// Code redemptions table (tracks who redeemed which codes)
+export const codeRedemptions = pgTable("code_redemptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  codeId: varchar("code_id").notNull().references(() => subscriptionCodes.id),
+  code: varchar("code").notNull(), // Denormalized for easier lookups
+  redeemedAt: timestamp("redeemed_at").defaultNow(),
+}, (table) => [
+  index("idx_redemption_user").on(table.userId),
+  index("idx_redemption_code").on(table.codeId),
+]);
+
+export type CodeRedemption = typeof codeRedemptions.$inferSelect;
+export type InsertCodeRedemption = typeof codeRedemptions.$inferInsert;
+
 // Wallet connections table (for token-gated access)
 export const walletConnections = pgTable("wallet_connections", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

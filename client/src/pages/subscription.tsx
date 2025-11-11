@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Loader2, Zap, Users } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { CheckCircle2, XCircle, Loader2, Zap, Users, Gift } from "lucide-react";
 import { useLocation } from "wouter";
 
 interface Subscription {
@@ -22,6 +24,7 @@ export default function SubscriptionPage() {
   const searchParams = new URLSearchParams(location.split('?')[1]);
   const success = searchParams.get('success');
   const cancelled = searchParams.get('cancelled');
+  const [redemptionCode, setRedemptionCode] = useState("");
 
   const { data: subscription, isLoading } = useQuery<Subscription>({
     queryKey: ['/api/subscription/status'],
@@ -64,6 +67,28 @@ export default function SubscriptionPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to cancel subscription",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const redeemCodeMutation = useMutation({
+    mutationFn: async (code: string) => {
+      const response = await apiRequest('POST', '/api/redeem-code', { code });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/subscription/status'] });
+      setRedemptionCode("");
+      toast({
+        title: "Success!",
+        description: data.message,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Redemption Failed",
+        description: error.message || "Invalid or expired code",
         variant: "destructive",
       });
     },
@@ -292,6 +317,47 @@ export default function SubscriptionPage() {
             </Card>
           </div>
         )}
+
+        {/* Subscription Code Redemption */}
+        <div className="mt-12 max-w-2xl mx-auto">
+          <Card data-testid="card-redeem-code">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Gift className="w-5 h-5 text-primary" />
+                <CardTitle>Redeem Subscription Code</CardTitle>
+              </div>
+              <CardDescription>
+                Have a lifetime access code? Enter it here to activate your subscription.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-3">
+                <Input
+                  placeholder="Enter code"
+                  value={redemptionCode}
+                  onChange={(e) => setRedemptionCode(e.target.value.toUpperCase())}
+                  disabled={redeemCodeMutation.isPending}
+                  className="font-mono"
+                  data-testid="input-redeem-code"
+                />
+                <Button
+                  onClick={() => redemptionCode && redeemCodeMutation.mutate(redemptionCode)}
+                  disabled={!redemptionCode || redeemCodeMutation.isPending}
+                  data-testid="button-redeem-code"
+                >
+                  {redeemCodeMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Redeeming...
+                    </>
+                  ) : (
+                    'Redeem'
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
