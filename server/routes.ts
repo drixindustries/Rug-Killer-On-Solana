@@ -866,7 +866,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         supply, 
         description,
         walletPrivateKey, // User provides this in the request
-        mintKeypair // Optional vanity address keypair
+        mintKeypair, // Optional vanity address keypair
+        generateVanity, // Generate vanity address
+        vanitySuffix // Suffix for vanity address
       } = req.body;
 
       if (!walletPrivateKey) {
@@ -883,6 +885,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description,
         walletPrivateKey,
         mintKeypair,
+        generateVanity,
+        vanitySuffix,
       });
 
       res.json(result);

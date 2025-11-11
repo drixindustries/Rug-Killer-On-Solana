@@ -12,6 +12,7 @@ import Documentation from "@/pages/documentation";
 import About from "@/pages/about";
 import VanityGenerator from "@/pages/vanity-generator";
 import AdminWallet from "@/pages/admin-wallet";
+import AdminDeployToken from "@/pages/admin-deploy-token";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -34,6 +35,7 @@ function Router() {
           <Route path="/about" component={About} />
           <Route path="/vanity" component={VanityGenerator} />
           <Route path="/admin/wallet" component={AdminWallet} />
+          <Route path="/admin/deploy-token" component={AdminDeployToken} />
         </>
       )}
       <Route component={NotFound} />

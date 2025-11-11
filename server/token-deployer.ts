@@ -27,6 +27,8 @@ export interface TokenDeploymentConfig {
   description?: string;
   walletPrivateKey: string; // Base58 encoded private key of the wallet funding deployment
   mintKeypair?: string; // Base58 encoded secret key for vanity address
+  generateVanity?: boolean; // Generate vanity address
+  vanitySuffix?: string; // Suffix for vanity address
 }
 
 export interface DeploymentResult {
@@ -35,6 +37,10 @@ export interface DeploymentResult {
   signature?: string;
   error?: string;
   steps: string[];
+  vanityKeypair?: {
+    publicKey: string;
+    privateKey: string;
+  };
 }
 
 export class TokenDeployer {
@@ -63,6 +69,8 @@ export class TokenDeployer {
 
       // Load or generate mint keypair
       let mintKeypair: Keypair;
+      let vanityKeypair: { publicKey: string; privateKey: string } | undefined;
+      
       if (config.mintKeypair) {
         try {
           mintKeypair = Keypair.fromSecretKey(bs58.decode(config.mintKeypair));
@@ -74,6 +82,34 @@ export class TokenDeployer {
             steps,
           };
         }
+      } else if (config.generateVanity && config.vanitySuffix) {
+        // Generate vanity address
+        steps.push(`🔄 Generating vanity address ending in "${config.vanitySuffix}"...`);
+        const { VanityAddressGenerator } = await import('./vanity-generator');
+        const generator = new VanityAddressGenerator();
+        
+        const result = await generator.generate({
+          pattern: config.vanitySuffix,
+          matchType: 'suffix',
+          caseSensitive: false,
+          maxAttempts: 50_000_000, // Higher limit for suffix
+        });
+
+        if (!result) {
+          return {
+            success: false,
+            error: `Failed to generate vanity address ending in "${config.vanitySuffix}" after 50M attempts`,
+            steps,
+          };
+        }
+
+        mintKeypair = Keypair.fromSecretKey(bs58.decode(result.secretKey));
+        vanityKeypair = {
+          publicKey: result.publicKey,
+          privateKey: result.secretKey,
+        };
+        steps.push(`✅ Generated vanity address: ${result.publicKey}`);
+        steps.push(`✅ Found in ${result.attempts.toLocaleString()} attempts (${(result.timeMs / 1000).toFixed(1)}s)`);
       } else {
         mintKeypair = Keypair.generate();
         steps.push(`✅ Generated new mint address: ${mintKeypair.publicKey.toBase58()}`);
@@ -164,6 +200,7 @@ export class TokenDeployer {
         mintAddress: mintKeypair.publicKey.toBase58(),
         signature: mintSig,
         steps,
+        vanityKeypair,
       };
 
     } catch (error) {
