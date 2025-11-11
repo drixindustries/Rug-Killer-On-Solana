@@ -43,6 +43,64 @@ export class AlphaAlertService {
   private async sendAlert(alert: AlphaAlert): Promise<void> {
     console.log(`[ALPHA ALERT] ${alert.type} from ${alert.source}: ${alert.mint}`);
     
+    // Format alert message
+    let message = '';
+    if (alert.type === 'caller_signal') {
+      message = `🚨 **ALPHA CALL from ${alert.source}**\n\n` +
+        `📍 CA: \`${alert.mint}\`\n` +
+        `👤 Caller: ${alert.source}\n` +
+        `🔗 https://pump.fun/${alert.mint}\n` +
+        `💎 https://dexscreener.com/solana/${alert.mint}`;
+    } else if (alert.type === 'new_token') {
+      message = `🔥 **NEW GEM DETECTED**\n\n` +
+        `📍 CA: \`${alert.mint}\`\n` +
+        `📊 Source: ${alert.source}\n` +
+        `${alert.data?.name ? `🏷️ ${alert.data.name} (${alert.data.symbol})\n` : ''}` +
+        `${alert.data?.marketCap ? `💰 MC: $${alert.data.marketCap.toLocaleString()}\n` : ''}` +
+        `🔗 https://pump.fun/${alert.mint}`;
+    } else {
+      message = `⚡ **ALPHA ALERT**\n\n${alert.mint}\nSource: ${alert.source}`;
+    }
+
+    // Send to Discord webhook
+    const DISCORD_WEBHOOK = process.env.ALPHA_DISCORD_WEBHOOK;
+    if (DISCORD_WEBHOOK) {
+      try {
+        await fetch(DISCORD_WEBHOOK, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: `@everyone ${message}`,
+            username: 'RugKiller Alpha Alerts',
+            avatar_url: 'https://i.imgur.com/rugkiller-icon.png',
+          }),
+        });
+      } catch (error) {
+        console.error('[ALPHA ALERT] Discord notification failed:', error);
+      }
+    }
+
+    // Send to Telegram
+    const TELEGRAM_TOKEN = process.env.ALPHA_TELEGRAM_BOT_TOKEN;
+    const TELEGRAM_CHAT = process.env.ALPHA_TELEGRAM_CHAT_ID;
+    if (TELEGRAM_TOKEN && TELEGRAM_CHAT) {
+      try {
+        const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
+        await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: TELEGRAM_CHAT,
+            text: message,
+            parse_mode: 'Markdown',
+          }),
+        });
+      } catch (error) {
+        console.error('[ALPHA ALERT] Telegram notification failed:', error);
+      }
+    }
+    
+    // Also trigger callbacks for extensibility
     for (const callback of this.alertCallbacks) {
       try {
         await callback(alert);
@@ -197,13 +255,48 @@ export class AlphaAlertService {
     this.startPumpFunMonitor();
 
     console.log('[ALPHA ALERT] Service started successfully');
-    await this.sendAlert({
-      type: 'new_token',
-      mint: 'SYSTEM',
-      source: 'AlphaAlerts',
-      timestamp: Date.now(),
-      data: { message: '🚨 Alpha Alert System ONLINE - Monitoring top callers and new launches' }
-    });
+    
+    // Send startup notification directly (not through sendAlert to avoid fake links)
+    const startupMessage = '🤖 **RUGKILLER ALPHA ALERTS ONLINE**\n\n' +
+      `✅ Monitoring ${this.alphaCallers.filter(c => c.enabled).length} top alpha callers\n` +
+      `✅ Connected to pump.fun live feed\n` +
+      `✅ Quality filters active (RugCheck > 85, No honeypots, Liquidity > $5K)\n\n` +
+      `Contract: \`AAF1h3emV6qDXKGQ1v6km9qqv9Z6Pja9sPhDjrUCRtek\``;
+    
+    const DISCORD_WEBHOOK = process.env.ALPHA_DISCORD_WEBHOOK;
+    if (DISCORD_WEBHOOK) {
+      try {
+        await fetch(DISCORD_WEBHOOK, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: startupMessage,
+            username: 'RugKiller Alpha Alerts',
+          }),
+        });
+      } catch (error) {
+        console.error('[ALPHA ALERT] Discord startup notification failed:', error);
+      }
+    }
+
+    const TELEGRAM_TOKEN = process.env.ALPHA_TELEGRAM_BOT_TOKEN;
+    const TELEGRAM_CHAT = process.env.ALPHA_TELEGRAM_CHAT_ID;
+    if (TELEGRAM_TOKEN && TELEGRAM_CHAT) {
+      try {
+        const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
+        await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: TELEGRAM_CHAT,
+            text: startupMessage,
+            parse_mode: 'Markdown',
+          }),
+        });
+      } catch (error) {
+        console.error('[ALPHA ALERT] Telegram startup notification failed:', error);
+      }
+    }
   }
 
   // Stop all monitoring

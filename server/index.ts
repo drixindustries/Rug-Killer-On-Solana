@@ -62,6 +62,15 @@ app.use((req, res, next) => {
       console.error('Failed to start Discord bot:', err);
     });
   }
+
+  // Start alpha alert service if configured
+  if (process.env.ALPHA_ALERTS_ENABLED === 'true') {
+    const { getAlphaAlertService } = await import('./alpha-alerts');
+    const alphaService = getAlphaAlertService();
+    alphaService.start().catch(err => {
+      console.error('Failed to start Alpha Alert service:', err);
+    });
+  }
   
   const server = await registerRoutes(app);
 

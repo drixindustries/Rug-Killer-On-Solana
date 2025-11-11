@@ -160,7 +160,7 @@ function createTelegramBot(botToken: string): Telegraf {
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
       const message = formatAnalysis(analysis);
       
-      await ctx.reply(message, { parse_mode: 'Markdown', disable_web_page_preview: true });
+      await ctx.reply(message, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } });
     } catch (error) {
       console.error('Telegram bot execute error:', error);
       ctx.reply('❌ Error analyzing token. Please check the address and try again.');
@@ -292,7 +292,7 @@ function createTelegramBot(botToken: string): Telegraf {
         await ctx.reply('🔍 Quick analysis...');
         const analysis = await tokenAnalyzer.analyzeToken(text);
         const message = formatAnalysis(analysis, true);
-        await ctx.reply(message, { parse_mode: 'Markdown', disable_web_page_preview: true });
+        await ctx.reply(message, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } });
       } catch (error) {
         // Silently ignore - not a valid token address
       }
