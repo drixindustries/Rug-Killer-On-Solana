@@ -184,14 +184,14 @@ export async function analyzeAndFlag(
       }
     }
     
-    // RULE 7: KOL Cabal Early Buying Detection
-    // Detect when multiple KOL wallets are in top holders (potential coordinated pump)
+    // RULE 7: Coordinated Pump Detection
+    // Detect when multiple influential wallets are in top holders (potential coordinated pump)
     if (analysis.topHolders && analysis.topHolders.length > 0) {
       const holderAddresses = analysis.topHolders.map(h => h.address);
       const kolHolders = await storage.getKolWalletsByAddresses(holderAddresses);
       
       if (kolHolders.length >= 3) {
-        // 3+ KOLs in top 20 holders is HIGHLY suspicious for early cabal buying
+        // 3+ influential wallets in top 20 holders is HIGHLY suspicious for coordinated buying
         const kolNames = kolHolders.map(k => k.displayName || k.walletAddress.substring(0, 8)).join(', ');
         const totalKolPercentage = kolHolders.reduce((sum, kol) => {
           const holder = analysis.topHolders.find(h => h.address === kol.walletAddress);
@@ -202,28 +202,28 @@ export async function analyzeAndFlag(
           analysis.tokenAddress,
           'cabal_token',
           85,
-          `${kolHolders.length} known KOL wallets in top holders (${totalKolPercentage.toFixed(1)}% supply): ${kolNames}`,
+          `${kolHolders.length} influential wallets in top holders (${totalKolPercentage.toFixed(1)}% supply): ${kolNames}`,
           'rules_engine'
         );
         
-        // Flag individual KOL wallets as potential cabal members
+        // Flag individual wallets as potential coordinated pump participants
         for (const kol of kolHolders) {
           await flagWallet(
             kol.walletAddress,
             'cabal_member',
             65,
-            `Participated in coordinated early buying with ${kolHolders.length - 1} other KOLs on ${analysis.tokenMetadata.symbol}`,
+            `Participated in coordinated early buying with ${kolHolders.length - 1} other wallets on ${analysis.tokenMetadata.symbol}`,
             'rules_engine'
           );
         }
       } else if (kolHolders.length === 2) {
-        // 2 KOLs is moderately suspicious
+        // 2 influential wallets is moderately suspicious
         const kolNames = kolHolders.map(k => k.displayName || k.walletAddress.substring(0, 8)).join(', ');
         await flagWallet(
           analysis.tokenAddress,
           'possible_cabal',
           60,
-          `2 known KOL wallets in top holders: ${kolNames}`,
+          `2 influential wallets in top holders: ${kolNames}`,
           'rules_engine'
         );
       }
@@ -263,7 +263,7 @@ export async function analyzeAndFlag(
                 'rules_engine'
               );
               
-              // Check if any bundled wallets are KOLs
+              // Check if any bundled wallets are influential
               const bundledAddresses = Array.from(uniqueWallets) as string[];
               const bundledKols = await storage.getKolWalletsByAddresses(bundledAddresses);
               
@@ -272,7 +272,7 @@ export async function analyzeAndFlag(
                   analysis.tokenAddress,
                   'kol_bundle',
                   90,
-                  `KOL bundling detected: ${bundledKols.length} known KOLs bought simultaneously`,
+                  `Coordinated bundling detected: ${bundledKols.length} influential wallets bought simultaneously`,
                   'rules_engine'
                 );
               }
@@ -284,13 +284,13 @@ export async function analyzeAndFlag(
       }
     }
     
-    // RULE 9: High-Influence KOL Participation Warning
+    // RULE 9: High-Influence Wallet Participation Warning
     // Not necessarily malicious, but worth flagging for transparency
     if (analysis.topHolders && analysis.topHolders.length > 0) {
       const holderAddresses = analysis.topHolders.slice(0, 10).map(h => h.address);
       const topKols = await storage.getKolWalletsByAddresses(holderAddresses);
       
-      // Check for high-influence KOLs (influence score > 70)
+      // Check for high-influence wallets (influence score > 70)
       const highInfluenceKols = topKols.filter(k => (k.influenceScore || 0) > 70);
       
       if (highInfluenceKols.length > 0) {
@@ -299,7 +299,7 @@ export async function analyzeAndFlag(
           analysis.tokenAddress,
           'kol_promoted',
           45, // Lower severity - not necessarily bad
-          `High-influence KOL participation: ${kolNames}`,
+          `High-influence wallet participation: ${kolNames}`,
           'rules_engine'
         );
       }

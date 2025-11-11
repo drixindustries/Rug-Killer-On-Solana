@@ -362,10 +362,10 @@ export type WalletChallenge = typeof walletChallenges.$inferSelect;
 export type InsertWalletChallenge = typeof walletChallenges.$inferInsert;
 
 // ============================================================================
-// KOL (KEY OPINION LEADER) TRACKING
+// INFLUENTIAL WALLET TRACKING
 // ============================================================================
 
-// KOL wallet tracking for cabal detection and influence analysis
+// Smart money wallet tracking for coordinated activity detection and influence analysis
 export const kolWallets = pgTable("kol_wallets", {
   id: serial("id").primaryKey(),
   walletAddress: varchar("wallet_address", { length: 255 }).notNull().unique(),

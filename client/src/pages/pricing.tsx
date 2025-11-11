@@ -73,7 +73,7 @@ const pricingTiers = [
       "Real-time alerts",
       "Custom watchlists",
       "API access",
-      "Advanced KOL tracking",
+      "Advanced smart money tracking",
       "Bundling detection",
       "Historical data (90 days)",
       "White-glove support",

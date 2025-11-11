@@ -303,7 +303,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         // Coming soon features
         embed.addFields({
           name: '🔜 Coming Soon',
-          value: '• Past rug history\n• Serial rugger detection\n• KOL shill tracking\n• Hidden wallet connections'
+          value: '• Past rug history\n• Serial rugger detection\n• Coordinated pump detection\n• Hidden wallet connections'
         });
         
         await interaction.editReply({ embeds: [embed] });

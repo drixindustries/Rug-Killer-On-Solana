@@ -20,7 +20,7 @@ Your bots are **100% ready** with all features:
 - Server-wide real-time alerts (optional)
 
 ### **Alpha Alerts** 🔥
-- Monitors top Solana alpha callers (Gemnl, ATM.day, Alpha Gardner)
+- Monitors influential wallet activity from configurable watchlists
 - Real-time pump.fun new token launches via WebSocket
 - Quality filtering: RugCheck > 85, no honeypots, liquidity > $5K
 - Auto-pings Discord/Telegram channels with @everyone

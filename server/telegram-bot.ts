@@ -244,7 +244,7 @@ function createTelegramBot(botToken: string): Telegraf {
       message += `🔜 **COMING SOON**\n`;
       message += `• Past rug history\n`;
       message += `• Serial rugger detection\n`;
-      message += `• KOL shill tracking\n`;
+      message += `• Coordinated pump detection\n`;
       message += `• Hidden wallet connections`;
       
       await ctx.reply(message, { parse_mode: 'Markdown' });
