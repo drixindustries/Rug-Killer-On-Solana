@@ -12,6 +12,8 @@ import {
   mapPlanToTier,
   WHOP_PLAN_IDS 
 } from "./whop-client";
+import { VanityAddressGenerator } from "./vanity-generator";
+import { z } from "zod";
 
 // Middleware: Requires active subscription OR 10M+ token holder status
 // This gates all premium features including token analysis, crypto payments, and bot access
@@ -678,6 +680,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({
         error: "Analysis failed",
         message: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    }
+  });
+
+  // Vanity address generator routes
+  const vanityEstimateSchema = z.object({
+    pattern: z.string().min(1).max(10),
+    matchType: z.enum(['prefix', 'suffix', 'contains']),
+  });
+
+  app.post('/api/vanity/estimate', isAuthenticated, async (req, res) => {
+    try {
+      const { pattern, matchType } = vanityEstimateSchema.parse(req.body);
+      const estimate = VanityAddressGenerator.estimateDifficulty(pattern, matchType);
+      return res.json(estimate);
+    } catch (error) {
+      console.error("Vanity estimate error:", error);
+      return res.status(400).json({
+        error: "Invalid request",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  const vanityGenerateSchema = z.object({
+    pattern: z.string().min(1).max(10),
+    matchType: z.enum(['prefix', 'suffix', 'contains']),
+    caseSensitive: z.boolean().optional(),
+    maxAttempts: z.number().min(1000).max(50_000_000).optional(),
+  });
+
+  app.post('/api/vanity/generate', isAuthenticated, async (req, res) => {
+    try {
+      const options = vanityGenerateSchema.parse(req.body);
+      const generator = new VanityAddressGenerator();
+      
+      // Set a timeout to prevent hanging forever
+      const timeout = setTimeout(() => {
+        generator.stop();
+      }, 60_000); // 60 second max
+
+      const result = await generator.generate(options);
+      clearTimeout(timeout);
+
+      if (!result) {
+        return res.status(404).json({
+          error: "No match found",
+          message: `Could not find a matching address within ${options.maxAttempts || 10_000_000} attempts`,
+        });
+      }
+
+      return res.json(result);
+    } catch (error) {
+      console.error("Vanity generation error:", error);
+      return res.status(500).json({
+        error: "Generation failed",
+        message: error instanceof Error ? error.message : "Unknown error",
       });
     }
   });
