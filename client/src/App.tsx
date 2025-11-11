@@ -9,6 +9,7 @@ import Landing from "@/pages/landing";
 import Subscription from "@/pages/subscription";
 import Pricing from "@/pages/pricing";
 import Documentation from "@/pages/documentation";
+import VanityGenerator from "@/pages/vanity-generator";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -27,6 +28,7 @@ function Router() {
           <Route path="/subscription" component={Subscription} />
           <Route path="/pricing" component={Pricing} />
           <Route path="/documentation" component={Documentation} />
+          <Route path="/vanity" component={VanityGenerator} />
         </>
       )}
       <Route component={NotFound} />
