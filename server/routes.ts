@@ -27,6 +27,14 @@ export const hasActiveAccess = async (req: any, res: any, next: any) => {
     }
 
     const userId = req.user.claims.sub;
+    const userEmail = req.user.claims.email;
+    
+    // ADMIN BYPASS: Allow admin emails full access for testing
+    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(e => e);
+    if (adminEmails.length > 0 && adminEmails.includes(userEmail)) {
+      console.log(`✅ Admin bypass granted to ${userEmail}`);
+      return next();
+    }
     
     // Check access via storage helper
     const accessCheck = await storage.hasActiveAccess(userId);
