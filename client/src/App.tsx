@@ -8,11 +8,13 @@ import Home from "@/pages/home";
 import Landing from "@/pages/landing";
 import Subscription from "@/pages/subscription";
 import Pricing from "@/pages/pricing";
+import Features from "@/pages/features";
 import Documentation from "@/pages/documentation";
 import About from "@/pages/about";
 import VanityGenerator from "@/pages/vanity-generator";
 import AdminWallet from "@/pages/admin-wallet";
 import Admin from "@/pages/admin";
+import BotSetup from "@/pages/bot-setup";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -23,6 +25,8 @@ function Router() {
       {isLoading || !isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
+          <Route path="/features" component={Features} />
+          <Route path="/bot-setup" component={BotSetup} />
           <Route path="/documentation" component={Documentation} />
           <Route path="/about" component={About} />
         </>
@@ -31,6 +35,8 @@ function Router() {
           <Route path="/" component={Home} />
           <Route path="/subscription" component={Subscription} />
           <Route path="/pricing" component={Pricing} />
+          <Route path="/features" component={Features} />
+          <Route path="/bot-setup" component={BotSetup} />
           <Route path="/documentation" component={Documentation} />
           <Route path="/about" component={About} />
           <Route path="/vanity" component={VanityGenerator} />

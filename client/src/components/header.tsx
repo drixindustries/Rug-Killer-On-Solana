@@ -91,6 +91,26 @@ export function Header({ onNewAnalysis }: HeaderProps) {
             </Button>
           </Link>
           
+          <Link href="/features">
+            <Button 
+              variant="ghost"
+              size="sm"
+              data-testid="button-features"
+            >
+              Features
+            </Button>
+          </Link>
+          
+          <Link href="/bot-setup">
+            <Button 
+              variant="ghost"
+              size="sm"
+              data-testid="button-bot-setup"
+            >
+              Bot Setup
+            </Button>
+          </Link>
+          
           <Link href="/documentation">
             <Button 
               variant="ghost"

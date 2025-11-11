@@ -23,7 +23,7 @@ export default function BotSetup() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
       <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-4" data-testid="heading-bot-setup">🤖 Bot Setup Guide</h1>
+        <h1 className="text-4xl font-bold mb-4" data-testid="heading-bot-setup">Bot Setup Guide</h1>
         <p className="text-lg text-muted-foreground">
           Set up your Telegram and Discord bots in 20 minutes. All features are already built and ready to go!
         </p>
@@ -52,7 +52,7 @@ export default function BotSetup() {
               <ul className="space-y-1 text-sm text-muted-foreground">
                 <li>• Monitors top Solana alpha callers</li>
                 <li>• Real-time pump.fun launches</li>
-                <li>• Quality filtering (RugCheck > 85)</li>
+                <li>• Quality filtering (RugCheck {'>'}  85)</li>
                 <li>• Auto-pings Discord/Telegram</li>
               </ul>
             </div>
