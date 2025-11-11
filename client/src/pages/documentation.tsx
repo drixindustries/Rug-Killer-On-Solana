@@ -3,14 +3,14 @@ import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, Shield, Zap, TrendingUp, Lock, Database, Bot, Wallet } from "lucide-react";
+import { Download, Shield, Zap, TrendingUp, Lock, Database, Bot, Wallet, Code, AlertTriangle, CheckCircle } from "lucide-react";
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 
-// PDF Document Component
+// PDF Document Component with comprehensive content
 const pdfStyles = StyleSheet.create({
   page: {
     padding: 40,
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'Helvetica',
   },
   title: {
@@ -19,25 +19,33 @@ const pdfStyles = StyleSheet.create({
     fontWeight: 'bold',
   },
   section: {
-    marginBottom: 15,
+    marginBottom: 12,
   },
   heading: {
     fontSize: 16,
     marginBottom: 8,
     fontWeight: 'bold',
+    color: '#1a1a1a',
   },
   subheading: {
-    fontSize: 14,
+    fontSize: 13,
     marginBottom: 6,
     fontWeight: 'bold',
+    color: '#2a2a2a',
   },
   text: {
-    marginBottom: 5,
-    lineHeight: 1.5,
+    marginBottom: 4,
+    lineHeight: 1.4,
   },
   list: {
     marginLeft: 15,
-    marginBottom: 5,
+    marginBottom: 4,
+  },
+  code: {
+    fontFamily: 'Courier',
+    fontSize: 10,
+    backgroundColor: '#f5f5f5',
+    padding: 2,
   },
   footer: {
     position: 'absolute',
@@ -45,7 +53,7 @@ const pdfStyles = StyleSheet.create({
     left: 40,
     right: 40,
     textAlign: 'center',
-    fontSize: 10,
+    fontSize: 9,
     color: 'gray',
   },
 });
@@ -59,162 +67,284 @@ const DocumentationPDF = () => (
         <Text style={pdfStyles.heading}>Overview</Text>
         <Text style={pdfStyles.text}>
           Solana Rug Killer is a comprehensive web application designed to analyze Solana SPL tokens 
-          for potential rug pull risks. It provides real-time analysis by checking for common indicators 
-          such as mint/freeze authority, holder concentration, liquidity pool status, and suspicious 
-          transaction patterns.
+          for potential rug pull risks. It provides real-time analysis by aggregating data from multiple 
+          trusted sources and applying AI-powered detection algorithms to identify common indicators such 
+          as mint/freeze authority, holder concentration, liquidity pool status, and suspicious transaction patterns.
         </Text>
       </View>
 
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>Key Features</Text>
-        <Text style={pdfStyles.subheading}>Multi-Source Analysis</Text>
+        <Text style={pdfStyles.heading}>Multi-Source Analysis</Text>
+        <Text style={pdfStyles.text}>
+          Our platform aggregates data from four major blockchain intelligence sources:
+        </Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Rugcheck.xyz - Community-driven risk scores</Text>
-          <Text style={pdfStyles.text}>• GoPlus Security - Honeypot & scam detection</Text>
-          <Text style={pdfStyles.text}>• DexScreener - Real-time market data</Text>
-          <Text style={pdfStyles.text}>• Jupiter Aggregator - Price verification</Text>
-        </View>
-
-        <Text style={pdfStyles.subheading}>Token Analysis</Text>
-        <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Authority checks (mint/freeze)</Text>
-          <Text style={pdfStyles.text}>• Holder analysis (top 20, concentration)</Text>
-          <Text style={pdfStyles.text}>• Liquidity assessment</Text>
-          <Text style={pdfStyles.text}>• 0-100 risk scoring with detailed red flags</Text>
-          <Text style={pdfStyles.text}>• BubbleMaps visual holder distribution</Text>
-        </View>
-
-        <Text style={pdfStyles.subheading}>Telegram & Discord Bots</Text>
-        <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• /execute [token] - Full risk analysis</Text>
-          <Text style={pdfStyles.text}>• /first20 [token] - Top 20 holder analysis</Text>
-          <Text style={pdfStyles.text}>• /devtorture [wallet] - Dev wallet history</Text>
-          <Text style={pdfStyles.text}>• /blacklist [wallet] - Check wallet flags</Text>
+          <Text style={pdfStyles.text}>• Rugcheck.xyz - Community-driven risk scores and liquidity analysis</Text>
+          <Text style={pdfStyles.text}>• GoPlus Security - Honeypot detection, contract security scanning, scam flags</Text>
+          <Text style={pdfStyles.text}>• DexScreener - Real-time market data (price, volume, liquidity, market cap)</Text>
+          <Text style={pdfStyles.text}>• Jupiter Aggregator - Price verification and liquidity aggregation</Text>
         </View>
       </View>
 
       <View style={pdfStyles.section}>
+        <Text style={pdfStyles.heading}>Token Analysis Features</Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>• Authority checks - Detects if mint or freeze authority is enabled</Text>
+          <Text style={pdfStyles.text}>• Holder analysis - Top 20 holders with concentration percentage</Text>
+          <Text style={pdfStyles.text}>• Liquidity assessment - Checks for locked liquidity and pool depth</Text>
+          <Text style={pdfStyles.text}>• Risk scoring - 0-100 score with detailed red flag breakdown</Text>
+          <Text style={pdfStyles.text}>• BubbleMaps visualization - Interactive holder distribution maps</Text>
+          <Text style={pdfStyles.text}>• Transaction history - Recent significant transactions and patterns</Text>
+          <Text style={pdfStyles.text}>• AI blacklist checks - Automatic flagging of suspicious wallets</Text>
+        </View>
+      </View>
+
+      <View style={pdfStyles.section}>
+        <Text style={pdfStyles.heading}>Telegram & Discord Bots</Text>
+        <Text style={pdfStyles.subheading}>Available Commands:</Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>• /execute [token] - Full comprehensive risk analysis</Text>
+          <Text style={pdfStyles.text}>• /first20 [token] - Detailed top 20 holder breakdown</Text>
+          <Text style={pdfStyles.text}>• /devtorture [wallet] - Complete dev wallet transaction history</Text>
+          <Text style={pdfStyles.text}>• /blacklist [wallet] - Check if wallet is flagged in AI blacklist</Text>
+        </View>
+        <Text style={pdfStyles.text}>
+          Both bots support markdown formatting (Telegram) and rich embeds (Discord) with color-coded 
+          risk indicators (green/yellow/orange/red) for quick visual assessment.
+        </Text>
+      </View>
+
+      <View style={pdfStyles.section}>
         <Text style={pdfStyles.heading}>Subscription Tiers</Text>
+        
         <Text style={pdfStyles.subheading}>FREE Trial - $0 for 7 days</Text>
         <View style={pdfStyles.list}>
           <Text style={pdfStyles.text}>• 3 token analyses per day</Text>
-          <Text style={pdfStyles.text}>• Basic risk score</Text>
-          <Text style={pdfStyles.text}>• Top 20 holder analysis</Text>
+          <Text style={pdfStyles.text}>• Basic risk score and holder analysis</Text>
+          <Text style={pdfStyles.text}>• No credit card required</Text>
         </View>
 
         <Text style={pdfStyles.subheading}>PRO - $29/month</Text>
         <View style={pdfStyles.list}>
           <Text style={pdfStyles.text}>• Unlimited token analyses</Text>
-          <Text style={pdfStyles.text}>• Full AI detection</Text>
-          <Text style={pdfStyles.text}>• BubbleMaps visualization</Text>
+          <Text style={pdfStyles.text}>• Full AI blacklist detection</Text>
+          <Text style={pdfStyles.text}>• BubbleMaps visual holder distribution</Text>
           <Text style={pdfStyles.text}>• Telegram & Discord bot access</Text>
-          <Text style={pdfStyles.text}>• Blacklist database access</Text>
+          <Text style={pdfStyles.text}>• Blacklist database query access</Text>
+          <Text style={pdfStyles.text}>• Priority support</Text>
         </View>
 
         <Text style={pdfStyles.subheading}>WHALE - $99/month</Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Everything in PRO</Text>
-          <Text style={pdfStyles.text}>• Real-time alerts</Text>
-          <Text style={pdfStyles.text}>• API access</Text>
-          <Text style={pdfStyles.text}>• Advanced KOL tracking</Text>
+          <Text style={pdfStyles.text}>• Everything in PRO tier</Text>
+          <Text style={pdfStyles.text}>• Real-time liquidity alerts</Text>
+          <Text style={pdfStyles.text}>• REST API access with 10,000 requests/month</Text>
+          <Text style={pdfStyles.text}>• Advanced KOL wallet tracking</Text>
           <Text style={pdfStyles.text}>• Team collaboration (up to 5 users)</Text>
+          <Text style={pdfStyles.text}>• Custom webhook integrations</Text>
         </View>
 
         <Text style={pdfStyles.subheading}>$KILL Holder - FREE Forever</Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Hold 10M+ $KILL tokens</Text>
-          <Text style={pdfStyles.text}>• Lifetime access to WHALE tier</Text>
-          <Text style={pdfStyles.text}>• Exclusive holder perks</Text>
+          <Text style={pdfStyles.text}>• Hold 10M+ official $KILL tokens</Text>
+          <Text style={pdfStyles.text}>• Lifetime access to WHALE tier features</Text>
+          <Text style={pdfStyles.text}>• Exclusive holder perks and governance rights</Text>
+          <Text style={pdfStyles.text}>• Connect wallet via Phantom to verify holdings</Text>
         </View>
       </View>
 
       <Text style={pdfStyles.footer}>
-        © 2025 Solana Rug Killer - Protecting Solana investors from rug pulls
+        © 2025 Solana Rug Killer - Page 1 of 3
       </Text>
     </Page>
 
     <Page size="A4" style={pdfStyles.page}>
-      <Text style={pdfStyles.title}>Technical Architecture</Text>
+      <Text style={pdfStyles.title}>Security & Access Control</Text>
 
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>Technology Stack</Text>
-        <Text style={pdfStyles.subheading}>Frontend</Text>
+        <Text style={pdfStyles.heading}>Challenge-Response Wallet Verification</Text>
+        <Text style={pdfStyles.text}>
+          Our wallet verification system uses cryptographic signatures to prevent replay attacks:
+        </Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• React with TypeScript</Text>
-          <Text style={pdfStyles.text}>• Vite for build tooling</Text>
-          <Text style={pdfStyles.text}>• Shadcn UI & Tailwind CSS</Text>
-          <Text style={pdfStyles.text}>• React Query for data fetching</Text>
-          <Text style={pdfStyles.text}>• Wouter for routing</Text>
-        </View>
-
-        <Text style={pdfStyles.subheading}>Backend</Text>
-        <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Express.js with TypeScript</Text>
-          <Text style={pdfStyles.text}>• PostgreSQL database</Text>
-          <Text style={pdfStyles.text}>• @solana/web3.js for blockchain interaction</Text>
-          <Text style={pdfStyles.text}>• Whop SDK for subscription payments</Text>
+          <Text style={pdfStyles.text}>1. User requests challenge from GET /api/wallet/challenge (5-minute expiry)</Text>
+          <Text style={pdfStyles.text}>2. User signs challenge with Phantom wallet using Ed25519 signature</Text>
+          <Text style={pdfStyles.text}>3. User submits POST /api/wallet/verify with wallet address, signature, and challenge</Text>
+          <Text style={pdfStyles.text}>4. Server validates: challenge exists, not expired, not used, signature valid, 10M+ tokens</Text>
+          <Text style={pdfStyles.text}>5. Challenge marked as used (single-use enforcement)</Text>
+          <Text style={pdfStyles.text}>6. Access granted for 24 hours, then revalidation required</Text>
         </View>
       </View>
 
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>Security Features</Text>
-        <Text style={pdfStyles.subheading}>Access Control</Text>
+        <Text style={pdfStyles.heading}>Access Control Rules</Text>
+        <Text style={pdfStyles.text}>
+          Protected endpoints require EITHER active subscription OR verified token holdings:
+        </Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Active subscription OR 10M+ $KILL tokens required</Text>
-          <Text style={pdfStyles.text}>• Challenge-response wallet verification</Text>
-          <Text style={pdfStyles.text}>• Ed25519 signature validation</Text>
-          <Text style={pdfStyles.text}>• Anti-replay protection with single-use challenges</Text>
-          <Text style={pdfStyles.text}>• 24-hour token holder revalidation</Text>
-        </View>
-
-        <Text style={pdfStyles.subheading}>Payment Security</Text>
-        <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Whop Merchant of Record (2.7% + $0.30 fees)</Text>
-          <Text style={pdfStyles.text}>• Hosted secure checkout</Text>
-          <Text style={pdfStyles.text}>• Automatic tax compliance</Text>
-          <Text style={pdfStyles.text}>• Webhook lifecycle management</Text>
+          <Text style={pdfStyles.text}>• Subscription check: Status = 'active' or 'trialing' AND currentPeriodEnd {'>'} now</Text>
+          <Text style={pdfStyles.text}>• Token holder check: isEligible = true AND lastVerifiedAt {'<'} 24 hours ago</Text>
+          <Text style={pdfStyles.text}>• Official token mint address is server-controlled (prevents bypass)</Text>
+          <Text style={pdfStyles.text}>• Auto-expiry when subscription or trial ends</Text>
         </View>
       </View>
 
       <View style={pdfStyles.section}>
         <Text style={pdfStyles.heading}>AI Blacklist System</Text>
+        <Text style={pdfStyles.text}>
+          Automated detection engine with 6 rules analyzing 52+ risk metrics:
+        </Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• 6 automated detection rules</Text>
-          <Text style={pdfStyles.text}>• Analyzes 52+ risk metrics</Text>
-          <Text style={pdfStyles.text}>• Flags honeypots, high sell tax, suspicious authorities</Text>
-          <Text style={pdfStyles.text}>• Wash trading pattern detection</Text>
-          <Text style={pdfStyles.text}>• Severity scoring with evidence tracking</Text>
+          <Text style={pdfStyles.text}>• Honeypot detection (severity: 90) - Tokens that can't be sold</Text>
+          <Text style={pdfStyles.text}>• High sell tax (severity: 80) - Excessive transaction fees</Text>
+          <Text style={pdfStyles.text}>• Suspicious authorities (severity: 75) - Mint/freeze enabled</Text>
+          <Text style={pdfStyles.text}>• Wash trading patterns (severity: 70) - Artificial volume</Text>
+          <Text style={pdfStyles.text}>• KOL cabal detection - Coordinated pump schemes</Text>
+          <Text style={pdfStyles.text}>• Evidence tracking with timestamped entries and deduplication</Text>
+        </View>
+      </View>
+
+      <View style={pdfStyles.section}>
+        <Text style={pdfStyles.heading}>Payment Systems</Text>
+        
+        <Text style={pdfStyles.subheading}>Whop Subscriptions</Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>• Merchant of Record handling (2.7% + $0.30 fees)</Text>
+          <Text style={pdfStyles.text}>• Hosted secure checkout with automatic tax compliance</Text>
+          <Text style={pdfStyles.text}>• Webhook lifecycle events: payment.succeeded, membership status changes</Text>
+          <Text style={pdfStyles.text}>• Status vocabulary: "valid", "trialing", "past_due", "cancelled", "expired"</Text>
+        </View>
+
+        <Text style={pdfStyles.subheading}>Crypto Payments (SOL only)</Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>• Production-ready Solana payment processing</Text>
+          <Text style={pdfStyles.text}>• Requires 6 blockchain confirmations before activation</Text>
+          <Text style={pdfStyles.text}>• Payment address generation with blockchain monitoring</Text>
+          <Text style={pdfStyles.text}>• Full audit trail in payment_audit table</Text>
+          <Text style={pdfStyles.text}>• ETH/BTC payments blocked (SOL-only security policy)</Text>
+        </View>
+      </View>
+
+      <Text style={pdfStyles.footer}>
+        © 2025 Solana Rug Killer - Page 2 of 3
+      </Text>
+    </Page>
+
+    <Page size="A4" style={pdfStyles.page}>
+      <Text style={pdfStyles.title}>API Endpoints & Setup</Text>
+
+      <View style={pdfStyles.section}>
+        <Text style={pdfStyles.heading}>Main API Endpoints</Text>
+        
+        <Text style={pdfStyles.subheading}>Token Analysis</Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>POST /api/analyze-token - Submit token address for analysis (requires access)</Text>
+          <Text style={pdfStyles.text}>GET /api/analysis/:id - Retrieve analysis results</Text>
+        </View>
+
+        <Text style={pdfStyles.subheading}>Wallet Verification</Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>GET /api/wallet/challenge - Request verification challenge (5min expiry)</Text>
+          <Text style={pdfStyles.text}>POST /api/wallet/verify - Submit signed challenge for verification</Text>
+          <Text style={pdfStyles.text}>GET /api/wallet - Get current wallet connection status</Text>
+        </View>
+
+        <Text style={pdfStyles.subheading}>Blacklist Operations</Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>GET /api/blacklist/check/:wallet - Check if wallet is flagged</Text>
+          <Text style={pdfStyles.text}>POST /api/blacklist/report - Submit wallet report with evidence</Text>
+          <Text style={pdfStyles.text}>GET /api/blacklist/stats - Get blacklist statistics</Text>
+          <Text style={pdfStyles.text}>GET /api/blacklist/top - Top flagged wallets by severity</Text>
+        </View>
+
+        <Text style={pdfStyles.subheading}>Bot Integration</Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>GET /api/bot/invite-links - Get Telegram/Discord bot invite URLs</Text>
+        </View>
+      </View>
+
+      <View style={pdfStyles.section}>
+        <Text style={pdfStyles.heading}>Environment Variables</Text>
+        
+        <Text style={pdfStyles.subheading}>Required for Whop Subscriptions</Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>WHOP_API_KEY - Whop API key from developer dashboard</Text>
+          <Text style={pdfStyles.text}>WHOP_APP_ID - Whop application ID</Text>
+          <Text style={pdfStyles.text}>WHOP_COMPANY_ID - Whop company/business ID</Text>
+          <Text style={pdfStyles.text}>WHOP_PLAN_ID_BASIC - Plan ID for $29/mo PRO tier</Text>
+          <Text style={pdfStyles.text}>WHOP_PLAN_ID_PREMIUM - Plan ID for $99/mo WHALE tier</Text>
+        </View>
+
+        <Text style={pdfStyles.subheading}>Required for Token Gating</Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>OFFICIAL_TOKEN_MINT_ADDRESS - SPL token mint for 10M+ access verification</Text>
+        </View>
+
+        <Text style={pdfStyles.subheading}>Optional for Bots</Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>TELEGRAM_BOT_TOKEN - From @BotFather on Telegram</Text>
+          <Text style={pdfStyles.text}>DISCORD_BOT_TOKEN - From Discord Developer Portal</Text>
+          <Text style={pdfStyles.text}>DISCORD_CLIENT_ID - Discord application ID</Text>
         </View>
       </View>
 
       <View style={pdfStyles.section}>
         <Text style={pdfStyles.heading}>Getting Started</Text>
+        
         <Text style={pdfStyles.subheading}>Step 1: Create Account</Text>
         <Text style={pdfStyles.text}>
-          Sign up with Google, GitHub, X (Twitter), Apple, or email/password through our 
-          Replit Auth integration.
+          Sign up using Google, GitHub, X (Twitter), Apple, or email/password through 
+          Replit Auth integration. Account creation is instant and free.
         </Text>
 
-        <Text style={pdfStyles.subheading}>Step 2: Start Free Trial</Text>
+        <Text style={pdfStyles.subheading}>Step 2: Start Free Trial (Optional)</Text>
         <Text style={pdfStyles.text}>
-          Get 7 days of free access with 3 analyses per day. No credit card required.
+          Get 7 days of free access with 3 analyses per day. No credit card required. 
+          Trial starts automatically upon first login.
         </Text>
 
-        <Text style={pdfStyles.subheading}>Step 3: Analyze Tokens</Text>
+        <Text style={pdfStyles.subheading}>Step 3: Analyze Your First Token</Text>
         <Text style={pdfStyles.text}>
-          Paste any Solana token address to receive comprehensive risk analysis including holder 
-          distribution, authority checks, and market data.
+          Navigate to the main dashboard and paste any Solana token address (e.g., 
+          EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v for USDC). Click "Analyze" 
+          to receive comprehensive risk analysis including holder distribution, authority 
+          checks, market data, and AI-powered red flags.
         </Text>
 
-        <Text style={pdfStyles.subheading}>Step 4: Upgrade (Optional)</Text>
+        <Text style={pdfStyles.subheading}>Step 4: Connect Phantom Wallet (Optional)</Text>
         <Text style={pdfStyles.text}>
-          Subscribe to PRO ($29/mo) or WHALE ($99/mo) for unlimited access, bot integration, 
-          and advanced features. Alternatively, hold 10M+ $KILL tokens for lifetime free access.
+          If you hold 10M+ official $KILL tokens, click "Connect Wallet" in the header, 
+          sign the challenge with Phantom wallet, and gain instant WHALE tier access 
+          without subscription. Revalidation required every 24 hours.
+        </Text>
+
+        <Text style={pdfStyles.subheading}>Step 5: Upgrade to PRO or WHALE</Text>
+        <Text style={pdfStyles.text}>
+          Visit /pricing to view detailed tier comparisons. Click "Subscribe" on your 
+          preferred tier to redirect to Whop's secure checkout. Payment processed via 
+          Whop with automatic subscription management and tax compliance.
+        </Text>
+
+        <Text style={pdfStyles.subheading}>Step 6: Enable Bot Access</Text>
+        <Text style={pdfStyles.text}>
+          Once subscribed, visit header/footer bot icons to get Telegram and Discord 
+          invite links. Add bots to your channels and use /execute, /first20, 
+          /devtorture, and /blacklist commands for instant analysis.
         </Text>
       </View>
 
+      <View style={pdfStyles.section}>
+        <Text style={pdfStyles.heading}>Support & Resources</Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>• Website: https://solana-rug-killer.replit.app</Text>
+          <Text style={pdfStyles.text}>• Documentation: /documentation route</Text>
+          <Text style={pdfStyles.text}>• Pricing: /pricing route</Text>
+          <Text style={pdfStyles.text}>• Contact: Available through the website</Text>
+        </View>
+      </View>
+
       <Text style={pdfStyles.footer}>
-        For support: Contact us through the website | Visit: https://solana-rug-killer.replit.app
+        © 2025 Solana Rug Killer - Page 3 of 3 | Protecting Solana investors from rug pulls
       </Text>
     </Page>
   </Document>
@@ -234,7 +364,7 @@ export default function Documentation() {
               <h1 className="text-4xl font-bold">Complete Documentation</h1>
             </div>
             <p className="text-lg text-muted-foreground mb-6">
-              Everything you need to know about Solana Rug Killer
+              Everything you need to know about Solana Rug Killer - comprehensive guide with PDF download
             </p>
             
             <PDFDownloadLink
@@ -244,7 +374,7 @@ export default function Documentation() {
               {({ loading }) => (
                 <Button size="lg" disabled={loading} data-testid="button-download-pdf">
                   <Download className="h-4 w-4 mr-2" />
-                  {loading ? 'Preparing PDF...' : 'Download PDF Documentation'}
+                  {loading ? 'Preparing PDF...' : 'Download Complete PDF Guide'}
                 </Button>
               )}
             </PDFDownloadLink>
@@ -261,14 +391,14 @@ export default function Documentation() {
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">
                 Solana Rug Killer is a comprehensive web application designed to analyze Solana SPL tokens 
-                for potential rug pull risks. It provides real-time analysis by checking for common indicators 
-                such as mint/freeze authority, holder concentration, liquidity pool status, and suspicious 
-                transaction patterns.
+                for potential rug pull risks. It provides real-time analysis by aggregating data from multiple 
+                trusted sources and applying AI-powered detection algorithms to identify common indicators such 
+                as mint/freeze authority, holder concentration, liquidity pool status, and suspicious transaction patterns.
               </p>
               <p className="text-muted-foreground">
                 Our platform leverages advanced analytics and AI-driven insights to protect users from 
-                fraudulent schemes in the Solana ecosystem, combining data from multiple trusted sources 
-                to give you the most accurate risk assessment possible.
+                fraudulent schemes in the Solana ecosystem, combining data from Rugcheck, GoPlus Security, 
+                DexScreener, and Jupiter Aggregator to give you the most accurate risk assessment possible.
               </p>
             </CardContent>
           </Card>
@@ -281,25 +411,37 @@ export default function Documentation() {
                   <Database className="h-5 w-5 text-primary" />
                   <CardTitle>Multi-Source Analysis</CardTitle>
                 </div>
-                <CardDescription>Aggregates data from multiple trusted sources</CardDescription>
+                <CardDescription>Aggregates data from four major blockchain intelligence sources</CardDescription>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2 text-sm">
+                <ul className="space-y-3 text-sm">
                   <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span><strong>Rugcheck.xyz</strong> - Community-driven risk scores</span>
+                    <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <div>
+                      <strong>Rugcheck.xyz</strong>
+                      <p className="text-muted-foreground text-xs">Community-driven risk scores and liquidity analysis</p>
+                    </div>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span><strong>GoPlus Security</strong> - Honeypot & scam detection</span>
+                    <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <div>
+                      <strong>GoPlus Security</strong>
+                      <p className="text-muted-foreground text-xs">Honeypot detection, contract security scanning, scam detection flags</p>
+                    </div>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span><strong>DexScreener</strong> - Real-time market data</span>
+                    <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <div>
+                      <strong>DexScreener</strong>
+                      <p className="text-muted-foreground text-xs">Real-time market data (price, volume, liquidity, market cap)</p>
+                    </div>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span><strong>Jupiter Aggregator</strong> - Price verification</span>
+                    <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <div>
+                      <strong>Jupiter Aggregator</strong>
+                      <p className="text-muted-foreground text-xs">Price verification and liquidity aggregation across Solana DEXs</p>
+                    </div>
                   </li>
                 </ul>
               </CardContent>
@@ -309,31 +451,39 @@ export default function Documentation() {
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <Zap className="h-5 w-5 text-primary" />
-                  <CardTitle>Token Analysis</CardTitle>
+                  <CardTitle>Token Analysis Features</CardTitle>
                 </div>
-                <CardDescription>Comprehensive risk assessment</CardDescription>
+                <CardDescription>Comprehensive risk assessment across multiple dimensions</CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
                     <span className="text-primary">•</span>
-                    <span>Authority checks (mint/freeze)</span>
+                    <span><strong>Authority checks</strong> - Detects if mint or freeze authority is enabled</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-primary">•</span>
-                    <span>Holder analysis (top 20, concentration)</span>
+                    <span><strong>Holder analysis</strong> - Top 20 holders with concentration percentage</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-primary">•</span>
-                    <span>Liquidity assessment</span>
+                    <span><strong>Liquidity assessment</strong> - Checks for locked liquidity and pool depth</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-primary">•</span>
-                    <span>0-100 risk scoring with detailed red flags</span>
+                    <span><strong>Risk scoring</strong> - 0-100 score with detailed red flag breakdown</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-primary">•</span>
-                    <span>BubbleMaps visual holder distribution</span>
+                    <span><strong>BubbleMaps</strong> - Interactive visual holder distribution maps</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary">•</span>
+                    <span><strong>Transaction history</strong> - Recent significant transactions and patterns</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary">•</span>
+                    <span><strong>AI blacklist checks</strong> - Automatic flagging of suspicious wallets</span>
                   </li>
                 </ul>
               </CardContent>
@@ -345,27 +495,48 @@ export default function Documentation() {
                   <Bot className="h-5 w-5 text-primary" />
                   <CardTitle>Telegram & Discord Bots</CardTitle>
                 </div>
-                <CardDescription>Instant analysis in your messaging apps</CardDescription>
+                <CardDescription>Instant analysis in your messaging apps with color-coded risk indicators</CardDescription>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span><code>/execute [token]</code> - Full risk analysis</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span><code>/first20 [token]</code> - Top 20 holder analysis</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span><code>/devtorture [wallet]</code> - Dev wallet history</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span><code>/blacklist [wallet]</code> - Check wallet flags</span>
-                  </li>
-                </ul>
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <p className="font-semibold mb-2">Available Commands:</p>
+                    <ul className="space-y-2">
+                      <li className="flex items-start gap-2">
+                        <Code className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                        <div>
+                          <code className="text-xs bg-muted px-1 py-0.5 rounded">/execute [token]</code>
+                          <p className="text-muted-foreground text-xs">Full comprehensive risk analysis</p>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <Code className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                        <div>
+                          <code className="text-xs bg-muted px-1 py-0.5 rounded">/first20 [token]</code>
+                          <p className="text-muted-foreground text-xs">Detailed top 20 holder breakdown with percentages</p>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <Code className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                        <div>
+                          <code className="text-xs bg-muted px-1 py-0.5 rounded">/devtorture [wallet]</code>
+                          <p className="text-muted-foreground text-xs">Complete dev wallet transaction history and patterns</p>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <Code className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                        <div>
+                          <code className="text-xs bg-muted px-1 py-0.5 rounded">/blacklist [wallet]</code>
+                          <p className="text-muted-foreground text-xs">Check if wallet is flagged in AI blacklist database</p>
+                        </div>
+                      </li>
+                    </ul>
+                  </div>
+                  <p className="text-muted-foreground text-xs">
+                    Both bots support rich formatting (Telegram markdown, Discord embeds) with 
+                    green/yellow/orange/red color-coded risk indicators for quick visual assessment.
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -375,30 +546,100 @@ export default function Documentation() {
                   <Lock className="h-5 w-5 text-primary" />
                   <CardTitle>Security & Access Control</CardTitle>
                 </div>
-                <CardDescription>Enterprise-grade security features</CardDescription>
+                <CardDescription>Enterprise-grade security with challenge-response verification</CardDescription>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span>Challenge-response wallet verification</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span>Ed25519 signature validation</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span>Anti-replay protection</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span>Whop secure payment processing</span>
-                  </li>
-                </ul>
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <p className="font-semibold mb-2">Challenge-Response Wallet Verification:</p>
+                    <ol className="space-y-1 text-xs text-muted-foreground ml-4 list-decimal">
+                      <li>Request challenge from <code className="bg-muted px-1 py-0.5 rounded">GET /api/wallet/challenge</code> (5min expiry)</li>
+                      <li>Sign challenge with Phantom wallet using Ed25519 signature</li>
+                      <li>Submit <code className="bg-muted px-1 py-0.5 rounded">POST /api/wallet/verify</code> with signature</li>
+                      <li>Server validates: challenge exists, not expired, signature valid, 10M+ tokens</li>
+                      <li>Challenge marked as used (prevents replay attacks)</li>
+                      <li>Access granted for 24 hours, then revalidation required</li>
+                    </ol>
+                  </div>
+                  <div>
+                    <p className="font-semibold mb-2">Additional Security Features:</p>
+                    <ul className="space-y-1 text-xs text-muted-foreground">
+                      <li>• Server-controlled official token mint address (prevents bypass)</li>
+                      <li>• Auto-expiry when subscription or trial ends</li>
+                      <li>• Whop secure payment processing with automatic tax compliance</li>
+                      <li>• SOL-only crypto payments with 6-confirmation requirement</li>
+                    </ul>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
+
+          {/* AI Blacklist System */}
+          <Card className="mb-8" data-testid="card-ai-blacklist">
+            <CardHeader>
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="h-5 w-5 text-primary" />
+                <CardTitle>AI Blacklist System</CardTitle>
+              </div>
+              <CardDescription>Automated detection engine with 6 rules analyzing 52+ risk metrics</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="font-semibold mb-2">Detection Rules:</p>
+                  <ul className="space-y-2">
+                    <li className="flex items-start gap-2">
+                      <Badge variant="destructive" className="mt-0.5">90</Badge>
+                      <div>
+                        <strong>Honeypot Detection</strong>
+                        <p className="text-xs text-muted-foreground">Tokens that can't be sold after purchase</p>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Badge variant="destructive" className="mt-0.5">80</Badge>
+                      <div>
+                        <strong>High Sell Tax</strong>
+                        <p className="text-xs text-muted-foreground">Excessive transaction fees (e.g., 99% sell tax)</p>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Badge variant="outline" className="mt-0.5 bg-orange-500/10">75</Badge>
+                      <div>
+                        <strong>Suspicious Authorities</strong>
+                        <p className="text-xs text-muted-foreground">Mint or freeze authority still enabled</p>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Badge variant="outline" className="mt-0.5 bg-yellow-500/10">70</Badge>
+                      <div>
+                        <strong>Wash Trading</strong>
+                        <p className="text-xs text-muted-foreground">Artificial volume through self-trading</p>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="font-semibold mb-2">Features:</p>
+                  <ul className="space-y-1 text-xs text-muted-foreground">
+                    <li>• Evidence tracking with timestamped entries</li>
+                    <li>• Severity scoring (0-100 scale)</li>
+                    <li>• Deduplication prevents spam for same wallet+labelType</li>
+                    <li>• KOL cabal detection for coordinated pump schemes</li>
+                    <li>• Automatic analysis on every token scan</li>
+                    <li>• Blacklist info included in bot responses</li>
+                  </ul>
+                  <p className="font-semibold mt-3 mb-2">API Endpoints:</p>
+                  <ul className="space-y-1 text-xs font-mono text-muted-foreground">
+                    <li>• GET /api/blacklist/check/:wallet</li>
+                    <li>• POST /api/blacklist/report</li>
+                    <li>• GET /api/blacklist/stats</li>
+                    <li>• GET /api/blacklist/top</li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Pricing Section */}
           <Card className="mb-8" data-testid="card-pricing">
@@ -407,14 +648,14 @@ export default function Documentation() {
                 <TrendingUp className="h-5 w-5" />
                 Subscription Tiers
               </CardTitle>
-              <CardDescription>Choose the plan that fits your needs</CardDescription>
+              <CardDescription>Choose the plan that fits your needs - all tiers include 7-day free trial</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-4 gap-4">
-                <div className="space-y-2">
+                <div className="space-y-2 p-4 border rounded-lg">
                   <Badge variant="outline">FREE Trial</Badge>
                   <p className="text-2xl font-bold">$0</p>
-                  <p className="text-sm text-muted-foreground">7 days</p>
+                  <p className="text-sm text-muted-foreground">7 days, no card required</p>
                   <ul className="text-xs space-y-1 text-muted-foreground">
                     <li>• 3 analyses/day</li>
                     <li>• Basic risk score</li>
@@ -422,31 +663,34 @@ export default function Documentation() {
                   </ul>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 p-4 border rounded-lg bg-primary/5">
                   <Badge>PRO</Badge>
                   <p className="text-2xl font-bold">$29</p>
                   <p className="text-sm text-muted-foreground">per month</p>
                   <ul className="text-xs space-y-1 text-muted-foreground">
                     <li>• Unlimited analyses</li>
+                    <li>• AI blacklist detection</li>
                     <li>• BubbleMaps viz</li>
                     <li>• Bot access</li>
-                    <li>• AI detection</li>
+                    <li>• Priority support</li>
                   </ul>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 p-4 border rounded-lg">
                   <Badge variant="default">WHALE</Badge>
                   <p className="text-2xl font-bold">$99</p>
                   <p className="text-sm text-muted-foreground">per month</p>
                   <ul className="text-xs space-y-1 text-muted-foreground">
                     <li>• Everything in PRO</li>
-                    <li>• API access</li>
                     <li>• Real-time alerts</li>
+                    <li>• API access (10k/mo)</li>
+                    <li>• KOL tracking</li>
                     <li>• Team (5 users)</li>
+                    <li>• Custom webhooks</li>
                   </ul>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 p-4 border rounded-lg bg-gradient-to-br from-primary/10 to-primary/5">
                   <Badge variant="outline" className="bg-primary/10">$KILL Holder</Badge>
                   <p className="text-2xl font-bold">FREE</p>
                   <p className="text-sm text-muted-foreground">forever</p>
@@ -455,6 +699,7 @@ export default function Documentation() {
                     <li>• WHALE tier access</li>
                     <li>• Exclusive perks</li>
                     <li>• Governance rights</li>
+                    <li>• Connect via Phantom</li>
                   </ul>
                 </div>
               </div>
@@ -468,7 +713,7 @@ export default function Documentation() {
                 <Wallet className="h-5 w-5" />
                 Getting Started
               </CardTitle>
-              <CardDescription>Start protecting yourself from rug pulls in 4 simple steps</CardDescription>
+              <CardDescription>Start protecting yourself from rug pulls in 6 simple steps</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-start gap-3">
@@ -477,7 +722,7 @@ export default function Documentation() {
                   <h4 className="font-semibold mb-1">Create Account</h4>
                   <p className="text-sm text-muted-foreground">
                     Sign up with Google, GitHub, X (Twitter), Apple, or email/password through our 
-                    Replit Auth integration.
+                    Replit Auth integration. Account creation is instant and free.
                   </p>
                 </div>
               </div>
@@ -487,7 +732,8 @@ export default function Documentation() {
                 <div>
                   <h4 className="font-semibold mb-1">Start Free Trial</h4>
                   <p className="text-sm text-muted-foreground">
-                    Get 7 days of free access with 3 analyses per day. No credit card required.
+                    Get 7 days of free access with 3 analyses per day. No credit card required. 
+                    Trial starts automatically upon first login.
                   </p>
                 </div>
               </div>
@@ -495,10 +741,12 @@ export default function Documentation() {
               <div className="flex items-start gap-3">
                 <Badge className="mt-1">3</Badge>
                 <div>
-                  <h4 className="font-semibold mb-1">Analyze Tokens</h4>
+                  <h4 className="font-semibold mb-1">Analyze Your First Token</h4>
                   <p className="text-sm text-muted-foreground">
-                    Paste any Solana token address to receive comprehensive risk analysis including 
-                    holder distribution, authority checks, and market data.
+                    Navigate to the main dashboard and paste any Solana token address (e.g., 
+                    EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v for USDC). Click "Analyze" to receive 
+                    comprehensive risk analysis including holder distribution, authority checks, market data, 
+                    and AI-powered red flags.
                   </p>
                 </div>
               </div>
@@ -506,11 +754,162 @@ export default function Documentation() {
               <div className="flex items-start gap-3">
                 <Badge className="mt-1">4</Badge>
                 <div>
-                  <h4 className="font-semibold mb-1">Upgrade (Optional)</h4>
+                  <h4 className="font-semibold mb-1">Connect Phantom Wallet (Optional)</h4>
                   <p className="text-sm text-muted-foreground">
-                    Subscribe to PRO ($29/mo) or WHALE ($99/mo) for unlimited access, bot integration, 
-                    and advanced features. Alternatively, hold 10M+ $KILL tokens for lifetime free access.
+                    If you hold 10M+ official $KILL tokens, click "Connect Wallet" in the header, 
+                    sign the challenge with Phantom wallet, and gain instant WHALE tier access without 
+                    subscription. Revalidation required every 24 hours.
                   </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Badge className="mt-1">5</Badge>
+                <div>
+                  <h4 className="font-semibold mb-1">Upgrade to PRO or WHALE</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Visit <a href="/pricing" className="text-primary hover:underline">/pricing</a> to view 
+                    detailed tier comparisons. Click "Subscribe" on your preferred tier to redirect to Whop's 
+                    secure checkout. Payment processed via Whop with automatic subscription management and 
+                    tax compliance.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Badge className="mt-1">6</Badge>
+                <div>
+                  <h4 className="font-semibold mb-1">Enable Bot Access</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Once subscribed, visit header/footer bot icons to get Telegram and Discord invite links. 
+                    Add bots to your channels and use <code className="text-xs bg-muted px-1 py-0.5 rounded">/execute</code>, 
+                    <code className="text-xs bg-muted px-1 py-0.5 rounded ml-1">/first20</code>, 
+                    <code className="text-xs bg-muted px-1 py-0.5 rounded ml-1">/devtorture</code>, and 
+                    <code className="text-xs bg-muted px-1 py-0.5 rounded ml-1">/blacklist</code> commands for instant analysis.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* API Endpoints */}
+          <Card className="mb-8" data-testid="card-api-endpoints">
+            <CardHeader>
+              <div className="flex items-center gap-2 mb-2">
+                <Code className="h-5 w-5 text-primary" />
+                <CardTitle>API Endpoints</CardTitle>
+              </div>
+              <CardDescription>Main endpoints for programmatic access (WHALE tier required)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-6 text-sm">
+                <div>
+                  <p className="font-semibold mb-2">Token Analysis</p>
+                  <ul className="space-y-2 font-mono text-xs text-muted-foreground">
+                    <li className="flex flex-col gap-1">
+                      <code className="text-primary">POST /api/analyze-token</code>
+                      <span className="text-xs">Submit token address for analysis</span>
+                    </li>
+                    <li className="flex flex-col gap-1">
+                      <code className="text-primary">GET /api/analysis/:id</code>
+                      <span className="text-xs">Retrieve analysis results</span>
+                    </li>
+                  </ul>
+
+                  <p className="font-semibold mt-4 mb-2">Wallet Verification</p>
+                  <ul className="space-y-2 font-mono text-xs text-muted-foreground">
+                    <li className="flex flex-col gap-1">
+                      <code className="text-primary">GET /api/wallet/challenge</code>
+                      <span className="text-xs">Request verification challenge (5min expiry)</span>
+                    </li>
+                    <li className="flex flex-col gap-1">
+                      <code className="text-primary">POST /api/wallet/verify</code>
+                      <span className="text-xs">Submit signed challenge</span>
+                    </li>
+                    <li className="flex flex-col gap-1">
+                      <code className="text-primary">GET /api/wallet</code>
+                      <span className="text-xs">Get wallet connection status</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div>
+                  <p className="font-semibold mb-2">Blacklist Operations</p>
+                  <ul className="space-y-2 font-mono text-xs text-muted-foreground">
+                    <li className="flex flex-col gap-1">
+                      <code className="text-primary">GET /api/blacklist/check/:wallet</code>
+                      <span className="text-xs">Check if wallet is flagged</span>
+                    </li>
+                    <li className="flex flex-col gap-1">
+                      <code className="text-primary">POST /api/blacklist/report</code>
+                      <span className="text-xs">Submit wallet report with evidence</span>
+                    </li>
+                    <li className="flex flex-col gap-1">
+                      <code className="text-primary">GET /api/blacklist/stats</code>
+                      <span className="text-xs">Get blacklist statistics</span>
+                    </li>
+                    <li className="flex flex-col gap-1">
+                      <code className="text-primary">GET /api/blacklist/top</code>
+                      <span className="text-xs">Top flagged wallets by severity</span>
+                    </li>
+                  </ul>
+
+                  <p className="font-semibold mt-4 mb-2">Bot Integration</p>
+                  <ul className="space-y-2 font-mono text-xs text-muted-foreground">
+                    <li className="flex flex-col gap-1">
+                      <code className="text-primary">GET /api/bot/invite-links</code>
+                      <span className="text-xs">Get Telegram/Discord bot URLs</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Environment Setup */}
+          <Card data-testid="card-environment">
+            <CardHeader>
+              <div className="flex items-center gap-2 mb-2">
+                <Database className="h-5 w-5 text-primary" />
+                <CardTitle>Environment Variables</CardTitle>
+              </div>
+              <CardDescription>Required configuration for self-hosting (for advanced users)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4 text-sm">
+                <div>
+                  <p className="font-semibold mb-2">Required for Whop Subscriptions:</p>
+                  <ul className="space-y-1 font-mono text-xs text-muted-foreground ml-4">
+                    <li>• WHOP_API_KEY</li>
+                    <li>• WHOP_APP_ID</li>
+                    <li>• WHOP_COMPANY_ID</li>
+                    <li>• WHOP_PLAN_ID_BASIC ($29/mo tier)</li>
+                    <li>• WHOP_PLAN_ID_PREMIUM ($99/mo tier)</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <p className="font-semibold mb-2">Required for Token Gating (10M+ access):</p>
+                  <ul className="space-y-1 font-mono text-xs text-muted-foreground ml-4">
+                    <li>• OFFICIAL_TOKEN_MINT_ADDRESS (SPL token mint)</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <p className="font-semibold mb-2">Optional for Bots:</p>
+                  <ul className="space-y-1 font-mono text-xs text-muted-foreground ml-4">
+                    <li>• TELEGRAM_BOT_TOKEN (from @BotFather)</li>
+                    <li>• DISCORD_BOT_TOKEN (from Discord Developer Portal)</li>
+                    <li>• DISCORD_CLIENT_ID (Discord application ID)</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <p className="font-semibold mb-2">Optional for Performance:</p>
+                  <ul className="space-y-1 font-mono text-xs text-muted-foreground ml-4">
+                    <li>• SOLANA_RPC_URL (custom RPC endpoint)</li>
+                    <li>• HELIUS_API_KEY (recommended for better rate limits)</li>
+                  </ul>
                 </div>
               </div>
             </CardContent>
