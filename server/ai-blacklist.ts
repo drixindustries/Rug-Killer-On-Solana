@@ -2,6 +2,7 @@ import { db } from "./db";
 import { badActorLabels, analysisRuns } from "@shared/schema";
 import type { TokenAnalysisResponse } from "@shared/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
+import { storage } from "./storage";
 
 // ============================================================================
 // PHASE 1: RULES-BASED BLACKLIST ENGINE
@@ -178,6 +179,127 @@ export async function analyzeAndFlag(
           'scammer',
           85,
           `Low liquidity ($${pair.liquidity.usd.toFixed(0)}) + high risk score`,
+          'rules_engine'
+        );
+      }
+    }
+    
+    // RULE 7: KOL Cabal Early Buying Detection
+    // Detect when multiple KOL wallets are in top holders (potential coordinated pump)
+    if (analysis.topHolders && analysis.topHolders.length > 0) {
+      const holderAddresses = analysis.topHolders.map(h => h.address);
+      const kolHolders = await storage.getKolWalletsByAddresses(holderAddresses);
+      
+      if (kolHolders.length >= 3) {
+        // 3+ KOLs in top 20 holders is HIGHLY suspicious for early cabal buying
+        const kolNames = kolHolders.map(k => k.displayName || k.walletAddress.substring(0, 8)).join(', ');
+        const totalKolPercentage = kolHolders.reduce((sum, kol) => {
+          const holder = analysis.topHolders.find(h => h.address === kol.walletAddress);
+          return sum + (holder?.percentage || 0);
+        }, 0);
+        
+        await flagWallet(
+          analysis.tokenAddress,
+          'cabal_token',
+          85,
+          `${kolHolders.length} known KOL wallets in top holders (${totalKolPercentage.toFixed(1)}% supply): ${kolNames}`,
+          'rules_engine'
+        );
+        
+        // Flag individual KOL wallets as potential cabal members
+        for (const kol of kolHolders) {
+          await flagWallet(
+            kol.walletAddress,
+            'cabal_member',
+            65,
+            `Participated in coordinated early buying with ${kolHolders.length - 1} other KOLs on ${analysis.tokenMetadata.symbol}`,
+            'rules_engine'
+          );
+        }
+      } else if (kolHolders.length === 2) {
+        // 2 KOLs is moderately suspicious
+        const kolNames = kolHolders.map(k => k.displayName || k.walletAddress.substring(0, 8)).join(', ');
+        await flagWallet(
+          analysis.tokenAddress,
+          'possible_cabal',
+          60,
+          `2 known KOL wallets in top holders: ${kolNames}`,
+          'rules_engine'
+        );
+      }
+    }
+    
+    // RULE 8: Bundling Detection (Multiple buyers at same time/block)
+    // Analyze transaction timing for coordinated buying patterns
+    if (analysis.recentTransactions && analysis.recentTransactions.length > 5) {
+      const buyTransactions = analysis.recentTransactions
+        .filter(tx => tx.type === 'swap')
+        .slice(0, 20); // Check first 20 buys
+      
+      if (buyTransactions.length >= 5) {
+        // Group transactions by timestamp (within 5-second windows)
+        const timeGroups: { [key: number]: typeof buyTransactions } = {};
+        
+        for (const tx of buyTransactions) {
+          const timeKey = Math.floor(tx.timestamp / 5); // 5-second buckets
+          if (!timeGroups[timeKey]) {
+            timeGroups[timeKey] = [];
+          }
+          timeGroups[timeKey].push(tx);
+        }
+        
+        // Find groups with 3+ simultaneous buys (bundling pattern)
+        for (const [timeKey, txGroup] of Object.entries(timeGroups)) {
+          if (txGroup.length >= 3) {
+            const uniqueWallets = new Set(txGroup.map(tx => tx.from).filter(Boolean));
+            
+            if (uniqueWallets.size >= 3) {
+              // Multiple unique wallets buying simultaneously = bundling
+              await flagWallet(
+                analysis.tokenAddress,
+                'bundled_token',
+                75,
+                `Bundling detected: ${uniqueWallets.size} wallets bought within 5 seconds`,
+                'rules_engine'
+              );
+              
+              // Check if any bundled wallets are KOLs
+              const bundledAddresses = Array.from(uniqueWallets) as string[];
+              const bundledKols = await storage.getKolWalletsByAddresses(bundledAddresses);
+              
+              if (bundledKols.length >= 2) {
+                await flagWallet(
+                  analysis.tokenAddress,
+                  'kol_bundle',
+                  90,
+                  `KOL bundling detected: ${bundledKols.length} known KOLs bought simultaneously`,
+                  'rules_engine'
+                );
+              }
+              
+              break; // Only flag once for bundling
+            }
+          }
+        }
+      }
+    }
+    
+    // RULE 9: High-Influence KOL Participation Warning
+    // Not necessarily malicious, but worth flagging for transparency
+    if (analysis.topHolders && analysis.topHolders.length > 0) {
+      const holderAddresses = analysis.topHolders.slice(0, 10).map(h => h.address);
+      const topKols = await storage.getKolWalletsByAddresses(holderAddresses);
+      
+      // Check for high-influence KOLs (influence score > 70)
+      const highInfluenceKols = topKols.filter(k => (k.influenceScore || 0) > 70);
+      
+      if (highInfluenceKols.length > 0) {
+        const kolNames = highInfluenceKols.map(k => k.displayName || k.walletAddress.substring(0, 8)).join(', ');
+        await flagWallet(
+          analysis.tokenAddress,
+          'kol_promoted',
+          45, // Lower severity - not necessarily bad
+          `High-influence KOL participation: ${kolNames}`,
           'rules_engine'
         );
       }

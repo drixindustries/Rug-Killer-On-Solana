@@ -3,6 +3,7 @@ import {
   subscriptions,
   walletConnections,
   walletChallenges,
+  kolWallets,
   type User,
   type UpsertUser,
   type Subscription,
@@ -11,9 +12,10 @@ import {
   type InsertWalletConnection,
   type WalletChallenge,
   type InsertWalletChallenge,
+  type KolWallet,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, isNull, lt } from "drizzle-orm";
+import { eq, and, isNull, lt, inArray, desc } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required by Replit Auth)
@@ -36,6 +38,12 @@ export interface IStorage {
   createChallenge(userId: string): Promise<WalletChallenge>;
   getChallenge(challenge: string): Promise<WalletChallenge | undefined>;
   markChallengeUsed(challengeId: string): Promise<WalletChallenge>;
+  
+  // KOL wallet operations
+  isKolWallet(walletAddress: string): Promise<boolean>;
+  getKolWallet(walletAddress: string): Promise<KolWallet | undefined>;
+  getTopKolWallets(limit?: number): Promise<KolWallet[]>;
+  getKolWalletsByAddresses(addresses: string[]): Promise<KolWallet[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -259,6 +267,42 @@ export class DatabaseStorage implements IStorage {
       .where(eq(walletChallenges.id, challengeId))
       .returning();
     return updated;
+  }
+
+  // KOL wallet operations
+  async isKolWallet(walletAddress: string): Promise<boolean> {
+    const [kol] = await db
+      .select({ id: kolWallets.id })
+      .from(kolWallets)
+      .where(eq(kolWallets.walletAddress, walletAddress))
+      .limit(1);
+    return !!kol;
+  }
+
+  async getKolWallet(walletAddress: string): Promise<KolWallet | undefined> {
+    const [kol] = await db
+      .select()
+      .from(kolWallets)
+      .where(eq(kolWallets.walletAddress, walletAddress));
+    return kol;
+  }
+
+  async getTopKolWallets(limit: number = 100): Promise<KolWallet[]> {
+    return await db
+      .select()
+      .from(kolWallets)
+      .where(eq(kolWallets.isVerified, true))
+      .orderBy(desc(kolWallets.influenceScore), desc(kolWallets.rank))
+      .limit(limit);
+  }
+
+  async getKolWalletsByAddresses(addresses: string[]): Promise<KolWallet[]> {
+    if (addresses.length === 0) return [];
+    
+    return await db
+      .select()
+      .from(kolWallets)
+      .where(inArray(kolWallets.walletAddress, addresses));
   }
 }
 
