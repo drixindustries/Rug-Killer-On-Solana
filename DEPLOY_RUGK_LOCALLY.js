@@ -38,6 +38,11 @@ const {
 const bs58 = require('bs58');
 const readline = require('readline');
 
+// Helper function to encode keypair to base58
+function encodeKeypair(keypair) {
+  return bs58.default ? bs58.default.encode(keypair.secretKey) : bs58.encode(keypair.secretKey);
+}
+
 // ============================================
 // CONFIGURATION
 // ============================================
@@ -89,7 +94,7 @@ function generateVanityAddress(suffix, maxAttempts = 50_000_000) {
       
       return {
         publicKey,
-        secretKey: bs58.encode(keypair.secretKey),
+        secretKey: encodeKeypair(keypair),
         keypair,
         attempts,
         timeMs,
@@ -269,7 +274,7 @@ async function main() {
   console.log(`✅ Balance confirmed: ${balanceSOL.toFixed(4)} SOL`);
   
   // Save burner keypair for later reference
-  const burnerPrivateKey = bs58.encode(payerKeypair.secretKey);
+  const burnerPrivateKey = encodeKeypair(payerKeypair);
   console.log('\n💾 SAVE THIS BURNER KEYPAIR (optional, for recovery only):');
   console.log(`   Public:  ${burnerAddress}`);
   console.log(`   Private: ${burnerPrivateKey}`);
