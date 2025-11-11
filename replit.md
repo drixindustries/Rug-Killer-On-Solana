@@ -53,14 +53,28 @@ The frontend, built with React and TypeScript using Vite, features a modern, dat
 
 ## Recent Implementation (November 11, 2025)
 
-### Phase 7: Stripe→Whop Migration (COMPLETED ✅)
-- **Complete payment migration** from Stripe to Whop
+### Phase 7: Stripe→Whop Migration + Visual Features (COMPLETED ✅)
+
+**Payment Migration**:
+- **Complete payment migration** from Stripe to Whop (ALL Stripe code removed)
 - **Database schema changes**: Removed Stripe fields, added `whopMembershipId`, `whopPlanId`, `whopUserId`
 - **Status vocabulary alignment**: Migrated to Whop lifecycle ("valid", "trialing", "past_due", "cancelled", "expired")
 - **Access control fix**: Updated `hasActiveAccess` to recognize all Whop statuses
 - **Whop SDK integration**: Client with `createWhopCheckout`, `getWhopMembership`, `cancelWhopMembership` helpers
 - **Webhook handler**: POST /api/whop/webhook for payment.succeeded, membership.went_valid, membership.went_invalid
 - **Frontend updates**: Removed Stripe SDK, direct redirect to Whop hosted checkout
+
+**Visual Features**:
+- **BubbleMaps.io Integration**: Embedded iframe on token analysis page showing visual holder distribution
+- **Telegram & Discord Bot Links**: Icon buttons in header and footer, bot showcase section on landing page
+- **Pricing Page**: 4-tier pricing (FREE, PRO $29, WHALE $99, $KILL Holder) with feature comparisons
+- **Phantom Wallet Connection**: Full wallet integration with challenge-response signature verification
+  - "Connect Wallet" button in header
+  - Token balance display
+  - Premium access indicator for 10M+ holders
+  - Dropdown menu with wallet info and disconnect option
+- **Bot Showcase**: Dedicated section on landing page highlighting bot commands and features
+- **Enhanced Footer**: Bot links, resource navigation, community section
 
 ## Previous Implementations
 
@@ -160,8 +174,8 @@ Every protected endpoint enforces:
 3. **Environment**: Ensure `OFFICIAL_TOKEN_MINT_ADDRESS` is configured
 
 ## Next Steps
-1. **Set environment variables** for desired features (payments, bots, token gating)
+1. **Set environment variables** for desired features (Whop payments, bots, token gating)
 2. **Configure OFFICIAL_TOKEN_MINT_ADDRESS** to enable 10M+ token holder access
-3. **Test wallet verification flow** with challenge-response system
-4. **Add rate limiting** to challenge endpoint (recommended for production)
-5. **UI integration** for wallet verification and bot invite links
+3. **Test Phantom wallet connection** and Whop subscription flows
+4. **Configure bot tokens** (TELEGRAM_BOT_TOKEN, DISCORD_BOT_TOKEN) to enable bot invite links
+5. **Add rate limiting** to challenge endpoint (recommended for production)

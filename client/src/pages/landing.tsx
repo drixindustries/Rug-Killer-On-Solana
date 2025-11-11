@@ -1,6 +1,7 @@
 import { Shield, TrendingUp, Lock, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BotShowcase } from "@/components/bot-showcase";
 
 export default function Landing() {
   return (
@@ -107,6 +108,8 @@ export default function Landing() {
             </div>
           </div>
         </section>
+
+        <BotShowcase />
 
         <section className="py-20">
           <div className="container mx-auto px-4">

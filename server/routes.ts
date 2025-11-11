@@ -464,7 +464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!process.env.PHANTOM_WALLET_ADDRESS) {
         console.error("PHANTOM_WALLET_ADDRESS not configured!");
         return res.status(503).json({ 
-          message: "Crypto payments are currently unavailable. Please use Stripe instead or contact support.",
+          message: "Crypto payments are currently unavailable. Please use Whop subscription instead or contact support.",
         });
       }
       
