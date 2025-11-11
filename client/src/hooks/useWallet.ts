@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import bs58 from "bs58";
 
 interface WalletConnection {
   walletAddress: string;
   isEligible: boolean;
   tokenBalance?: number;
   lastVerifiedAt: string;
+  userId: string;
 }
 
 export function useWallet() {
@@ -21,9 +23,9 @@ export function useWallet() {
 
   const checkExistingConnection = async () => {
     try {
-      const response = await apiRequest("GET", "/api/wallet");
+      const response = await apiRequest("GET", "/api/wallet/status");
       const data = await response.json();
-      if (data.walletAddress) {
+      if (data && data.walletAddress) {
         setConnection(data);
         setWalletAddress(data.walletAddress);
       }
@@ -55,26 +57,35 @@ export function useWallet() {
       const encodedMessage = new TextEncoder().encode(challengeData.challenge);
       const signedMessage = await window.solana.signMessage(encodedMessage, "utf8");
       
-      const signature = Array.from(signedMessage.signature);
+      const signatureBase58 = bs58.encode(signedMessage.signature);
 
       const verifyResponse = await apiRequest("POST", "/api/wallet/verify", {
         walletAddress: publicKey,
-        signature,
+        signature: signatureBase58,
         challenge: challengeData.challenge,
       });
 
       const verifyData = await verifyResponse.json();
 
-      if (verifyData.isEligible) {
-        setConnection(verifyData);
-        toast({
-          title: "Wallet Connected Successfully!",
-          description: `You have ${verifyData.tokenBalance?.toLocaleString()} $KILL tokens. Premium access unlocked!`,
-        });
+      if (verifyData.wallet) {
+        setConnection(verifyData.wallet);
+        
+        if (verifyData.wallet.isEligible) {
+          toast({
+            title: "Wallet Connected Successfully!",
+            description: `You have ${verifyData.wallet.tokenBalance?.toLocaleString()} $KILL tokens. Premium access unlocked!`,
+          });
+        } else {
+          toast({
+            title: "Insufficient Token Balance",
+            description: `You need 10M+ $KILL tokens for premium access. Current: ${verifyData.wallet.tokenBalance?.toLocaleString() || 0}`,
+            variant: "destructive",
+          });
+        }
       } else {
         toast({
-          title: "Insufficient Token Balance",
-          description: `You need 10M+ $KILL tokens for premium access. Current: ${verifyData.tokenBalance?.toLocaleString() || 0}`,
+          title: "Verification Failed",
+          description: verifyData.message || "Failed to verify wallet ownership.",
           variant: "destructive",
         });
       }
