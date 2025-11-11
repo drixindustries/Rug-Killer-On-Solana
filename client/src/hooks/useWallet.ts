@@ -1,0 +1,119 @@
+import { useState, useEffect, useCallback } from "react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+
+interface WalletConnection {
+  walletAddress: string;
+  isEligible: boolean;
+  tokenBalance?: number;
+  lastVerifiedAt: string;
+}
+
+export function useWallet() {
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connection, setConnection] = useState<WalletConnection | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    checkExistingConnection();
+  }, []);
+
+  const checkExistingConnection = async () => {
+    try {
+      const response = await apiRequest("GET", "/api/wallet");
+      const data = await response.json();
+      if (data.walletAddress) {
+        setConnection(data);
+        setWalletAddress(data.walletAddress);
+      }
+    } catch (error) {
+      console.error("Failed to check existing connection:", error);
+    }
+  };
+
+  const connectWallet = useCallback(async () => {
+    if (!window.solana || !window.solana.isPhantom) {
+      toast({
+        title: "Phantom Wallet Not Found",
+        description: "Please install Phantom wallet to continue.",
+        variant: "destructive",
+      });
+      window.open("https://phantom.app/", "_blank");
+      return;
+    }
+
+    setIsConnecting(true);
+    try {
+      const resp = await window.solana.connect();
+      const publicKey = resp.publicKey.toString();
+      setWalletAddress(publicKey);
+
+      const challengeResponse = await apiRequest("GET", "/api/wallet/challenge");
+      const challengeData = await challengeResponse.json();
+
+      const encodedMessage = new TextEncoder().encode(challengeData.challenge);
+      const signedMessage = await window.solana.signMessage(encodedMessage, "utf8");
+      
+      const signature = Array.from(signedMessage.signature);
+
+      const verifyResponse = await apiRequest("POST", "/api/wallet/verify", {
+        walletAddress: publicKey,
+        signature,
+        challenge: challengeData.challenge,
+      });
+
+      const verifyData = await verifyResponse.json();
+
+      if (verifyData.isEligible) {
+        setConnection(verifyData);
+        toast({
+          title: "Wallet Connected Successfully!",
+          description: `You have ${verifyData.tokenBalance?.toLocaleString()} $KILL tokens. Premium access unlocked!`,
+        });
+      } else {
+        toast({
+          title: "Insufficient Token Balance",
+          description: `You need 10M+ $KILL tokens for premium access. Current: ${verifyData.tokenBalance?.toLocaleString() || 0}`,
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error("Wallet connection error:", error);
+      toast({
+        title: "Connection Failed",
+        description: error.message || "Failed to connect wallet. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [toast]);
+
+  const disconnectWallet = useCallback(async () => {
+    if (window.solana) {
+      await window.solana.disconnect();
+    }
+    setWalletAddress(null);
+    setConnection(null);
+  }, []);
+
+  return {
+    walletAddress,
+    connection,
+    isConnecting,
+    connectWallet,
+    disconnectWallet,
+  };
+}
+
+declare global {
+  interface Window {
+    solana?: {
+      isPhantom?: boolean;
+      connect: () => Promise<{ publicKey: { toString: () => string } }>;
+      disconnect: () => Promise<void>;
+      signMessage: (message: Uint8Array, encoding: string) => Promise<{ signature: Uint8Array }>;
+    };
+  }
+}

@@ -14,6 +14,7 @@ import { TokenMetadataCard } from "@/components/token-metadata-card";
 import { RugcheckCard } from "@/components/rugcheck-card";
 import { GoPlusCard } from "@/components/goplus-card";
 import { MarketDataCard } from "@/components/market-data-card";
+import { BubbleMapsCard } from "@/components/bubblemaps-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import type { TokenAnalysisResponse } from "@shared/schema";
@@ -145,6 +146,8 @@ export default function Home() {
                     <TransactionTimeline transactions={analysis.recentTransactions || []} />
                   </div>
                 </div>
+
+                <BubbleMapsCard tokenAddress={analysis.tokenAddress} />
 
                 {analysis.topHolders && analysis.topHolders.length > 0 && (
                   <>
