@@ -107,7 +107,7 @@ function createTelegramBot(botToken: string): Telegraf {
   // /start command
   bot.command('start', async (ctx) => {
     await ctx.reply(
-      '🔥 **SOLANA RUG DETECTOR**\n\n' +
+      '🔥 **SOLANA RUG KILLER**\n\n' +
       'Available commands:\n\n' +
       '/execute <address> - Full 52-metric scan\n' +
       '/first20 <address> - Top 20 holder analysis\n' +

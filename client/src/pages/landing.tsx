@@ -9,7 +9,7 @@ export default function Landing() {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Shield className="w-6 h-6 text-primary" />
-            <span className="font-semibold text-xl">Solana Rug Detector</span>
+            <span className="font-semibold text-xl">Solana Rug Killer</span>
           </div>
           <Button 
             onClick={() => window.location.href = '/api/login'}

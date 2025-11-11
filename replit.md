@@ -1,7 +1,7 @@
-# Solana Rug Detector
+# Solana Rug Killer
 
 ## Overview
-The Solana Rug Detector is a comprehensive web application designed to analyze Solana SPL tokens for potential rug pull risks. It provides real-time analysis by checking for common indicators such as mint/freeze authority, holder concentration, liquidity pool status, and suspicious transaction patterns. The project's ambition is to offer a robust tool for investors to identify and mitigate risks in the Solana ecosystem, leveraging advanced analytics and AI-driven insights to protect users from fraudulent schemes.
+Solana Rug Killer is a comprehensive web application designed to analyze Solana SPL tokens for potential rug pull risks. It provides real-time analysis by checking for common indicators such as mint/freeze authority, holder concentration, liquidity pool status, and suspicious transaction patterns. The project's ambition is to offer a robust tool for investors to identify and mitigate risks in the Solana ecosystem, leveraging advanced analytics and AI-driven insights to protect users from fraudulent schemes.
 
 ## User Preferences
 - Modern, data-dense dashboard design (inspired by Linear and Dexscreener)
