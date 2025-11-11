@@ -17,17 +17,19 @@ The frontend features a modern, data-dense dashboard using React, TypeScript, Vi
 ### Technical Implementations
 - **Frontend**: React, TypeScript, Vite, Wouter (routing), React Query (data fetching), Shadcn UI, Tailwind CSS, Recharts.
 - **Backend**: Express.js with TypeScript, using `@solana/web3.js` and `@solana/spl-token` for Solana blockchain interaction.
-- **Data Storage**: PostgreSQL for persistent data (users, subscriptions, wallet connections, crypto payment audit trails, AI blacklist data). In-memory storage (MemStorage) for session data.
+- **Data Storage**: PostgreSQL for persistent data (users, subscriptions, subscription codes, code redemptions, wallet connections, crypto payment audit trails, AI blacklist data). In-memory storage (MemStorage) for session data.
 - **Solana Integration**: Connects to Solana mainnet via a configurable RPC URL.
 - **Authentication & Authorization**: Replit Auth blueprint (Google, GitHub, X, Apple, email/password) integrated with Whop for subscription management and token-gated access.
 - **Payment Systems**: Whop for subscription management and crypto payments (Solana only) with 6 confirmations and audit trails.
+- **Subscription Codes**: Database-driven redemption system with row-level locking, transaction safety, SQL-based usage counting to prevent race conditions, and Whop webhook protection to prevent downgrades of lifetime subscriptions.
 - **Bots**: Telegram and Discord bots provide token analysis, holder analysis, dev wallet history, and blacklist checks, supporting markdown and rich embeds.
 - **AI Blacklist System**: A rules-based detection engine with 6 automated rules analyzing over 52 risk metrics to identify honeypots, high sell taxes, suspicious authorities, and wash trading patterns. Includes severity scoring, evidence tracking, and dedicated API endpoints.
 
 ### Feature Specifications
 - **Token Analysis**: Authority checks, holder analysis, liquidity assessment, 0-100 risk scoring with red flags, and transaction history.
 - **User Management**: Accounts, session management, and wallet connections.
-- **Subscription Tiers**: Individual and Group plans with a 1-week free trial.
+- **Subscription Tiers**: Individual, Group, and Lifetime plans with a 1-week free trial.
+- **Subscription Codes**: Redeemable codes for lifetime access with transaction-safe redemption, usage limits, expiration dates, and Whop webhook protection.
 - **Blacklist**: Automated wallet flagging and reporting.
 - **Bot Commands**: `/execute`, `/first20`, `/devtorture`, `/blacklist` for Telegram and Discord.
 
