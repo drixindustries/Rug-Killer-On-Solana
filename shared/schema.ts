@@ -149,6 +149,28 @@ export interface DexScreenerData {
   schemaVersion: string;
 }
 
+// Jupiter Price Data
+export interface JupiterPriceData {
+  id: string;
+  type: string;
+  price: string;
+  extraInfo?: {
+    lastSwappedPrice?: {
+      lastJupiterSellAt: number;
+      lastJupiterSellPrice: string;
+      lastJupiterBuyAt: number;
+      lastJupiterBuyPrice: string;
+    };
+    quotedPrice?: {
+      buyPrice: string;
+      buyAt: number;
+      sellPrice: string;
+      sellAt: number;
+    };
+    confidenceLevel?: string;
+  };
+}
+
 // Complete Token Analysis Response
 export interface TokenAnalysisResponse {
   tokenAddress: string;
@@ -185,6 +207,7 @@ export interface TokenAnalysisResponse {
   rugcheckData?: RugcheckData;
   goplusData?: GoPlusSecurityData;
   dexscreenerData?: DexScreenerData;
+  jupiterPriceData?: JupiterPriceData;
 }
 
 // Storage schema (not used for in-memory but kept for consistency)

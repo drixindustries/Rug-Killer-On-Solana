@@ -6,11 +6,13 @@ A comprehensive web application for analyzing Solana tokens to detect potential 
 This application provides real-time analysis of Solana SPL tokens, checking for common rug pull indicators including mint authority, freeze authority, holder concentration, liquidity pool status, and suspicious transaction patterns.
 
 ## Recent Changes (November 11, 2025)
-- Initial MVP implementation complete
+- Initial MVP implementation complete with multi-source data aggregation
 - Frontend: React dashboard with exceptional visual design following design_guidelines.md
 - Backend: Solana RPC integration with comprehensive risk analysis
+- External APIs integrated: Rugcheck, GoPlus Security, DexScreener, Jupiter
 - Error handling: Graceful fallbacks for RPC rate limits and network errors
-- All MVP features implemented and tested
+- Market data display: Real-time prices, volume, liquidity from DexScreener
+- Price verification: Jupiter aggregator integration for additional price data
 
 ## Project Architecture
 
@@ -32,9 +34,9 @@ This application provides real-time analysis of Solana SPL tokens, checking for 
 - **Schema**: Centralized TypeScript types and Zod validation schemas
 - **Type Safety**: Consistent types between frontend and backend
 
-## Key Features (MVP Completed)
+## Key Features
 
-### Token Analysis
+### Token Analysis (Core Features Completed)
 1. **Authority Checks**
    - Mint authority detection (can dev mint unlimited tokens?)
    - Freeze authority detection (can dev freeze accounts?)
@@ -143,14 +145,38 @@ This starts both Express (port 5000) and Vite dev server
 - Test known tokens: USDC, SOL (wrapped)
 - Error scenarios tested (invalid addresses, RPC failures)
 
+## Integrated External Services
+
+### Rugcheck.xyz
+- Community-driven risk scores and liquidity analysis
+- Token verification status
+- Market liquidity metrics from top DEXes
+
+### GoPlus Security
+- Honeypot detection with buy/sell tax analysis
+- Contract security scanning (mintable, freezable, open source)
+- Scam detection flags
+- Security risk warnings
+
+### DexScreener
+- Real-time market data from all Solana DEXes
+- Price, 24h volume, liquidity, market cap, FDV
+- Trading activity (buys/sells) across timeframes
+- Multi-DEX pair aggregation (Raydium, Orca, etc.)
+
+### Jupiter Aggregator
+- Price verification from Jupiter's liquidity aggregator
+- Buy/sell price quotes with confidence levels
+- Independent price source for cross-validation
+
 ## Next Steps / Future Enhancements
-1. **RPC Configuration**: Add UI for users to input custom RPC endpoints
-2. **Enhanced APIs**: Integrate Rugcheck.xyz, GoPlus, Dexscreener for additional data
-3. **Honeypot Detection**: Simulate sells to detect trading restrictions
-4. **Social Verification**: Check website/Twitter/Discord links
-5. **Real-time Monitoring**: WebSocket integration for live updates
+1. **Pump.fun Live Monitor**: Real-time WebSocket monitoring of new token launches (IN PROGRESS)
+2. **Payment System**: Stripe subscriptions for Discord/Telegram alerts ($20/mo DMs, $100/mo groups)
+3. **Discord Bot**: Token alert notifications to Discord users/channels
+4. **Telegram Bot**: Token alert notifications to Telegram users/groups
+5. **Social Verification**: Check website/Twitter/Discord links
 6. **Token Watchlist**: Save and monitor multiple tokens
-7. **Historical Data**: Track token metrics over time
+7. **Historical Data**: Track token metrics over time with PostgreSQL
 8. **Export Reports**: PDF/CSV export of analysis results
 
 ## Technical Decisions
