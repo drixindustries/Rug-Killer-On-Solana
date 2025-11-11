@@ -54,6 +54,33 @@ function getRiskEmoji(riskLevel: string): string {
   }
 }
 
+function getLiquidityFieldValue(liquidityPool: any): string {
+  let value = `Status: ${liquidityPool.status}`;
+  
+  // Add LP Burn Information - only show if data is available
+  if (liquidityPool.burnPercentage !== undefined) {
+    const burnPct = liquidityPool.burnPercentage;
+    let burnEmoji = '';
+    
+    if (liquidityPool.isBurned || burnPct >= 99.99) {
+      burnEmoji = '✅🔥';
+    } else if (burnPct >= 90) {
+      burnEmoji = '⚠️🔥';
+    } else if (burnPct >= 50) {
+      burnEmoji = '🟡';
+    } else {
+      burnEmoji = '❌';
+    }
+    
+    value += `\nLP Burn: ${burnEmoji} ${burnPct.toFixed(2)}%`;
+  } else {
+    // Data unavailable - don't mislead users
+    value += `\nLP Burn: ❓ Unknown`;
+  }
+  
+  return value;
+}
+
 function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   const emoji = getRiskEmoji(analysis.riskLevel);
   const color = getRiskColor(analysis.riskLevel);
@@ -75,7 +102,7 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
       },
       {
         name: '💧 Liquidity',
-        value: analysis.liquidityPool.status,
+        value: getLiquidityFieldValue(analysis.liquidityPool),
         inline: true
       }
     )

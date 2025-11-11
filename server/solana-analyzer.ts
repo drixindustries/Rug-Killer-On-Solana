@@ -65,6 +65,13 @@ export class SolanaTokenAnalyzer {
         this.dexscreenerService.getTokenData(tokenAddress).catch(() => null),
         this.jupiterPriceService.getTokenPrice(tokenAddress).catch(() => null),
       ]);
+
+      // Enrich liquidity data with market information from Rugcheck and DexScreener
+      const enrichedLiquidity = this.enrichLiquidityWithMarketData(
+        liquidityPool,
+        rugcheckData,
+        dexscreenerData
+      );
       
       // Build metadata with safe numeric conversions
       const supply = Number(mintInfo.supply);
@@ -79,11 +86,11 @@ export class SolanaTokenAnalyzer {
         isMutable: mintAuthority.hasAuthority,
       };
       
-      // Calculate risk flags
+      // Calculate risk flags (use enriched liquidity for accurate risk assessment)
       const redFlags = this.calculateRiskFlags(
         mintAuthority,
         freezeAuthority,
-        liquidityPool,
+        enrichedLiquidity,
         topHolderConcentration,
         holders.length
       );
@@ -107,7 +114,7 @@ export class SolanaTokenAnalyzer {
         holderCount: holders.length,
         topHolders: holders,
         topHolderConcentration: isNaN(topHolderConcentration) ? 0 : topHolderConcentration,
-        liquidityPool,
+        liquidityPool: enrichedLiquidity,
         recentTransactions,
         suspiciousActivityDetected: recentTransactions.some(tx => tx.suspicious),
         redFlags,
@@ -209,21 +216,83 @@ export class SolanaTokenAnalyzer {
   }
 
   private analyzeLiquidity(topHolderConcentration: number): LiquidityPoolStatus {
-    // Simplified liquidity analysis based on holder concentration
-    let status: "SAFE" | "RISKY" | "UNKNOWN" = "UNKNOWN";
-    
-    if (topHolderConcentration > 80) {
-      status = "RISKY";
-    } else if (topHolderConcentration < 50) {
-      status = "SAFE";
-    }
-    
+    // Early on-chain analysis - status remains UNKNOWN until enriched with external data
+    // Holder concentration is separate concern and handled in holder-specific flags
     return {
       exists: true,
-      isLocked: false,
-      isBurned: false,
-      status,
+      status: "UNKNOWN",
+      // Don't set isBurned, isLocked, or burnPercentage here
+      // They will be enriched with real data if available from Rugcheck/DexScreener
     };
+  }
+
+  private enrichLiquidityWithMarketData(
+    liquidityPool: LiquidityPoolStatus,
+    rugcheckData: any,
+    dexscreenerData: any
+  ): LiquidityPoolStatus {
+    // Extract LP addresses from DexScreener pairs
+    const lpAddresses: string[] = [];
+    if (dexscreenerData?.pairs) {
+      dexscreenerData.pairs.forEach((pair: any) => {
+        if (pair.pairAddress) {
+          lpAddresses.push(pair.pairAddress);
+        }
+      });
+    }
+
+    // Extract LP burn data from Rugcheck markets
+    let maxBurnPercentage = 0;
+    let lpMintAddress: string | undefined;
+    let totalLiquidity: number | undefined;
+
+    if (rugcheckData?.markets && rugcheckData.markets.length > 0) {
+      // Find the market with highest liquidity
+      const primaryMarket = rugcheckData.markets.reduce((prev: any, current: any) => {
+        return (current.liquidity || 0) > (prev.liquidity || 0) ? current : prev;
+      });
+
+      maxBurnPercentage = primaryMarket.lpBurn || 0;
+      totalLiquidity = primaryMarket.liquidity;
+      
+      // The lpBurn field is already a percentage (0-100)
+      const isBurned = maxBurnPercentage >= 99.99;
+      const isLocked = maxBurnPercentage >= 90;
+
+      // Cross-validate with DexScreener: if liquidity exists but burn is low, it's risky
+      const hasLiquidity = dexscreenerData?.pairs?.some((p: any) => 
+        p.liquidity?.usd && p.liquidity.usd > 1000
+      );
+
+      let status: "SAFE" | "RISKY" | "UNKNOWN" = liquidityPool.status;
+      if (isBurned && hasLiquidity) {
+        status = "SAFE";
+      } else if (hasLiquidity && maxBurnPercentage < 50) {
+        status = "RISKY";
+      }
+
+      return {
+        ...liquidityPool,
+        isBurned,
+        isLocked,
+        burnPercentage: maxBurnPercentage,
+        totalLiquidity,
+        lpAddresses,
+        status,
+      };
+    }
+
+    // No Rugcheck data - leave burnPercentage undefined to indicate "unknown"
+    // Only add LP addresses if available from DexScreener
+    if (lpAddresses.length > 0) {
+      return {
+        ...liquidityPool,
+        lpAddresses,
+      };
+    }
+    
+    // No data available at all
+    return liquidityPool;
   }
 
   private async fetchRecentTransactions(mintPubkey: PublicKey): Promise<TransactionInfo[]> {

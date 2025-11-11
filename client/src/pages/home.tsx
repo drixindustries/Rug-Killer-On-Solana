@@ -15,6 +15,8 @@ import { RugcheckCard } from "@/components/rugcheck-card";
 import { GoPlusCard } from "@/components/goplus-card";
 import { MarketDataCard } from "@/components/market-data-card";
 import { BubbleMapsCard } from "@/components/bubblemaps-card";
+import { TokenInfoSidebar } from "@/components/token-info-sidebar";
+import { LiquidityBurnCard } from "@/components/liquidity-burn-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import type { TokenAnalysisResponse } from "@shared/schema";
@@ -63,6 +65,11 @@ export default function Home() {
 
             <TokenInput onAnalyze={handleAnalyze} isAnalyzing={isLoading} />
 
+            {/* BubbleMaps - Positioned directly below token input for better visibility */}
+            {analysis && (
+              <BubbleMapsCard tokenAddress={analysis.tokenAddress} />
+            )}
+
             {isLoading && (
               <div className="space-y-6">
                 <Card className="p-8">
@@ -105,6 +112,17 @@ export default function Home() {
                     />
                     
                     <CriticalAlerts redFlags={analysis.redFlags || []} />
+
+                    {/* LP Burn Checker - Only show if we have burn data */}
+                    {analysis.liquidityPool?.burnPercentage !== undefined && (
+                      <LiquidityBurnCard
+                        burnPercentage={analysis.liquidityPool.burnPercentage}
+                        lpMintAddress={analysis.liquidityPool.lpMintAddress}
+                        lpReserve={analysis.liquidityPool.lpReserve}
+                        actualSupply={analysis.liquidityPool.actualSupply}
+                        isBurned={analysis.liquidityPool.isBurned ?? false}
+                      />
+                    )}
                     
                     <MetricsGrid
                       totalSupply={analysis.metadata?.supply || 0}
@@ -117,6 +135,14 @@ export default function Home() {
                   </div>
                   
                   <div className="space-y-6">
+                    {/* Token Info Sidebar with copy-able addresses */}
+                    <TokenInfoSidebar
+                      tokenAddress={analysis.tokenAddress}
+                      mintAuthority={analysis.mintAuthority.hasAuthority ? analysis.mintAuthority.authorityAddress : null}
+                      freezeAuthority={analysis.freezeAuthority.hasAuthority ? analysis.freezeAuthority.authorityAddress : null}
+                      lpAddresses={analysis.liquidityPool?.lpAddresses || []}
+                    />
+
                     <TokenMetadataCard 
                       metadata={analysis.metadata}
                       tokenAddress={analysis.tokenAddress}
@@ -146,8 +172,6 @@ export default function Home() {
                     <TransactionTimeline transactions={analysis.recentTransactions || []} />
                   </div>
                 </div>
-
-                <BubbleMapsCard tokenAddress={analysis.tokenAddress} />
 
                 {analysis.topHolders && analysis.topHolders.length > 0 && (
                   <>

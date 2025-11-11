@@ -70,6 +70,33 @@ Use /execute ${analysis.tokenAddress.slice(0, 8)}... for full analysis`;
   if (analysis.liquidityPool.totalLiquidity && analysis.liquidityPool.totalLiquidity > 0) {
     message += `• Total: $${formatNumber(analysis.liquidityPool.totalLiquidity)}\n`;
   }
+  
+  // LP Burn Information - only show if data is available
+  if (analysis.liquidityPool.burnPercentage !== undefined) {
+    const burnPct = analysis.liquidityPool.burnPercentage;
+    let burnEmoji = '🔥';
+    let burnStatus = '';
+    
+    if (analysis.liquidityPool.isBurned || burnPct >= 99.99) {
+      burnEmoji = '✅🔥';
+      burnStatus = '100% BURNED';
+    } else if (burnPct >= 90) {
+      burnEmoji = '⚠️🔥';
+      burnStatus = 'Partially Burned';
+    } else if (burnPct >= 50) {
+      burnEmoji = '🟡';
+      burnStatus = 'Low Burn';
+    } else {
+      burnEmoji = '❌';
+      burnStatus = 'Not Burned';
+    }
+    
+    message += `• LP Burn: ${burnEmoji} ${burnPct.toFixed(2)}% (${burnStatus})\n`;
+  } else {
+    // Data unavailable - don't mislead users
+    message += `• LP Burn: ❓ Data unavailable\n`;
+  }
+  
   message += `\n`;
   
   if (analysis.redFlags.length > 0) {

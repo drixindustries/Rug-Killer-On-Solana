@@ -54,10 +54,15 @@ export interface TransactionInfo {
 // Liquidity Pool Status
 export interface LiquidityPoolStatus {
   exists: boolean;
-  isLocked: boolean;
-  isBurned: boolean;
+  isLocked?: boolean; // Only set when burn data is available
+  isBurned?: boolean; // Only set when burn data is available
   totalLiquidity?: number;
   status: "SAFE" | "RISKY" | "UNKNOWN";
+  burnPercentage?: number; // Undefined = unknown, not 0%
+  lpMintAddress?: string;
+  lpReserve?: number;
+  actualSupply?: number;
+  lpAddresses?: string[];
 }
 
 // Token Metadata
