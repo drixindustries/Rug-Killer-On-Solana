@@ -74,6 +74,17 @@ const DocumentationPDF = () => (
       </View>
 
       <View style={pdfStyles.section}>
+        <Text style={pdfStyles.heading}>Project Information</Text>
+        <Text style={pdfStyles.subheading}>Official Contract Address</Text>
+        <Text style={pdfStyles.code}>AAF1h3emV6qDXKGQ1v6km9qqv9Z6Pja9sPhDjrUCRtek</Text>
+        <Text style={pdfStyles.text}>
+          This is the official vanity Solana address generated for the Solana Rug Killer project. 
+          The address features the suffix "rtek" and serves as the project's official contract identifier 
+          on the Solana blockchain.
+        </Text>
+      </View>
+
+      <View style={pdfStyles.section}>
         <Text style={pdfStyles.heading}>Multi-Source Analysis</Text>
         <Text style={pdfStyles.text}>
           Our platform aggregates data from four major blockchain intelligence sources:
