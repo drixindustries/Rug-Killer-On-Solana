@@ -21,10 +21,11 @@ export interface IStorage {
   // User operations (required by Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  updateUserStripeInfo(userId: string, stripeCustomerId: string, stripeSubscriptionId?: string): Promise<User>;
+  updateUserWhopInfo(userId: string, whopUserId: string): Promise<User>;
   
   // Subscription operations
   getSubscription(userId: string): Promise<Subscription | undefined>;
+  getSubscriptionByWhopId(whopMembershipId: string): Promise<Subscription | undefined>;
   createSubscription(subscription: InsertSubscription): Promise<Subscription>;
   updateSubscription(id: string, data: Partial<InsertSubscription>): Promise<Subscription>;
   
@@ -68,16 +69,14 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserStripeInfo(
+  async updateUserWhopInfo(
     userId: string,
-    stripeCustomerId: string,
-    stripeSubscriptionId?: string
+    whopUserId: string
   ): Promise<User> {
     const [user] = await db
       .update(users)
       .set({
-        stripeCustomerId,
-        stripeSubscriptionId,
+        whopUserId,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId))
@@ -91,6 +90,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(subscriptions)
       .where(eq(subscriptions.userId, userId));
+    return subscription;
+  }
+
+  async getSubscriptionByWhopId(whopMembershipId: string): Promise<Subscription | undefined> {
+    const [subscription] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.whopMembershipId, whopMembershipId));
     return subscription;
   }
 
@@ -120,15 +127,17 @@ export class DatabaseStorage implements IStorage {
   }> {
     const now = new Date();
     
-    // Check subscription status
+    // Check subscription status (Whop vocabulary)
     const subscription = await this.getSubscription(userId);
     
     if (subscription) {
-      // Check if subscription is active/trial AND not expired
+      // Check if subscription is valid/trialing AND not expired
       const periodEnd = subscription.currentPeriodEnd || subscription.trialEndsAt;
       
-      // Allow both 'active' and 'trial' status (Stripe paid trials use 'trial')
-      if ((subscription.status === 'active' || subscription.status === 'trial') && periodEnd && periodEnd > now) {
+      // Whop statuses: "valid" (active subscription), "trialing" (in trial), "past_due" (grace period)
+      const activeStatuses = ['valid', 'trialing', 'past_due'];
+      
+      if (activeStatuses.includes(subscription.status) && periodEnd && periodEnd > now) {
         return {
           hasAccess: true,
           reason: `Active ${subscription.tier} subscription (${subscription.status}) until ${periodEnd.toISOString()}`,
@@ -136,9 +145,9 @@ export class DatabaseStorage implements IStorage {
         };
       }
       
-      // Handle expired trials - mark as expired
-      if ((subscription.tier === 'free_trial' || subscription.status === 'trial') && periodEnd && periodEnd <= now) {
-        // Auto-expire the trial
+      // Handle expired subscriptions - mark as expired
+      if ((subscription.tier === 'free_trial' || subscription.status === 'trialing') && periodEnd && periodEnd <= now) {
+        // Auto-expire the subscription/trial
         const updated = await this.updateSubscription(subscription.id, {
           status: 'expired',
         });

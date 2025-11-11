@@ -257,8 +257,7 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  stripeCustomerId: varchar("stripe_customer_id").unique(),
-  stripeSubscriptionId: varchar("stripe_subscription_id"),
+  whopUserId: varchar("whop_user_id").unique(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -267,21 +266,23 @@ export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
 // Subscriptions table
+// Maps to Whop memberships: status values align with Whop lifecycle (valid, past_due, cancelled, expired)
+// currentPeriodEnd maps to Whop's valid_until timestamp
 export const subscriptions = pgTable("subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   tier: varchar("tier").notNull(), // "free_trial", "basic", "premium"
-  status: varchar("status").notNull(), // "active", "cancelled", "expired"
-  stripeCustomerId: varchar("stripe_customer_id"),
-  stripeSubscriptionId: varchar("stripe_subscription_id"),
-  trialEndsAt: timestamp("trial_ends_at"),
-  currentPeriodStart: timestamp("current_period_start"),
-  currentPeriodEnd: timestamp("current_period_end"),
+  status: varchar("status").notNull(), // Whop states: "valid", "past_due", "cancelled", "expired", "trialing"
+  whopMembershipId: varchar("whop_membership_id").notNull().unique(), // Canonical Whop membership reference
+  whopPlanId: varchar("whop_plan_id").notNull(), // Whop plan ID (e.g., "plan_xxxxx")
+  trialEndsAt: timestamp("trial_ends_at"), // For free trial tracking
+  currentPeriodEnd: timestamp("current_period_end").notNull(), // Maps to Whop's valid_until
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("idx_subscriptions_user_id").on(table.userId),
   index("idx_subscriptions_status").on(table.status),
+  index("idx_subscriptions_whop_membership").on(table.whopMembershipId),
 ]);
 
 export type Subscription = typeof subscriptions.$inferSelect;
