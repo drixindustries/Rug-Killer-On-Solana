@@ -15,11 +15,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 function extractBillingPeriod(subscription: Stripe.Subscription): { start: Date; end: Date } {
+  const sub = subscription as any; // Cast for API version compatibility
+  
   if (subscription.items.data.length === 0) {
     console.warn(`No subscription items found for subscription ${subscription.id}, using current_period_* fields`);
     return {
-      start: new Date(subscription.current_period_start * 1000),
-      end: new Date(subscription.current_period_end * 1000),
+      start: new Date(sub.current_period_start * 1000),
+      end: new Date(sub.current_period_end * 1000),
     };
   }
 
@@ -39,8 +41,8 @@ function extractBillingPeriod(subscription: Stripe.Subscription): { start: Date;
 
   console.warn(`billing_period missing on subscription ${subscription.id}, using subscription current_period_* fields`);
   return {
-    start: new Date(subscription.current_period_start * 1000),
-    end: new Date(subscription.current_period_end * 1000),
+    start: new Date(sub.current_period_start * 1000),
+    end: new Date(sub.current_period_end * 1000),
   };
 }
 
@@ -328,6 +330,147 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // CRYPTO PAYMENT ROUTES
+  // ============================================================================
+  
+  // Import crypto payment service
+  const cryptoPayments = await import('./crypto-payments');
+  
+  // POST /api/create-crypto-payment - Generate crypto payment address
+  app.post('/api/create-crypto-payment', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { chain, tier } = req.body;
+      
+      // Only allow SOL payments until ETH/BTC are fully implemented
+      if (!chain || chain !== 'SOL') {
+        return res.status(400).json({ 
+          message: "Only SOL payments are currently supported. ETH and BTC coming soon!",
+          supported_chains: ['SOL']
+        });
+      }
+      
+      // Verify PHANTOM_WALLET_ADDRESS is configured
+      if (!process.env.PHANTOM_WALLET_ADDRESS) {
+        console.error("PHANTOM_WALLET_ADDRESS not configured!");
+        return res.status(503).json({ 
+          message: "Crypto payments are currently unavailable. Please use Stripe instead or contact support.",
+        });
+      }
+      
+      if (!tier || !['basic', 'premium'].includes(tier)) {
+        return res.status(400).json({ message: "Invalid tier. Must be 'basic' or 'premium'" });
+      }
+      
+      const result = await cryptoPayments.generatePaymentAddress(userId, chain, tier);
+      
+      res.json({
+        paymentId: result.payment.id,
+        address: result.cryptoAddress.address,
+        amount: result.amountToPay,
+        chain,
+        tier,
+        expiresAt: result.expiresAt,
+      });
+    } catch (error: any) {
+      console.error("Error creating crypto payment:", error);
+      res.status(500).json({ message: "Error creating crypto payment: " + error.message });
+    }
+  });
+  
+  // GET /api/crypto-payment/:paymentId - Check payment status
+  app.get('/api/crypto-payment/:paymentId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { paymentId } = req.params;
+      const payment = await cryptoPayments.getPaymentStatus(paymentId);
+      
+      if (!payment) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+      
+      res.json(payment);
+    } catch (error: any) {
+      console.error("Error fetching payment status:", error);
+      res.status(500).json({ message: "Error fetching payment status: " + error.message });
+    }
+  });
+  
+  // POST /api/crypto-payment/:paymentId/check - Manually check for payment
+  app.post('/api/crypto-payment/:paymentId/check', isAuthenticated, async (req: any, res) => {
+    try {
+      const { paymentId } = req.params;
+      
+      // Trigger manual check
+      const payment = await cryptoPayments.checkSolPayment(paymentId);
+      
+      res.json(payment);
+    } catch (error: any) {
+      console.error("Error checking payment:", error);
+      res.status(500).json({ message: "Error checking payment: " + error.message });
+    }
+  });
+  
+  // ============================================================================
+  // AI BLACKLIST ROUTES
+  // ============================================================================
+  
+  const blacklist = await import('./ai-blacklist');
+  
+  // GET /api/blacklist/check/:wallet - Check if wallet is blacklisted
+  app.get('/api/blacklist/check/:wallet', async (req, res) => {
+    try {
+      const { wallet } = req.params;
+      const result = await blacklist.checkBlacklist(wallet);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error checking blacklist:", error);
+      res.status(500).json({ message: "Error checking blacklist: " + error.message });
+    }
+  });
+  
+  // POST /api/blacklist/report - Report a suspicious wallet
+  app.post('/api/blacklist/report', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { walletAddress, reportType, evidence } = req.body;
+      
+      if (!walletAddress || !reportType || !evidence) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+      
+      await blacklist.reportWallet(walletAddress, reportType, evidence, userId);
+      
+      res.json({ message: "Report submitted successfully" });
+    } catch (error: any) {
+      console.error("Error reporting wallet:", error);
+      res.status(500).json({ message: "Error reporting wallet: " + error.message });
+    }
+  });
+  
+  // GET /api/blacklist/stats - Get blacklist statistics
+  app.get('/api/blacklist/stats', async (req, res) => {
+    try {
+      const stats = await blacklist.getBlacklistStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Error getting blacklist stats:", error);
+      res.status(500).json({ message: "Error getting blacklist stats: " + error.message });
+    }
+  });
+  
+  // GET /api/blacklist/top - Get top flagged wallets
+  app.get('/api/blacklist/top', async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 100;
+      const wallets = await blacklist.getTopFlaggedWallets(limit);
+      res.json(wallets);
+    } catch (error: any) {
+      console.error("Error getting top flagged wallets:", error);
+      res.status(500).json({ message: "Error getting top flagged wallets: " + error.message });
+    }
+  });
+  
   // POST /api/analyze-token - Analyze a Solana token for rug pull risks
   app.post("/api/analyze-token", async (req, res) => {
     try {
@@ -345,8 +488,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Perform token analysis
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      
+      // Get userId if authenticated
+      const userId = (req as any).user?.claims?.sub;
+      
+      // Run AI blacklist analysis in background (don't block response)
+      blacklist.analyzeAndFlag(analysis, userId).catch(err => {
+        console.error("Background blacklist analysis error:", err);
+      });
+      
+      // Check if mint/freeze authority is blacklisted
+      const blacklistChecks = await Promise.all([
+        analysis.mintAuthority.authorityAddress 
+          ? blacklist.checkBlacklist(analysis.mintAuthority.authorityAddress)
+          : Promise.resolve({ isBlacklisted: false, severity: 0, labels: [], warnings: [] }),
+        analysis.freezeAuthority.authorityAddress
+          ? blacklist.checkBlacklist(analysis.freezeAuthority.authorityAddress)
+          : Promise.resolve({ isBlacklisted: false, severity: 0, labels: [], warnings: [] }),
+        blacklist.checkBlacklist(tokenAddress),
+      ]);
+      
+      // Add blacklist info to response
+      const responseWithBlacklist = {
+        ...analysis,
+        blacklistInfo: {
+          mintAuthority: blacklistChecks[0],
+          freezeAuthority: blacklistChecks[1],
+          token: blacklistChecks[2],
+        },
+      };
 
-      return res.json(analysis);
+      return res.json(responseWithBlacklist);
     } catch (error) {
       console.error("Token analysis error:", error);
       

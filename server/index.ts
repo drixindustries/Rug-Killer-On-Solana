@@ -47,6 +47,22 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Start bots only if credentials are configured
+  if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_TOKEN !== 'PLACEHOLDER_TOKEN') {
+    const { startTelegramBot } = await import('./telegram-bot');
+    startTelegramBot().catch(err => {
+      console.error('Failed to start Telegram bot:', err);
+    });
+  }
+  
+  if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_BOT_TOKEN !== 'PLACEHOLDER_TOKEN' &&
+      process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_ID !== 'PLACEHOLDER_ID') {
+    const { startDiscordBot } = await import('./discord-bot');
+    startDiscordBot().catch(err => {
+      console.error('Failed to start Discord bot:', err);
+    });
+  }
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
