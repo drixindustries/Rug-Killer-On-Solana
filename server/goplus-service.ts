@@ -6,7 +6,7 @@ export class GoPlusSecurityService {
   async getTokenSecurity(tokenAddress: string): Promise<GoPlusSecurityData | null> {
     try {
       const response = await fetch(
-        `${GOPLUS_API_URL}/solana/token_security/${tokenAddress}`,
+        `${GOPLUS_API_URL}/token_security/solana?contract_addresses=${tokenAddress}`,
         {
           signal: AbortSignal.timeout(10000),
         }
@@ -19,15 +19,20 @@ export class GoPlusSecurityService {
 
       const data = await response.json();
       
-      if (data.code !== 1 || !data.result) {
+      if (data.code !== 1) {
         console.error("GoPlus API returned error:", data.message);
+        return null;
+      }
+
+      if (!data.result || data.result === null) {
+        console.log(`GoPlus: No security data available for token ${tokenAddress}`);
         return null;
       }
 
       let tokenData = data.result[tokenAddress];
       
       if (!tokenData) {
-        console.error("GoPlus: Token data not found in response");
+        console.log(`GoPlus: Token ${tokenAddress} not found in result map`);
         return null;
       }
 

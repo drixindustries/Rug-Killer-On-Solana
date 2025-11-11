@@ -93,6 +93,13 @@ The default public Solana RPC endpoint (https://api.mainnet-beta.solana.com) has
 - **Solution**: Configure custom RPC endpoint via SOLANA_RPC_URL environment variable
 - **Recommended Providers**: Helius, QuickNode, Alchemy (all have free tiers)
 
+### External API Data Availability
+Rugcheck and GoPlus APIs may not have data for all tokens:
+- **Rugcheck**: Primarily tracks newer tokens and DeFi projects; may not have data for established tokens like USDC
+- **GoPlus**: Database coverage varies; established tokens like USDC may return null results
+- **Handling**: Cards only render when data is available; missing data does not cause errors
+- **UI Behavior**: If Rugcheck/GoPlus return null, their respective cards won't display
+
 ### Error Handling Strategy
 When RPC calls fail:
 1. Backend returns complete response with safe defaults
