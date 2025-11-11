@@ -95,6 +95,85 @@ export class DatabaseStorage implements IStorage {
     return subscription;
   }
 
+  // Access control - checks subscription OR token holder status
+  async hasActiveAccess(userId: string): Promise<{
+    hasAccess: boolean;
+    reason: string;
+    subscription?: Subscription;
+    wallet?: WalletConnection;
+  }> {
+    const now = new Date();
+    
+    // Check subscription status
+    const subscription = await this.getSubscription(userId);
+    
+    if (subscription) {
+      // Check if subscription is active/trial AND not expired
+      const periodEnd = subscription.currentPeriodEnd || subscription.trialEndsAt;
+      
+      // Allow both 'active' and 'trial' status (Stripe paid trials use 'trial')
+      if ((subscription.status === 'active' || subscription.status === 'trial') && periodEnd && periodEnd > now) {
+        return {
+          hasAccess: true,
+          reason: `Active ${subscription.tier} subscription (${subscription.status}) until ${periodEnd.toISOString()}`,
+          subscription,
+        };
+      }
+      
+      // Handle expired trials - mark as expired
+      if ((subscription.tier === 'free_trial' || subscription.status === 'trial') && periodEnd && periodEnd <= now) {
+        // Auto-expire the trial
+        const updated = await this.updateSubscription(subscription.id, {
+          status: 'expired',
+        });
+        
+        // Update the local reference with fresh data
+        subscription.status = updated.status;
+        
+        // Continue to check wallet, don't return yet
+      }
+    }
+    
+    // Check wallet token holder status (10M+ tokens)
+    const wallet = await this.getWalletConnection(userId);
+    
+    if (wallet?.isEligible) {
+      // Check if verification is recent (within 24 hours)
+      const lastVerified = wallet.lastVerifiedAt ? new Date(wallet.lastVerifiedAt) : null;
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      
+      if (lastVerified && lastVerified > twentyFourHoursAgo) {
+        return {
+          hasAccess: true,
+          reason: `Token holder with ${wallet.tokenBalance.toLocaleString()} tokens (verified ${lastVerified.toISOString()})`,
+          wallet,
+        };
+      } else {
+        return {
+          hasAccess: false,
+          reason: 'Token balance verification expired (older than 24 hours). Please reverify your wallet.',
+          wallet,
+        };
+      }
+    }
+    
+    // No access
+    if (subscription?.tier === 'free_trial') {
+      return {
+        hasAccess: false,
+        reason: 'Free trial expired. Please subscribe or connect a wallet with 10M+ tokens.',
+        subscription,
+      };
+    }
+    
+    return {
+      hasAccess: false,
+      reason: 'No active subscription or token holder status. Please subscribe or connect a wallet with 10M+ tokens.',
+      subscription,
+      wallet,
+    };
+  }
+
   // Wallet connection operations
   async getWalletConnection(userId: string): Promise<WalletConnection | undefined> {
     const [wallet] = await db

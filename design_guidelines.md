@@ -1,4 +1,4 @@
-# Solana Rug Detector - Design Guidelines
+# Solana Rug Killer - Design Guidelines
 
 ## Design Approach
 **System:** Dark cyberpunk dashboard inspired by Linear's clarity + Dexscreener's density + crypto terminal aesthetics. Professional security-focused interface with warm, high-tech visual treatment.

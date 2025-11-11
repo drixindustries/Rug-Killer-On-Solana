@@ -66,6 +66,51 @@ function mapStripeStatus(stripeStatus: string): 'active' | 'cancelled' | 'trial'
   }
 }
 
+// Middleware: Requires active subscription OR 10M+ token holder status
+// This gates all premium features including token analysis, crypto payments, and bot access
+export const hasActiveAccess = async (req: any, res: any, next: any) => {
+  try {
+    // Must be authenticated first
+    if (!req.isAuthenticated() || !req.user?.claims?.sub) {
+      return res.status(401).json({ 
+        message: "Unauthorized. Please log in." 
+      });
+    }
+
+    const userId = req.user.claims.sub;
+    
+    // Check access via storage helper
+    const accessCheck = await storage.hasActiveAccess(userId);
+    
+    if (accessCheck.hasAccess) {
+      // Log successful access for security monitoring
+      console.log(`✅ Access granted to ${userId}: ${accessCheck.reason}`);
+      return next();
+    }
+    
+    // Access denied - provide clear reason
+    console.warn(`❌ Access denied to ${userId}: ${accessCheck.reason}`);
+    return res.status(403).json({
+      message: accessCheck.reason,
+      subscription: accessCheck.subscription ? {
+        tier: accessCheck.subscription.tier,
+        status: accessCheck.subscription.status,
+        currentPeriodEnd: accessCheck.subscription.currentPeriodEnd,
+      } : null,
+      wallet: accessCheck.wallet ? {
+        isEligible: accessCheck.wallet.isEligible,
+        tokenBalance: accessCheck.wallet.tokenBalance,
+        lastVerifiedAt: accessCheck.wallet.lastVerifiedAt,
+      } : null,
+    });
+  } catch (error) {
+    console.error("Error checking access:", error);
+    return res.status(500).json({ 
+      message: "Failed to verify access. Please try again." 
+    });
+  }
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
   await setupAuth(app);
@@ -121,6 +166,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching wallet:", error);
       res.status(500).json({ message: "Failed to fetch wallet" });
+    }
+  });
+
+  // POST /api/wallet/verify - Verify token holder status (10M+ tokens)
+  // Note: Uses isAuthenticated (not hasActiveAccess) to allow users to verify eligibility
+  app.post('/api/wallet/verify', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { walletAddress, tokenMintAddress } = req.body;
+      
+      if (!walletAddress) {
+        return res.status(400).json({ message: "Wallet address is required" });
+      }
+      
+      if (!tokenMintAddress) {
+        return res.status(400).json({ 
+          message: "Token mint address is required. Please provide the SPL token mint address to verify." 
+        });
+      }
+
+      // Import Solana connection
+      const { Connection, PublicKey } = await import('@solana/web3.js');
+      const { getAssociatedTokenAddress, getAccount } = await import('@solana/spl-token');
+      
+      const connection = new Connection(
+        process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
+        'confirmed'
+      );
+
+      try {
+        const walletPubkey = new PublicKey(walletAddress);
+        const mintPubkey = new PublicKey(tokenMintAddress);
+        
+        // Get associated token account
+        const tokenAccount = await getAssociatedTokenAddress(
+          mintPubkey,
+          walletPubkey
+        );
+        
+        // Get token account info
+        const accountInfo = await getAccount(connection, tokenAccount);
+        const balance = Number(accountInfo.amount) / Math.pow(10, 9); // Assuming 9 decimals
+        
+        // Check if eligible (10M+ tokens)
+        const isEligible = balance >= 10_000_000;
+        
+        // Check if wallet connection already exists
+        const existing = await storage.getWalletByAddress(walletAddress);
+        
+        let wallet;
+        if (existing) {
+          // Update existing
+          wallet = await storage.updateWalletBalance(walletAddress, balance, isEligible);
+        } else {
+          // Create new
+          wallet = await storage.createWalletConnection({
+            userId,
+            walletAddress,
+            tokenBalance: balance,
+            isEligible,
+          });
+        }
+        
+        console.log(`✅ Wallet verified: ${walletAddress} - ${balance.toLocaleString()} tokens - eligible: ${isEligible}`);
+        
+        res.json({
+          wallet,
+          message: isEligible 
+            ? `Congratulations! You hold ${balance.toLocaleString()} tokens and have full access.`
+            : `You hold ${balance.toLocaleString()} tokens. You need 10M+ tokens for access.`,
+        });
+        
+      } catch (error: any) {
+        // Handle wallet/token not found
+        if (error.message?.includes('could not find account')) {
+          return res.status(404).json({ 
+            message: "No token account found for this wallet and token mint. Make sure you're using the correct addresses." 
+          });
+        }
+        throw error;
+      }
+      
+    } catch (error: any) {
+      console.error("Error verifying wallet:", error);
+      res.status(500).json({ 
+        message: "Failed to verify wallet: " + error.message 
+      });
     }
   });
 
@@ -472,7 +604,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // POST /api/analyze-token - Analyze a Solana token for rug pull risks
-  app.post("/api/analyze-token", async (req, res) => {
+  // PROTECTED: Requires active subscription OR 10M+ tokens
+  app.post("/api/analyze-token", hasActiveAccess, async (req, res) => {
     try {
       // Validate request body
       const result = analyzeTokenSchema.safeParse(req.body);
