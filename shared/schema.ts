@@ -9,6 +9,7 @@ import {
   boolean,
   integer,
   bigint,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // Token Analysis Request
@@ -300,3 +301,136 @@ export const walletConnections = pgTable("wallet_connections", {
 
 export type WalletConnection = typeof walletConnections.$inferSelect;
 export type InsertWalletConnection = typeof walletConnections.$inferInsert;
+
+// ============================================================================
+// CRYPTO PAYMENTS TABLES
+// ============================================================================
+
+// Crypto payment addresses table
+export const cryptoAddresses = pgTable("crypto_addresses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  chain: varchar("chain").notNull(), // "SOL", "ETH", "BTC"
+  address: varchar("address").notNull().unique(), // UNIQUE: Each blockchain address can only be used once
+  tier: varchar("tier").notNull(), // "basic", "premium"
+  expiresAt: timestamp("expires_at").notNull(), // Payment address expires after 1 hour
+  isPaid: boolean("is_paid").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_crypto_addresses_user").on(table.userId),
+  index("idx_crypto_addresses_chain").on(table.chain),
+]);
+
+export type CryptoAddress = typeof cryptoAddresses.$inferSelect;
+export type InsertCryptoAddress = typeof cryptoAddresses.$inferInsert;
+
+// Payments table - tracks all crypto payments
+export const payments = pgTable("payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  cryptoAddressId: varchar("crypto_address_id").notNull().unique().references(() => cryptoAddresses.id), // UNIQUE: One payment per address
+  chain: varchar("chain").notNull(), // "SOL", "ETH", "BTC"
+  tier: varchar("tier").notNull(), // "basic", "premium"
+  amountExpected: varchar("amount_expected").notNull(), // Expected amount in crypto (as string for precision)
+  amountReceived: varchar("amount_received"), // Actual amount received
+  txHash: varchar("tx_hash").unique(), // UNIQUE: Prevent duplicate blockchain transaction processing
+  fromAddress: varchar("from_address"), // Sender address
+  status: varchar("status").notNull().default("pending"), // "pending", "confirmed", "failed", "expired"
+  confirmations: integer("confirmations").notNull().default(0),
+  confirmedAt: timestamp("confirmed_at"),
+  subscriptionActivatedAt: timestamp("subscription_activated_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_payments_user").on(table.userId),
+  index("idx_payments_status").on(table.status),
+]);
+
+export type Payment = typeof payments.$inferSelect;
+export type InsertPayment = typeof payments.$inferInsert;
+
+// Payment audit log - tracks all blockchain checks
+export const paymentAudit = pgTable("payment_audit", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  paymentId: varchar("payment_id").notNull().references(() => payments.id, { onDelete: "cascade" }),
+  checkType: varchar("check_type").notNull(), // "blockchain_scan", "confirmation_update", "status_change"
+  details: jsonb("details"), // Store check results
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_payment_audit_payment").on(table.paymentId),
+]);
+
+export type PaymentAudit = typeof paymentAudit.$inferSelect;
+export type InsertPaymentAudit = typeof paymentAudit.$inferInsert;
+
+// ============================================================================
+// AI BLACKLIST TABLES
+// ============================================================================
+
+// Analysis runs - stores historical token analysis for ML training
+export const analysisRuns = pgTable("analysis_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tokenAddress: varchar("token_address").notNull(),
+  userId: varchar("user_id").references(() => users.id),
+  riskScore: integer("risk_score").notNull(), // 0-100
+  riskLevel: varchar("risk_level").notNull(), // "LOW", "MODERATE", "HIGH", "EXTREME"
+  analysisData: jsonb("analysis_data").notNull(), // Full TokenAnalysisResponse
+  rugDetected: boolean("rug_detected").default(false), // Manual flag for confirmed rugs
+  userReported: boolean("user_reported").default(false), // User reported as rug
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_analysis_token").on(table.tokenAddress),
+  index("idx_analysis_rug").on(table.rugDetected),
+  index("idx_analysis_created").on(table.createdAt),
+]);
+
+export type AnalysisRun = typeof analysisRuns.$inferSelect;
+export type InsertAnalysisRun = typeof analysisRuns.$inferInsert;
+
+// Bad actor labels - blacklist database
+export const badActorLabels = pgTable("bad_actor_labels", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  walletAddress: varchar("wallet_address").notNull().unique(),
+  labelType: varchar("label_type").notNull(), // "rugger_dev", "scammer", "honeypot_creator", "wash_trader", "serial_rugger"
+  severity: integer("severity").notNull(), // 0-100 (higher = more dangerous)
+  rugCount: integer("rug_count").notNull().default(0), // Number of confirmed rugs
+  totalVictims: integer("total_victims").default(0), // Estimated victims
+  totalLosses: varchar("total_losses"), // Estimated SOL lost by victims
+  evidenceData: jsonb("evidence_data"), // Store evidence/patterns
+  detectionMethod: varchar("detection_method").notNull(), // "rules_engine", "ml_model", "manual_report", "community_vote"
+  confidence: integer("confidence").notNull(), // 0-100 confidence score
+  isActive: boolean("is_active").notNull().default(true), // Can be deactivated if false positive
+  reviewedBy: varchar("reviewed_by"), // Admin user ID who reviewed
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_bad_actors_wallet").on(table.walletAddress),
+  index("idx_bad_actors_severity").on(table.severity),
+  index("idx_bad_actors_active").on(table.isActive),
+  index("idx_bad_actors_label_type").on(table.labelType),
+]);
+
+export type BadActorLabel = typeof badActorLabels.$inferSelect;
+export type InsertBadActorLabel = typeof badActorLabels.$inferInsert;
+
+// Bot configuration table
+export const botConfig = pgTable("bot_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  platform: varchar("platform").notNull(), // "telegram", "discord"
+  platformUserId: varchar("platform_user_id").notNull(), // Telegram chat ID or Discord user ID
+  platformUsername: varchar("platform_username"),
+  isActive: boolean("is_active").notNull().default(true),
+  alertsEnabled: boolean("alerts_enabled").notNull().default(true),
+  minRiskLevel: varchar("min_risk_level").default("MODERATE"), // Only alert for HIGH and EXTREME by default
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_bot_config_user").on(table.userId),
+  index("idx_bot_config_platform").on(table.platform),
+  uniqueIndex("unique_bot_platform_user").on(table.platform, table.platformUserId), // UNIQUE: Prevent duplicate bot registrations
+]);
+
+export type BotConfig = typeof botConfig.$inferSelect;
+export type InsertBotConfig = typeof botConfig.$inferInsert;
