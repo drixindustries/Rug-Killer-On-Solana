@@ -10,6 +10,9 @@ import {
   integer,
   bigint,
   uniqueIndex,
+  serial,
+  decimal,
+  text,
 } from "drizzle-orm/pg-core";
 
 // Token Analysis Request
@@ -317,6 +320,37 @@ export const walletChallenges = pgTable("wallet_challenges", {
 
 export type WalletChallenge = typeof walletChallenges.$inferSelect;
 export type InsertWalletChallenge = typeof walletChallenges.$inferInsert;
+
+// ============================================================================
+// KOL (KEY OPINION LEADER) TRACKING
+// ============================================================================
+
+// KOL wallet tracking for cabal detection and influence analysis
+export const kolWallets = pgTable("kol_wallets", {
+  id: serial("id").primaryKey(),
+  walletAddress: varchar("wallet_address", { length: 255 }).notNull().unique(),
+  displayName: varchar("display_name", { length: 255 }),
+  twitterHandle: varchar("twitter_handle", { length: 255 }),
+  telegramHandle: varchar("telegram_handle", { length: 255 }),
+  rank: integer("rank"),
+  profitSol: decimal("profit_sol", { precision: 20, scale: 9 }),
+  wins: integer("wins").default(0),
+  losses: integer("losses").default(0),
+  influenceScore: integer("influence_score").default(50), // 0-100, higher = more influential
+  isVerified: boolean("is_verified").default(false),
+  source: varchar("source", { length: 50 }).default("kolscan"), // kolscan, manual, etc
+  notes: text("notes"),
+  lastActiveAt: timestamp("last_active_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_kol_wallet_address").on(table.walletAddress),
+  index("idx_kol_rank").on(table.rank),
+  index("idx_kol_influence").on(table.influenceScore),
+]);
+
+export type KolWallet = typeof kolWallets.$inferSelect;
+export type InsertKolWallet = typeof kolWallets.$inferInsert;
 
 // ============================================================================
 // CRYPTO PAYMENTS TABLES
