@@ -15,6 +15,14 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 function extractBillingPeriod(subscription: Stripe.Subscription): { start: Date; end: Date } {
+  if (subscription.items.data.length === 0) {
+    console.warn(`No subscription items found for subscription ${subscription.id}, using current_period_* fields`);
+    return {
+      start: new Date(subscription.current_period_start * 1000),
+      end: new Date(subscription.current_period_end * 1000),
+    };
+  }
+
   if (subscription.items.data.length !== 1) {
     console.warn(`Unexpected subscription item count: ${subscription.items.data.length}. Expected 1 for single-tier subscription.`);
   }
@@ -29,12 +37,31 @@ function extractBillingPeriod(subscription: Stripe.Subscription): { start: Date;
     };
   }
 
-  console.warn(`billing_period missing on subscription ${subscription.id}, using 30-day fallback`);
-  const now = new Date();
+  console.warn(`billing_period missing on subscription ${subscription.id}, using subscription current_period_* fields`);
   return {
-    start: now,
-    end: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+    start: new Date(subscription.current_period_start * 1000),
+    end: new Date(subscription.current_period_end * 1000),
   };
+}
+
+function mapStripeStatus(stripeStatus: string): 'active' | 'cancelled' | 'trial' {
+  switch (stripeStatus) {
+    case 'active':
+      return 'active';
+    case 'trialing':
+      return 'trial';
+    case 'canceled':
+    case 'unpaid':
+    case 'past_due':
+      return 'cancelled';
+    case 'incomplete':
+    case 'incomplete_expired':
+    case 'paused':
+      return 'cancelled';
+    default:
+      console.warn(`Unknown Stripe subscription status: ${stripeStatus}, treating as cancelled`);
+      return 'cancelled';
+  }
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -233,11 +260,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId);
             const periods = extractBillingPeriod(stripeSubscription);
 
+            const mappedStatus = mapStripeStatus(stripeSubscription.status);
+            
             const existingSubscription = await storage.getSubscription(userId);
             if (existingSubscription) {
               await storage.updateSubscription(existingSubscription.id, {
                 tier: tier || 'basic',
-                status: 'active',
+                status: mappedStatus,
                 stripeCustomerId: session.customer as string,
                 stripeSubscriptionId: subscriptionId,
                 currentPeriodStart: periods.start,
@@ -247,7 +276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await storage.createSubscription({
                 userId,
                 tier: tier || 'basic',
-                status: 'active',
+                status: mappedStatus,
                 stripeCustomerId: session.customer as string,
                 stripeSubscriptionId: subscriptionId,
                 currentPeriodStart: periods.start,
@@ -264,14 +293,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const userId = subscription.metadata?.userId;
           const tier = subscription.metadata?.tier as 'basic' | 'premium';
 
-          if (userId && subscription.items.data.length > 0) {
+          if (userId) {
             const periods = extractBillingPeriod(subscription);
+            const mappedStatus = mapStripeStatus(subscription.status);
 
             const dbSubscription = await storage.getSubscription(userId);
             if (dbSubscription) {
               await storage.updateSubscription(dbSubscription.id, {
                 tier: tier || dbSubscription.tier,
-                status: subscription.status === 'active' ? 'active' : 'cancelled',
+                status: mappedStatus,
                 currentPeriodStart: periods.start,
                 currentPeriodEnd: periods.end,
               });
@@ -279,7 +309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await storage.createSubscription({
                 userId,
                 tier: tier || 'basic',
-                status: subscription.status === 'active' ? 'active' : 'cancelled',
+                status: mappedStatus,
                 stripeCustomerId: subscription.customer as string,
                 stripeSubscriptionId: subscription.id,
                 currentPeriodStart: periods.start,
