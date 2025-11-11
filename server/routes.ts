@@ -784,6 +784,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========================================
+  // CREATOR WALLET ROUTES (Admin Only)
+  // ========================================
+  
+  // Admin middleware - checks if user is authorized to manage creator wallet
+  const isAdmin = async (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated() || !req.user?.claims?.sub) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    // Check if user is admin (you can customize this logic)
+    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim());
+    const userEmail = req.user.claims.email;
+    
+    if (!adminEmails.includes(userEmail)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    
+    next();
+  };
+
+  // GET /api/admin/creator-wallet - View creator wallet info (NO private key)
+  app.get('/api/admin/creator-wallet', isAdmin, async (req, res) => {
+    try {
+      const { getCreatorWallet } = await import('./creator-wallet');
+      const wallet = getCreatorWallet();
+      const info = await wallet.getWalletInfo();
+      
+      res.json({
+        publicKey: info.publicKey,
+        balance: info.balance,
+        isConfigured: info.isConfigured,
+        pumpFunUrl: info.publicKey ? `https://pump.fun/profile/${info.publicKey}` : null,
+      });
+    } catch (error) {
+      console.error("Error fetching creator wallet:", error);
+      res.status(500).json({ message: "Failed to fetch creator wallet" });
+    }
+  });
+
+  // POST /api/admin/creator-wallet/generate - Generate new wallet (returns private key ONCE)
+  app.post('/api/admin/creator-wallet/generate', isAdmin, async (req, res) => {
+    try {
+      const { CreatorWalletService } = await import('./creator-wallet');
+      const newWallet = CreatorWalletService.generateNewWallet();
+      
+      res.json({
+        publicKey: newWallet.publicKey,
+        privateKey: newWallet.privateKey,
+        warning: 'SAVE THIS PRIVATE KEY IMMEDIATELY! Import it into Phantom wallet. It will never be shown again.',
+        nextSteps: [
+          '1. Copy the private key above',
+          '2. Open Phantom wallet → Settings → Import Private Key',
+          '3. Paste the private key',
+          '4. Add CREATOR_WALLET_PRIVATE_KEY to Replit Secrets',
+          '5. Restart the application',
+          '6. Use this wallet to create tokens on pump.fun',
+        ],
+      });
+    } catch (error) {
+      console.error("Error generating creator wallet:", error);
+      res.status(500).json({ message: "Failed to generate wallet" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

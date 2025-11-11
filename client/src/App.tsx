@@ -11,6 +11,7 @@ import Pricing from "@/pages/pricing";
 import Documentation from "@/pages/documentation";
 import About from "@/pages/about";
 import VanityGenerator from "@/pages/vanity-generator";
+import AdminWallet from "@/pages/admin-wallet";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -32,6 +33,7 @@ function Router() {
           <Route path="/documentation" component={Documentation} />
           <Route path="/about" component={About} />
           <Route path="/vanity" component={VanityGenerator} />
+          <Route path="/admin/wallet" component={AdminWallet} />
         </>
       )}
       <Route component={NotFound} />
