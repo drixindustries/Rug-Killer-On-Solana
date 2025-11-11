@@ -174,9 +174,9 @@ export function Header({ onNewAnalysis }: HeaderProps) {
             </Button>
           )}
 
-          {user && (
+          {user ? (
             <UserMenu user={user as UserType} />
-          )}
+          ) : null}
         </div>
       </div>
     </header>
