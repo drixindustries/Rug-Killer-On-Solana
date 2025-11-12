@@ -20,36 +20,22 @@ import BotSetup from "@/pages/bot-setup";
 import NotFound from "@/pages/not-found";
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
-
+  // Authentication disabled - all routes are publicly accessible
   return (
     <Switch>
-      {isLoading || !isAuthenticated ? (
-        <>
-          <Route path="/" component={Landing} />
-          <Route path="/features" component={Features} />
-          <Route path="/bot-setup" component={BotSetup} />
-          <Route path="/documentation" component={Documentation} />
-          <Route path="/about" component={About} />
-          <Route path="/terms" component={Terms} />
-          <Route path="/privacy" component={Privacy} />
-        </>
-      ) : (
-        <>
-          <Route path="/" component={Home} />
-          <Route path="/subscription" component={Subscription} />
-          <Route path="/pricing" component={Pricing} />
-          <Route path="/features" component={Features} />
-          <Route path="/bot-setup" component={BotSetup} />
-          <Route path="/documentation" component={Documentation} />
-          <Route path="/about" component={About} />
-          <Route path="/terms" component={Terms} />
-          <Route path="/privacy" component={Privacy} />
-          <Route path="/vanity" component={VanityGenerator} />
-          <Route path="/admin" component={Admin} />
-          <Route path="/admin/wallet" component={AdminWallet} />
-        </>
-      )}
+      <Route path="/" component={Home} />
+      <Route path="/landing" component={Landing} />
+      <Route path="/subscription" component={Subscription} />
+      <Route path="/pricing" component={Pricing} />
+      <Route path="/features" component={Features} />
+      <Route path="/bot-setup" component={BotSetup} />
+      <Route path="/documentation" component={Documentation} />
+      <Route path="/about" component={About} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/vanity" component={VanityGenerator} />
+      <Route path="/admin" component={Admin} />
+      <Route path="/admin/wallet" component={AdminWallet} />
       <Route component={NotFound} />
     </Switch>
   );

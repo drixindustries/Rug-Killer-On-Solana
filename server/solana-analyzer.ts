@@ -35,10 +35,19 @@ export class SolanaTokenAnalyzer {
 
   async analyzeToken(tokenAddress: string): Promise<TokenAnalysisResponse> {
     try {
+      console.log(`🔍 Analyzing token: ${tokenAddress}`);
       const mintPubkey = new PublicKey(tokenAddress);
+      console.log(`✅ PublicKey created successfully: ${mintPubkey.toBase58()}`);
       
       // Fetch mint account info
+      console.log(`📡 Fetching mint info from RPC...`);
       const mintInfo = await getMint(this.connection, mintPubkey);
+      console.log(`✅ Mint info fetched:`, {
+        decimals: mintInfo.decimals,
+        supply: mintInfo.supply.toString(),
+        mintAuthority: mintInfo.mintAuthority?.toBase58() || 'null',
+        freezeAuthority: mintInfo.freezeAuthority?.toBase58() || 'null',
+      });
       
       // Analyze authorities
       const mintAuthority = this.analyzeMintAuthority(mintInfo.mintAuthority);
