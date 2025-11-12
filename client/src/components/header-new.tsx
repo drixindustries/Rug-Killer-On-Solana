@@ -110,7 +110,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
               className="hidden sm:inline-flex"
               data-testid="button-github"
             >
-              <a href="https://github.com/yourusername/solana-rug-killer" target="_blank" rel="noopener noreferrer" title="View on GitHub">
+              <a href="https://github.com/yourusername/solana-rug-killer" target="_blank" rel="noopener noreferrer" title="View on GitHub" aria-label="View project on GitHub">
                 <SiGithub className="h-4 w-4" />
               </a>
             </Button>
@@ -123,7 +123,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
                 className="hidden sm:inline-flex"
                 data-testid="button-telegram-bot"
               >
-                <a href={botLinks.telegram} target="_blank" rel="noopener noreferrer" title="Join Telegram Bot">
+                <a href={botLinks.telegram} target="_blank" rel="noopener noreferrer" title="Join Telegram Bot" aria-label="Join Telegram bot">
                   <SiTelegram className="h-4 w-4" />
                 </a>
               </Button>
@@ -137,7 +137,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
                 className="hidden sm:inline-flex"
                 data-testid="button-discord-bot"
               >
-                <a href={botLinks.discord} target="_blank" rel="noopener noreferrer" title="Join Discord Bot">
+                <a href={botLinks.discord} target="_blank" rel="noopener noreferrer" title="Join Discord Bot" aria-label="Join Discord bot">
                   <SiDiscord className="h-4 w-4" />
                 </a>
               </Button>
@@ -301,7 +301,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
                       size="icon"
                       asChild
                     >
-                      <a href="https://github.com/yourusername/solana-rug-killer" target="_blank" rel="noopener noreferrer" title="GitHub">
+                      <a href="https://github.com/yourusername/solana-rug-killer" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="View project on GitHub">
                         <SiGithub className="h-4 w-4" />
                       </a>
                     </Button>
@@ -311,7 +311,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
                         size="icon"
                         asChild
                       >
-                        <a href={botLinks.telegram} target="_blank" rel="noopener noreferrer" title="Telegram">
+                        <a href={botLinks.telegram} target="_blank" rel="noopener noreferrer" title="Telegram" aria-label="Join Telegram bot">
                           <SiTelegram className="h-4 w-4" />
                         </a>
                       </Button>
@@ -322,7 +322,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
                         size="icon"
                         asChild
                       >
-                        <a href={botLinks.discord} target="_blank" rel="noopener noreferrer" title="Discord">
+                        <a href={botLinks.discord} target="_blank" rel="noopener noreferrer" title="Discord" aria-label="Join Discord bot">
                           <SiDiscord className="h-4 w-4" />
                         </a>
                       </Button>
