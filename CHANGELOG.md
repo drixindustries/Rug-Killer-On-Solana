@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Advanced Analytics Dashboard (Option C - COMPLETE)**:
+  - **Market Overview**: Summary statistics (total analyzed, rugs detected, avg risk score, active alerts), top 10 trending tokens with risk scores and analyze buttons, risk distribution visualization
+  - **Historical Tracking**: Time-series charts showing token performance over configurable timeframes (7d/30d/90d), supports any token address input, responsive line/bar charts with tooltips
+  - **Risk Insights**: Aggregate rug pull statistics (7-day and 30-day periods), common red flag analysis with pie chart visualization, detection rate metrics
+  - **Hot Tokens**: Real-time feed of newly launched/high-volume tokens (auto-refresh every 30s), comprehensive token stats with quick analyze buttons, limit 20 tokens
+  - **Performance Metrics**: Success rates and false positive analysis (7-day and 30-day), coverage metrics showing detection accuracy, system performance KPIs
+  - **Database Tables**: token_snapshots (historical data), trending_tokens (hot tokens feed), risk_statistics (aggregate metrics)
+  - **Background Workers**: Snapshot collector (every 5 mins), trending calculator (every 5 mins), risk aggregator (daily)
+  - **5 Analytics API Endpoints**: /market-overview, /historical/:tokenAddress, /risk-insights, /hot-tokens, /performance
+  - **195+ data-testid attributes** for comprehensive test coverage across all analytics sections
+  - Navigation menu updated with Analytics Dashboard link in Tools section
+  - All numeric displays use Number() wrapping for safe formatting
+  - Loading states for all sections with skeleton UI
+  - Mobile-responsive design with card-based layouts
 - **Testing Infrastructure (Option A)**:
   - 32 comprehensive unit tests for `server/solana-analyzer.ts` covering risk scoring, bundle detection, holder filtering, and API resilience (429 rate limits, timeouts)
   - 15+ integration tests using Supertest for API endpoints
@@ -58,6 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive bundle visualization pie chart with interactive tooltips
 - Navigation menu enhancements with "Tools" section for Portfolio, Alerts, and Comparison
 - This CHANGELOG.md file to track all changes
+
+### Deferred
+- **Social Features & Community (Option D)**: Token comments, community risk votes, user profiles & reputation, social sharing, watchlist sharing, token reports - deferred to future implementation
+- **Mobile Optimization (Option E)**: PWA support, push notifications, mobile navigation, performance optimizations - deferred to future implementation
 
 ### Fixed
 - Pump.fun LP detection now handles both `pump_fun` and `pump_fun_amm` market types

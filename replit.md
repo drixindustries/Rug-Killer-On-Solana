@@ -46,6 +46,13 @@ The frontend features a modern, data-dense dashboard using React, TypeScript, Vi
 - **AI Blacklist System**: A rules-based detection engine with 6 automated rules analyzing over 52 risk metrics to identify honeypots, high sell taxes, suspicious authorities, and wash trading patterns. Includes severity scoring, evidence tracking, and dedicated API endpoints.
 - **Alpha Alerts**: Live monitoring service that auto-pings Discord/Telegram channels when detecting: (1) Smart money signals from configurable wallet watchlists, (2) New token launches from pump.fun WebSocket, (3) Quality-filtered gems (RugCheck > 85, no honeypots, liquidity > $5K). Monitoring-only with no automated trading or private keys.
 - **Creator Wallet**: Secure wallet service for pump.fun creator rewards (0.05% of trading volume). Admin-only access with one-time private key generation, Phantom wallet import instructions, and balance monitoring. Stored in `CREATOR_WALLET_PRIVATE_KEY` secret.
+- **Advanced Analytics Dashboard (Option C - Nov 2024)**: 
+  - **Market Overview**: Real-time summary statistics (total tokens analyzed, rugs detected, average risk score, active alerts). Top 10 trending tokens table with rank, risk score badges, 24h volume, and quick analyze buttons. Risk distribution visualization showing safety levels.
+  - **Historical Tracking**: Interactive time-series charts for any token address showing performance over configurable timeframes (7/30/90 days). Responsive line/bar charts with tooltips. Supports trend analysis for risk scores, holder counts, and market metrics over time.
+  - **Risk Insights**: Aggregate statistics on rug pull patterns across 7-day and 30-day periods. Common red flag analysis with pie chart visualization. Detection rate metrics showing system accuracy.
+  - **Hot Tokens**: Real-time feed of newly launched and high-volume tokens with auto-refresh (30s interval). Displays top 20 tokens with comprehensive stats (name, risk score, volume, 24h change) and quick analyze buttons.
+  - **Performance Metrics**: System KPIs including success rates, false positive analysis, and coverage metrics across 7-day and 30-day windows. Tracks detection accuracy and system reliability.
+  - **Infrastructure**: PostgreSQL tables (token_snapshots, trending_tokens, risk_statistics). Background workers running via setInterval (snapshot collector every 5 mins, trending calculator every 5 mins, risk aggregator daily). 5 dedicated API endpoints with authentication. 195+ data-testid attributes for testing.
 
 ### Feature Specifications
 - **Token Analysis**: Authority checks, holder analysis, liquidity assessment, 0-100 risk scoring with red flags, and transaction history.
