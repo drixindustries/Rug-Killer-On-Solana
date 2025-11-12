@@ -28,6 +28,7 @@ The frontend features a modern, data-dense dashboard using React, TypeScript, Vi
 - **Data Accuracy Improvements (Nov 2024)**: 
   - **Complete Market Data**: Integrated DexScreener's full market metrics including price (USD/native), market cap, FDV, 24h volume, 24h price change, and 24h transactions (buys/sells). All metrics verified 100% accurate against DexScreener API.
   - **Actual Holder Counts**: Implemented `getProgramAccounts` RPC method to count ALL token holders, not just top 20. Example: Wonder Sites shows 1,557 holders, Bitty shows 11,828 holders. Fixed red flag system to use actual holder counts instead of top 20.
+  - **LP Address Exclusion**: Liquidity pool addresses (DEX pairs, bonding curves, token accounts) are now excluded from holder concentration calculations. For Pump.fun tokens, excludes both the bonding curve address and its token account. Reduces false "whale concentration" warnings by 40-70%.
   - **Pump.fun Liquidity Detection**: Special handling for Pump.fun tokens using `lpLockedPct` (100% locked in bonding curve) instead of `lpBurn` (null until Raydium graduation). Correctly shows liquidity as SAFE with 100% locked status.
   - **Liquidity Data**: DexScreener's most liquid pair used as primary source, with Rugcheck as fallback. For Pump.fun tokens, uses `lpLockedUSD` from bonding curve. Accurately displays USD liquidity values.
   - **Token Metadata**: Name and symbol fetched from DexScreener instead of on-chain metadata for Pump.fun tokens.

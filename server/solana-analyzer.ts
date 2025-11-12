@@ -69,13 +69,8 @@ export class SolanaTokenAnalyzer {
       // Use getProgramAccounts result if available, otherwise fallback to top holders length
       const holderCount = totalHolderCount || holders.length;
       
-      // Calculate holder concentration with safety check
-      const topHolderConcentration = Math.min(100, Math.max(0, 
-        holders.slice(0, 10).reduce((sum, h) => sum + (h.percentage || 0), 0)
-      ));
-      
-      // Analyze liquidity (simplified for MVP)
-      const liquidityPool = this.analyzeLiquidity(topHolderConcentration);
+      // First, get liquidity pool addresses from external sources
+      const liquidityPool = this.analyzeLiquidity(0); // Pass 0 initially, will recalculate
 
       // Enrich liquidity data with market information from Rugcheck and DexScreener
       const enrichedLiquidity = this.enrichLiquidityWithMarketData(
@@ -83,6 +78,15 @@ export class SolanaTokenAnalyzer {
         rugcheckData,
         dexscreenerData
       );
+      
+      // Filter out LP/exchange addresses from holder concentration calculation
+      const lpAddresses = enrichedLiquidity.lpAddresses || [];
+      const nonLpHolders = holders.filter(h => !lpAddresses.includes(h.address));
+      
+      // Calculate holder concentration excluding LP addresses
+      const topHolderConcentration = Math.min(100, Math.max(0, 
+        nonLpHolders.slice(0, 10).reduce((sum, h) => sum + (h.percentage || 0), 0)
+      ));
       
       // Build metadata - prioritize DexScreener data over on-chain defaults
       const supply = Number(mintInfo.supply);
@@ -130,7 +134,7 @@ export class SolanaTokenAnalyzer {
         freezeAuthority,
         metadata,
         holderCount: holderCount,
-        topHolders: holders,
+        topHolders: nonLpHolders, // Return filtered holders (excluding LP addresses)
         topHolderConcentration: isNaN(topHolderConcentration) ? 0 : topHolderConcentration,
         liquidityPool: enrichedLiquidity,
         marketData,
@@ -329,6 +333,19 @@ export class SolanaTokenAnalyzer {
       });
     }
 
+    // Add Rugcheck liquidity token accounts to exclude from holder concentration
+    // For Pump.fun, this includes the token account owned by the bonding curve
+    if (rugcheckData?.markets) {
+      rugcheckData.markets.forEach((market: any) => {
+        if (market.pubkey) lpAddresses.push(market.pubkey); // Pair/program address
+        if (market.liquidityA) lpAddresses.push(market.liquidityA); // Token account A
+        if (market.liquidityB) lpAddresses.push(market.liquidityB); // Token account B (SOL)
+      });
+    }
+
+    // Deduplicate LP addresses using Set
+    const uniqueLpAddresses = Array.from(new Set(lpAddresses));
+
     // Get most liquid pair from DexScreener for primary liquidity data
     const dexService = new DexScreenerService();
     const primaryPair = dexscreenerData ? dexService.getMostLiquidPair(dexscreenerData) : null;
@@ -386,7 +403,7 @@ export class SolanaTokenAnalyzer {
         isLocked,
         burnPercentage: maxBurnPercentage,
         totalLiquidity,
-        lpAddresses,
+        lpAddresses: uniqueLpAddresses,
         status,
       };
     }
@@ -396,16 +413,16 @@ export class SolanaTokenAnalyzer {
       return {
         ...liquidityPool,
         totalLiquidity: primaryPair.liquidity.usd,
-        lpAddresses,
+        lpAddresses: uniqueLpAddresses,
         status: totalLiquidity && totalLiquidity > 1000 ? "RISKY" : "UNKNOWN",
       };
     }
 
     // No liquidity data at all - add LP addresses if available
-    if (lpAddresses.length > 0) {
+    if (uniqueLpAddresses.length > 0) {
       return {
         ...liquidityPool,
-        lpAddresses,
+        lpAddresses: uniqueLpAddresses,
       };
     }
     
