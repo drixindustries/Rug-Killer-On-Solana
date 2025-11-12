@@ -460,7 +460,8 @@ export class SolanaTokenAnalyzer {
       });
 
       // Check if this is a Pump.fun token (bonding curve model)
-      const isPumpFun = primaryMarket.marketType === 'pump_fun';
+      // Rugcheck may return 'pump_fun' or 'pump_fun_amm' market types
+      const isPumpFun = primaryMarket.marketType?.startsWith('pump_fun') || false;
       
       // For Pump.fun tokens, use lpLockedPct from the lp object
       // For regular tokens, use lpBurn field
@@ -487,7 +488,8 @@ export class SolanaTokenAnalyzer {
       const hasLiquidity = (totalLiquidity && totalLiquidity > 1000) || false;
 
       let status: "SAFE" | "RISKY" | "UNKNOWN" = liquidityPool.status;
-      if (isBurned && hasLiquidity) {
+      // For pump.fun tokens, locked >= 90% is safe. For regular tokens, burned >= 99.99% is safe.
+      if ((isBurned || isLocked) && hasLiquidity) {
         status = "SAFE";
       } else if (hasLiquidity && maxBurnPercentage < 50) {
         status = "RISKY";
