@@ -54,12 +54,10 @@ export function Header({ onNewAnalysis }: HeaderProps) {
         <div className="flex h-14 items-center justify-between">
           {/* Left: Logo */}
           <div className="flex items-center gap-6">
-            <Link href="/">
-              <a className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                <Shield className="h-6 w-6 text-primary" />
-                <span className="font-bold text-lg hidden sm:inline">Solana Rug Killer</span>
-                <span className="font-bold text-lg sm:hidden">SRK</span>
-              </a>
+            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+              <Shield className="h-6 w-6 text-primary" />
+              <span className="font-bold text-lg hidden sm:inline">Solana Rug Killer</span>
+              <span className="font-bold text-lg sm:hidden">SRK</span>
             </Link>
 
             {/* Desktop Navigation Menu */}
@@ -76,17 +74,17 @@ export function Header({ onNewAnalysis }: HeaderProps) {
                           {section.items.map((item) => (
                             <li key={item.href}>
                               <NavigationMenuLink asChild>
-                                <Link href={item.href}>
-                                  <a className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                                    data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                                  >
-                                    <div className="text-sm font-medium leading-none">{item.title}</div>
-                                    {item.description && (
-                                      <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                                        {item.description}
-                                      </p>
-                                    )}
-                                  </a>
+                                <Link 
+                                  href={item.href}
+                                  className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                                  data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                                >
+                                  <div className="text-sm font-medium leading-none">{item.title}</div>
+                                  {item.description && (
+                                    <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+                                      {item.description}
+                                    </p>
+                                  )}
                                 </Link>
                               </NavigationMenuLink>
                             </li>
@@ -237,17 +235,17 @@ export function Header({ onNewAnalysis }: HeaderProps) {
                       <h3 className="font-semibold text-sm text-muted-foreground">{section.title}</h3>
                       <div className="space-y-2">
                         {section.items.map((item) => (
-                          <Link key={item.href} href={item.href}>
-                            <a 
-                              className="block rounded-md p-2 hover:bg-accent transition-colors"
-                              onClick={() => setMobileMenuOpen(false)}
-                              data-testid={`mobile-nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                            >
-                              <div className="font-medium text-sm">{item.title}</div>
-                              {item.description && (
-                                <p className="text-xs text-muted-foreground mt-1">{item.description}</p>
-                              )}
-                            </a>
+                          <Link 
+                            key={item.href} 
+                            href={item.href}
+                            className="block rounded-md p-2 hover:bg-accent transition-colors"
+                            onClick={() => setMobileMenuOpen(false)}
+                            data-testid={`mobile-nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                          >
+                            <div className="font-medium text-sm">{item.title}</div>
+                            {item.description && (
+                              <p className="text-xs text-muted-foreground mt-1">{item.description}</p>
+                            )}
                           </Link>
                         ))}
                       </div>
