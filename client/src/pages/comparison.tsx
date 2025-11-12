@@ -275,7 +275,7 @@ export default function Comparison() {
                                   Risk Score
                                 </span>
                                 <span className={`text-xl font-bold ${getRiskColor(result.riskLevel)}`} data-testid={`text-risk-score-${index}`}>
-                                  {result.riskScore}
+                                  {Number(result.riskScore || 0).toFixed(0)}
                                 </span>
                               </div>
 
@@ -306,7 +306,7 @@ export default function Comparison() {
                                     <span>Price</span>
                                   </div>
                                   <span className="text-sm font-semibold" data-testid={`text-price-${index}`}>
-                                    ${result.marketData?.priceUsd?.toFixed(6)}
+                                    ${Number(result.marketData?.priceUsd || 0).toFixed(6)}
                                   </span>
                                 </div>
                               )}
@@ -316,7 +316,7 @@ export default function Comparison() {
                                   Top 10 Hold
                                 </span>
                                 <span className="text-sm font-semibold" data-testid={`text-concentration-${index}`}>
-                                  {result.topHolderConcentration.toFixed(1)}%
+                                  {Number(result.topHolderConcentration || 0).toFixed(1)}%
                                 </span>
                               </div>
                             </div>
@@ -393,7 +393,7 @@ export default function Comparison() {
                               <span className="text-muted-foreground">-</span>
                             ) : (
                               <span className={`text-xl font-bold ${getRiskColor(result.riskLevel)}`}>
-                                {result.riskScore}
+                                {Number(result.riskScore || 0).toFixed(0)}
                               </span>
                             )}
                           </TableCell>
@@ -433,7 +433,7 @@ export default function Comparison() {
                             {result.error || !result.marketData?.priceUsd ? (
                               <span className="text-muted-foreground">-</span>
                             ) : (
-                              `$${result.marketData.priceUsd.toFixed(6)}`
+                              `$${Number(result.marketData.priceUsd || 0).toFixed(6)}`
                             )}
                           </TableCell>
                         ))}
@@ -446,7 +446,7 @@ export default function Comparison() {
                             {result.error ? (
                               <span className="text-muted-foreground">-</span>
                             ) : (
-                              `${result.topHolderConcentration.toFixed(1)}%`
+                              `${Number(result.topHolderConcentration || 0).toFixed(1)}%`
                             )}
                           </TableCell>
                         ))}

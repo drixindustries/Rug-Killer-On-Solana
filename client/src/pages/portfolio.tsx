@@ -74,35 +74,82 @@ export default function Portfolio() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
-    // Parse and validate numeric fields (avoid empty string issues)
-    const quantity = formData.get('quantity');
-    const priceUsd = formData.get('priceUsd');
-    const feeUsd = formData.get('feeUsd');
-    
-    if (!quantity || isNaN(parseFloat(quantity as string))) {
-      toast({ title: "Error", description: "Invalid quantity", variant: "destructive" });
+    // Validate token address
+    const tokenAddress = formData.get('tokenAddress') as string;
+    if (!tokenAddress || tokenAddress.trim().length < 32) {
+      toast({ 
+        title: "Invalid Token Address", 
+        description: "Token address must be at least 32 characters", 
+        variant: "destructive" 
+      });
       return;
     }
     
+    // Parse and validate quantity
+    const quantityStr = formData.get('quantity') as string;
+    if (!quantityStr) {
+      toast({ title: "Error", description: "Quantity is required", variant: "destructive" });
+      return;
+    }
+    const quantity = parseFloat(quantityStr);
+    if (isNaN(quantity)) {
+      toast({ title: "Invalid Quantity", description: "Please enter a valid number for quantity", variant: "destructive" });
+      return;
+    }
+    if (quantity <= 0) {
+      toast({ title: "Invalid Quantity", description: "Quantity must be greater than zero", variant: "destructive" });
+      return;
+    }
+    
+    // Parse and validate price (optional but must be valid if provided)
+    let priceUsd: number | undefined;
+    const priceStr = formData.get('priceUsd') as string;
+    if (priceStr && priceStr !== '') {
+      priceUsd = parseFloat(priceStr);
+      if (isNaN(priceUsd)) {
+        toast({ title: "Invalid Price", description: "Please enter a valid number for price", variant: "destructive" });
+        return;
+      }
+      if (priceUsd < 0) {
+        toast({ title: "Invalid Price", description: "Price cannot be negative", variant: "destructive" });
+        return;
+      }
+    }
+    
+    // Parse and validate fee (optional but must be valid if provided)
+    let feeUsd: number | undefined;
+    const feeStr = formData.get('feeUsd') as string;
+    if (feeStr && feeStr !== '') {
+      feeUsd = parseFloat(feeStr);
+      if (isNaN(feeUsd)) {
+        toast({ title: "Invalid Fee", description: "Please enter a valid number for fee", variant: "destructive" });
+        return;
+      }
+      if (feeUsd < 0) {
+        toast({ title: "Invalid Fee", description: "Fee cannot be negative", variant: "destructive" });
+        return;
+      }
+    }
+    
     addTransaction.mutate({
-      tokenAddress: formData.get('tokenAddress') as string,
+      tokenAddress: tokenAddress.trim(),
       txType: formData.get('txType') as string,
-      quantity: parseFloat(quantity as string),
-      priceUsd: priceUsd && priceUsd !== '' ? parseFloat(priceUsd as string) : undefined,
-      feeUsd: feeUsd && feeUsd !== '' ? parseFloat(feeUsd as string) : undefined,
+      quantity,
+      priceUsd,
+      feeUsd,
       note: formData.get('note') as string || undefined,
     });
   };
 
   // Calculate portfolio totals
   const totalValue = positions.reduce((sum, p) => {
-    const qty = parseFloat(p.quantity || '0');
-    const price = parseFloat(p.latestPriceUsd || '0');
+    const qty = Number(p.quantity || 0);
+    const price = Number(p.latestPriceUsd || 0);
     return sum + (qty * price);
   }, 0);
 
   const totalPnl = positions.reduce((sum, p) => {
-    return sum + parseFloat(p.unrealizedPnlUsd || '0') + parseFloat(p.realizedPnlUsd || '0');
+    return sum + Number(p.unrealizedPnlUsd || 0) + Number(p.realizedPnlUsd || 0);
   }, 0);
 
   return (
@@ -177,7 +224,7 @@ export default function Portfolio() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-value">
-              ${totalValue.toFixed(2)}
+              ${Number(totalValue || 0).toFixed(2)}
             </div>
           </CardContent>
         </Card>
@@ -188,7 +235,7 @@ export default function Portfolio() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${totalPnl >= 0 ? 'text-green-500' : 'text-red-500'}`} data-testid="text-total-pnl">
-              ${totalPnl.toFixed(2)}
+              ${Number(totalPnl || 0).toFixed(2)}
             </div>
           </CardContent>
         </Card>
@@ -228,26 +275,36 @@ export default function Portfolio() {
               </TableHeader>
               <TableBody>
                 {positions.map((position) => {
-                  const quantity = parseFloat(position.quantity || '0');
-                  const avgCost = parseFloat(position.avgCostUsd || '0');
-                  const currentPrice = parseFloat(position.latestPriceUsd || '0');
+                  const quantity = Number(position.quantity || 0);
+                  const avgCost = Number(position.avgCostUsd || 0);
+                  const currentPrice = Number(position.latestPriceUsd || 0);
                   const value = quantity * currentPrice;
-                  const unrealizedPnl = parseFloat(position.unrealizedPnlUsd || '0');
-                  const realizedPnl = parseFloat(position.realizedPnlUsd || '0');
-                  const pnlPct = parseFloat(position.pnlPct || '0');
+                  const unrealizedPnl = Number(position.unrealizedPnlUsd || 0);
+                  const realizedPnl = Number(position.realizedPnlUsd || 0);
+                  const pnlPct = Number(position.pnlPct || 0);
 
                   return (
                     <TableRow key={position.id} data-testid={`row-position-${position.tokenAddress}`}>
-                      <TableCell className="font-mono text-xs">{position.tokenAddress.slice(0, 8)}...</TableCell>
-                      <TableCell className="text-right">{quantity.toFixed(4)}</TableCell>
-                      <TableCell className="text-right">${avgCost.toFixed(4)}</TableCell>
-                      <TableCell className="text-right">${currentPrice.toFixed(4)}</TableCell>
-                      <TableCell className="text-right">${value.toFixed(2)}</TableCell>
-                      <TableCell className={`text-right ${unrealizedPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        ${unrealizedPnl.toFixed(2)} ({pnlPct.toFixed(2)}%)
+                      <TableCell className="font-mono text-xs" data-testid={`cell-token-${position.tokenAddress}`}>
+                        {position.tokenAddress.slice(0, 8)}...
                       </TableCell>
-                      <TableCell className={`text-right ${realizedPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        ${realizedPnl.toFixed(2)}
+                      <TableCell className="text-right" data-testid={`cell-quantity-${position.tokenAddress}`}>
+                        {Number(quantity || 0).toFixed(4)}
+                      </TableCell>
+                      <TableCell className="text-right" data-testid={`cell-avg-cost-${position.tokenAddress}`}>
+                        ${Number(avgCost || 0).toFixed(4)}
+                      </TableCell>
+                      <TableCell className="text-right" data-testid={`cell-current-price-${position.tokenAddress}`}>
+                        ${Number(currentPrice || 0).toFixed(4)}
+                      </TableCell>
+                      <TableCell className="text-right" data-testid={`cell-value-${position.tokenAddress}`}>
+                        ${Number(value || 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell className={`text-right ${unrealizedPnl >= 0 ? 'text-green-500' : 'text-red-500'}`} data-testid={`cell-unrealized-pnl-${position.tokenAddress}`}>
+                        ${Number(unrealizedPnl || 0).toFixed(2)} ({Number(pnlPct || 0).toFixed(2)}%)
+                      </TableCell>
+                      <TableCell className={`text-right ${realizedPnl >= 0 ? 'text-green-500' : 'text-red-500'}`} data-testid={`cell-realized-pnl-${position.tokenAddress}`}>
+                        ${Number(realizedPnl || 0).toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
@@ -301,17 +358,23 @@ export default function Portfolio() {
                 </TableHeader>
                 <TableBody>
                   {transactions.map((tx) => (
-                    <TableRow key={tx.id}>
-                      <TableCell>{new Date(tx.executedAt!).toLocaleDateString()}</TableCell>
-                      <TableCell><Badge>{tx.txType}</Badge></TableCell>
-                      <TableCell className="text-right">{parseFloat(tx.quantity).toFixed(4)}</TableCell>
-                      <TableCell className="text-right">
-                        {tx.priceUsd ? `$${parseFloat(tx.priceUsd).toFixed(4)}` : '-'}
+                    <TableRow key={tx.id} data-testid={`row-transaction-${tx.id}`}>
+                      <TableCell data-testid={`cell-tx-date-${tx.id}`}>
+                        {new Date(tx.executedAt!).toLocaleDateString()}
                       </TableCell>
-                      <TableCell className="text-right">
-                        {tx.feeUsd ? `$${parseFloat(tx.feeUsd).toFixed(4)}` : '-'}
+                      <TableCell data-testid={`cell-tx-type-${tx.id}`}>
+                        <Badge data-testid={`badge-tx-type-${tx.id}`}>{tx.txType}</Badge>
                       </TableCell>
-                      <TableCell>{tx.note || '-'}</TableCell>
+                      <TableCell className="text-right" data-testid={`cell-tx-quantity-${tx.id}`}>
+                        {Number(tx.quantity || 0).toFixed(4)}
+                      </TableCell>
+                      <TableCell className="text-right" data-testid={`cell-tx-price-${tx.id}`}>
+                        {tx.priceUsd ? `$${Number(tx.priceUsd || 0).toFixed(4)}` : '-'}
+                      </TableCell>
+                      <TableCell className="text-right" data-testid={`cell-tx-fee-${tx.id}`}>
+                        {tx.feeUsd ? `$${Number(tx.feeUsd || 0).toFixed(4)}` : '-'}
+                      </TableCell>
+                      <TableCell data-testid={`cell-tx-note-${tx.id}`}>{tx.note || '-'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

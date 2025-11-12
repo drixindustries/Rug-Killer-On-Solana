@@ -75,25 +75,77 @@ export default function Alerts() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const alertType = formData.get('alertType') as string;
-    const targetValue = formData.get('targetValue');
     
-    // Validate numeric fields
-    if (!targetValue || isNaN(parseFloat(targetValue as string))) {
-      toast({ title: "Error", description: "Invalid target value", variant: "destructive" });
+    // Validate token address
+    const tokenAddress = formData.get('tokenAddress') as string;
+    if (!tokenAddress || tokenAddress.trim().length < 32) {
+      toast({ 
+        title: "Invalid Token Address", 
+        description: "Token address must be at least 32 characters", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    // Validate alert type
+    const alertType = formData.get('alertType') as string;
+    if (!alertType) {
+      toast({ title: "Error", description: "Please select an alert type", variant: "destructive" });
+      return;
+    }
+    
+    // Parse and validate target value
+    const targetValueStr = formData.get('targetValue') as string;
+    if (!targetValueStr) {
+      toast({ title: "Error", description: "Target value is required", variant: "destructive" });
+      return;
+    }
+    const targetValue = parseFloat(targetValueStr);
+    if (isNaN(targetValue)) {
+      toast({ 
+        title: "Invalid Target Value", 
+        description: "Please enter a valid number for target value", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    if (targetValue <= 0) {
+      toast({ 
+        title: "Invalid Target Value", 
+        description: "Target value must be greater than zero", 
+        variant: "destructive" 
+      });
       return;
     }
     
     const data: any = {
-      tokenAddress: formData.get('tokenAddress') as string,
+      tokenAddress: tokenAddress.trim(),
       alertType,
-      targetValue: parseFloat(targetValue as string),
+      targetValue,
     };
 
+    // Validate lookback window for percent-based alerts
     if (alertType === 'percent_change' || alertType === 'percent_drop') {
-      const lookback = formData.get('lookbackWindowMinutes');
-      if (lookback && lookback !== '') {
-        data.lookbackWindowMinutes = parseInt(lookback as string);
+      const lookbackStr = formData.get('lookbackWindowMinutes') as string;
+      if (lookbackStr && lookbackStr !== '') {
+        const lookbackMinutes = parseInt(lookbackStr);
+        if (isNaN(lookbackMinutes)) {
+          toast({ 
+            title: "Invalid Lookback Window", 
+            description: "Please enter a valid number for lookback window", 
+            variant: "destructive" 
+          });
+          return;
+        }
+        if (lookbackMinutes <= 0) {
+          toast({ 
+            title: "Invalid Lookback Window", 
+            description: "Lookback window must be greater than zero", 
+            variant: "destructive" 
+          });
+          return;
+        }
+        data.lookbackWindowMinutes = lookbackMinutes;
       }
     }
     
@@ -220,22 +272,30 @@ export default function Alerts() {
 
                   return (
                     <TableRow key={alert.id} data-testid={`row-alert-${alert.id}`}>
-                      <TableCell className="font-mono text-xs">{alert.tokenAddress.slice(0, 8)}...</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{alert.alertType.replace('_', ' ')}</Badge>
+                      <TableCell className="font-mono text-xs" data-testid={`cell-token-${alert.id}`}>
+                        {alert.tokenAddress.slice(0, 8)}...
                       </TableCell>
-                      <TableCell>
+                      <TableCell data-testid={`cell-type-${alert.id}`}>
+                        <Badge variant="outline" data-testid={`badge-type-${alert.id}`}>
+                          {alert.alertType.replace('_', ' ')}
+                        </Badge>
+                      </TableCell>
+                      <TableCell data-testid={`cell-target-${alert.id}`}>
                         {alert.alertType.includes('percent') 
-                          ? `${parseFloat(alert.targetValue).toFixed(1)}%`
-                          : `$${parseFloat(alert.targetValue).toFixed(4)}`}
+                          ? `${Number(alert.targetValue || 0).toFixed(1)}%`
+                          : `$${Number(alert.targetValue || 0).toFixed(4)}`}
                       </TableCell>
-                      <TableCell>
-                        {alert.lastPrice ? `$${parseFloat(alert.lastPrice).toFixed(4)}` : '-'}
+                      <TableCell data-testid={`cell-last-price-${alert.id}`}>
+                        {alert.lastPrice ? `$${Number(alert.lastPrice || 0).toFixed(4)}` : '-'}
                       </TableCell>
-                      <TableCell className={statusColor}>
-                        {isTriggered ? 'Triggered' : alert.isActive ? 'Active' : 'Paused'}
+                      <TableCell className={statusColor} data-testid={`cell-status-${alert.id}`}>
+                        <Badge variant="outline" data-testid={`badge-status-${alert.id}`}>
+                          {isTriggered ? 'Triggered' : alert.isActive ? 'Active' : 'Paused'}
+                        </Badge>
                       </TableCell>
-                      <TableCell>{new Date(alert.createdAt!).toLocaleDateString()}</TableCell>
+                      <TableCell data-testid={`cell-created-${alert.id}`}>
+                        {new Date(alert.createdAt!).toLocaleDateString()}
+                      </TableCell>
                       <TableCell>
                         <div className="flex gap-2 items-center">
                           <Switch

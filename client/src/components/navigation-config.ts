@@ -12,6 +12,26 @@ export interface NavSection {
 
 export const navigationConfig: NavSection[] = [
   {
+    title: "Tools",
+    items: [
+      {
+        title: "Portfolio Tracker",
+        href: "/portfolio",
+        description: "Track holdings, transactions, and P&L"
+      },
+      {
+        title: "Price Alerts",
+        href: "/alerts",
+        description: "Get notified when prices hit your targets"
+      },
+      {
+        title: "Token Comparison",
+        href: "/compare",
+        description: "Compare multiple tokens side-by-side"
+      }
+    ]
+  },
+  {
     title: "Product",
     items: [
       {
