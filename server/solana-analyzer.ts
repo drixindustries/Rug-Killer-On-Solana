@@ -68,12 +68,10 @@ export class SolanaTokenAnalyzer {
             percentage: h.pct || 0,
           }));
       
-      // Get holder count - use Rugcheck total if available, otherwise use array length
+      // Get holder count
       // Note: With free RPC, on-chain fetch often fails (429 rate limit)
       // Rugcheck provides top 20 holders - accurate total count requires premium RPC
-      const holderCount = rugcheckData?.holderSummary?.holderCount || 
-                          rugcheckData?.fileMeta?.tokenMeta?.holder || 
-                          holders.length;
+      const holderCount = holders.length;
       
       // Calculate holder concentration with safety check
       const topHolderConcentration = Math.min(100, Math.max(0, 

@@ -94,7 +94,7 @@ export interface RugcheckData {
     lpBurn: number;
   }>;
   topHolders: Array<{
-    owner: string;
+    address: string;
     pct: number;
   }>;
   fileMeta?: {
