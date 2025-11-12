@@ -53,16 +53,8 @@ export class SolanaTokenAnalyzer {
       const mintAuthority = this.analyzeMintAuthority(mintInfo.mintAuthority);
       const freezeAuthority = this.analyzeFreezeAuthority(mintInfo.freezeAuthority);
       
-      // Fetch token accounts (holders)
-      const holders = await this.fetchTopHolders(mintPubkey, mintInfo.decimals, mintInfo.supply);
-      
-      // Calculate holder concentration with safety check
-      const topHolderConcentration = Math.min(100, Math.max(0, 
-        holders.slice(0, 10).reduce((sum, h) => sum + (h.percentage || 0), 0)
-      ));
-      
-      // Analyze liquidity (simplified for MVP)
-      const liquidityPool = this.analyzeLiquidity(topHolderConcentration);
+      // Fetch token accounts (holders) from on-chain
+      const onChainHolders = await this.fetchTopHolders(mintPubkey, mintInfo.decimals, mintInfo.supply);
       
       // Get recent transactions (simplified for MVP)
       const recentTransactions = await this.fetchRecentTransactions(mintPubkey);
@@ -74,6 +66,31 @@ export class SolanaTokenAnalyzer {
         this.dexscreenerService.getTokenData(tokenAddress).catch(() => null),
         this.jupiterPriceService.getTokenPrice(tokenAddress).catch(() => null),
       ]);
+      
+      // Enrich holders with Rugcheck data if on-chain fetch failed
+      const holders = onChainHolders.length > 0 
+        ? onChainHolders 
+        : (rugcheckData?.topHolders || []).map((h: any, index: number) => ({
+            rank: index + 1,
+            address: h.address || '',
+            balance: h.pct || 0,
+            percentage: h.pct || 0,
+          }));
+      
+      // Get holder count - use Rugcheck total if available, otherwise use array length
+      // Note: With free RPC, on-chain fetch often fails (429 rate limit)
+      // Rugcheck provides top 20 holders - accurate total count requires premium RPC
+      const holderCount = rugcheckData?.holderSummary?.holderCount || 
+                          rugcheckData?.fileMeta?.tokenMeta?.holder || 
+                          holders.length;
+      
+      // Calculate holder concentration with safety check
+      const topHolderConcentration = Math.min(100, Math.max(0, 
+        holders.slice(0, 10).reduce((sum, h) => sum + (h.percentage || 0), 0)
+      ));
+      
+      // Analyze liquidity (simplified for MVP)
+      const liquidityPool = this.analyzeLiquidity(topHolderConcentration);
 
       // Enrich liquidity data with market information from Rugcheck and DexScreener
       const enrichedLiquidity = this.enrichLiquidityWithMarketData(
@@ -82,16 +99,20 @@ export class SolanaTokenAnalyzer {
         dexscreenerData
       );
       
-      // Build metadata with safe numeric conversions
+      // Build metadata - prioritize DexScreener data over on-chain defaults
       const supply = Number(mintInfo.supply);
       const safeSupply = isNaN(supply) || !isFinite(supply) ? 0 : supply;
       
+      // Get most liquid pair from DexScreener for metadata
+      const dexService = new DexScreenerService();
+      const primaryPair = dexscreenerData ? dexService.getMostLiquidPair(dexscreenerData) : null;
+      
       const metadata: TokenMetadata = {
-        name: "Unknown Token",
-        symbol: tokenAddress.slice(0, 6),
+        name: primaryPair?.baseToken?.name || "Unknown Token",
+        symbol: primaryPair?.baseToken?.symbol || tokenAddress.slice(0, 6),
         decimals: mintInfo.decimals || 0,
         supply: safeSupply,
-        hasMetadata: false,
+        hasMetadata: !!(primaryPair?.baseToken?.name),
         isMutable: mintAuthority.hasAuthority,
       };
       
@@ -120,7 +141,7 @@ export class SolanaTokenAnalyzer {
         mintAuthority,
         freezeAuthority,
         metadata,
-        holderCount: holders.length,
+        holderCount: holderCount,
         topHolders: holders,
         topHolderConcentration: isNaN(topHolderConcentration) ? 0 : topHolderConcentration,
         liquidityPool: enrichedLiquidity,
@@ -250,10 +271,16 @@ export class SolanaTokenAnalyzer {
       });
     }
 
+    // Get most liquid pair from DexScreener for primary liquidity data
+    const dexService = new DexScreenerService();
+    const primaryPair = dexscreenerData ? dexService.getMostLiquidPair(dexscreenerData) : null;
+    
+    // Use DexScreener liquidity as primary source, fallback to Rugcheck
+    let totalLiquidity = primaryPair?.liquidity?.usd;
+    
     // Extract LP burn data from Rugcheck markets
     let maxBurnPercentage = 0;
     let lpMintAddress: string | undefined;
-    let totalLiquidity: number | undefined;
 
     if (rugcheckData?.markets && rugcheckData.markets.length > 0) {
       // Find the market with highest liquidity
@@ -262,16 +289,18 @@ export class SolanaTokenAnalyzer {
       });
 
       maxBurnPercentage = primaryMarket.lpBurn || 0;
-      totalLiquidity = primaryMarket.liquidity;
+      
+      // Use Rugcheck liquidity if DexScreener didn't have it
+      if (!totalLiquidity) {
+        totalLiquidity = primaryMarket.liquidity;
+      }
       
       // The lpBurn field is already a percentage (0-100)
       const isBurned = maxBurnPercentage >= 99.99;
       const isLocked = maxBurnPercentage >= 90;
 
-      // Cross-validate with DexScreener: if liquidity exists but burn is low, it's risky
-      const hasLiquidity = dexscreenerData?.pairs?.some((p: any) => 
-        p.liquidity?.usd && p.liquidity.usd > 1000
-      );
+      // Cross-validate: if liquidity exists but burn is low, it's risky
+      const hasLiquidity = (totalLiquidity && totalLiquidity > 1000) || false;
 
       let status: "SAFE" | "RISKY" | "UNKNOWN" = liquidityPool.status;
       if (isBurned && hasLiquidity) {
@@ -291,8 +320,17 @@ export class SolanaTokenAnalyzer {
       };
     }
 
-    // No Rugcheck data - leave burnPercentage undefined to indicate "unknown"
-    // Only add LP addresses if available from DexScreener
+    // No Rugcheck data - use DexScreener liquidity only
+    if (primaryPair?.liquidity?.usd) {
+      return {
+        ...liquidityPool,
+        totalLiquidity: primaryPair.liquidity.usd,
+        lpAddresses,
+        status: totalLiquidity && totalLiquidity > 1000 ? "RISKY" : "UNKNOWN",
+      };
+    }
+
+    // No liquidity data at all - add LP addresses if available
     if (lpAddresses.length > 0) {
       return {
         ...liquidityPool,

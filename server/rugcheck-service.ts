@@ -57,8 +57,8 @@ export class RugcheckService {
       lpBurn: market.lp?.lpBurn || 0,
     }));
 
-    const topHolders = (data.topHolders || []).slice(0, 10).map((holder: any) => ({
-      owner: holder.owner || "",
+    const topHolders = (data.topHolders || []).map((holder: any) => ({
+      address: holder.owner || "",  // Map 'owner' to 'address' for consistency
       pct: holder.pct || 0,
     }));
 

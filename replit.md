@@ -24,7 +24,11 @@ The frontend features a modern, data-dense dashboard using React, TypeScript, Vi
 - **Frontend**: React, TypeScript, Vite, Wouter (routing), React Query (data fetching), Shadcn UI, Tailwind CSS, Recharts.
 - **Backend**: Express.js with TypeScript, using `@solana/web3.js` and `@solana/spl-token` for Solana blockchain interaction.
 - **Data Storage**: PostgreSQL for persistent data (users, subscriptions, subscription codes, code redemptions, wallet connections, crypto payment audit trails, AI blacklist data). In-memory storage (MemStorage) for session data.
-- **Solana Integration**: Connects to Solana mainnet via a configurable RPC URL.
+- **Solana Integration**: Connects to Solana mainnet via a configurable RPC URL (default: public Solana RPC, configurable via `SOLANA_RPC_URL` environment variable for premium providers like Helius/QuickNode/Alchemy).
+- **Data Accuracy Improvements (Nov 2024)**: 
+  - **Liquidity Data**: DexScreener's most liquid pair now used as primary source, with Rugcheck as fallback. Accurately displays USD liquidity values (e.g., ~$460K for Bitty token).
+  - **Token Metadata**: Name and symbol fetched from DexScreener instead of on-chain metadata for Pump.fun tokens.
+  - **Holder Data**: Displays top 20 holders from Rugcheck when on-chain RPC fails (429 rate limits). Total holder count limited to top 20 with free RPC - accurate total counts require premium RPC provider.
 - **Authentication & Authorization**: Replit Auth blueprint (Google, GitHub, X, Apple, email/password) integrated with Whop for subscription management and token-gated access. Admin access controlled via ADMIN_EMAILS environment variable.
 - **Admin Access**: User menu dropdown in header shows login status, logout option, and admin dashboard link for authorized users (configured via ADMIN_EMAILS secret).
 - **Payment Systems**: Whop for subscription management and crypto payments (Solana only) with 6 confirmations and audit trails.
