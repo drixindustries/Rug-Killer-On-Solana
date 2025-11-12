@@ -251,6 +251,44 @@ export default function BotSetup() {
               </div>
             </CardContent>
           </Card>
+
+          <Card className="mb-4 bg-primary/5 border-primary" data-testid="card-discord-invite">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <SiDiscord className="h-6 w-6 text-[#5865F2]" />
+                Invite Discord Bot to Your Server
+              </CardTitle>
+              <CardDescription>
+                Add the Solana Rug Killer bot to your Discord server instantly
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm">
+                Click the button below to invite the bot to your Discord server. You'll need "Manage Server" permissions.
+              </p>
+              <Button
+                variant="default"
+                size="lg"
+                asChild
+                className="w-full sm:w-auto"
+                data-testid="button-invite-discord-bot"
+              >
+                <a 
+                  href="https://discord.com/oauth2/authorize?client_id=1437952073319714879&scope=bot&permissions=3072" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  <SiDiscord className="h-5 w-5 mr-2" />
+                  Invite Discord Bot
+                  <ExternalLink className="h-4 w-4 ml-2" />
+                </a>
+              </Button>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>• Bot permissions: Read Messages, Send Messages, Embed Links</p>
+                <p>• After inviting, use <code className="bg-muted px-1 py-0.5 rounded">/execute</code> to analyze tokens</p>
+              </div>
+            </CardContent>
+          </Card>
         </section>
 
         <section>

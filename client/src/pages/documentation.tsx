@@ -578,6 +578,301 @@ export default function Documentation() {
               </CardContent>
             </Card>
 
+            {/* Bot Usage Guides */}
+            <Card data-testid="card-telegram-guide" className="mb-8">
+              <CardHeader>
+                <div className="flex items-center gap-2 mb-2">
+                  <Bot className="h-5 w-5 text-primary" />
+                  <CardTitle>Telegram Bot Usage Guide</CardTitle>
+                </div>
+                <CardDescription>Complete guide for using the bot in direct messages and groups/channels</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {/* Individual Usage */}
+                  <div>
+                    <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                      <Badge variant="outline">Individual Use</Badge>
+                      Direct Messages (Private Chat)
+                    </h4>
+                    <div className="space-y-3 text-sm">
+                      <div className="bg-muted p-3 rounded-md">
+                        <p className="font-semibold mb-2">Step 1: Find the Bot</p>
+                        <ol className="space-y-1 text-xs text-muted-foreground ml-4 list-decimal">
+                          <li>Open Telegram app or web.telegram.org</li>
+                          <li>Click the search bar at the top</li>
+                          <li>Search for: <code className="bg-background px-1 py-0.5 rounded">@RugKillerAlphaBot</code></li>
+                          <li>Click on the bot with the verified checkmark</li>
+                        </ol>
+                      </div>
+
+                      <div className="bg-muted p-3 rounded-md">
+                        <p className="font-semibold mb-2">Step 2: Start the Bot</p>
+                        <ol className="space-y-1 text-xs text-muted-foreground ml-4 list-decimal">
+                          <li>Click the blue "Start" button at the bottom</li>
+                          <li>The bot will send you a welcome message</li>
+                          <li>You're ready to analyze tokens!</li>
+                        </ol>
+                      </div>
+
+                      <div className="bg-muted p-3 rounded-md">
+                        <p className="font-semibold mb-2">Step 3: Use Commands</p>
+                        <div className="space-y-2 text-xs">
+                          <div>
+                            <p className="font-medium mb-1">Full Token Analysis:</p>
+                            <code className="bg-background px-2 py-1 rounded block">/execute 2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt</code>
+                          </div>
+                          <div>
+                            <p className="font-medium mb-1">Top 20 Holders:</p>
+                            <code className="bg-background px-2 py-1 rounded block">/first20 2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt</code>
+                          </div>
+                          <div>
+                            <p className="font-medium mb-1">Check Wallet History:</p>
+                            <code className="bg-background px-2 py-1 rounded block">/devtorture HgK4jnXmQoNZWVJE3NSJF3JfhGNp4gAJF7ZqvDBCqxXE</code>
+                          </div>
+                          <div>
+                            <p className="font-medium mb-1">Check Blacklist:</p>
+                            <code className="bg-background px-2 py-1 rounded block">/blacklist HgK4jnXmQoNZWVJE3NSJF3JfhGNp4gAJF7ZqvDBCqxXE</code>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-green-500/10 border border-green-500 p-3 rounded-md">
+                        <p className="font-semibold text-xs mb-1 flex items-center gap-1">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          Pro Tips:
+                        </p>
+                        <ul className="space-y-1 text-xs text-muted-foreground">
+                          <li>• Responses appear in 2-5 seconds with markdown formatting</li>
+                          <li>• Color indicators: 🟢 Safe, 🟡 Caution, 🟠 Warning, 🔴 Danger</li>
+                          <li>• You can analyze unlimited tokens with active subscription</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Group Usage */}
+                  <div className="border-t pt-6">
+                    <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                      <Badge variant="outline">Group/Channel Use</Badge>
+                      Adding Bot to Groups and Channels
+                    </h4>
+                    <div className="space-y-3 text-sm">
+                      <div className="bg-muted p-3 rounded-md">
+                        <p className="font-semibold mb-2">Step 1: Add Bot to Group/Channel</p>
+                        <ol className="space-y-1 text-xs text-muted-foreground ml-4 list-decimal">
+                          <li>Open your Telegram group or channel</li>
+                          <li>Click the group/channel name at the top</li>
+                          <li>Click "Add Members" (for groups) or "Subscribers" (for channels)</li>
+                          <li>Search for: <code className="bg-background px-1 py-0.5 rounded">@RugKillerAlphaBot</code></li>
+                          <li>Click "Add" or "Invite"</li>
+                        </ol>
+                      </div>
+
+                      <div className="bg-muted p-3 rounded-md">
+                        <p className="font-semibold mb-2">Step 2: Set Bot Permissions (Groups Only)</p>
+                        <ol className="space-y-1 text-xs text-muted-foreground ml-4 list-decimal">
+                          <li>Go to Group Settings → Administrators</li>
+                          <li>Find @RugKillerAlphaBot in the member list</li>
+                          <li>Required permissions: "Send Messages", "Send Media"</li>
+                          <li>Optional: Enable "Read Messages" for auto-responses</li>
+                        </ol>
+                      </div>
+
+                      <div className="bg-muted p-3 rounded-md">
+                        <p className="font-semibold mb-2">Step 3: Use Commands in Group</p>
+                        <div className="space-y-2 text-xs">
+                          <p className="text-muted-foreground">Same commands work in groups! Just type them in the chat:</p>
+                          <code className="bg-background px-2 py-1 rounded block">/execute@RugKillerAlphaBot 2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt</code>
+                          <p className="text-muted-foreground italic">
+                            Note: Adding <code className="bg-background px-1 py-0.5 rounded">@RugKillerAlphaBot</code> after the command 
+                            ensures the right bot responds if multiple bots are in the group.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-blue-500/10 border border-blue-500 p-3 rounded-md">
+                        <p className="font-semibold text-xs mb-1">Group Admin Features:</p>
+                        <ul className="space-y-1 text-xs text-muted-foreground">
+                          <li>• Set auto-scan for new token mentions in group messages</li>
+                          <li>• Pin bot responses for important alerts</li>
+                          <li>• All group members can use commands (with active group subscription)</li>
+                          <li>• Bot responses are public - everyone in the group can see them</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-discord-guide" className="mb-8">
+              <CardHeader>
+                <div className="flex items-center gap-2 mb-2">
+                  <Bot className="h-5 w-5 text-primary" />
+                  <CardTitle>Discord Bot Usage Guide</CardTitle>
+                </div>
+                <CardDescription>Complete guide for using the bot in DMs and servers</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {/* Individual Usage */}
+                  <div>
+                    <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                      <Badge variant="outline">Individual Use</Badge>
+                      Direct Messages (DMs)
+                    </h4>
+                    <div className="space-y-3 text-sm">
+                      <div className="bg-muted p-3 rounded-md">
+                        <p className="font-semibold mb-2">Step 1: Invite Bot to a Server First</p>
+                        <div className="space-y-2 text-xs text-muted-foreground">
+                          <p>⚠️ Discord requires bots to share at least one server with you before DMs work.</p>
+                          <Button
+                            variant="default"
+                            size="sm"
+                            asChild
+                            className="mt-2"
+                          >
+                            <a 
+                              href="https://discord.com/oauth2/authorize?client_id=1437952073319714879&scope=bot&permissions=3072" 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                            >
+                              Invite Bot to Your Server
+                            </a>
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="bg-muted p-3 rounded-md">
+                        <p className="font-semibold mb-2">Step 2: Send DM to Bot</p>
+                        <ol className="space-y-1 text-xs text-muted-foreground ml-4 list-decimal">
+                          <li>Find the bot in your server's member list</li>
+                          <li>Right-click on "RugKillerAlphaBot"</li>
+                          <li>Select "Message"</li>
+                          <li>Start typing commands in the DM</li>
+                        </ol>
+                      </div>
+
+                      <div className="bg-muted p-3 rounded-md">
+                        <p className="font-semibold mb-2">Step 3: Use Slash Commands</p>
+                        <div className="space-y-2 text-xs">
+                          <div>
+                            <p className="font-medium mb-1">Type <code className="bg-background px-1 py-0.5 rounded">/</code> to see all commands:</p>
+                          </div>
+                          <div>
+                            <p className="font-medium mb-1">Full Token Analysis:</p>
+                            <code className="bg-background px-2 py-1 rounded block">/execute token_address:2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt</code>
+                          </div>
+                          <div>
+                            <p className="font-medium mb-1">Top 20 Holders:</p>
+                            <code className="bg-background px-2 py-1 rounded block">/first20 token_address:2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt</code>
+                          </div>
+                          <div>
+                            <p className="font-medium mb-1">Check Wallet:</p>
+                            <code className="bg-background px-2 py-1 rounded block">/devtorture wallet_address:HgK4jnXmQoNZWVJE3NSJF3JfhGNp4gAJF7ZqvDBCqxXE</code>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-green-500/10 border border-green-500 p-3 rounded-md">
+                        <p className="font-semibold text-xs mb-1 flex items-center gap-1">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          Discord Features:
+                        </p>
+                        <ul className="space-y-1 text-xs text-muted-foreground">
+                          <li>• Rich embeds with color-coded borders (green = safe, red = danger)</li>
+                          <li>• Clickable links to DexScreener, Rugcheck, BubbleMaps</li>
+                          <li>• Responses appear instantly (Discord slash commands)</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Server Usage */}
+                  <div className="border-t pt-6">
+                    <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                      <Badge variant="outline">Server Use</Badge>
+                      Adding Bot to Discord Servers
+                    </h4>
+                    <div className="space-y-3 text-sm">
+                      <div className="bg-muted p-3 rounded-md">
+                        <p className="font-semibold mb-2">Step 1: Invite Bot to Server</p>
+                        <div className="space-y-2 text-xs text-muted-foreground">
+                          <p>You need "Manage Server" permission to invite bots.</p>
+                          <Button
+                            variant="default"
+                            size="sm"
+                            asChild
+                            className="mt-2"
+                          >
+                            <a 
+                              href="https://discord.com/oauth2/authorize?client_id=1437952073319714879&scope=bot&permissions=3072" 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                            >
+                              Invite Bot to Your Server
+                            </a>
+                          </Button>
+                          <ol className="space-y-1 ml-4 list-decimal mt-2">
+                            <li>Click the invite link above</li>
+                            <li>Select your server from the dropdown</li>
+                            <li>Click "Authorize"</li>
+                            <li>Complete the CAPTCHA if prompted</li>
+                          </ol>
+                        </div>
+                      </div>
+
+                      <div className="bg-muted p-3 rounded-md">
+                        <p className="font-semibold mb-2">Step 2: Set Channel Permissions (Optional)</p>
+                        <ol className="space-y-1 text-xs text-muted-foreground ml-4 list-decimal">
+                          <li>Go to Server Settings → Roles</li>
+                          <li>Find the bot's role</li>
+                          <li>Restrict which channels the bot can access</li>
+                          <li>Example: Only allow in #token-analysis channel</li>
+                        </ol>
+                      </div>
+
+                      <div className="bg-muted p-3 rounded-md">
+                        <p className="font-semibold mb-2">Step 3: Use Commands in Channels</p>
+                        <div className="space-y-2 text-xs">
+                          <p className="text-muted-foreground">Type <code className="bg-background px-1 py-0.5 rounded">/</code> in any channel to see available commands:</p>
+                          <code className="bg-background px-2 py-1 rounded block">/execute token_address:2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt</code>
+                          <p className="text-muted-foreground italic mt-2">
+                            The bot will respond in the same channel where you used the command.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-blue-500/10 border border-blue-500 p-3 rounded-md">
+                        <p className="font-semibold text-xs mb-1">Server Admin Features:</p>
+                        <ul className="space-y-1 text-xs text-muted-foreground">
+                          <li>• Create dedicated #rug-alerts channel for alpha notifications</li>
+                          <li>• Set up role-based access (only VIP members can use bot)</li>
+                          <li>• Pin important bot responses for quick reference</li>
+                          <li>• All server members can use slash commands (with group subscription)</li>
+                          <li>• Responses are public - visible to everyone in the channel</li>
+                        </ul>
+                      </div>
+
+                      <div className="bg-orange-500/10 border border-orange-500 p-3 rounded-md">
+                        <p className="font-semibold text-xs mb-1 flex items-center gap-1">
+                          <AlertTriangle className="h-4 w-4 text-orange-500" />
+                          Troubleshooting:
+                        </p>
+                        <ul className="space-y-1 text-xs text-muted-foreground">
+                          <li>• If slash commands don't appear, try re-inviting the bot</li>
+                          <li>• Make sure bot has "Send Messages" and "Embed Links" permissions</li>
+                          <li>• Check if bot is offline in member list (contact support if down)</li>
+                          <li>• Rate limit: Max 5 commands per minute per user</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             <Card data-testid="card-security">
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2">

@@ -72,45 +72,63 @@ export function Footer() {
             </ul>
           </div>
           
-          <div>
+          <div className="lg:col-span-2">
             <h3 className="text-sm font-semibold mb-3">Community</h3>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline"
-                size="icon"
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline"
+                  size="icon"
+                  asChild
+                  data-testid="footer-button-github"
+                >
+                  <a href="https://github.com/yourusername/solana-rug-killer" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="View on GitHub">
+                    <SiGithub className="h-5 w-5" />
+                  </a>
+                </Button>
+                
+                {botLinks?.telegram && (
+                  <Button 
+                    variant="outline"
+                    size="icon"
+                    asChild
+                    data-testid="footer-button-telegram"
+                  >
+                    <a href={botLinks.telegram} target="_blank" rel="noopener noreferrer" title="Telegram" aria-label="Join Telegram bot">
+                      <SiTelegram className="h-5 w-5" />
+                    </a>
+                  </Button>
+                )}
+                
+                {botLinks?.discord && (
+                  <Button 
+                    variant="outline"
+                    size="icon"
+                    asChild
+                    data-testid="footer-button-discord"
+                  >
+                    <a href={botLinks.discord} target="_blank" rel="noopener noreferrer" title="Discord" aria-label="Join Discord server">
+                      <SiDiscord className="h-5 w-5" />
+                    </a>
+                  </Button>
+                )}
+              </div>
+              <Button
+                variant="default"
+                size="sm"
                 asChild
-                data-testid="footer-button-github"
+                className="w-full sm:w-auto"
+                data-testid="footer-button-invite-discord"
               >
-                <a href="https://github.com/yourusername/solana-rug-killer" target="_blank" rel="noopener noreferrer" title="GitHub">
-                  <SiGithub className="h-5 w-5" />
+                <a 
+                  href="https://discord.com/oauth2/authorize?client_id=1437952073319714879&scope=bot&permissions=3072" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  <SiDiscord className="h-4 w-4 mr-2" />
+                  Invite Discord Bot
                 </a>
               </Button>
-              
-              {botLinks?.telegram && (
-                <Button 
-                  variant="outline"
-                  size="icon"
-                  asChild
-                  data-testid="footer-button-telegram"
-                >
-                  <a href={botLinks.telegram} target="_blank" rel="noopener noreferrer" title="Telegram">
-                    <SiTelegram className="h-5 w-5" />
-                  </a>
-                </Button>
-              )}
-              
-              {botLinks?.discord && (
-                <Button 
-                  variant="outline"
-                  size="icon"
-                  asChild
-                  data-testid="footer-button-discord"
-                >
-                  <a href={botLinks.discord} target="_blank" rel="noopener noreferrer" title="Discord">
-                    <SiDiscord className="h-5 w-5" />
-                  </a>
-                </Button>
-              )}
             </div>
           </div>
         </div>
