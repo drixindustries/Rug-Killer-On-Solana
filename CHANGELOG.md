@@ -18,10 +18,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Jest configuration with separate coverage directories (unit: 92%, integration, global: 70%)
   - Playwright configuration with Chromium/Firefox/WebKit support
   - Mock builder pattern for flexible test scenarios
+- **User Features (Option B)**:
+  - **Portfolio Tracker**: Track holdings, transactions, and P&L with weighted-average cost basis
+    - Weighted-average cost basis calculation using decimal.js for precision
+    - Row-level locking (SELECT FOR UPDATE) for transactional integrity
+    - Support for buy/sell/airdrop transaction types
+    - Real-time unrealized P&L calculation via price cache integration
+    - Realized P&L tracking across all transactions
+    - Comprehensive transaction history with filtering by token
+    - Safe numeric formatting with Number() wrapping to prevent display errors
+    - Client-side validation preventing negative quantities and malformed inputs
+    - Complete data-testid coverage for testing
+  - **Price Alerts**: Get notified when prices hit your targets
+    - Four alert types: price_above, price_below, percent_change, percent_drop
+    - BullMQ worker for periodic alert monitoring (every 60 seconds)
+    - Price cache integration (15-30s TTL) for efficient monitoring
+    - Configurable lookback windows for percentage-based alerts
+    - Alert persistence with lastPrice tracking (toFixed(8) precision)
+    - Active/inactive toggle for alert management
+    - Email notifications when alerts trigger (ready for integration)
+    - Safe numeric formatting preventing exponential notation
+    - Client-side validation for token addresses (length >= 32) and target values
+    - Complete data-testid coverage for testing
+  - **Token Comparison**: Compare multiple tokens side-by-side
+    - Batch analysis of up to 10 tokens simultaneously
+    - Side-by-side comparison of risk scores, holder metrics, and market data
+    - Mobile-responsive design with card-based layout
+    - Desktop table view for detailed analysis
+    - Safe numeric formatting for all metrics
+    - Complete data-testid coverage for testing
+  - **Price Cache Infrastructure**:
+    - Batch price fetching with 15-30s TTL caching
+    - DexScreener and Jupiter integration for accurate pricing
+    - Automatic cache invalidation and refresh
+    - Support for multi-token queries via POST /api/prices
 - Bundle percentage detection (DevsNightmarePro style) - calculates % of supply controlled by bundled wallets
 - Auto-refresh functionality - automatically re-analyzes tokens every 5 minutes
 - Orange UI highlighting for bundle warnings in MetricsGrid component
 - Comprehensive bundle visualization pie chart with interactive tooltips
+- Navigation menu enhancements with "Tools" section for Portfolio, Alerts, and Comparison
 - This CHANGELOG.md file to track all changes
 
 ### Fixed
