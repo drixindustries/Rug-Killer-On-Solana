@@ -17,6 +17,7 @@ import VanityGenerator from "@/pages/vanity-generator";
 import AdminWallet from "@/pages/admin-wallet";
 import Admin from "@/pages/admin";
 import BotSetup from "@/pages/bot-setup";
+import Watchlist from "@/pages/watchlist";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -29,6 +30,7 @@ function Router() {
       <Route path="/pricing" component={Pricing} />
       <Route path="/features" component={Features} />
       <Route path="/bot-setup" component={BotSetup} />
+      <Route path="/watchlist" component={Watchlist} />
       <Route path="/documentation" component={Documentation} />
       <Route path="/about" component={About} />
       <Route path="/terms" component={Terms} />

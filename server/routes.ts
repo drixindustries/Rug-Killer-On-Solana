@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { analyzeTokenSchema } from "@shared/schema";
+import { analyzeTokenSchema, insertWatchlistSchema } from "@shared/schema";
 import { tokenAnalyzer } from "./solana-analyzer";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { storage } from "./storage";
@@ -650,6 +650,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error getting top flagged wallets:", error);
       res.status(500).json({ message: "Error getting top flagged wallets: " + error.message });
+    }
+  });
+  
+  // ============================================================================
+  // WATCHLIST ROUTES
+  // ============================================================================
+  
+  // GET /api/watchlist - Get user's watchlist
+  app.get('/api/watchlist', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const watchlist = await storage.getWatchlist(userId);
+      res.json(watchlist);
+    } catch (error: any) {
+      console.error("Error fetching watchlist:", error);
+      res.status(500).json({ message: "Failed to fetch watchlist: " + error.message });
+    }
+  });
+  
+  // POST /api/watchlist - Add token to watchlist
+  app.post('/api/watchlist', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const result = insertWatchlistSchema.safeParse(req.body);
+      
+      if (!result.success) {
+        return res.status(400).json({
+          message: "Invalid request",
+          errors: result.error.errors,
+        });
+      }
+      
+      const { tokenAddress, label } = result.data;
+      
+      const entry = await storage.addToWatchlist({
+        userId,
+        tokenAddress,
+        label,
+        metadata: null,
+      });
+      
+      res.status(201).json(entry);
+    } catch (error: any) {
+      console.error("Error adding to watchlist:", error);
+      
+      if (error.message?.includes('unique constraint') || error.code === '23505') {
+        return res.status(409).json({ 
+          message: "This token is already in your watchlist" 
+        });
+      }
+      
+      res.status(500).json({ 
+        message: "Failed to add to watchlist: " + error.message 
+      });
+    }
+  });
+  
+  // DELETE /api/watchlist/:tokenAddress - Remove token from watchlist
+  app.delete('/api/watchlist/:tokenAddress', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { tokenAddress } = req.params;
+      
+      if (!tokenAddress || tokenAddress.length < 32 || tokenAddress.length > 44) {
+        return res.status(400).json({ 
+          message: "Invalid token address" 
+        });
+      }
+      
+      await storage.removeFromWatchlist(userId, tokenAddress);
+      
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Error removing from watchlist:", error);
+      res.status(500).json({ 
+        message: "Failed to remove from watchlist: " + error.message 
+      });
+    }
+  });
+  
+  // ============================================================================
+  // PRICE API ROUTES (Shared Cache for Watchlist, Portfolio, Alerts)
+  // ============================================================================
+  
+  // GET /api/prices/:tokenAddress - Get price for single token
+  app.get('/api/prices/:tokenAddress', async (req, res) => {
+    try {
+      const { priceService } = await import('./services/price-service');
+      const { tokenAddress } = req.params;
+      
+      const price = await priceService.getPrice(tokenAddress);
+      
+      if (!price) {
+        return res.status(404).json({ 
+          message: "Price not found for this token" 
+        });
+      }
+      
+      res.json(price);
+    } catch (error: any) {
+      console.error("Error fetching price:", error);
+      res.status(500).json({ 
+        message: "Failed to fetch price: " + error.message 
+      });
+    }
+  });
+  
+  // POST /api/prices/batch - Get prices for multiple tokens
+  app.post('/api/prices/batch', async (req, res) => {
+    try {
+      const { priceService } = await import('./services/price-service');
+      const { tokenAddresses } = req.body;
+      
+      if (!Array.isArray(tokenAddresses)) {
+        return res.status(400).json({ 
+          message: "tokenAddresses must be an array" 
+        });
+      }
+      
+      if (tokenAddresses.length > 100) {
+        return res.status(400).json({ 
+          message: "Maximum 100 tokens per request" 
+        });
+      }
+      
+      const prices = await priceService.getPrices(tokenAddresses);
+      
+      // Convert Map to object for JSON response
+      const pricesObject: Record<string, any> = {};
+      for (const [address, price] of Array.from(prices.entries())) {
+        pricesObject[address] = price;
+      }
+      
+      res.json(pricesObject);
+    } catch (error: any) {
+      console.error("Error fetching batch prices:", error);
+      res.status(500).json({ 
+        message: "Failed to fetch prices: " + error.message 
+      });
     }
   });
   

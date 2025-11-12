@@ -6,6 +6,7 @@ import {
   walletConnections,
   walletChallenges,
   kolWallets,
+  watchlistEntries,
   type User,
   type UpsertUser,
   type SubscriptionCode,
@@ -19,6 +20,8 @@ import {
   type WalletChallenge,
   type InsertWalletChallenge,
   type KolWallet,
+  type WatchlistEntry,
+  type InsertWatchlistEntry,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, isNull, lt, inArray, desc, sql } from "drizzle-orm";
@@ -55,6 +58,11 @@ export interface IStorage {
   getKolWallet(walletAddress: string): Promise<KolWallet | undefined>;
   getTopKolWallets(limit?: number): Promise<KolWallet[]>;
   getKolWalletsByAddresses(addresses: string[]): Promise<KolWallet[]>;
+  
+  // Watchlist operations
+  addToWatchlist(entry: Omit<InsertWatchlistEntry, 'id' | 'createdAt'>): Promise<WatchlistEntry>;
+  removeFromWatchlist(userId: string, tokenAddress: string): Promise<void>;
+  getWatchlist(userId: string): Promise<WatchlistEntry[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -438,6 +446,34 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(kolWallets)
       .where(inArray(kolWallets.walletAddress, addresses));
+  }
+
+  // Watchlist operations
+  async addToWatchlist(entry: Omit<InsertWatchlistEntry, 'id' | 'createdAt'>): Promise<WatchlistEntry> {
+    const [watchlistEntry] = await db
+      .insert(watchlistEntries)
+      .values(entry)
+      .returning();
+    return watchlistEntry;
+  }
+
+  async removeFromWatchlist(userId: string, tokenAddress: string): Promise<void> {
+    await db
+      .delete(watchlistEntries)
+      .where(
+        and(
+          eq(watchlistEntries.userId, userId),
+          eq(watchlistEntries.tokenAddress, tokenAddress)
+        )
+      );
+  }
+
+  async getWatchlist(userId: string): Promise<WatchlistEntry[]> {
+    return await db
+      .select()
+      .from(watchlistEntries)
+      .where(eq(watchlistEntries.userId, userId))
+      .orderBy(desc(watchlistEntries.createdAt));
   }
 }
 
