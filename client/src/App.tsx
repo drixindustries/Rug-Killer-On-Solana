@@ -22,6 +22,9 @@ import Portfolio from "@/pages/portfolio";
 import Alerts from "@/pages/alerts";
 import Comparison from "@/pages/comparison";
 import Analytics from "@/pages/analytics";
+import Profile from "@/pages/profile";
+import Leaderboard from "@/pages/leaderboard";
+import Moderation from "@/pages/admin/moderation";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -39,6 +42,9 @@ function Router() {
       <Route path="/alerts" component={Alerts} />
       <Route path="/compare" component={Comparison} />
       <Route path="/analytics" component={Analytics} />
+      <Route path="/profile/:userId" component={Profile} />
+      <Route path="/leaderboard" component={Leaderboard} />
+      <Route path="/admin/moderation" component={Moderation} />
       <Route path="/documentation" component={Documentation} />
       <Route path="/about" component={About} />
       <Route path="/terms" component={Terms} />

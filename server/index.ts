@@ -76,6 +76,10 @@ app.use((req, res, next) => {
   const { analyticsWorker } = await import('./workers/analytics-worker');
   analyticsWorker.start();
   
+  // Start social worker (always enabled for community features)
+  const { socialWorker } = await import('./workers/social-worker');
+  socialWorker.start();
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

@@ -13,6 +13,15 @@ import {
   tokenSnapshots,
   trendingTokens,
   riskStatistics,
+  userProfiles,
+  tokenComments,
+  commentVotes,
+  communityVotes,
+  communityVoteSummaries,
+  sharedWatchlists,
+  watchlistFollowers,
+  tokenReports,
+  userActivities,
   type User,
   type UpsertUser,
   type SubscriptionCode,
@@ -40,6 +49,24 @@ import {
   type InsertTrendingToken,
   type RiskStatistic,
   type InsertRiskStatistic,
+  type UserProfile,
+  type InsertUserProfile,
+  type TokenComment,
+  type InsertTokenComment,
+  type CommentVote,
+  type InsertCommentVote,
+  type CommunityVote,
+  type InsertCommunityVote,
+  type CommunityVoteSummary,
+  type InsertCommunityVoteSummary,
+  type SharedWatchlist,
+  type InsertSharedWatchlist,
+  type WatchlistFollower,
+  type InsertWatchlistFollower,
+  type TokenReport,
+  type InsertTokenReport,
+  type UserActivity,
+  type InsertUserActivity,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, isNull, lt, inArray, desc, sql } from "drizzle-orm";
@@ -104,6 +131,59 @@ export interface IStorage {
   updateTrendingScores(tokens: InsertTrendingToken[]): Promise<void>;
   getRiskStatistics(windowDays: number): Promise<RiskStatistic | undefined>;
   saveRiskStatistics(stats: Omit<InsertRiskStatistic, 'id' | 'updatedAt'>): Promise<RiskStatistic>;
+  
+  // Social features - User profiles
+  getUserProfile(userId: string): Promise<UserProfile | undefined>;
+  createUserProfile(profile: Omit<InsertUserProfile, 'createdAt'>): Promise<UserProfile>;
+  updateUserProfile(userId: string, data: Partial<InsertUserProfile>): Promise<UserProfile>;
+  getTopUsers(limit?: number): Promise<UserProfile[]>;
+  
+  // Social features - Comments
+  createComment(comment: Omit<InsertTokenComment, 'id' | 'createdAt' | 'upvoteCount' | 'downvoteCount' | 'flagged'>): Promise<TokenComment>;
+  getCommentsByToken(tokenAddress: string): Promise<(TokenComment & { author: User | null })[]>;
+  getFlaggedComments(): Promise<(TokenComment & { author: User | null })[]>;
+  getComment(id: string): Promise<TokenComment | undefined>;
+  deleteComment(id: string, userId: string): Promise<void>;
+  flagComment(id: string): Promise<TokenComment>;
+  updateCommentVoteCounts(commentId: string): Promise<void>;
+  
+  // Social features - Comment votes
+  voteComment(vote: Omit<InsertCommentVote, 'createdAt'>): Promise<CommentVote>;
+  removeCommentVote(userId: string, commentId: string): Promise<void>;
+  getUserCommentVote(userId: string, commentId: string): Promise<CommentVote | undefined>;
+  
+  // Social features - Community votes
+  createCommunityVote(vote: Omit<InsertCommunityVote, 'id' | 'createdAt'>): Promise<CommunityVote>;
+  updateCommunityVote(id: string, data: Partial<InsertCommunityVote>): Promise<CommunityVote>;
+  deleteCommunityVote(id: string, userId: string): Promise<void>;
+  getUserCommunityVote(tokenAddress: string, userId: string): Promise<CommunityVote | undefined>;
+  getCommunityVoteSummary(tokenAddress: string): Promise<CommunityVoteSummary | undefined>;
+  upsertVoteSummary(summary: InsertCommunityVoteSummary): Promise<CommunityVoteSummary>;
+  
+  // Social features - Shared watchlists
+  createSharedWatchlist(watchlist: Omit<InsertSharedWatchlist, 'id' | 'createdAt' | 'updatedAt'>): Promise<SharedWatchlist>;
+  getSharedWatchlist(id: string): Promise<SharedWatchlist | undefined>;
+  getSharedWatchlistBySlug(slug: string): Promise<SharedWatchlist | undefined>;
+  updateSharedWatchlist(id: string, data: Partial<InsertSharedWatchlist>): Promise<SharedWatchlist>;
+  getPublicWatchlists(limit?: number): Promise<SharedWatchlist[]>;
+  getUserSharedWatchlists(userId: string): Promise<SharedWatchlist[]>;
+  
+  // Social features - Watchlist followers
+  followWatchlist(userId: string, watchlistId: string): Promise<WatchlistFollower>;
+  unfollowWatchlist(userId: string, watchlistId: string): Promise<void>;
+  getFollowedWatchlists(userId: string): Promise<SharedWatchlist[]>;
+  isFollowingWatchlist(userId: string, watchlistId: string): Promise<boolean>;
+  
+  // Social features - Token reports
+  createTokenReport(report: Omit<InsertTokenReport, 'id' | 'createdAt' | 'updatedAt'>): Promise<TokenReport>;
+  getTokenReports(tokenAddress: string): Promise<(TokenReport & { reporter: User | null })[]>;
+  updateTokenReport(id: string, data: Partial<InsertTokenReport>): Promise<TokenReport>;
+  getPendingReports(): Promise<(TokenReport & { reporter: User | null })[]>;
+  
+  // Social features - User activities
+  recordActivity(activity: Omit<InsertUserActivity, 'id' | 'createdAt'>): Promise<UserActivity>;
+  getUserActivities(userId: string, limit?: number): Promise<UserActivity[]>;
+  calculateUserReputation(userId: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -872,6 +952,443 @@ export class DatabaseStorage implements IStorage {
       .values(stats)
       .returning();
     return saved;
+  }
+
+  // Social features - User profiles
+  async getUserProfile(userId: string): Promise<UserProfile | undefined> {
+    const [profile] = await db.select().from(userProfiles).where(eq(userProfiles.userId, userId));
+    return profile;
+  }
+
+  async createUserProfile(profile: Omit<InsertUserProfile, 'createdAt'>): Promise<UserProfile> {
+    const [newProfile] = await db.insert(userProfiles).values(profile).returning();
+    return newProfile;
+  }
+
+  async updateUserProfile(userId: string, data: Partial<InsertUserProfile>): Promise<UserProfile> {
+    const [updated] = await db
+      .update(userProfiles)
+      .set(data)
+      .where(eq(userProfiles.userId, userId))
+      .returning();
+    return updated;
+  }
+
+  async getTopUsers(limit: number = 10): Promise<UserProfile[]> {
+    return await db
+      .select()
+      .from(userProfiles)
+      .orderBy(desc(userProfiles.reputationScore))
+      .limit(limit);
+  }
+
+  // Social features - Comments
+  async createComment(comment: Omit<InsertTokenComment, 'id' | 'createdAt' | 'upvoteCount' | 'downvoteCount' | 'flagged'>): Promise<TokenComment> {
+    const [newComment] = await db.insert(tokenComments).values(comment).returning();
+    return newComment;
+  }
+
+  async getCommentsByToken(tokenAddress: string): Promise<(TokenComment & { author: User | null })[]> {
+    const comments = await db
+      .select({
+        id: tokenComments.id,
+        tokenAddress: tokenComments.tokenAddress,
+        userId: tokenComments.userId,
+        commentText: tokenComments.commentText,
+        rating: tokenComments.rating,
+        upvoteCount: tokenComments.upvoteCount,
+        downvoteCount: tokenComments.downvoteCount,
+        flagged: tokenComments.flagged,
+        createdAt: tokenComments.createdAt,
+        author: users,
+      })
+      .from(tokenComments)
+      .leftJoin(users, eq(tokenComments.userId, users.id))
+      .where(eq(tokenComments.tokenAddress, tokenAddress))
+      .orderBy(desc(tokenComments.createdAt));
+    
+    return comments as (TokenComment & { author: User | null })[];
+  }
+
+  async getComment(id: string): Promise<TokenComment | undefined> {
+    const [comment] = await db.select().from(tokenComments).where(eq(tokenComments.id, id));
+    return comment;
+  }
+
+  async getFlaggedComments(): Promise<(TokenComment & { author: User | null })[]> {
+    const comments = await db
+      .select({
+        id: tokenComments.id,
+        tokenAddress: tokenComments.tokenAddress,
+        userId: tokenComments.userId,
+        commentText: tokenComments.commentText,
+        rating: tokenComments.rating,
+        upvoteCount: tokenComments.upvoteCount,
+        downvoteCount: tokenComments.downvoteCount,
+        flagged: tokenComments.flagged,
+        createdAt: tokenComments.createdAt,
+        author: users,
+      })
+      .from(tokenComments)
+      .leftJoin(users, eq(tokenComments.userId, users.id))
+      .where(eq(tokenComments.flagged, true))
+      .orderBy(desc(tokenComments.createdAt));
+    
+    return comments as (TokenComment & { author: User | null })[];
+  }
+
+  async deleteComment(id: string, userId: string): Promise<void> {
+    await db.delete(tokenComments).where(
+      and(
+        eq(tokenComments.id, id),
+        eq(tokenComments.userId, userId)
+      )
+    );
+  }
+
+  async flagComment(id: string): Promise<TokenComment> {
+    const [flagged] = await db
+      .update(tokenComments)
+      .set({ flagged: true })
+      .where(eq(tokenComments.id, id))
+      .returning();
+    return flagged;
+  }
+
+  async updateCommentVoteCounts(commentId: string): Promise<void> {
+    const votes = await db
+      .select()
+      .from(commentVotes)
+      .where(eq(commentVotes.commentId, commentId));
+    
+    const upvotes = votes.filter(v => v.voteType === 'up').length;
+    const downvotes = votes.filter(v => v.voteType === 'down').length;
+    
+    await db
+      .update(tokenComments)
+      .set({ upvoteCount: upvotes, downvoteCount: downvotes })
+      .where(eq(tokenComments.id, commentId));
+  }
+
+  // Social features - Comment votes
+  async voteComment(vote: Omit<InsertCommentVote, 'createdAt'>): Promise<CommentVote> {
+    const [newVote] = await db
+      .insert(commentVotes)
+      .values(vote)
+      .onConflictDoUpdate({
+        target: [commentVotes.userId, commentVotes.commentId],
+        set: { voteType: vote.voteType },
+      })
+      .returning();
+    
+    await this.updateCommentVoteCounts(vote.commentId);
+    return newVote;
+  }
+
+  async removeCommentVote(userId: string, commentId: string): Promise<void> {
+    await db.delete(commentVotes).where(
+      and(
+        eq(commentVotes.userId, userId),
+        eq(commentVotes.commentId, commentId)
+      )
+    );
+    await this.updateCommentVoteCounts(commentId);
+  }
+
+  async getUserCommentVote(userId: string, commentId: string): Promise<CommentVote | undefined> {
+    const [vote] = await db
+      .select()
+      .from(commentVotes)
+      .where(
+        and(
+          eq(commentVotes.userId, userId),
+          eq(commentVotes.commentId, commentId)
+        )
+      );
+    return vote;
+  }
+
+  // Social features - Community votes
+  async createCommunityVote(vote: Omit<InsertCommunityVote, 'id' | 'createdAt'>): Promise<CommunityVote> {
+    const [newVote] = await db
+      .insert(communityVotes)
+      .values(vote)
+      .onConflictDoUpdate({
+        target: [communityVotes.tokenAddress, communityVotes.userId],
+        set: {
+          voteType: vote.voteType,
+          confidence: vote.confidence,
+          reason: vote.reason,
+          weight: vote.weight,
+        },
+      })
+      .returning();
+    return newVote;
+  }
+
+  async updateCommunityVote(id: string, data: Partial<InsertCommunityVote>): Promise<CommunityVote> {
+    const [updated] = await db
+      .update(communityVotes)
+      .set(data)
+      .where(eq(communityVotes.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCommunityVote(id: string, userId: string): Promise<void> {
+    await db.delete(communityVotes).where(
+      and(
+        eq(communityVotes.id, id),
+        eq(communityVotes.userId, userId)
+      )
+    );
+  }
+
+  async getUserCommunityVote(tokenAddress: string, userId: string): Promise<CommunityVote | undefined> {
+    const [vote] = await db
+      .select()
+      .from(communityVotes)
+      .where(
+        and(
+          eq(communityVotes.tokenAddress, tokenAddress),
+          eq(communityVotes.userId, userId)
+        )
+      );
+    return vote;
+  }
+
+  async getCommunityVoteSummary(tokenAddress: string): Promise<CommunityVoteSummary | undefined> {
+    const [summary] = await db
+      .select()
+      .from(communityVoteSummaries)
+      .where(eq(communityVoteSummaries.tokenAddress, tokenAddress));
+    return summary;
+  }
+
+  async upsertVoteSummary(summary: InsertCommunityVoteSummary): Promise<CommunityVoteSummary> {
+    const [upserted] = await db
+      .insert(communityVoteSummaries)
+      .values(summary)
+      .onConflictDoUpdate({
+        target: communityVoteSummaries.tokenAddress,
+        set: {
+          safeWeight: summary.safeWeight,
+          riskyWeight: summary.riskyWeight,
+          scamWeight: summary.scamWeight,
+          totalVotes: summary.totalVotes,
+          consensus: summary.consensus,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return upserted;
+  }
+
+  // Social features - Shared watchlists
+  async createSharedWatchlist(watchlist: Omit<InsertSharedWatchlist, 'id' | 'createdAt' | 'updatedAt'>): Promise<SharedWatchlist> {
+    const [newWatchlist] = await db
+      .insert(sharedWatchlists)
+      .values(watchlist)
+      .returning();
+    return newWatchlist;
+  }
+
+  async getSharedWatchlist(id: string): Promise<SharedWatchlist | undefined> {
+    const [watchlist] = await db
+      .select()
+      .from(sharedWatchlists)
+      .where(eq(sharedWatchlists.id, id));
+    return watchlist;
+  }
+
+  async getSharedWatchlistBySlug(slug: string): Promise<SharedWatchlist | undefined> {
+    const [watchlist] = await db
+      .select()
+      .from(sharedWatchlists)
+      .where(eq(sharedWatchlists.shareSlug, slug));
+    return watchlist;
+  }
+
+  async updateSharedWatchlist(id: string, data: Partial<InsertSharedWatchlist>): Promise<SharedWatchlist> {
+    const [updated] = await db
+      .update(sharedWatchlists)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(sharedWatchlists.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getPublicWatchlists(limit: number = 20): Promise<SharedWatchlist[]> {
+    return await db
+      .select()
+      .from(sharedWatchlists)
+      .where(eq(sharedWatchlists.isPublic, true))
+      .orderBy(desc(sharedWatchlists.followersCount))
+      .limit(limit);
+  }
+
+  async getUserSharedWatchlists(userId: string): Promise<SharedWatchlist[]> {
+    return await db
+      .select()
+      .from(sharedWatchlists)
+      .where(eq(sharedWatchlists.ownerId, userId))
+      .orderBy(desc(sharedWatchlists.createdAt));
+  }
+
+  // Social features - Watchlist followers
+  async followWatchlist(userId: string, watchlistId: string): Promise<WatchlistFollower> {
+    const [follower] = await db
+      .insert(watchlistFollowers)
+      .values({ userId, watchlistId })
+      .onConflictDoNothing()
+      .returning();
+    
+    await db
+      .update(sharedWatchlists)
+      .set({
+        followersCount: sql`${sharedWatchlists.followersCount} + 1`,
+      })
+      .where(eq(sharedWatchlists.id, watchlistId));
+    
+    return follower;
+  }
+
+  async unfollowWatchlist(userId: string, watchlistId: string): Promise<void> {
+    await db
+      .delete(watchlistFollowers)
+      .where(
+        and(
+          eq(watchlistFollowers.userId, userId),
+          eq(watchlistFollowers.watchlistId, watchlistId)
+        )
+      );
+    
+    await db
+      .update(sharedWatchlists)
+      .set({
+        followersCount: sql`GREATEST(0, ${sharedWatchlists.followersCount} - 1)`,
+      })
+      .where(eq(sharedWatchlists.id, watchlistId));
+  }
+
+  async getFollowedWatchlists(userId: string): Promise<SharedWatchlist[]> {
+    const followed = await db
+      .select({
+        watchlist: sharedWatchlists,
+      })
+      .from(watchlistFollowers)
+      .innerJoin(sharedWatchlists, eq(watchlistFollowers.watchlistId, sharedWatchlists.id))
+      .where(eq(watchlistFollowers.userId, userId));
+    
+    return followed.map(f => f.watchlist);
+  }
+
+  async isFollowingWatchlist(userId: string, watchlistId: string): Promise<boolean> {
+    const [result] = await db
+      .select()
+      .from(watchlistFollowers)
+      .where(
+        and(
+          eq(watchlistFollowers.userId, userId),
+          eq(watchlistFollowers.watchlistId, watchlistId)
+        )
+      );
+    return !!result;
+  }
+
+  // Social features - Token reports
+  async createTokenReport(report: Omit<InsertTokenReport, 'id' | 'createdAt' | 'updatedAt'>): Promise<TokenReport> {
+    const [newReport] = await db
+      .insert(tokenReports)
+      .values(report)
+      .returning();
+    return newReport;
+  }
+
+  async getTokenReports(tokenAddress: string): Promise<(TokenReport & { reporter: User | null })[]> {
+    const reports = await db
+      .select({
+        id: tokenReports.id,
+        tokenAddress: tokenReports.tokenAddress,
+        reporterId: tokenReports.reporterId,
+        reportType: tokenReports.reportType,
+        evidence: tokenReports.evidence,
+        status: tokenReports.status,
+        reviewerId: tokenReports.reviewerId,
+        resolutionNotes: tokenReports.resolutionNotes,
+        severityScore: tokenReports.severityScore,
+        createdAt: tokenReports.createdAt,
+        updatedAt: tokenReports.updatedAt,
+        reporter: users,
+      })
+      .from(tokenReports)
+      .leftJoin(users, eq(tokenReports.reporterId, users.id))
+      .where(eq(tokenReports.tokenAddress, tokenAddress))
+      .orderBy(desc(tokenReports.createdAt));
+    
+    return reports as (TokenReport & { reporter: User | null })[];
+  }
+
+  async updateTokenReport(id: string, data: Partial<InsertTokenReport>): Promise<TokenReport> {
+    const [updated] = await db
+      .update(tokenReports)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(tokenReports.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getPendingReports(): Promise<(TokenReport & { reporter: User | null })[]> {
+    const reports = await db
+      .select({
+        id: tokenReports.id,
+        tokenAddress: tokenReports.tokenAddress,
+        reporterId: tokenReports.reporterId,
+        reportType: tokenReports.reportType,
+        evidence: tokenReports.evidence,
+        status: tokenReports.status,
+        reviewerId: tokenReports.reviewerId,
+        resolutionNotes: tokenReports.resolutionNotes,
+        severityScore: tokenReports.severityScore,
+        createdAt: tokenReports.createdAt,
+        updatedAt: tokenReports.updatedAt,
+        reporter: users,
+      })
+      .from(tokenReports)
+      .leftJoin(users, eq(tokenReports.reporterId, users.id))
+      .where(eq(tokenReports.status, 'pending'))
+      .orderBy(desc(tokenReports.createdAt));
+    
+    return reports as (TokenReport & { reporter: User | null })[];
+  }
+
+  // Social features - User activities
+  async recordActivity(activity: Omit<InsertUserActivity, 'id' | 'createdAt'>): Promise<UserActivity> {
+    const [newActivity] = await db
+      .insert(userActivities)
+      .values(activity)
+      .returning();
+    return newActivity;
+  }
+
+  async getUserActivities(userId: string, limit: number = 50): Promise<UserActivity[]> {
+    return await db
+      .select()
+      .from(userActivities)
+      .where(eq(userActivities.userId, userId))
+      .orderBy(desc(userActivities.createdAt))
+      .limit(limit);
+  }
+
+  async calculateUserReputation(userId: string): Promise<number> {
+    const result = await db
+      .select({
+        totalPoints: sql<number>`COALESCE(SUM(${userActivities.points}), 0)`,
+      })
+      .from(userActivities)
+      .where(eq(userActivities.userId, userId));
+    
+    return result[0]?.totalPoints || 0;
   }
 }
 

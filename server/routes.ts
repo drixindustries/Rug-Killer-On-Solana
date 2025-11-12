@@ -1393,6 +1393,604 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
+  // SOCIAL FEATURES - COMMENTS API
+  // ========================================
+  
+  // POST /api/comments - Create comment
+  app.post('/api/comments', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { socialService } = await import('./services/social-service');
+      
+      // Rate limiting
+      const rateLimit = await socialService.checkRateLimit(userId, 'comment');
+      if (!rateLimit.allowed) {
+        return res.status(429).json({ 
+          message: `Rate limit exceeded. Please wait before commenting again.`,
+          remaining: rateLimit.remaining 
+        });
+      }
+      
+      // Validate input
+      const { tokenAddress, content, rating } = req.body;
+      if (!tokenAddress || !content) {
+        return res.status(400).json({ message: 'Token address and content required' });
+      }
+      
+      // Sanitize content
+      const sanitizedContent = socialService.sanitizeContent(content);
+      
+      // Spam detection
+      const isSpam = await socialService.detectSpam(sanitizedContent);
+      if (isSpam) {
+        return res.status(400).json({ message: 'Content flagged as spam' });
+      }
+      
+      const comment = await storage.createComment({
+        userId,
+        tokenAddress,
+        commentText: sanitizedContent,
+        rating: rating || null,
+      });
+      
+      // Award points for commenting
+      await socialService.awardPoints(userId, 'comment', 5, tokenAddress);
+      
+      res.json(comment);
+    } catch (error) {
+      console.error('Error creating comment:', error);
+      res.status(500).json({ message: 'Failed to create comment' });
+    }
+  });
+  
+  // GET /api/comments/:tokenAddress - Get all comments
+  app.get('/api/comments/:tokenAddress', async (req, res) => {
+    try {
+      const { tokenAddress } = req.params;
+      const comments = await storage.getCommentsByToken(tokenAddress);
+      res.json(comments);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      res.status(500).json({ message: 'Failed to fetch comments' });
+    }
+  });
+  
+  // GET /api/comments/flagged - Get flagged comments (admin only)
+  app.get('/api/comments/flagged', isAdmin, async (req, res) => {
+    try {
+      const comments = await storage.getFlaggedComments();
+      res.json(comments);
+    } catch (error) {
+      console.error('Error fetching flagged comments:', error);
+      res.status(500).json({ message: 'Failed to fetch flagged comments' });
+    }
+  });
+  
+  // POST /api/comments/:id/vote - Upvote/downvote
+  app.post('/api/comments/:id/vote', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { voteType } = req.body;
+      
+      if (!['upvote', 'downvote'].includes(voteType)) {
+        return res.status(400).json({ message: 'Invalid vote type' });
+      }
+      
+      // Check if already voted
+      const existingVote = await storage.getUserCommentVote(userId, id);
+      if (existingVote) {
+        if (existingVote.voteType === voteType) {
+          // Remove vote
+          await storage.removeCommentVote(userId, id);
+        } else {
+          // Update vote
+          await storage.removeCommentVote(userId, id);
+          await storage.voteComment({ userId, commentId: id, voteType: voteType as 'upvote' | 'downvote' });
+        }
+      } else {
+        await storage.voteComment({ userId, commentId: id, voteType: voteType as 'upvote' | 'downvote' });
+      }
+      
+      // Update vote counts
+      await storage.updateCommentVoteCounts(id);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error voting on comment:', error);
+      res.status(500).json({ message: 'Failed to vote on comment' });
+    }
+  });
+  
+  // DELETE /api/comments/:id - Delete own comment
+  app.delete('/api/comments/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      await storage.deleteComment(id, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      res.status(500).json({ message: 'Failed to delete comment' });
+    }
+  });
+  
+  // POST /api/comments/:id/flag - Flag inappropriate
+  app.post('/api/comments/:id/flag', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const comment = await storage.flagComment(id);
+      res.json(comment);
+    } catch (error) {
+      console.error('Error flagging comment:', error);
+      res.status(500).json({ message: 'Failed to flag comment' });
+    }
+  });
+  
+  // ========================================
+  // SOCIAL FEATURES - COMMUNITY VOTES API
+  // ========================================
+  
+  // POST /api/community-votes - Submit vote
+  app.post('/api/community-votes', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { socialService } = await import('./services/social-service');
+      
+      // Rate limiting
+      const rateLimit = await socialService.checkRateLimit(userId, 'vote');
+      if (!rateLimit.allowed) {
+        return res.status(429).json({ 
+          message: `Rate limit exceeded. ${rateLimit.remaining} votes remaining.`,
+          remaining: rateLimit.remaining 
+        });
+      }
+      
+      const { tokenAddress, voteType, confidence } = req.body;
+      if (!tokenAddress || !voteType) {
+        return res.status(400).json({ message: 'Token address and vote type required' });
+      }
+      
+      if (!['safe', 'risky', 'scam'].includes(voteType)) {
+        return res.status(400).json({ message: 'Invalid vote type' });
+      }
+      
+      // Check if already voted
+      const existingVote = await storage.getUserCommunityVote(tokenAddress, userId);
+      if (existingVote) {
+        // Update vote
+        const updated = await storage.updateCommunityVote(existingVote.id, {
+          voteType: voteType as 'safe' | 'risky' | 'scam',
+          confidence: confidence || 50,
+        });
+        
+        // Recalculate consensus
+        await socialService.aggregateVotes(tokenAddress);
+        
+        return res.json(updated);
+      }
+      
+      const vote = await storage.createCommunityVote({
+        userId,
+        tokenAddress,
+        voteType: voteType as 'safe' | 'risky' | 'scam',
+        confidence: confidence || 50,
+      });
+      
+      // Award points for voting
+      await socialService.awardPoints(userId, 'vote', 2, tokenAddress);
+      
+      // Recalculate consensus
+      await socialService.aggregateVotes(tokenAddress);
+      
+      res.json(vote);
+    } catch (error) {
+      console.error('Error submitting vote:', error);
+      res.status(500).json({ message: 'Failed to submit vote' });
+    }
+  });
+  
+  // GET /api/community-votes/:tokenAddress/summary - Get consensus
+  app.get('/api/community-votes/:tokenAddress/summary', async (req, res) => {
+    try {
+      const { tokenAddress } = req.params;
+      const summary = await storage.getCommunityVoteSummary(tokenAddress);
+      res.json(summary || null);
+    } catch (error) {
+      console.error('Error fetching vote summary:', error);
+      res.status(500).json({ message: 'Failed to fetch vote summary' });
+    }
+  });
+  
+  // PUT /api/community-votes/:id - Update vote
+  app.put('/api/community-votes/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { voteType, confidence } = req.body;
+      
+      const updated = await storage.updateCommunityVote(id, {
+        voteType: voteType as 'safe' | 'risky' | 'scam',
+        confidence,
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating vote:', error);
+      res.status(500).json({ message: 'Failed to update vote' });
+    }
+  });
+  
+  // DELETE /api/community-votes/:id - Delete vote
+  app.delete('/api/community-votes/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      await storage.deleteCommunityVote(id, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting vote:', error);
+      res.status(500).json({ message: 'Failed to delete vote' });
+    }
+  });
+  
+  // ========================================
+  // SOCIAL FEATURES - USER PROFILES API
+  // ========================================
+  
+  // GET /api/profile/:userId - Get profile
+  app.get('/api/profile/:userId', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const profile = await storage.getUserProfile(userId);
+      
+      if (!profile) {
+        return res.status(404).json({ message: 'Profile not found' });
+      }
+      
+      res.json(profile);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      res.status(500).json({ message: 'Failed to fetch profile' });
+    }
+  });
+  
+  // PUT /api/profile - Update own profile
+  app.put('/api/profile', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { socialService } = await import('./services/social-service');
+      
+      const { username, bio, isPublic } = req.body;
+      
+      // Sanitize text inputs
+      const sanitizedBio = bio ? socialService.sanitizeContent(bio) : undefined;
+      
+      // Check if profile exists
+      let profile = await storage.getUserProfile(userId);
+      if (!profile) {
+        // Create profile
+        profile = await storage.createUserProfile({
+          userId,
+          username: username || null,
+          bio: sanitizedBio || null,
+          isPublic: isPublic !== undefined ? isPublic : true,
+          reputationScore: 0,
+          contributionCount: 0,
+        });
+      } else {
+        // Update profile
+        profile = await storage.updateUserProfile(userId, {
+          username,
+          bio: sanitizedBio,
+          isPublic,
+        });
+      }
+      
+      res.json(profile);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      res.status(500).json({ message: 'Failed to update profile' });
+    }
+  });
+  
+  // GET /api/profile/:userId/activities - Activity feed
+  app.get('/api/profile/:userId/activities', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 50;
+      
+      const activities = await storage.getUserActivities(userId, limit);
+      res.json(activities);
+    } catch (error) {
+      console.error('Error fetching activities:', error);
+      res.status(500).json({ message: 'Failed to fetch activities' });
+    }
+  });
+  
+  // GET /api/leaderboard - Top users
+  app.get('/api/leaderboard', async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const users = await storage.getTopUsers(limit);
+      res.json(users);
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error);
+      res.status(500).json({ message: 'Failed to fetch leaderboard' });
+    }
+  });
+  
+  // ========================================
+  // SOCIAL FEATURES - WATCHLIST SHARING API
+  // ========================================
+  
+  // POST /api/watchlists/share - Make public, get share_slug
+  app.post('/api/watchlists/share', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { socialService } = await import('./services/social-service');
+      const { name, description, tokenAddresses, isPublic } = req.body;
+      
+      if (!name || !tokenAddresses || !Array.isArray(tokenAddresses)) {
+        return res.status(400).json({ message: 'Name and token addresses required' });
+      }
+      
+      const slug = socialService.generateShareSlug();
+      const sanitizedDescription = description ? socialService.sanitizeContent(description) : null;
+      
+      const sharedWatchlist = await storage.createSharedWatchlist({
+        userId,
+        name,
+        description: sanitizedDescription,
+        tokenAddresses,
+        shareSlug: slug,
+        isPublic: isPublic !== undefined ? isPublic : true,
+        followerCount: 0,
+      });
+      
+      res.json(sharedWatchlist);
+    } catch (error) {
+      console.error('Error sharing watchlist:', error);
+      res.status(500).json({ message: 'Failed to share watchlist' });
+    }
+  });
+  
+  // GET /api/watchlists/shared/:slug - Get by slug (public)
+  app.get('/api/watchlists/shared/:slug', async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const watchlist = await storage.getSharedWatchlistBySlug(slug);
+      
+      if (!watchlist) {
+        return res.status(404).json({ message: 'Watchlist not found' });
+      }
+      
+      if (!watchlist.isPublic) {
+        return res.status(403).json({ message: 'This watchlist is private' });
+      }
+      
+      res.json(watchlist);
+    } catch (error) {
+      console.error('Error fetching shared watchlist:', error);
+      res.status(500).json({ message: 'Failed to fetch watchlist' });
+    }
+  });
+  
+  // POST /api/watchlists/:id/follow - Follow
+  app.post('/api/watchlists/:id/follow', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      const follower = await storage.followWatchlist(userId, id);
+      res.json(follower);
+    } catch (error) {
+      console.error('Error following watchlist:', error);
+      res.status(500).json({ message: 'Failed to follow watchlist' });
+    }
+  });
+  
+  // DELETE /api/watchlists/:id/unfollow - Unfollow
+  app.delete('/api/watchlists/:id/unfollow', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      await storage.unfollowWatchlist(userId, id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error unfollowing watchlist:', error);
+      res.status(500).json({ message: 'Failed to unfollow watchlist' });
+    }
+  });
+  
+  // GET /api/watchlists/following - Get followed lists
+  app.get('/api/watchlists/following', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const watchlists = await storage.getFollowedWatchlists(userId);
+      res.json(watchlists);
+    } catch (error) {
+      console.error('Error fetching followed watchlists:', error);
+      res.status(500).json({ message: 'Failed to fetch followed watchlists' });
+    }
+  });
+  
+  // GET /api/watchlists/public - Browse public watchlists
+  app.get('/api/watchlists/public', async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const watchlists = await storage.getPublicWatchlists(limit);
+      res.json(watchlists);
+    } catch (error) {
+      console.error('Error fetching public watchlists:', error);
+      res.status(500).json({ message: 'Failed to fetch public watchlists' });
+    }
+  });
+  
+  // ========================================
+  // SOCIAL FEATURES - TOKEN REPORTS API
+  // ========================================
+  
+  // POST /api/reports - Submit report
+  app.post('/api/reports', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { socialService } = await import('./services/social-service');
+      
+      // Rate limiting
+      const rateLimit = await socialService.checkRateLimit(userId, 'report');
+      if (!rateLimit.allowed) {
+        return res.status(429).json({ 
+          message: `Rate limit exceeded. ${rateLimit.remaining} reports remaining.`,
+          remaining: rateLimit.remaining 
+        });
+      }
+      
+      const { tokenAddress, reportType, evidence, severity } = req.body;
+      
+      if (!tokenAddress || !reportType || !evidence) {
+        return res.status(400).json({ message: 'Token address, report type, and evidence required' });
+      }
+      
+      if (!['scam', 'honeypot', 'soft_rug', 'other'].includes(reportType)) {
+        return res.status(400).json({ message: 'Invalid report type' });
+      }
+      
+      const sanitizedEvidence = socialService.sanitizeContent(evidence);
+      
+      const report = await storage.createTokenReport({
+        userId,
+        tokenAddress,
+        reportType: reportType as 'scam' | 'honeypot' | 'soft_rug' | 'other',
+        evidence: sanitizedEvidence,
+        severity: severity || 3,
+        status: 'pending',
+      });
+      
+      // Award points for reporting
+      await socialService.awardPoints(userId, 'report', 10, tokenAddress);
+      
+      res.json(report);
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      res.status(500).json({ message: 'Failed to submit report' });
+    }
+  });
+  
+  // GET /api/reports/:tokenAddress - Get reports
+  app.get('/api/reports/:tokenAddress', async (req, res) => {
+    try {
+      const { tokenAddress } = req.params;
+      const reports = await storage.getTokenReports(tokenAddress);
+      res.json(reports);
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+      res.status(500).json({ message: 'Failed to fetch reports' });
+    }
+  });
+  
+  // PUT /api/reports/:id/review - Admin review
+  app.put('/api/reports/:id/review', isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, reviewNotes } = req.body;
+      
+      if (!['pending', 'approved', 'dismissed'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status' });
+      }
+      
+      const report = await storage.updateTokenReport(id, {
+        status: status as 'pending' | 'approved' | 'dismissed',
+        reviewNotes,
+      });
+      
+      res.json(report);
+    } catch (error) {
+      console.error('Error reviewing report:', error);
+      res.status(500).json({ message: 'Failed to review report' });
+    }
+  });
+  
+  // GET /api/reports/pending - Admin pending queue
+  app.get('/api/reports/pending', isAdmin, async (req, res) => {
+    try {
+      const reports = await storage.getPendingReports();
+      res.json(reports);
+    } catch (error) {
+      console.error('Error fetching pending reports:', error);
+      res.status(500).json({ message: 'Failed to fetch pending reports' });
+    }
+  });
+  
+  // ========================================
+  // SOCIAL FEATURES - SOCIAL SHARING API
+  // ========================================
+  
+  // GET /api/share/preview/:tokenAddress - OG meta tags
+  app.get('/api/share/preview/:tokenAddress', async (req, res) => {
+    try {
+      const { tokenAddress } = req.params;
+      
+      // You could fetch token analysis here to generate preview
+      const baseUrl = process.env.REPL_SLUG 
+        ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+        : 'http://localhost:5000';
+      
+      const preview = {
+        url: `${baseUrl}/?token=${tokenAddress}`,
+        title: `Solana Rug Killer - Token Analysis`,
+        description: `Analyze ${tokenAddress} for rug pull risks`,
+        image: `${baseUrl}/favicon.png`,
+      };
+      
+      res.json(preview);
+    } catch (error) {
+      console.error('Error generating preview:', error);
+      res.status(500).json({ message: 'Failed to generate preview' });
+    }
+  });
+  
+  // GET /api/share/twitter/:tokenAddress - Twitter URL
+  app.get('/api/share/twitter/:tokenAddress', async (req, res) => {
+    try {
+      const { tokenAddress } = req.params;
+      const baseUrl = process.env.REPL_SLUG 
+        ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+        : 'http://localhost:5000';
+      
+      const url = `${baseUrl}/?token=${tokenAddress}`;
+      const text = `Check out this token analysis on Solana Rug Killer`;
+      const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+      
+      res.json({ url: twitterUrl });
+    } catch (error) {
+      console.error('Error generating Twitter URL:', error);
+      res.status(500).json({ message: 'Failed to generate Twitter URL' });
+    }
+  });
+  
+  // GET /api/share/telegram/:tokenAddress - Telegram URL
+  app.get('/api/share/telegram/:tokenAddress', async (req, res) => {
+    try {
+      const { tokenAddress } = req.params;
+      const baseUrl = process.env.REPL_SLUG 
+        ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+        : 'http://localhost:5000';
+      
+      const url = `${baseUrl}/?token=${tokenAddress}`;
+      const text = `Check out this token analysis on Solana Rug Killer`;
+      const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+      
+      res.json({ url: telegramUrl });
+    } catch (error) {
+      console.error('Error generating Telegram URL:', error);
+      res.status(500).json({ message: 'Failed to generate Telegram URL' });
+    }
+  });
+
+  // ========================================
   // ADMIN ROUTES
   // ========================================
   

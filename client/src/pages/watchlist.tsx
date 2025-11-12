@@ -24,16 +24,23 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Trash2, Star } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Loader2, Plus, Trash2, Star, Share2, Copy, Twitter, Send, Users, Heart } from "lucide-react";
 import { format } from "date-fns";
-import type { WatchlistEntry } from "@shared/schema";
+import type { WatchlistEntry, SharedWatchlist } from "@shared/schema";
 
 export default function Watchlist() {
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [tokenAddress, setTokenAddress] = useState("");
   const [label, setLabel] = useState("");
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
+  const [shareLink, setShareLink] = useState("");
 
   const { data: watchlist, isLoading } = useQuery<WatchlistEntry[]>({
     queryKey: ["/api/watchlist"],

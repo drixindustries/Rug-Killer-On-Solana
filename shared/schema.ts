@@ -792,3 +792,249 @@ export const insertRiskStatisticSchema = z.object({
 export type InsertTokenSnapshotRequest = z.infer<typeof insertTokenSnapshotSchema>;
 export type InsertTrendingTokenRequest = z.infer<typeof insertTrendingTokenSchema>;
 export type InsertRiskStatisticRequest = z.infer<typeof insertRiskStatisticSchema>;
+
+// ============================================================================
+// SOCIAL FEATURES TABLES (Option D: Community Features)
+// ============================================================================
+
+// User profiles - extended user information for social features
+export const userProfiles = pgTable("user_profiles", {
+  userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  username: varchar("username", { length: 50 }).unique(),
+  bio: text("bio"),
+  avatarUrl: text("avatar_url"),
+  reputationScore: integer("reputation_score").notNull().default(0),
+  contributionCount: integer("contribution_count").notNull().default(0),
+  visibility: varchar("visibility", { length: 20 }).notNull().default("public"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_user_profiles_reputation").on(table.reputationScore),
+  index("idx_user_profiles_username").on(table.username),
+]);
+
+export type UserProfile = typeof userProfiles.$inferSelect;
+export type InsertUserProfile = typeof userProfiles.$inferInsert;
+
+// Token comments - user comments and ratings on tokens
+export const tokenComments = pgTable("token_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tokenAddress: varchar("token_address", { length: 44 }).notNull(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  commentText: text("comment_text").notNull(),
+  rating: integer("rating"), // 1-5 stars, nullable
+  upvoteCount: integer("upvote_count").notNull().default(0),
+  downvoteCount: integer("downvote_count").notNull().default(0),
+  flagged: boolean("flagged").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_token_comments_token").on(table.tokenAddress),
+  index("idx_token_comments_user").on(table.userId),
+  index("idx_token_comments_created").on(table.createdAt),
+]);
+
+export type TokenComment = typeof tokenComments.$inferSelect;
+export type InsertTokenComment = typeof tokenComments.$inferInsert;
+
+// Comment votes - upvote/downvote tracking for comments
+export const commentVotes = pgTable("comment_votes", {
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  commentId: varchar("comment_id").notNull().references(() => tokenComments.id, { onDelete: "cascade" }),
+  voteType: varchar("vote_type", { length: 10 }).notNull(), // 'up' or 'down'
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_comment_vote").on(table.userId, table.commentId),
+  index("idx_comment_votes_comment").on(table.commentId),
+]);
+
+export type CommentVote = typeof commentVotes.$inferSelect;
+export type InsertCommentVote = typeof commentVotes.$inferInsert;
+
+// Community votes - user votes on token safety (safe/risky/scam)
+export const communityVotes = pgTable("community_votes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tokenAddress: varchar("token_address", { length: 44 }).notNull(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  voteType: varchar("vote_type", { length: 10 }).notNull(), // 'safe', 'risky', 'scam'
+  confidence: integer("confidence").notNull(), // 1-5
+  reason: text("reason"),
+  weight: decimal("weight", { precision: 10, scale: 2 }).notNull().default("1.0"), // Reputation-based weighting
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_community_vote").on(table.tokenAddress, table.userId),
+  index("idx_community_votes_token").on(table.tokenAddress),
+  index("idx_community_votes_user").on(table.userId),
+]);
+
+export type CommunityVote = typeof communityVotes.$inferSelect;
+export type InsertCommunityVote = typeof communityVotes.$inferInsert;
+
+// Community vote summaries - aggregated consensus for each token
+export const communityVoteSummaries = pgTable("community_vote_summaries", {
+  tokenAddress: varchar("token_address", { length: 44 }).primaryKey(),
+  safeWeight: decimal("safe_weight", { precision: 20, scale: 2 }).notNull().default("0"),
+  riskyWeight: decimal("risky_weight", { precision: 20, scale: 2 }).notNull().default("0"),
+  scamWeight: decimal("scam_weight", { precision: 20, scale: 2 }).notNull().default("0"),
+  totalVotes: integer("total_votes").notNull().default(0),
+  consensus: varchar("consensus", { length: 10 }), // 'safe', 'risky', 'scam', 'mixed'
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_community_vote_summaries_consensus").on(table.consensus),
+]);
+
+export type CommunityVoteSummary = typeof communityVoteSummaries.$inferSelect;
+export type InsertCommunityVoteSummary = typeof communityVoteSummaries.$inferInsert;
+
+// Shared watchlists - public watchlists that users can share and follow
+export const sharedWatchlists = pgTable("shared_watchlists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerId: varchar("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 120 }).notNull(),
+  description: text("description"),
+  isPublic: boolean("is_public").notNull().default(false),
+  shareSlug: varchar("share_slug", { length: 20 }).notNull().unique(),
+  followersCount: integer("followers_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_shared_watchlists_owner").on(table.ownerId),
+  index("idx_shared_watchlists_public").on(table.isPublic),
+  index("idx_shared_watchlists_slug").on(table.shareSlug),
+]);
+
+export type SharedWatchlist = typeof sharedWatchlists.$inferSelect;
+export type InsertSharedWatchlist = typeof sharedWatchlists.$inferInsert;
+
+// Watchlist followers - tracks who follows which shared watchlists
+export const watchlistFollowers = pgTable("watchlist_followers", {
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  watchlistId: varchar("watchlist_id").notNull().references(() => sharedWatchlists.id, { onDelete: "cascade" }),
+  followedAt: timestamp("followed_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_watchlist_follower").on(table.userId, table.watchlistId),
+  index("idx_watchlist_followers_user").on(table.userId),
+  index("idx_watchlist_followers_watchlist").on(table.watchlistId),
+]);
+
+export type WatchlistFollower = typeof watchlistFollowers.$inferSelect;
+export type InsertWatchlistFollower = typeof watchlistFollowers.$inferInsert;
+
+// Token reports - user-submitted rug pull reports
+export const tokenReports = pgTable("token_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tokenAddress: varchar("token_address", { length: 44 }).notNull(),
+  reporterId: varchar("reporter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  reportType: varchar("report_type", { length: 20 }).notNull(), // 'scam', 'honeypot', 'soft_rug', 'other'
+  evidence: text("evidence").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"), // 'pending', 'under_review', 'verified', 'dismissed'
+  reviewerId: varchar("reviewer_id").references(() => users.id),
+  resolutionNotes: text("resolution_notes"),
+  severityScore: integer("severity_score"), // 1-5
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_token_reports_token").on(table.tokenAddress),
+  index("idx_token_reports_reporter").on(table.reporterId),
+  index("idx_token_reports_status").on(table.status),
+]);
+
+export type TokenReport = typeof tokenReports.$inferSelect;
+export type InsertTokenReport = typeof tokenReports.$inferInsert;
+
+// User activities - tracks all user actions for reputation calculation
+export const userActivities = pgTable("user_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  activityType: varchar("activity_type", { length: 20 }).notNull(), // 'comment', 'vote', 'report', 'helpful_vote', 'watchlist_share', 'follow'
+  targetToken: varchar("target_token", { length: 44 }),
+  targetWatchlist: varchar("target_watchlist"),
+  points: integer("points").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_user_activities_user").on(table.userId),
+  index("idx_user_activities_created").on(table.createdAt),
+  index("idx_user_activities_type").on(table.activityType),
+]);
+
+export type UserActivity = typeof userActivities.$inferSelect;
+export type InsertUserActivity = typeof userActivities.$inferInsert;
+
+// Zod schemas for social features using createInsertSchema
+import { createInsertSchema } from "drizzle-zod";
+
+export const insertUserProfileSchema = createInsertSchema(userProfiles).omit({ 
+  createdAt: true 
+}).extend({
+  username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, underscores, and hyphens"),
+  bio: z.string().max(500).optional(),
+  visibility: z.enum(["public", "private"]).default("public"),
+});
+
+export const insertTokenCommentSchema = createInsertSchema(tokenComments).omit({
+  id: true,
+  createdAt: true,
+  upvoteCount: true,
+  downvoteCount: true,
+  flagged: true,
+}).extend({
+  tokenAddress: z.string().min(32).max(44),
+  commentText: z.string().min(1).max(2000),
+  rating: z.number().int().min(1).max(5).optional(),
+});
+
+export const insertCommentVoteSchema = createInsertSchema(commentVotes).omit({
+  createdAt: true,
+}).extend({
+  voteType: z.enum(["up", "down"]),
+});
+
+export const insertCommunityVoteSchema = createInsertSchema(communityVotes).omit({
+  id: true,
+  createdAt: true,
+  weight: true,
+}).extend({
+  tokenAddress: z.string().min(32).max(44),
+  voteType: z.enum(["safe", "risky", "scam"]),
+  confidence: z.number().int().min(1).max(5),
+  reason: z.string().max(1000).optional(),
+});
+
+export const insertSharedWatchlistSchema = createInsertSchema(sharedWatchlists).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  shareSlug: true,
+  followersCount: true,
+}).extend({
+  name: z.string().min(1).max(120),
+  description: z.string().max(500).optional(),
+});
+
+export const insertTokenReportSchema = createInsertSchema(tokenReports).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  status: true,
+  reviewerId: true,
+  resolutionNotes: true,
+}).extend({
+  tokenAddress: z.string().min(32).max(44),
+  reportType: z.enum(["scam", "honeypot", "soft_rug", "other"]),
+  evidence: z.string().min(10).max(5000),
+  severityScore: z.number().int().min(1).max(5).optional(),
+});
+
+export const insertUserActivitySchema = createInsertSchema(userActivities).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  activityType: z.enum(["comment", "vote", "report", "helpful_vote", "watchlist_share", "follow"]),
+  points: z.number().int(),
+});
+
+export type InsertUserProfileRequest = z.infer<typeof insertUserProfileSchema>;
+export type InsertTokenCommentRequest = z.infer<typeof insertTokenCommentSchema>;
+export type InsertCommentVoteRequest = z.infer<typeof insertCommentVoteSchema>;
+export type InsertCommunityVoteRequest = z.infer<typeof insertCommunityVoteSchema>;
+export type InsertSharedWatchlistRequest = z.infer<typeof insertSharedWatchlistSchema>;
+export type InsertTokenReportRequest = z.infer<typeof insertTokenReportSchema>;
+export type InsertUserActivityRequest = z.infer<typeof insertUserActivitySchema>;

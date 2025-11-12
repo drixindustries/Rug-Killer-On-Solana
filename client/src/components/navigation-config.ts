@@ -33,6 +33,31 @@ export const navigationConfig: NavSection[] = [
         title: "Token Comparison",
         href: "/compare",
         description: "Compare multiple tokens side-by-side"
+      },
+      {
+        title: "Watchlist",
+        href: "/watchlist",
+        description: "Track and share your favorite tokens"
+      }
+    ]
+  },
+  {
+    title: "Community",
+    items: [
+      {
+        title: "Leaderboard",
+        href: "/leaderboard",
+        description: "Top contributors and reputation rankings"
+      },
+      {
+        title: "My Profile",
+        href: "/profile/me",
+        description: "View and edit your community profile"
+      },
+      {
+        title: "Browse Shared Watchlists",
+        href: "/watchlist#shared",
+        description: "Discover community curated token lists"
       }
     ]
   },
@@ -93,6 +118,11 @@ export const navigationConfig: NavSection[] = [
         title: "Privacy",
         href: "/privacy",
         description: "Privacy Policy"
+      },
+      {
+        title: "Admin: Moderation",
+        href: "/admin/moderation",
+        description: "Review reports and manage flagged content"
       }
     ]
   }
