@@ -14,6 +14,7 @@ import { RugcheckService } from "./rugcheck-service";
 import { GoPlusSecurityService } from "./goplus-service";
 import { DexScreenerService } from "./dexscreener-service";
 import { JupiterPriceService } from "./jupiter-service";
+import { isKnownAddress, getKnownAddressInfo, detectBundledWallets } from "./known-addresses";
 
 // Use public Solana RPC endpoint (can be configured later)
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
@@ -81,12 +82,81 @@ export class SolanaTokenAnalyzer {
       
       // Filter out LP/exchange addresses from holder concentration calculation
       const lpAddresses = enrichedLiquidity.lpAddresses || [];
-      const nonLpHolders = holders.filter(h => !lpAddresses.includes(h.address));
       
-      // Calculate holder concentration excluding LP addresses
+      // Detect bundled wallets (same-block purchases, suspicious patterns)
+      const bundledWallets = detectBundledWallets(holders);
+      
+      // Filter out LP addresses, known exchanges, and bundled wallets
+      const addressesToExclude = new Set([
+        ...lpAddresses,
+        ...bundledWallets,
+      ]);
+      
+      // Also filter out known exchange/protocol addresses
+      const filteredHolders = holders.filter(h => {
+        // Exclude LP addresses
+        if (addressesToExclude.has(h.address)) return false;
+        
+        // Exclude known exchanges/protocols
+        if (isKnownAddress(h.address)) return false;
+        
+        return true;
+      });
+      
+      // Calculate holder concentration excluding filtered addresses
       const topHolderConcentration = Math.min(100, Math.max(0, 
-        nonLpHolders.slice(0, 10).reduce((sum, h) => sum + (h.percentage || 0), 0)
+        filteredHolders.slice(0, 10).reduce((sum, h) => sum + (h.percentage || 0), 0)
       ));
+      
+      // Build holder filtering metadata
+      const excludedAddresses: Array<{address: string; type: 'lp' | 'exchange' | 'protocol' | 'bundled'; label?: string; reason: string;}> = [];
+      
+      // Add LP addresses
+      lpAddresses.forEach(addr => {
+        excludedAddresses.push({
+          address: addr,
+          type: 'lp',
+          reason: 'Liquidity pool or token account'
+        });
+      });
+      
+      // Add known exchanges/protocols
+      holders.forEach(h => {
+        if (isKnownAddress(h.address)) {
+          const info = getKnownAddressInfo(h.address);
+          excludedAddresses.push({
+            address: h.address,
+            type: info?.type === 'exchange' ? 'exchange' : 'protocol',
+            label: info?.label,
+            reason: info?.label || 'Known exchange/protocol'
+          });
+        }
+      });
+      
+      // Add bundled wallets
+      bundledWallets.forEach(addr => {
+        excludedAddresses.push({
+          address: addr,
+          type: 'bundled',
+          reason: 'Suspected bundled wallet (same purchase pattern)'
+        });
+      });
+      
+      const holderFiltering = {
+        totals: {
+          lp: lpAddresses.length,
+          exchanges: excludedAddresses.filter(a => a.type === 'exchange').length,
+          protocols: excludedAddresses.filter(a => a.type === 'protocol').length,
+          bundled: bundledWallets.length,
+          total: excludedAddresses.length
+        },
+        excluded: excludedAddresses,
+        bundledDetection: bundledWallets.length > 0 ? {
+          strategy: 'percentageMatch' as const,
+          confidence: 'low' as const,
+          details: `Detected ${bundledWallets.length} wallets with suspicious patterns`
+        } : undefined
+      };
       
       // Build metadata - prioritize DexScreener data over on-chain defaults
       const supply = Number(mintInfo.supply);
@@ -134,8 +204,9 @@ export class SolanaTokenAnalyzer {
         freezeAuthority,
         metadata,
         holderCount: holderCount,
-        topHolders: nonLpHolders, // Return filtered holders (excluding LP addresses)
+        topHolders: filteredHolders, // Return filtered holders (excluding LP, exchanges, bundles)
         topHolderConcentration: isNaN(topHolderConcentration) ? 0 : topHolderConcentration,
+        holderFiltering,
         liquidityPool: enrichedLiquidity,
         marketData,
         recentTransactions,
@@ -171,6 +242,10 @@ export class SolanaTokenAnalyzer {
         holderCount: 0,
         topHolders: [],
         topHolderConcentration: 0,
+        holderFiltering: {
+          totals: { lp: 0, exchanges: 0, protocols: 0, bundled: 0, total: 0 },
+          excluded: [],
+        },
         liquidityPool: {
           exists: false,
           isLocked: false,

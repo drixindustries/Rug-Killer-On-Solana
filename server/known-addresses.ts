@@ -1,0 +1,159 @@
+// Known Solana addresses that should be excluded from holder concentration calculations
+// These are exchanges, bundling bots, and protocol-owned addresses that don't represent individual whales
+
+export interface KnownAddress {
+  address: string;
+  label: string;
+  type: 'exchange' | 'protocol' | 'bundler' | 'vault';
+  source: string;
+}
+
+// Centralized Exchange Addresses
+export const KNOWN_EXCHANGES: KnownAddress[] = [
+  // Binance
+  {
+    address: '5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9',
+    label: 'Binance 2',
+    type: 'exchange',
+    source: 'Solscan labeled'
+  },
+  // Add more as they become publicly known
+];
+
+// DeFi Protocol Addresses (Staking pools, vaults, etc.)
+export const KNOWN_PROTOCOLS: KnownAddress[] = [
+  // Raydium
+  {
+    address: '5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1',
+    label: 'Raydium Authority V4',
+    type: 'protocol',
+    source: 'Solscan labeled'
+  },
+  // Orca
+  {
+    address: '3xQ5vZfpcjLhFWKHNFzJP8SJmBLqpN9Sq5q5K2JmvPuG',
+    label: 'Orca Whirlpool',
+    type: 'protocol',
+    source: 'Solscan labeled'
+  },
+  // Meteora
+  {
+    address: 'LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo',
+    label: 'Meteora Pool',
+    type: 'protocol',
+    source: 'Solscan labeled'
+  },
+];
+
+// Pump.fun Official Addresses
+export const PUMPFUN_ADDRESSES: KnownAddress[] = [
+  {
+    address: 'Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1',
+    label: 'Pump.fun Fee Receiver',
+    type: 'protocol',
+    source: 'Pump.fun documentation'
+  },
+  {
+    address: 'CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM',
+    label: 'Pump.fun Program Authority',
+    type: 'protocol',
+    source: 'Pump.fun documentation'
+  },
+];
+
+// Bundler/Volume Bot Known Patterns
+// These are addresses known to be used by bundling services
+export const KNOWN_BUNDLERS: KnownAddress[] = [
+  // Common bundling service addresses will be added as discovered
+  // Typically identified by wash trading patterns and same-block purchases
+];
+
+// Combine all known addresses
+export const ALL_KNOWN_ADDRESSES: KnownAddress[] = [
+  ...KNOWN_EXCHANGES,
+  ...KNOWN_PROTOCOLS,
+  ...PUMPFUN_ADDRESSES,
+  ...KNOWN_BUNDLERS,
+];
+
+// Quick lookup for address filtering
+export const KNOWN_ADDRESS_SET = new Set(
+  ALL_KNOWN_ADDRESSES.map(a => a.address)
+);
+
+/**
+ * Check if an address is a known exchange/protocol/bundler
+ */
+export function isKnownAddress(address: string): boolean {
+  return KNOWN_ADDRESS_SET.has(address);
+}
+
+/**
+ * Get details about a known address
+ */
+export function getKnownAddressInfo(address: string): KnownAddress | undefined {
+  return ALL_KNOWN_ADDRESSES.find(a => a.address === address);
+}
+
+/**
+ * Detect potential bundled wallets by analyzing transaction timing
+ * Bundlers typically execute multiple buys in the same block (0.4s window)
+ */
+export interface BundleDetectionResult {
+  isBundled: boolean;
+  bundleWallets: string[];
+  bundleSize: number;
+  sameBlockCount: number;
+}
+
+/**
+ * Analyze holders for bundling patterns
+ * Returns addresses that appear to be part of a bundle
+ */
+export function detectBundledWallets(
+  holders: Array<{ address: string; percentage: number }>,
+  transactionData?: Array<{ address: string; blockHeight: number; timestamp: number }>
+): string[] {
+  const bundledAddresses: string[] = [];
+  
+  // If we don't have transaction data, use pattern-based detection
+  if (!transactionData) {
+    // Pattern 1: Multiple holders with suspiciously similar percentages
+    const percentageGroups = new Map<string, string[]>();
+    holders.forEach(holder => {
+      // Round to 2 decimals for grouping
+      const roundedPct = holder.percentage.toFixed(2);
+      if (!percentageGroups.has(roundedPct)) {
+        percentageGroups.set(roundedPct, []);
+      }
+      percentageGroups.get(roundedPct)!.push(holder.address);
+    });
+    
+    // If 3+ holders have exact same percentage, likely bundled
+    percentageGroups.forEach(addresses => {
+      if (addresses.length >= 3) {
+        bundledAddresses.push(...addresses);
+      }
+    });
+    
+    return bundledAddresses;
+  }
+  
+  // With transaction data, detect same-block purchases
+  const blockGroups = new Map<number, string[]>();
+  transactionData.forEach(tx => {
+    if (!blockGroups.has(tx.blockHeight)) {
+      blockGroups.set(tx.blockHeight, []);
+    }
+    blockGroups.get(tx.blockHeight)!.push(tx.address);
+  });
+  
+  // Find blocks with 10+ simultaneous purchases (strong bundle signal)
+  blockGroups.forEach(addresses => {
+    if (addresses.length >= 10) {
+      bundledAddresses.push(...addresses);
+    }
+  });
+  
+  return bundledAddresses;
+}

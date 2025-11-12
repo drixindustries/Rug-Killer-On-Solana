@@ -191,6 +191,30 @@ export interface JupiterPriceData {
   };
 }
 
+// Holder Filtering Metadata
+export interface FilteredAddress {
+  address: string;
+  type: 'lp' | 'exchange' | 'protocol' | 'bundled';
+  label?: string;
+  reason: string;
+}
+
+export interface HolderFilteringMetadata {
+  totals: {
+    lp: number;
+    exchanges: number;
+    protocols: number;
+    bundled: number;
+    total: number;
+  };
+  excluded: FilteredAddress[];
+  bundledDetection?: {
+    strategy: 'percentageMatch' | 'sameBlock' | 'fundingSource';
+    confidence: 'low' | 'medium' | 'high';
+    details?: string;
+  };
+}
+
 // Complete Token Analysis Response
 export interface MarketData {
   priceUsd: number | null;
@@ -224,6 +248,7 @@ export interface TokenAnalysisResponse {
   holderCount: number;
   topHolders: HolderInfo[];
   topHolderConcentration: number;
+  holderFiltering: HolderFilteringMetadata;
   
   // Liquidity
   liquidityPool: LiquidityPoolStatus;
