@@ -110,7 +110,7 @@ export class SolanaTokenAnalyzer {
         freezeAuthority,
         enrichedLiquidity,
         topHolderConcentration,
-        holders.length
+        holderCount
       );
       
       // Calculate overall risk score with safety check
