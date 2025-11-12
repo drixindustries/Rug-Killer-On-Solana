@@ -569,3 +569,121 @@ export const botConfig = pgTable("bot_config", {
 
 export type BotConfig = typeof botConfig.$inferSelect;
 export type InsertBotConfig = typeof botConfig.$inferInsert;
+
+// ============================================================================
+// USER FEATURES TABLES (Option B: Watchlist, Portfolio, Alerts)
+// ============================================================================
+
+// Watchlist entries - users save tokens to track
+export const watchlistEntries = pgTable("watchlist_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenAddress: varchar("token_address", { length: 44 }).notNull(),
+  label: varchar("label", { length: 120 }), // Optional user label/note
+  metadata: jsonb("metadata"), // Cached token name, symbol for quick display
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_watchlist_user").on(table.userId),
+  uniqueIndex("unique_watchlist_user_token").on(table.userId, table.tokenAddress),
+]);
+
+export type WatchlistEntry = typeof watchlistEntries.$inferSelect;
+export type InsertWatchlistEntry = typeof watchlistEntries.$inferInsert;
+
+// Portfolio positions - aggregated holdings per token
+export const portfolioPositions = pgTable("portfolio_positions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenAddress: varchar("token_address", { length: 44 }).notNull(),
+  quantity: decimal("quantity", { precision: 38, scale: 12 }).notNull(),
+  avgCostUsd: decimal("avg_cost_usd", { precision: 24, scale: 8 }), // Average purchase price
+  realizedPnlUsd: decimal("realized_pnl_usd", { precision: 24, scale: 8 }).default("0"),
+  latestPriceUsd: decimal("latest_price_usd", { precision: 24, scale: 8 }), // Cached from price worker
+  unrealizedPnlUsd: decimal("unrealized_pnl_usd", { precision: 24, scale: 8 }), // Cached calculation
+  pnlPct: decimal("pnl_pct", { precision: 10, scale: 4 }), // Percentage gain/loss
+  lastRebalancedAt: timestamp("last_rebalanced_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_portfolio_user").on(table.userId),
+  uniqueIndex("unique_portfolio_user_token").on(table.userId, table.tokenAddress),
+]);
+
+export type PortfolioPosition = typeof portfolioPositions.$inferSelect;
+export type InsertPortfolioPosition = typeof portfolioPositions.$inferInsert;
+
+// Portfolio transactions - detailed transaction history
+export const portfolioTransactions = pgTable("portfolio_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  positionId: varchar("position_id").notNull().references(() => portfolioPositions.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }), // Redundant for filtering
+  txType: varchar("tx_type").notNull(), // "buy", "sell", "airdrop", "manual_adjust"
+  quantity: decimal("quantity", { precision: 38, scale: 12 }).notNull(),
+  priceUsd: decimal("price_usd", { precision: 24, scale: 8 }),
+  feeUsd: decimal("fee_usd", { precision: 24, scale: 8 }).default("0"),
+  note: text("note"), // User notes
+  executedAt: timestamp("executed_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_transaction_user_date").on(table.userId, table.executedAt),
+  index("idx_transaction_position_date").on(table.positionId, table.executedAt),
+]);
+
+export type PortfolioTransaction = typeof portfolioTransactions.$inferSelect;
+export type InsertPortfolioTransaction = typeof portfolioTransactions.$inferInsert;
+
+// Price alerts - user-configured price notifications
+export const priceAlerts = pgTable("price_alerts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenAddress: varchar("token_address", { length: 44 }).notNull(),
+  alertType: varchar("alert_type").notNull(), // "price_above", "price_below", "percent_change", "percent_drop"
+  targetValue: decimal("target_value", { precision: 24, scale: 8 }).notNull(), // Price threshold or percentage
+  lookbackWindowMinutes: integer("lookback_window_minutes"), // For percent_change/percent_drop
+  isActive: boolean("is_active").notNull().default(true),
+  lastPrice: decimal("last_price", { precision: 24, scale: 8 }), // Last checked price
+  triggeredAt: timestamp("triggered_at"), // When alert fired
+  cancelledAt: timestamp("cancelled_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_alerts_active_scan").on(table.isActive, table.alertType, table.tokenAddress),
+  index("idx_alerts_user_status").on(table.userId, table.isActive),
+  uniqueIndex("unique_alert_config").on(table.userId, table.tokenAddress, table.alertType, table.targetValue),
+]);
+
+export type PriceAlert = typeof priceAlerts.$inferSelect;
+export type InsertPriceAlert = typeof priceAlerts.$inferInsert;
+
+// Zod schemas for validation
+export const insertWatchlistSchema = z.object({
+  tokenAddress: z.string().min(32).max(44),
+  label: z.string().max(120).optional(),
+});
+
+export const insertPortfolioPositionSchema = z.object({
+  tokenAddress: z.string().min(32).max(44),
+  quantity: z.string().or(z.number()),
+  avgCostUsd: z.string().or(z.number()).optional(),
+});
+
+export const insertPortfolioTransactionSchema = z.object({
+  tokenAddress: z.string().min(32).max(44), // Will be used to find position
+  txType: z.enum(["buy", "sell", "airdrop", "manual_adjust"]),
+  quantity: z.string().or(z.number()),
+  priceUsd: z.string().or(z.number()).optional(),
+  feeUsd: z.string().or(z.number()).optional(),
+  note: z.string().optional(),
+  executedAt: z.string().or(z.date()).optional(), // ISO string or Date
+});
+
+export const insertPriceAlertSchema = z.object({
+  tokenAddress: z.string().min(32).max(44),
+  alertType: z.enum(["price_above", "price_below", "percent_change", "percent_drop"]),
+  targetValue: z.string().or(z.number()),
+  lookbackWindowMinutes: z.number().int().positive().optional(),
+});
+
+export type InsertWatchlistRequest = z.infer<typeof insertWatchlistSchema>;
+export type InsertPortfolioPositionRequest = z.infer<typeof insertPortfolioPositionSchema>;
+export type InsertPortfolioTransactionRequest = z.infer<typeof insertPortfolioTransactionSchema>;
+export type InsertPriceAlertRequest = z.infer<typeof insertPriceAlertSchema>;
