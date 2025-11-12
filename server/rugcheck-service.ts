@@ -53,8 +53,10 @@ export class RugcheckService {
 
     const markets = (data.markets || []).map((market: any) => ({
       name: market.name || "Unknown",
-      liquidity: market.lp?.lpUSD || 0,
+      marketType: market.marketType || null,
+      liquidity: market.lp?.lpLockedUSD || market.lp?.lpUSD || 0,
       lpBurn: market.lp?.lpBurn || 0,
+      lp: market.lp || null,  // Preserve full LP data for Pump.fun tokens
     }));
 
     const topHolders = (data.topHolders || []).map((holder: any) => ({

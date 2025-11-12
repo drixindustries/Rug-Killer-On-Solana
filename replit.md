@@ -27,8 +27,9 @@ The frontend features a modern, data-dense dashboard using React, TypeScript, Vi
 - **Solana Integration**: Connects to Solana mainnet via a configurable RPC URL (default: public Solana RPC, configurable via `SOLANA_RPC_URL` environment variable for premium providers like Helius/QuickNode/Alchemy).
 - **Data Accuracy Improvements (Nov 2024)**: 
   - **Complete Market Data**: Integrated DexScreener's full market metrics including price (USD/native), market cap, FDV, 24h volume, 24h price change, and 24h transactions (buys/sells). All metrics verified 100% accurate against DexScreener API.
-  - **Actual Holder Counts**: Implemented `getProgramAccounts` RPC method to count ALL token holders, not just top 20. Example: Wonder Sites shows 1,557 holders, Bitty shows 11,828 holders (previously showed only 20).
-  - **Liquidity Data**: DexScreener's most liquid pair used as primary source, with Rugcheck as fallback. Accurately displays USD liquidity values.
+  - **Actual Holder Counts**: Implemented `getProgramAccounts` RPC method to count ALL token holders, not just top 20. Example: Wonder Sites shows 1,557 holders, Bitty shows 11,828 holders. Fixed red flag system to use actual holder counts instead of top 20.
+  - **Pump.fun Liquidity Detection**: Special handling for Pump.fun tokens using `lpLockedPct` (100% locked in bonding curve) instead of `lpBurn` (null until Raydium graduation). Correctly shows liquidity as SAFE with 100% locked status.
+  - **Liquidity Data**: DexScreener's most liquid pair used as primary source, with Rugcheck as fallback. For Pump.fun tokens, uses `lpLockedUSD` from bonding curve. Accurately displays USD liquidity values.
   - **Token Metadata**: Name and symbol fetched from DexScreener instead of on-chain metadata for Pump.fun tokens.
   - **New `marketData` Field**: Normalized market metrics exposed as first-class fields in API response for easy frontend consumption, while preserving raw `dexscreenerData` for advanced use cases.
 - **Authentication & Authorization**: Replit Auth blueprint (Google, GitHub, X, Apple, email/password) integrated with Whop for subscription management and token-gated access. Admin access controlled via ADMIN_EMAILS environment variable.

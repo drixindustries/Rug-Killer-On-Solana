@@ -346,14 +346,27 @@ export class SolanaTokenAnalyzer {
         return (current.liquidity || 0) > (prev.liquidity || 0) ? current : prev;
       });
 
-      maxBurnPercentage = primaryMarket.lpBurn || 0;
+      // Check if this is a Pump.fun token (bonding curve model)
+      const isPumpFun = primaryMarket.marketType === 'pump_fun';
+      
+      // For Pump.fun tokens, use lpLockedPct from the lp object
+      // For regular tokens, use lpBurn field
+      if (isPumpFun && primaryMarket.lp) {
+        maxBurnPercentage = primaryMarket.lp.lpLockedPct || 0;
+        // Use locked USD liquidity for Pump.fun
+        if (!totalLiquidity && primaryMarket.lp.lpLockedUSD) {
+          totalLiquidity = primaryMarket.lp.lpLockedUSD;
+        }
+      } else {
+        maxBurnPercentage = primaryMarket.lpBurn || 0;
+      }
       
       // Use Rugcheck liquidity if DexScreener didn't have it
       if (!totalLiquidity) {
         totalLiquidity = primaryMarket.liquidity;
       }
       
-      // The lpBurn field is already a percentage (0-100)
+      // The percentage is already 0-100
       const isBurned = maxBurnPercentage >= 99.99;
       const isLocked = maxBurnPercentage >= 90;
 
