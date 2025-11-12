@@ -33,6 +33,7 @@ The frontend features a modern, data-dense dashboard using React, TypeScript, Vi
     - **Known Exchanges**: CEX wallets (Binance, etc.) and DeFi protocol addresses (configurable via `known-addresses.ts`)
     - **Bundled Wallets**: Auto-detects coordinated purchases (same-block buys, identical percentages) common in pump schemes
     - **Transparency**: New `holderFiltering` API field exposes all filtered addresses with labels and reasons
+    - **Bundle Visualization**: Interactive pie chart showing holder distribution breakdown (legitimate/LP/exchange/protocol/bundled) with tooltips, summary stats, and confidence-based alerts. Includes edge-case protection for zero holders and negative value prevention.
   - **Pump.fun Liquidity Detection**: Special handling for Pump.fun tokens using `lpLockedPct` (100% locked in bonding curve) instead of `lpBurn` (null until Raydium graduation). Correctly shows liquidity as SAFE with 100% locked status.
   - **Liquidity Data**: DexScreener's most liquid pair used as primary source, with Rugcheck as fallback. For Pump.fun tokens, uses `lpLockedUSD` from bonding curve. Accurately displays USD liquidity values.
   - **Token Metadata**: Name and symbol fetched from DexScreener instead of on-chain metadata for Pump.fun tokens.
