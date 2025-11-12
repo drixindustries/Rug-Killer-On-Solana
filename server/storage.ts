@@ -7,6 +7,9 @@ import {
   walletChallenges,
   kolWallets,
   watchlistEntries,
+  portfolioPositions,
+  portfolioTransactions,
+  priceAlerts,
   type User,
   type UpsertUser,
   type SubscriptionCode,
@@ -22,6 +25,12 @@ import {
   type KolWallet,
   type WatchlistEntry,
   type InsertWatchlistEntry,
+  type PortfolioPosition,
+  type InsertPortfolioPosition,
+  type PortfolioTransaction,
+  type InsertPortfolioTransaction,
+  type PriceAlert,
+  type InsertPriceAlert,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, isNull, lt, inArray, desc, sql } from "drizzle-orm";
@@ -63,6 +72,21 @@ export interface IStorage {
   addToWatchlist(entry: Omit<InsertWatchlistEntry, 'id' | 'createdAt'>): Promise<WatchlistEntry>;
   removeFromWatchlist(userId: string, tokenAddress: string): Promise<void>;
   getWatchlist(userId: string): Promise<WatchlistEntry[]>;
+  
+  // Portfolio operations
+  getPortfolioPositions(userId: string): Promise<PortfolioPosition[]>;
+  getPortfolioPosition(userId: string, tokenAddress: string): Promise<PortfolioPosition | undefined>;
+  recordTransaction(userId: string, tx: Omit<InsertPortfolioTransaction, 'id' | 'positionId' | 'userId' | 'createdAt'>): Promise<{ transaction: PortfolioTransaction; position: PortfolioPosition }>;
+  getTransactionHistory(userId: string, tokenAddress?: string): Promise<PortfolioTransaction[]>;
+  deletePosition(userId: string, tokenAddress: string): Promise<void>;
+  
+  // Price alerts operations
+  createPriceAlert(alert: Omit<InsertPriceAlert, 'id' | 'createdAt'>): Promise<PriceAlert>;
+  getPriceAlerts(userId: string): Promise<PriceAlert[]>;
+  getActivePriceAlerts(): Promise<PriceAlert[]>;
+  updatePriceAlert(alertId: string, data: Partial<InsertPriceAlert>): Promise<PriceAlert>;
+  deletePriceAlert(userId: string, alertId: string): Promise<void>;
+  triggerAlert(alertId: string, currentPrice: number): Promise<PriceAlert>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -474,6 +498,271 @@ export class DatabaseStorage implements IStorage {
       .from(watchlistEntries)
       .where(eq(watchlistEntries.userId, userId))
       .orderBy(desc(watchlistEntries.createdAt));
+  }
+
+  // Portfolio operations
+  async getPortfolioPositions(userId: string): Promise<PortfolioPosition[]> {
+    return await db
+      .select()
+      .from(portfolioPositions)
+      .where(eq(portfolioPositions.userId, userId))
+      .orderBy(desc(portfolioPositions.updatedAt));
+  }
+
+  async getPortfolioPosition(userId: string, tokenAddress: string): Promise<PortfolioPosition | undefined> {
+    const [position] = await db
+      .select()
+      .from(portfolioPositions)
+      .where(
+        and(
+          eq(portfolioPositions.userId, userId),
+          eq(portfolioPositions.tokenAddress, tokenAddress)
+        )
+      );
+    return position;
+  }
+
+  async recordTransaction(
+    userId: string,
+    tx: Omit<InsertPortfolioTransaction, 'id' | 'positionId' | 'userId' | 'createdAt'> & { tokenAddress: string }
+  ): Promise<{ transaction: PortfolioTransaction; position: PortfolioPosition }> {
+    const Decimal = (await import('decimal.js')).default;
+    type DecimalType = InstanceType<typeof Decimal>;
+    
+    // Validate required fields per txType
+    if ((tx.txType === 'buy' || tx.txType === 'sell') && !tx.priceUsd) {
+      throw new Error(`priceUsd is required for ${tx.txType} transactions`);
+    }
+    
+    const quantity = new Decimal(tx.quantity.toString());
+    if (quantity.isZero() || quantity.isNegative()) {
+      throw new Error('Transaction quantity must be positive');
+    }
+
+    // Use database transaction with row-level locking
+    const result = await db.transaction(async (trx) => {
+      // Find or create position with SELECT FOR UPDATE (lock the row)
+      let [position] = await trx
+        .select()
+        .from(portfolioPositions)
+        .where(
+          and(
+            eq(portfolioPositions.userId, userId),
+            eq(portfolioPositions.tokenAddress, tx.tokenAddress)
+          )
+        )
+        .for('update');
+
+      // Create position if doesn't exist
+      if (!position) {
+        [position] = await trx
+          .insert(portfolioPositions)
+          .values({
+            userId,
+            tokenAddress: tx.tokenAddress,
+            quantity: '0',
+            avgCostUsd: null,
+            realizedPnlUsd: '0',
+            latestPriceUsd: null,
+            unrealizedPnlUsd: null,
+            pnlPct: null,
+            lastRebalancedAt: null,
+          })
+          .returning();
+      }
+
+      // Calculate updates using weighted-average cost basis with decimal.js
+      const oldQuantity = new Decimal(position.quantity || '0');
+      const oldAvgCost = position.avgCostUsd ? new Decimal(position.avgCostUsd) : new Decimal(0);
+      const oldRealizedPnl = new Decimal(position.realizedPnlUsd || '0');
+      const txPrice = tx.priceUsd ? new Decimal(tx.priceUsd.toString()) : new Decimal(0);
+      const txFee = tx.feeUsd ? new Decimal(tx.feeUsd.toString()) : new Decimal(0);
+
+      let newQuantity: DecimalType;
+      let newAvgCost: DecimalType | null;
+      let newRealizedPnl: DecimalType;
+
+      switch (tx.txType) {
+        case 'buy':
+          // Weighted average: (oldQty * oldCost + buyQty * buyPrice + fee) / newQty
+          newQuantity = oldQuantity.plus(quantity);
+          const totalCost = oldQuantity.times(oldAvgCost).plus(quantity.times(txPrice)).plus(txFee);
+          newAvgCost = totalCost.div(newQuantity);
+          newRealizedPnl = oldRealizedPnl;
+          break;
+
+        case 'sell':
+          // Validate sufficient holdings
+          if (oldQuantity.lessThan(quantity)) {
+            throw new Error(`Insufficient holdings: have ${oldQuantity.toString()}, trying to sell ${quantity.toString()}`);
+          }
+          
+          // Realized P&L: (sellPrice * sellQty - fee) - (avgCost * sellQty)
+          const proceeds = txPrice.times(quantity).minus(txFee);
+          const costBasis = oldAvgCost.times(quantity);
+          const realizedGain = proceeds.minus(costBasis);
+          
+          newQuantity = oldQuantity.minus(quantity);
+          newRealizedPnl = oldRealizedPnl.plus(realizedGain);
+          
+          // Keep avgCost if position remains, reset to null if fully liquidated
+          newAvgCost = newQuantity.isZero() ? null : oldAvgCost;
+          break;
+
+        case 'airdrop':
+          // Add zero-cost quantity without altering avgCost
+          newQuantity = oldQuantity.plus(quantity);
+          // Weighted average with zero cost: (oldQty * oldCost + qty * 0) / newQty
+          newAvgCost = oldQuantity.isZero() ? new Decimal(0) : oldQuantity.times(oldAvgCost).div(newQuantity);
+          newRealizedPnl = oldRealizedPnl;
+          break;
+
+        case 'manual_adjust':
+          // Direct quantity change, preserve avgCost
+          const adjustment = quantity.times(tx.priceUsd ? new Decimal(tx.priceUsd.toString()) : new Decimal(0));
+          if (adjustment.isNegative()) {
+            // Reduction
+            if (oldQuantity.lessThan(quantity.abs())) {
+              throw new Error('Manual adjustment would result in negative quantity');
+            }
+            newQuantity = oldQuantity.minus(quantity.abs());
+          } else {
+            // Increase
+            newQuantity = oldQuantity.plus(quantity);
+          }
+          newAvgCost = oldAvgCost;
+          newRealizedPnl = oldRealizedPnl;
+          break;
+
+        default:
+          throw new Error(`Unknown transaction type: ${tx.txType}`);
+      }
+
+      // Enforce non-negative balance
+      if (newQuantity.isNegative()) {
+        throw new Error('Transaction would result in negative quantity');
+      }
+
+      // Insert transaction record
+      const [transaction] = await trx
+        .insert(portfolioTransactions)
+        .values({
+          positionId: position.id,
+          userId,
+          txType: tx.txType,
+          quantity: quantity.toFixed(12),
+          priceUsd: tx.priceUsd ? txPrice.toFixed(8) : null,
+          feeUsd: txFee.toFixed(8),
+          note: tx.note || null,
+          executedAt: tx.executedAt || new Date(),
+        })
+        .returning();
+
+      // Update position (unrealized P&L will be calculated by price worker)
+      const [updatedPosition] = await trx
+        .update(portfolioPositions)
+        .set({
+          quantity: newQuantity.toFixed(12),
+          avgCostUsd: newAvgCost ? newAvgCost.toFixed(8) : null,
+          realizedPnlUsd: newRealizedPnl.toFixed(8),
+          updatedAt: new Date(),
+        })
+        .where(eq(portfolioPositions.id, position.id))
+        .returning();
+
+      return { transaction, position: updatedPosition };
+    });
+
+    return result;
+  }
+
+  async getTransactionHistory(userId: string, tokenAddress?: string): Promise<PortfolioTransaction[]> {
+    if (tokenAddress) {
+      // Get position first to filter by positionId
+      const position = await this.getPortfolioPosition(userId, tokenAddress);
+      if (!position) return [];
+      
+      return await db
+        .select()
+        .from(portfolioTransactions)
+        .where(eq(portfolioTransactions.positionId, position.id))
+        .orderBy(desc(portfolioTransactions.executedAt));
+    }
+    
+    return await db
+      .select()
+      .from(portfolioTransactions)
+      .where(eq(portfolioTransactions.userId, userId))
+      .orderBy(desc(portfolioTransactions.executedAt));
+  }
+
+  async deletePosition(userId: string, tokenAddress: string): Promise<void> {
+    await db
+      .delete(portfolioPositions)
+      .where(
+        and(
+          eq(portfolioPositions.userId, userId),
+          eq(portfolioPositions.tokenAddress, tokenAddress)
+        )
+      );
+    // Transactions cascade delete via FK
+  }
+
+  // Price alerts operations
+  async createPriceAlert(alert: Omit<InsertPriceAlert, 'id' | 'createdAt'>): Promise<PriceAlert> {
+    const [priceAlert] = await db
+      .insert(priceAlerts)
+      .values(alert)
+      .returning();
+    return priceAlert;
+  }
+
+  async getPriceAlerts(userId: string): Promise<PriceAlert[]> {
+    return await db
+      .select()
+      .from(priceAlerts)
+      .where(eq(priceAlerts.userId, userId))
+      .orderBy(desc(priceAlerts.createdAt));
+  }
+
+  async getActivePriceAlerts(): Promise<PriceAlert[]> {
+    return await db
+      .select()
+      .from(priceAlerts)
+      .where(eq(priceAlerts.isActive, true));
+  }
+
+  async updatePriceAlert(alertId: string, data: Partial<InsertPriceAlert>): Promise<PriceAlert> {
+    const [updated] = await db
+      .update(priceAlerts)
+      .set(data)
+      .where(eq(priceAlerts.id, alertId))
+      .returning();
+    return updated;
+  }
+
+  async deletePriceAlert(userId: string, alertId: string): Promise<void> {
+    await db
+      .delete(priceAlerts)
+      .where(
+        and(
+          eq(priceAlerts.id, alertId),
+          eq(priceAlerts.userId, userId)
+        )
+      );
+  }
+
+  async triggerAlert(alertId: string, currentPrice: number): Promise<PriceAlert> {
+    const [updated] = await db
+      .update(priceAlerts)
+      .set({
+        isActive: false,
+        triggeredAt: new Date(),
+        lastPrice: currentPrice.toString(),
+      })
+      .where(eq(priceAlerts.id, alertId))
+      .returning();
+    return updated;
   }
 }
 

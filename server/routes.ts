@@ -793,6 +793,182 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // ============================================================================
+  // PORTFOLIO ROUTES
+  // ============================================================================
+  
+  // GET /api/portfolio/positions - Get user's portfolio positions
+  app.get('/api/portfolio/positions', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const positions = await storage.getPortfolioPositions(userId);
+      res.json(positions);
+    } catch (error: any) {
+      console.error("Error fetching portfolio:", error);
+      res.status(500).json({ message: "Failed to fetch portfolio: " + error.message });
+    }
+  });
+  
+  // POST /api/portfolio/transactions - Record a new transaction
+  app.post('/api/portfolio/transactions', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { insertPortfolioTransactionSchema } = await import('@shared/schema');
+      
+      const result = insertPortfolioTransactionSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          message: "Invalid request",
+          errors: result.error.errors,
+        });
+      }
+      
+      const { tokenAddress, txType, quantity, priceUsd, feeUsd, note, executedAt } = result.data;
+      
+      const txResult = await storage.recordTransaction(userId, {
+        tokenAddress,
+        txType,
+        quantity,
+        priceUsd,
+        feeUsd,
+        note,
+        executedAt: executedAt ? new Date(executedAt) : new Date(),
+      });
+      
+      res.status(201).json(txResult);
+    } catch (error: any) {
+      console.error("Error recording transaction:", error);
+      
+      if (error.message?.includes('Insufficient holdings') || 
+          error.message?.includes('negative quantity')) {
+        return res.status(400).json({ message: error.message });
+      }
+      
+      res.status(500).json({ message: "Failed to record transaction: " + error.message });
+    }
+  });
+  
+  // GET /api/portfolio/transactions - Get transaction history
+  app.get('/api/portfolio/transactions', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const tokenAddress = req.query.tokenAddress as string | undefined;
+      
+      const transactions = await storage.getTransactionHistory(userId, tokenAddress);
+      res.json(transactions);
+    } catch (error: any) {
+      console.error("Error fetching transactions:", error);
+      res.status(500).json({ message: "Failed to fetch transactions: " + error.message });
+    }
+  });
+  
+  // DELETE /api/portfolio/positions/:tokenAddress - Delete a position
+  app.delete('/api/portfolio/positions/:tokenAddress', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { tokenAddress } = req.params;
+      
+      await storage.deletePosition(userId, tokenAddress);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Error deleting position:", error);
+      res.status(500).json({ message: "Failed to delete position: " + error.message });
+    }
+  });
+  
+  // ============================================================================
+  // PRICE ALERTS ROUTES
+  // ============================================================================
+  
+  // GET /api/alerts - Get user's price alerts
+  app.get('/api/alerts', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const alerts = await storage.getPriceAlerts(userId);
+      res.json(alerts);
+    } catch (error: any) {
+      console.error("Error fetching alerts:", error);
+      res.status(500).json({ message: "Failed to fetch alerts: " + error.message });
+    }
+  });
+  
+  // POST /api/alerts - Create a new price alert
+  app.post('/api/alerts', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { insertPriceAlertSchema } = await import('@shared/schema');
+      
+      const result = insertPriceAlertSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          message: "Invalid request",
+          errors: result.error.errors,
+        });
+      }
+      
+      const { tokenAddress, alertType, targetValue, lookbackWindowMinutes } = result.data;
+      
+      const alert = await storage.createPriceAlert({
+        userId,
+        tokenAddress,
+        alertType,
+        targetValue,
+        lookbackWindowMinutes,
+        isActive: true,
+        lastPrice: null,
+        triggeredAt: null,
+        cancelledAt: null,
+      });
+      
+      res.status(201).json(alert);
+    } catch (error: any) {
+      console.error("Error creating alert:", error);
+      
+      if (error.message?.includes('unique constraint') || error.code === '23505') {
+        return res.status(409).json({ 
+          message: "You already have this alert configured" 
+        });
+      }
+      
+      res.status(500).json({ message: "Failed to create alert: " + error.message });
+    }
+  });
+  
+  // PATCH /api/alerts/:id - Update alert (toggle active/inactive)
+  app.patch('/api/alerts/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { isActive } = req.body;
+      
+      // Verify ownership
+      const alerts = await storage.getPriceAlerts(userId);
+      if (!alerts.find(a => a.id === id)) {
+        return res.status(404).json({ message: "Alert not found" });
+      }
+      
+      const updated = await storage.updatePriceAlert(id, { isActive });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating alert:", error);
+      res.status(500).json({ message: "Failed to update alert: " + error.message });
+    }
+  });
+  
+  // DELETE /api/alerts/:id - Delete alert
+  app.delete('/api/alerts/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      await storage.deletePriceAlert(userId, id);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Error deleting alert:", error);
+      res.status(500).json({ message: "Failed to delete alert: " + error.message });
+    }
+  });
+  
   // POST /api/analyze-token - Analyze a Solana token for rug pull risks
   // PROTECTED: Requires active subscription OR 10M+ tokens
   app.post("/api/analyze-token", hasActiveAccess, async (req, res) => {
@@ -847,6 +1023,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       return res.status(500).json({
         error: "Analysis failed",
+        message: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    }
+  });
+
+  // POST /api/compare-tokens - Compare multiple tokens side-by-side
+  // Validation schema: accept array of 2-5 token addresses
+  const compareTokensSchema = z.object({
+    tokenAddresses: z.array(z.string().min(32).max(44)).min(2).max(5),
+  });
+
+  app.post("/api/compare-tokens", async (req, res) => {
+    try {
+      // Validate request body
+      const result = compareTokensSchema.safeParse(req.body);
+      
+      if (!result.success) {
+        return res.status(400).json({
+          error: "Invalid request",
+          details: result.error.errors,
+          message: "Please provide 2-5 valid token addresses",
+        });
+      }
+
+      const { tokenAddresses } = result.data;
+
+      // Analyze each token in parallel
+      const analysisPromises = tokenAddresses.map(async (tokenAddress) => {
+        try {
+          const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+          
+          // Get userId if authenticated (optional)
+          const userId = (req as any).user?.claims?.sub;
+          
+          // Run AI blacklist analysis in background (don't block response)
+          if (userId) {
+            blacklist.analyzeAndFlag(analysis, userId).catch(err => {
+              console.error("Background blacklist analysis error:", err);
+            });
+          }
+          
+          // Check if mint/freeze authority is blacklisted
+          const blacklistChecks = await Promise.all([
+            analysis.mintAuthority.authorityAddress 
+              ? blacklist.checkBlacklist(analysis.mintAuthority.authorityAddress)
+              : Promise.resolve({ isBlacklisted: false, severity: 0, labels: [], warnings: [] }),
+            analysis.freezeAuthority.authorityAddress
+              ? blacklist.checkBlacklist(analysis.freezeAuthority.authorityAddress)
+              : Promise.resolve({ isBlacklisted: false, severity: 0, labels: [], warnings: [] }),
+            blacklist.checkBlacklist(tokenAddress),
+          ]);
+          
+          return {
+            ...analysis,
+            blacklistInfo: {
+              mintAuthority: blacklistChecks[0],
+              freezeAuthority: blacklistChecks[1],
+              token: blacklistChecks[2],
+            },
+          };
+        } catch (error) {
+          console.error(`Error analyzing token ${tokenAddress}:`, error);
+          // Return error object for this specific token
+          return {
+            tokenAddress,
+            error: true,
+            message: error instanceof Error ? error.message : "Analysis failed",
+          };
+        }
+      });
+
+      // Wait for all analyses to complete
+      const results = await Promise.all(analysisPromises);
+
+      return res.json({
+        comparisons: results,
+        comparedAt: Date.now(),
+      });
+    } catch (error) {
+      console.error("Token comparison error:", error);
+      
+      return res.status(500).json({
+        error: "Comparison failed",
         message: error instanceof Error ? error.message : "Unknown error occurred",
       });
     }

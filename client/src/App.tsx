@@ -18,6 +18,9 @@ import AdminWallet from "@/pages/admin-wallet";
 import Admin from "@/pages/admin";
 import BotSetup from "@/pages/bot-setup";
 import Watchlist from "@/pages/watchlist";
+import Portfolio from "@/pages/portfolio";
+import Alerts from "@/pages/alerts";
+import Comparison from "@/pages/comparison";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -31,6 +34,9 @@ function Router() {
       <Route path="/features" component={Features} />
       <Route path="/bot-setup" component={BotSetup} />
       <Route path="/watchlist" component={Watchlist} />
+      <Route path="/portfolio" component={Portfolio} />
+      <Route path="/alerts" component={Alerts} />
+      <Route path="/compare" component={Comparison} />
       <Route path="/documentation" component={Documentation} />
       <Route path="/about" component={About} />
       <Route path="/terms" component={Terms} />

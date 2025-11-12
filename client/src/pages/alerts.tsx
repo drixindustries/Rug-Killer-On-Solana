@@ -1,0 +1,257 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Plus, Trash2, Bell, BellOff } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import type { PriceAlert } from "@shared/schema";
+
+export default function Alerts() {
+  const { toast } = useToast();
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+
+  // Fetch alerts
+  const { data: alerts = [], isLoading } = useQuery<PriceAlert[]>({
+    queryKey: ['/api/alerts'],
+  });
+
+  // Create alert mutation
+  const createAlert = useMutation({
+    mutationFn: async (data: any) => {
+      return apiRequest('/api/alerts', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/alerts'] });
+      setIsAddDialogOpen(false);
+      toast({ title: "Alert created", description: "You'll be notified when conditions are met" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Toggle alert mutation
+  const toggleAlert = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      return apiRequest(`/api/alerts/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isActive }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/alerts'] });
+      toast({ title: "Alert updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Delete alert mutation
+  const deleteAlert = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/alerts/${id}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/alerts'] });
+      toast({ title: "Alert deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const alertType = formData.get('alertType') as string;
+    
+    const data: any = {
+      tokenAddress: formData.get('tokenAddress'),
+      alertType,
+      targetValue: formData.get('targetValue'),
+    };
+
+    if (alertType === 'percent_change' || alertType === 'percent_drop') {
+      data.lookbackWindowMinutes = parseInt(formData.get('lookbackWindowMinutes') as string);
+    }
+    
+    createAlert.mutate(data);
+  };
+
+  const activeCount = alerts.filter(a => a.isActive).length;
+  const triggeredCount = alerts.filter(a => a.triggeredAt).length;
+
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold" data-testid="title-alerts">Price Alerts</h1>
+          <p className="text-muted-foreground">Get notified when token prices hit your targets</p>
+        </div>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-create-alert">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Alert
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Price Alert</DialogTitle>
+              <DialogDescription>
+                Set up notifications for price movements
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="tokenAddress">Token Address</Label>
+                <Input id="tokenAddress" name="tokenAddress" required data-testid="input-token-address" />
+              </div>
+              <div>
+                <Label htmlFor="alertType">Alert Type</Label>
+                <Select name="alertType" required>
+                  <SelectTrigger data-testid="select-alert-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="price_above">Price Above</SelectItem>
+                    <SelectItem value="price_below">Price Below</SelectItem>
+                    <SelectItem value="percent_change">Percent Change</SelectItem>
+                    <SelectItem value="percent_drop">Percent Drop</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="targetValue">Target Value (price or %)</Label>
+                <Input id="targetValue" name="targetValue" type="number" step="any" required data-testid="input-target-value" />
+              </div>
+              <div>
+                <Label htmlFor="lookbackWindowMinutes">Lookback Window (minutes, for % alerts)</Label>
+                <Input id="lookbackWindowMinutes" name="lookbackWindowMinutes" type="number" defaultValue="60" data-testid="input-lookback" />
+              </div>
+              <Button type="submit" className="w-full" disabled={createAlert.isPending} data-testid="button-submit-alert">
+                {createAlert.isPending ? "Creating..." : "Create Alert"}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Alerts</CardTitle>
+            <Bell className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-total-alerts">{alerts.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active</CardTitle>
+            <Bell className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-500" data-testid="text-active-alerts">{activeCount}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Triggered</CardTitle>
+            <BellOff className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-triggered-alerts">{triggeredCount}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Alerts</CardTitle>
+          <CardDescription>Manage your price alert notifications</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <p className="text-muted-foreground">Loading alerts...</p>
+          ) : alerts.length === 0 ? (
+            <p className="text-muted-foreground" data-testid="text-empty-alerts">No alerts configured. Create one to get started.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Token</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Target</TableHead>
+                  <TableHead>Last Price</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {alerts.map((alert) => {
+                  const isTriggered = !!alert.triggeredAt;
+                  const statusColor = isTriggered ? 'text-muted-foreground' : 
+                                     alert.isActive ? 'text-green-500' : 'text-orange-500';
+
+                  return (
+                    <TableRow key={alert.id} data-testid={`row-alert-${alert.id}`}>
+                      <TableCell className="font-mono text-xs">{alert.tokenAddress.slice(0, 8)}...</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{alert.alertType.replace('_', ' ')}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {alert.alertType.includes('percent') 
+                          ? `${parseFloat(alert.targetValue).toFixed(1)}%`
+                          : `$${parseFloat(alert.targetValue).toFixed(4)}`}
+                      </TableCell>
+                      <TableCell>
+                        {alert.lastPrice ? `$${parseFloat(alert.lastPrice).toFixed(4)}` : '-'}
+                      </TableCell>
+                      <TableCell className={statusColor}>
+                        {isTriggered ? 'Triggered' : alert.isActive ? 'Active' : 'Paused'}
+                      </TableCell>
+                      <TableCell>{new Date(alert.createdAt!).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2 items-center">
+                          <Switch
+                            checked={alert.isActive && !isTriggered}
+                            disabled={isTriggered}
+                            onCheckedChange={(checked) => toggleAlert.mutate({ id: alert.id, isActive: checked })}
+                            data-testid={`switch-toggle-${alert.id}`}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteAlert.mutate(alert.id)}
+                            data-testid={`button-delete-${alert.id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
