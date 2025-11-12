@@ -18,6 +18,7 @@ import { BubbleMapsCard } from "@/components/bubblemaps-card";
 import { TokenInfoSidebar } from "@/components/token-info-sidebar";
 import { LiquidityBurnCard } from "@/components/liquidity-burn-card";
 import { HolderFilteringCard } from "@/components/holder-filtering-card";
+import { BundleVisualizationChart } from "@/components/bundle-visualization-chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -201,6 +202,14 @@ export default function Home() {
                       bundledCount={analysis.holderFiltering?.totals.bundled}
                       bundleConfidence={analysis.holderFiltering?.bundledDetection?.confidence}
                     />
+
+                    {/* Bundle Visualization Chart */}
+                    {analysis.holderFiltering && analysis.holderFiltering.totals.total > 0 && (
+                      <BundleVisualizationChart 
+                        filtering={analysis.holderFiltering}
+                        totalHolders={analysis.holderCount || 0}
+                      />
+                    )}
 
                     {/* Holder Filtering Details */}
                     {analysis.holderFiltering && analysis.holderFiltering.totals.total > 0 && (
