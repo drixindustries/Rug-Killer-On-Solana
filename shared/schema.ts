@@ -192,6 +192,21 @@ export interface JupiterPriceData {
 }
 
 // Complete Token Analysis Response
+export interface MarketData {
+  priceUsd: number | null;
+  priceNative: number | null;
+  marketCap: number | null;
+  fdv: number | null;
+  volume24h: number | null;
+  priceChange24h: number | null;
+  txns24h: { buys: number; sells: number } | null;
+  liquidityUsd: number | null;
+  source: 'dexscreener' | 'rugcheck' | null;
+  pairAddress?: string | null;
+  dexId?: string | null;
+  updatedAt?: number | null;
+}
+
 export interface TokenAnalysisResponse {
   tokenAddress: string;
   riskScore: number;
@@ -213,6 +228,9 @@ export interface TokenAnalysisResponse {
   // Liquidity
   liquidityPool: LiquidityPoolStatus;
   
+  // Market data (normalized from DexScreener/Rugcheck)
+  marketData?: MarketData;
+  
   // Transactions
   recentTransactions: TransactionInfo[];
   suspiciousActivityDetected: boolean;
@@ -223,7 +241,7 @@ export interface TokenAnalysisResponse {
   // Creation info
   creationDate?: number;
   
-  // External API data
+  // External API data (raw for debugging)
   rugcheckData?: RugcheckData;
   goplusData?: GoPlusSecurityData;
   dexscreenerData?: DexScreenerData;

@@ -44,14 +44,11 @@ export class SolanaTokenAnalyzer {
       const mintAuthority = this.analyzeMintAuthority(mintInfo.mintAuthority);
       const freezeAuthority = this.analyzeFreezeAuthority(mintInfo.freezeAuthority);
       
-      // Fetch token accounts (holders) from on-chain
-      const onChainHolders = await this.fetchTopHolders(mintPubkey, mintInfo.decimals, mintInfo.supply);
-      
-      // Get recent transactions (simplified for MVP)
-      const recentTransactions = await this.fetchRecentTransactions(mintPubkey);
-      
-      // Fetch external API data (non-blocking, in parallel)
-      const [rugcheckData, goplusData, dexscreenerData, jupiterPriceData] = await Promise.all([
+      // Fetch token accounts (holders) from on-chain and external APIs in parallel
+      const [onChainHolders, totalHolderCount, recentTransactions, rugcheckData, goplusData, dexscreenerData, jupiterPriceData] = await Promise.all([
+        this.fetchTopHolders(mintPubkey, mintInfo.decimals, mintInfo.supply),
+        this.getTotalHolderCount(mintPubkey).catch(() => null),
+        this.fetchRecentTransactions(mintPubkey),
         this.rugcheckService.getTokenReport(tokenAddress).catch(() => null),
         this.goplusService.getTokenSecurity(tokenAddress).catch(() => null),
         this.dexscreenerService.getTokenData(tokenAddress).catch(() => null),
@@ -68,10 +65,9 @@ export class SolanaTokenAnalyzer {
             percentage: h.pct || 0,
           }));
       
-      // Get holder count
-      // Note: With free RPC, on-chain fetch often fails (429 rate limit)
-      // Rugcheck provides top 20 holders - accurate total count requires premium RPC
-      const holderCount = holders.length;
+      // Get actual total holder count (not just top 20)
+      // Use getProgramAccounts result if available, otherwise fallback to top holders length
+      const holderCount = totalHolderCount || holders.length;
       
       // Calculate holder concentration with safety check
       const topHolderConcentration = Math.min(100, Math.max(0, 
@@ -92,7 +88,7 @@ export class SolanaTokenAnalyzer {
       const supply = Number(mintInfo.supply);
       const safeSupply = isNaN(supply) || !isFinite(supply) ? 0 : supply;
       
-      // Get most liquid pair from DexScreener for metadata
+      // Get most liquid pair from DexScreener for metadata and market data
       const dexService = new DexScreenerService();
       const primaryPair = dexscreenerData ? dexService.getMostLiquidPair(dexscreenerData) : null;
       
@@ -104,6 +100,9 @@ export class SolanaTokenAnalyzer {
         hasMetadata: !!(primaryPair?.baseToken?.name),
         isMutable: mintAuthority.hasAuthority,
       };
+      
+      // Build market data from DexScreener primary pair
+      const marketData = this.buildMarketData(primaryPair, rugcheckData);
       
       // Calculate risk flags (use enriched liquidity for accurate risk assessment)
       const redFlags = this.calculateRiskFlags(
@@ -134,6 +133,7 @@ export class SolanaTokenAnalyzer {
         topHolders: holders,
         topHolderConcentration: isNaN(topHolderConcentration) ? 0 : topHolderConcentration,
         liquidityPool: enrichedLiquidity,
+        marketData,
         recentTransactions,
         suspiciousActivityDetected: recentTransactions.some(tx => tx.suspicious),
         redFlags,
@@ -234,6 +234,44 @@ export class SolanaTokenAnalyzer {
     }
   }
 
+  private async getTotalHolderCount(mintPubkey: PublicKey): Promise<number | null> {
+    try {
+      // Use getProgramAccounts to count ALL token holders (expensive call)
+      const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+      
+      const accounts = await this.connection.getProgramAccounts(
+        TOKEN_PROGRAM_ID,
+        {
+          filters: [
+            { dataSize: 165 }, // Token account data size
+            { 
+              memcmp: { 
+                offset: 0, 
+                bytes: mintPubkey.toBase58() 
+              } 
+            }
+          ],
+        }
+      );
+      
+      // Filter out accounts with 0 balance
+      const nonZeroAccounts = accounts.filter(account => {
+        const data = account.account.data;
+        if (Buffer.isBuffer(data)) {
+          // Read amount from token account (bytes 64-72)
+          const amount = data.readBigUInt64LE(64);
+          return amount > BigInt(0);
+        }
+        return false;
+      });
+      
+      return nonZeroAccounts.length;
+    } catch (error) {
+      console.error("Error fetching total holder count:", error);
+      return null;
+    }
+  }
+
   private analyzeLiquidity(topHolderConcentration: number): LiquidityPoolStatus {
     // Early on-chain analysis - status remains UNKNOWN until enriched with external data
     // Holder concentration is separate concern and handled in holder-specific flags
@@ -242,6 +280,37 @@ export class SolanaTokenAnalyzer {
       status: "UNKNOWN",
       // Don't set isBurned, isLocked, or burnPercentage here
       // They will be enriched with real data if available from Rugcheck/DexScreener
+    };
+  }
+
+  private buildMarketData(primaryPair: any, rugcheckData: any) {
+    if (!primaryPair) {
+      return undefined;
+    }
+
+    // Safely parse numeric strings from DexScreener
+    const parseNumeric = (value: any): number | null => {
+      if (value === null || value === undefined) return null;
+      const num = typeof value === 'string' ? parseFloat(value) : value;
+      return isNaN(num) || !isFinite(num) ? null : num;
+    };
+
+    return {
+      priceUsd: parseNumeric(primaryPair.priceUsd),
+      priceNative: parseNumeric(primaryPair.priceNative),
+      marketCap: parseNumeric(primaryPair.marketCap),
+      fdv: parseNumeric(primaryPair.fdv),
+      volume24h: parseNumeric(primaryPair.volume?.h24),
+      priceChange24h: parseNumeric(primaryPair.priceChange?.h24),
+      txns24h: primaryPair.txns?.h24 ? {
+        buys: primaryPair.txns.h24.buys || 0,
+        sells: primaryPair.txns.h24.sells || 0,
+      } : null,
+      liquidityUsd: parseNumeric(primaryPair.liquidity?.usd),
+      source: 'dexscreener' as const,
+      pairAddress: primaryPair.pairAddress || null,
+      dexId: primaryPair.dexId || null,
+      updatedAt: Date.now(),
     };
   }
 
