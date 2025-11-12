@@ -154,7 +154,7 @@ export default function Pricing() {
   };
 
   const handleFreeTrial = () => {
-    window.location.href = '/api/login';
+    window.location.href = '/';
   };
 
   const handleSubscribe = (tier: 'individual' | 'group') => {

@@ -14,10 +14,10 @@ export default function Landing() {
             <span className="font-semibold text-xl">Solana Rug Killer</span>
           </div>
           <Button 
-            onClick={() => window.location.href = '/api/login'}
-            data-testid="button-login"
+            onClick={() => window.location.href = '/'}
+            data-testid="button-get-started-header"
           >
-            Log In
+            Analyze Tokens
           </Button>
         </div>
       </header>
@@ -40,10 +40,10 @@ export default function Landing() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
               <Button 
                 size="lg"
-                onClick={() => window.location.href = '/api/login'}
+                onClick={() => window.location.href = '/'}
                 data-testid="button-get-started"
               >
-                Start Free Trial
+                Start Analyzing Now
               </Button>
               <Button 
                 size="lg"
@@ -57,15 +57,15 @@ export default function Landing() {
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center pt-6 text-sm text-muted-foreground">
               <div className="flex items-center gap-2" data-testid="badge-free-trial">
                 <Shield className="w-4 h-4 text-green-500" />
-                <span>7-day free trial</span>
+                <span>100% Free & Open</span>
               </div>
               <div className="flex items-center gap-2" data-testid="badge-no-credit-card">
                 <Shield className="w-4 h-4 text-green-500" />
-                <span>No credit card required</span>
+                <span>No signup required</span>
               </div>
               <div className="flex items-center gap-2" data-testid="badge-cancel-anytime">
                 <Shield className="w-4 h-4 text-green-500" />
-                <span>Cancel anytime</span>
+                <span>Instant results</span>
               </div>
             </div>
             <div className="max-w-2xl mx-auto pt-8">

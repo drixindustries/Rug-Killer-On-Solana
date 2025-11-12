@@ -554,8 +554,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
   
   // GET /api/bot/invite-links - Get Telegram and Discord bot invite links
-  // PROTECTED: Requires active subscription OR 10M+ tokens
-  app.get('/api/bot/invite-links', hasActiveAccess, async (req: any, res) => {
+  // OPEN ACCESS - No authentication required
+  app.get('/api/bot/invite-links', async (req: any, res) => {
     try {
       const links: { telegram?: string; discord?: string; message: string } = {
         message: "You have access to premium bot features!",
