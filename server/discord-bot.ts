@@ -178,11 +178,10 @@ const commands = [
 // ============================================================================
 
 function createDiscordClient(botToken: string, clientId: string): Client {
+  // Only use Guilds intent - slash commands don't need message content
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildMessages,
-      GatewayIntentBits.MessageContent,
     ],
   });
   
