@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { Users, Coins, Droplet, Calendar, TrendingUp, Wallet } from "lucide-react";
+import { Users, Coins, Droplet, Calendar, TrendingUp, Wallet, AlertTriangle } from "lucide-react";
 
 interface MetricsGridProps {
   totalSupply: number;
@@ -8,6 +8,8 @@ interface MetricsGridProps {
   liquidityStatus: string;
   creationDate?: number;
   decimals: number;
+  bundledCount?: number;
+  bundleConfidence?: 'low' | 'medium' | 'high';
 }
 
 export function MetricsGrid({
@@ -17,12 +19,27 @@ export function MetricsGrid({
   liquidityStatus,
   creationDate,
   decimals,
+  bundledCount = 0,
+  bundleConfidence,
 }: MetricsGridProps) {
   const formatNumber = (num: number) => {
     if (num >= 1e9) return `${(num / 1e9).toFixed(2)}B`;
     if (num >= 1e6) return `${(num / 1e6).toFixed(2)}M`;
     if (num >= 1e3) return `${(num / 1e3).toFixed(2)}K`;
     return num.toFixed(2);
+  };
+
+  const getBundleSecondaryText = () => {
+    if (bundledCount === 0) {
+      return "No suspicious bundles detected";
+    }
+    if (bundleConfidence === 'high') {
+      return `High confidence detection`;
+    }
+    if (bundleConfidence === 'medium') {
+      return `Medium confidence detection`;
+    }
+    return `Low confidence detection`;
   };
 
   const metrics = [
@@ -48,6 +65,14 @@ export function MetricsGrid({
       testId: "metric-concentration",
     },
     {
+      icon: AlertTriangle,
+      label: "Bundled Wallets",
+      value: bundledCount.toLocaleString(),
+      secondary: getBundleSecondaryText(),
+      testId: "metric-bundled-wallets",
+      warning: bundledCount > 0,
+    },
+    {
       icon: Droplet,
       label: "Liquidity Pool",
       value: liquidityStatus,
@@ -60,13 +85,6 @@ export function MetricsGrid({
       value: creationDate ? new Date(creationDate).toLocaleDateString() : "Unknown",
       secondary: creationDate ? getTimeAgo(creationDate) : "",
       testId: "metric-creation-date",
-    },
-    {
-      icon: Wallet,
-      label: "Token Program",
-      value: "SPL Token",
-      secondary: "Solana standard",
-      testId: "metric-token-program",
     },
   ];
 
@@ -86,21 +104,26 @@ export function MetricsGrid({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {metrics.map((metric) => {
         const Icon = metric.icon;
+        const isWarning = 'warning' in metric && metric.warning;
         return (
-          <Card key={metric.label} className="p-6" data-testid={metric.testId}>
+          <Card 
+            key={metric.label} 
+            className={`p-6 ${isWarning ? 'border-orange-500/50' : ''}`}
+            data-testid={metric.testId}
+          >
             <div className="flex items-start gap-4">
-              <div className="p-2 rounded-md bg-primary/10">
-                <Icon className="h-5 w-5 text-primary" />
+              <div className={`p-2 rounded-md ${isWarning ? 'bg-orange-500/10' : 'bg-primary/10'}`}>
+                <Icon className={`h-5 w-5 ${isWarning ? 'text-orange-500' : 'text-primary'}`} />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
                   {metric.label}
                 </p>
-                <p className="text-xl font-semibold mt-1" data-testid={`${metric.testId}-value`}>
+                <p className={`text-xl font-semibold mt-1 ${isWarning ? 'text-orange-500' : ''}`} data-testid={`${metric.testId}-value`}>
                   {metric.value}
                 </p>
                 {metric.secondary && (
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className={`text-xs mt-1 ${isWarning ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground'}`}>
                     {metric.secondary}
                   </p>
                 )}

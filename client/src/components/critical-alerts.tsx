@@ -1,13 +1,30 @@
 import { Card } from "@/components/ui/card";
-import { AlertTriangle, Lock, Shield, Droplet } from "lucide-react";
-import type { RiskFlag } from "@shared/schema";
+import { AlertTriangle, Lock, Shield, Droplet, Users } from "lucide-react";
+import type { RiskFlag, HolderFilteringMetadata } from "@shared/schema";
 
 interface CriticalAlertsProps {
   redFlags: RiskFlag[];
+  holderFiltering?: HolderFilteringMetadata;
 }
 
-export function CriticalAlerts({ redFlags }: CriticalAlertsProps) {
-  if (redFlags.length === 0) {
+export function CriticalAlerts({ redFlags, holderFiltering }: CriticalAlertsProps) {
+  // Check for bundle warnings
+  const bundleWarning = holderFiltering && holderFiltering.totals.bundled > 0 && holderFiltering.bundledDetection 
+    ? {
+        type: 'bundled_wallets' as const,
+        severity: holderFiltering.totals.bundled >= 5 
+          ? 'high' as const
+          : holderFiltering.bundledDetection.confidence === 'high'
+            ? 'high' as const
+            : 'medium' as const,
+        title: `${holderFiltering.totals.bundled} Bundled Wallet${holderFiltering.totals.bundled > 1 ? 's' : ''} Detected`,
+        description: `Detected coordinated wallet activity with ${holderFiltering.bundledDetection.confidence} confidence. ${holderFiltering.bundledDetection.details}. This may indicate manipulation or coordinated pump schemes.`,
+      }
+    : null;
+
+  const allAlerts = bundleWarning ? [...redFlags, bundleWarning] : redFlags;
+
+  if (allAlerts.length === 0) {
     return (
       <Card className="p-6" data-testid="card-no-alerts">
         <div className="flex items-center gap-3 text-green-600">
@@ -29,6 +46,8 @@ export function CriticalAlerts({ redFlags }: CriticalAlertsProps) {
         return <Lock className="h-5 w-5" />;
       case "low_liquidity":
         return <Droplet className="h-5 w-5" />;
+      case "bundled_wallets":
+        return <Users className="h-5 w-5" />;
       default:
         return <Shield className="h-5 w-5" />;
     }
@@ -50,7 +69,7 @@ export function CriticalAlerts({ redFlags }: CriticalAlertsProps) {
   return (
     <div className="space-y-2">
       <h2 className="text-xl font-semibold mb-4">Critical Alerts</h2>
-      {redFlags.map((flag, index) => (
+      {allAlerts.map((flag, index) => (
         <Card
           key={index}
           className={`p-4 ${getSeverityColor(flag.severity)}`}

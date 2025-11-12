@@ -17,6 +17,7 @@ import { MarketDataCard } from "@/components/market-data-card";
 import { BubbleMapsCard } from "@/components/bubblemaps-card";
 import { TokenInfoSidebar } from "@/components/token-info-sidebar";
 import { LiquidityBurnCard } from "@/components/liquidity-burn-card";
+import { HolderFilteringCard } from "@/components/holder-filtering-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -174,7 +175,10 @@ export default function Home() {
                       analyzedAt={analysis.analyzedAt}
                     />
                     
-                    <CriticalAlerts redFlags={analysis.redFlags || []} />
+                    <CriticalAlerts 
+                      redFlags={analysis.redFlags || []}
+                      holderFiltering={analysis.holderFiltering}
+                    />
 
                     {/* LP Burn Checker - Only show if we have burn data */}
                     {analysis.liquidityPool?.burnPercentage !== undefined && (
@@ -194,7 +198,14 @@ export default function Home() {
                       liquidityStatus={analysis.liquidityPool?.status || "UNKNOWN"}
                       creationDate={analysis.creationDate}
                       decimals={analysis.metadata?.decimals || 0}
+                      bundledCount={analysis.holderFiltering?.totals.bundled}
+                      bundleConfidence={analysis.holderFiltering?.bundledDetection?.confidence}
                     />
+
+                    {/* Holder Filtering Details */}
+                    {analysis.holderFiltering && analysis.holderFiltering.totals.total > 0 && (
+                      <HolderFilteringCard filtering={analysis.holderFiltering} />
+                    )}
                   </div>
                   
                   <div className="space-y-6">
