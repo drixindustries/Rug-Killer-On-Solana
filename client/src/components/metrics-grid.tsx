@@ -10,6 +10,7 @@ interface MetricsGridProps {
   decimals: number;
   bundledCount?: number;
   bundleConfidence?: 'low' | 'medium' | 'high';
+  bundleSupplyPct?: number; // % of supply controlled by bundles (DevsNightmare)
 }
 
 export function MetricsGrid({
@@ -21,6 +22,7 @@ export function MetricsGrid({
   decimals,
   bundledCount = 0,
   bundleConfidence,
+  bundleSupplyPct,
 }: MetricsGridProps) {
   const formatNumber = (num: number) => {
     if (num >= 1e9) return `${(num / 1e9).toFixed(2)}B`;
@@ -42,7 +44,53 @@ export function MetricsGrid({
     return `Low confidence detection`;
   };
 
-  const metrics = [
+  // Build metrics array - show bundle percentage prominently if detected
+  const metrics = bundleSupplyPct !== undefined && bundleSupplyPct > 0 ? [
+    {
+      icon: Coins,
+      label: "Total Supply",
+      value: formatNumber(totalSupply / Math.pow(10, decimals)),
+      secondary: `${decimals} decimals`,
+      testId: "metric-total-supply",
+    },
+    {
+      icon: Users,
+      label: "Holder Count",
+      value: holderCount.toLocaleString(),
+      secondary: "unique addresses",
+      testId: "metric-holder-count",
+    },
+    {
+      icon: AlertTriangle,
+      label: "Bundle Supply % (DevsNightmare)",
+      value: `${bundleSupplyPct.toFixed(2)}%`,
+      secondary: `${bundledCount} bundled wallet${bundledCount !== 1 ? 's' : ''} control this supply`,
+      testId: "metric-bundle-percentage",
+      warning: true,
+      highlight: true, // Special orange highlight
+    },
+    {
+      icon: TrendingUp,
+      label: "Top Holder Concentration",
+      value: `${topHolderConcentration.toFixed(1)}%`,
+      secondary: "top 10 wallets",
+      testId: "metric-concentration",
+    },
+    {
+      icon: Droplet,
+      label: "Liquidity Pool",
+      value: liquidityStatus,
+      secondary: "LP status",
+      testId: "metric-liquidity",
+    },
+    {
+      icon: Calendar,
+      label: "Creation Date",
+      value: creationDate ? new Date(creationDate).toLocaleDateString() : "Unknown",
+      secondary: creationDate ? getTimeAgo(creationDate) : "",
+      testId: "metric-creation-date",
+    },
+  ] : [
     {
       icon: Coins,
       label: "Total Supply",
@@ -105,10 +153,11 @@ export function MetricsGrid({
       {metrics.map((metric) => {
         const Icon = metric.icon;
         const isWarning = 'warning' in metric && metric.warning;
+        const isHighlight = 'highlight' in metric && metric.highlight;
         return (
           <Card 
             key={metric.label} 
-            className={`p-6 ${isWarning ? 'border-orange-500/50' : ''}`}
+            className={`p-6 ${isHighlight ? 'border-orange-500 bg-orange-500/5' : isWarning ? 'border-orange-500/50' : ''}`}
             data-testid={metric.testId}
           >
             <div className="flex items-start gap-4">

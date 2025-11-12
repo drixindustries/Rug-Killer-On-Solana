@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Header } from "@/components/header-new";
@@ -30,6 +30,7 @@ import { CONTRACT_ADDRESS } from "@/constants";
 export default function Home() {
   const { toast } = useToast();
   const [analysis, setAnalysis] = useState<TokenAnalysisResponse | null>(null);
+  const [currentTokenAddress, setCurrentTokenAddress] = useState<string | null>(null);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -50,13 +51,27 @@ export default function Home() {
   });
 
   const handleAnalyze = (address: string) => {
+    setCurrentTokenAddress(address);
     analyzeMutation.mutate(address);
   };
 
   const handleNewAnalysis = () => {
     setAnalysis(null);
+    setCurrentTokenAddress(null);
     analyzeMutation.reset();
   };
+
+  // Auto-refresh every 5 minutes (300,000 ms) when token is analyzed
+  useEffect(() => {
+    if (!currentTokenAddress || !analysis) return;
+
+    const refreshInterval = setInterval(() => {
+      console.log(`Auto-refreshing analysis for ${currentTokenAddress}`);
+      analyzeMutation.mutate(currentTokenAddress);
+    }, 300000); // 5 minutes
+
+    return () => clearInterval(refreshInterval);
+  }, [currentTokenAddress, analysis]);
 
   const isLoading = analyzeMutation.isPending;
   const error = analyzeMutation.error;
@@ -201,6 +216,7 @@ export default function Home() {
                       decimals={analysis.metadata?.decimals || 0}
                       bundledCount={analysis.holderFiltering?.totals.bundled}
                       bundleConfidence={analysis.holderFiltering?.bundledDetection?.confidence}
+                      bundleSupplyPct={analysis.holderFiltering?.bundledDetection?.bundleSupplyPct}
                     />
 
                     {/* Bundle Visualization Chart */}
