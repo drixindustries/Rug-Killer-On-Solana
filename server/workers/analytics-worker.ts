@@ -1,7 +1,7 @@
 import { storage } from "../storage";
 import { priceCache } from "../services/price-cache";
 import { tokenAnalyzer } from "../solana-analyzer";
-import { getBlacklist } from "../ai-blacklist";
+import { getTopFlaggedWallets } from "../ai-blacklist";
 import type { InsertTrendingToken } from "@shared/schema";
 
 /**
@@ -226,7 +226,7 @@ export class AnalyticsWorker {
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
       // Get blacklist for rug detection count
-      const blacklist = await getBlacklist();
+      const blacklist = await getTopFlaggedWallets();
 
       // Aggregate 7-day stats
       await this.aggregateRiskWindow(sevenDaysAgo, now, blacklist.length);

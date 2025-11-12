@@ -74,6 +74,23 @@ export const hasActiveAccess = async (req: any, res: any, next: any) => {
   */
 };
 
+// Admin middleware - checks if user is authorized admin access
+const isAdmin = async (req: any, res: any, next: any) => {
+  if (!req.isAuthenticated() || !req.user?.claims?.sub) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  // Check if user is admin (you can customize this logic)
+  const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim());
+  const userEmail = req.user.claims.email;
+  
+  if (!adminEmails.includes(userEmail)) {
+    return res.status(403).json({ message: "Admin access required" });
+  }
+  
+  next();
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
   await setupAuth(app);
@@ -1993,23 +2010,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========================================
   // ADMIN ROUTES
   // ========================================
-  
-  // Admin middleware - checks if user is authorized to manage creator wallet
-  const isAdmin = async (req: any, res: any, next: any) => {
-    if (!req.isAuthenticated() || !req.user?.claims?.sub) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-    
-    // Check if user is admin (you can customize this logic)
-    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim());
-    const userEmail = req.user.claims.email;
-    
-    if (!adminEmails.includes(userEmail)) {
-      return res.status(403).json({ message: "Admin access required" });
-    }
-    
-    next();
-  };
 
   // Check if current user has admin access
   app.get('/api/admin/check', isAuthenticated, async (req: any, res) => {

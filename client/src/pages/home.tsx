@@ -486,22 +486,22 @@ export default function Home() {
                     )}
                     
                     <TransactionTimeline transactions={analysis.recentTransactions || []} />
+                    
+                    {analysis.topHolders && analysis.topHolders.length > 0 && (
+                      <>
+                        <TopHoldersTable 
+                          holders={analysis.topHolders}
+                          decimals={analysis.metadata?.decimals || 0}
+                        />
+
+                        <HolderDistributionChart
+                          holders={analysis.topHolders}
+                          totalConcentration={analysis.topHolderConcentration || 0}
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
-
-                  {analysis.topHolders && analysis.topHolders.length > 0 && (
-                    <>
-                      <TopHoldersTable 
-                        holders={analysis.topHolders}
-                        decimals={analysis.metadata?.decimals || 0}
-                      />
-
-                      <HolderDistributionChart
-                        holders={analysis.topHolders}
-                        totalConcentration={analysis.topHolderConcentration || 0}
-                      />
-                    </>
-                  )}
                 </TabsContent>
 
                 <TabsContent value="community" className="space-y-6">

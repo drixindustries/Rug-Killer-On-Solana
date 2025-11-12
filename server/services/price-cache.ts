@@ -115,6 +115,33 @@ export class PriceCache {
   }
 
   /**
+   * Get all token addresses in the cache
+   * Returns array of token addresses (does not filter by expiry)
+   */
+  getAllTokens(): string[] {
+    return Array.from(this.cache.keys());
+  }
+
+  /**
+   * Get recently updated token addresses
+   * @param minutes - Number of minutes to look back
+   * @returns Array of token addresses updated within the last N minutes
+   */
+  getRecentlyUpdated(minutes: number): string[] {
+    const now = Date.now();
+    const cutoffTime = now - (minutes * 60 * 1000);
+    const recentTokens: string[] = [];
+
+    for (const [address, entry] of Array.from(this.cache.entries())) {
+      if (entry.lastUpdated >= cutoffTime) {
+        recentTokens.push(address);
+      }
+    }
+
+    return recentTokens;
+  }
+
+  /**
    * Get cache statistics
    */
   getStats() {
