@@ -289,45 +289,43 @@ export default function Analytics() {
                       <tr className="border-b text-sm text-muted-foreground">
                         <th className="text-left py-2 px-4">Rank</th>
                         <th className="text-left py-2 px-4">Token Address</th>
-                        <th className="text-right py-2 px-4">Score</th>
+                        <th className="text-right py-2 px-4">Risk Score</th>
                         <th className="text-right py-2 px-4">Volume 24h</th>
-                        <th className="text-right py-2 px-4">Velocity</th>
+                        <th className="text-right py-2 px-4">Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {marketOverview?.trending.slice(0, 10).map((token) => (
+                      {marketOverview?.trending.slice(0, 10).map((token, index) => (
                         <tr
                           key={token.tokenAddress}
                           className="border-b hover-elevate"
-                          data-testid={`row-trending-${token.rank}`}
+                          data-testid={`row-trending-${index}`}
                         >
                           <td className="py-3 px-4">
-                            <Badge variant="outline" data-testid={`badge-rank-${token.rank}`}>
+                            <Badge variant="outline">
                               #{token.rank}
                             </Badge>
                           </td>
-                          <td className="py-3 px-4 font-mono text-sm" data-testid={`text-address-${token.rank}`}>
+                          <td className="py-3 px-4 font-mono text-sm" data-testid={`text-trending-token-${index}`}>
                             {token.tokenAddress.slice(0, 8)}...{token.tokenAddress.slice(-8)}
                           </td>
-                          <td className="py-3 px-4 text-right font-semibold" data-testid={`text-score-${token.rank}`}>
-                            {token.score.toFixed(2)}
+                          <td className="py-3 px-4 text-right">
+                            <Badge variant="outline" data-testid={`badge-risk-${index}`}>
+                              Score: {Number(token.score).toFixed(2)}
+                            </Badge>
                           </td>
-                          <td className="py-3 px-4 text-right" data-testid={`text-volume-${token.rank}`}>
-                            ${token.volume24h?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || "N/A"}
+                          <td className="py-3 px-4 text-right" data-testid={`text-volume-${index}`}>
+                            ${Number(token.volume24h || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                           </td>
-                          <td
-                            className="py-3 px-4 text-right"
-                            data-testid={`text-velocity-${token.rank}`}
-                          >
-                            <span
-                              className={
-                                (token.velocity || 0) >= 0
-                                  ? "text-green-500"
-                                  : "text-red-500"
-                              }
+                          <td className="py-3 px-4 text-right">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => window.open(`/?token=${token.tokenAddress}`, '_blank')}
+                              data-testid={`button-analyze-trending-${index}`}
                             >
-                              {token.velocity ? `${token.velocity > 0 ? "+" : ""}${token.velocity.toFixed(2)}%` : "N/A"}
-                            </span>
+                              Analyze
+                            </Button>
                           </td>
                         </tr>
                       ))}
@@ -370,7 +368,7 @@ export default function Analytics() {
                 <Tabs
                   value={historicalDays.toString()}
                   onValueChange={(v) => setHistoricalDays(parseInt(v) as 7 | 30 | 90)}
-                  data-testid="tabs-timeframe"
+                  data-testid="select-timeframe"
                 >
                   <TabsList>
                     <TabsTrigger value="7" data-testid="tab-7d">7 Days</TabsTrigger>
@@ -385,7 +383,7 @@ export default function Analytics() {
                 historicalLoading ? (
                   <Skeleton className="h-[400px] w-full" />
                 ) : historicalData && historicalData.data.length > 0 ? (
-                  <div className="space-y-6">
+                  <div className="space-y-6" data-testid="chart-historical">
                     {/* Price Chart */}
                     <div data-testid="chart-price">
                       <h4 className="text-sm font-medium mb-2">Price (USD)</h4>
@@ -475,7 +473,7 @@ export default function Analytics() {
                 {insightsLoading ? (
                   <Skeleton className="h-[300px] w-full" />
                 ) : riskInsights?.last30Days?.commonFlags ? (
-                  <ResponsiveContainer width="100%" height={300}>
+                  <ResponsiveContainer width="100%" height={300} data-testid="chart-common-flags">
                     <BarChart
                       data={Object.entries(riskInsights.last30Days.commonFlags).map(([flag, count]) => ({
                         flag: flag.replace(/_/g, " ").toUpperCase(),
@@ -517,26 +515,26 @@ export default function Analytics() {
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <p className="text-xs text-muted-foreground">Total Analyzed</p>
-                            <p className="text-xl font-bold" data-testid="text-analyzed-7d">
-                              {riskInsights.last7Days.totalAnalyzed.toLocaleString()}
+                            <p className="text-xl font-bold" data-testid="text-7d-total">
+                              {Number(riskInsights.last7Days.totalAnalyzed).toLocaleString()}
                             </p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Rugs Detected</p>
-                            <p className="text-xl font-bold text-destructive" data-testid="text-rugs-7d">
-                              {riskInsights.last7Days.rugDetected}
+                            <p className="text-xl font-bold text-destructive" data-testid="text-7d-rugs">
+                              {Number(riskInsights.last7Days.rugDetected)}
                             </p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Detection Rate</p>
-                            <p className="text-xl font-bold" data-testid="text-detection-rate-7d">
-                              {riskInsights.last7Days.detectionRate}%
+                            <p className="text-xl font-bold" data-testid="text-7d-rate">
+                              {Number(riskInsights.last7Days.detectionRate).toFixed(2)}%
                             </p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">False Positives</p>
-                            <p className="text-xl font-bold" data-testid="text-false-positives-7d">
-                              {riskInsights.last7Days.falsePositives}
+                            <p className="text-xl font-bold" data-testid="text-7d-false-positives">
+                              {Number(riskInsights.last7Days.falsePositives)}
                             </p>
                           </div>
                         </div>
@@ -549,26 +547,26 @@ export default function Analytics() {
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <p className="text-xs text-muted-foreground">Total Analyzed</p>
-                            <p className="text-xl font-bold" data-testid="text-analyzed-30d">
-                              {riskInsights.last30Days.totalAnalyzed.toLocaleString()}
+                            <p className="text-xl font-bold" data-testid="text-30d-total">
+                              {Number(riskInsights.last30Days.totalAnalyzed).toLocaleString()}
                             </p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Rugs Detected</p>
-                            <p className="text-xl font-bold text-destructive" data-testid="text-rugs-30d">
-                              {riskInsights.last30Days.rugDetected}
+                            <p className="text-xl font-bold text-destructive" data-testid="text-30d-rugs">
+                              {Number(riskInsights.last30Days.rugDetected)}
                             </p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Detection Rate</p>
-                            <p className="text-xl font-bold" data-testid="text-detection-rate-30d">
-                              {riskInsights.last30Days.detectionRate}%
+                            <p className="text-xl font-bold" data-testid="text-30d-rate">
+                              {Number(riskInsights.last30Days.detectionRate).toFixed(2)}%
                             </p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">False Positives</p>
-                            <p className="text-xl font-bold" data-testid="text-false-positives-30d">
-                              {riskInsights.last30Days.falsePositives}
+                            <p className="text-xl font-bold" data-testid="text-30d-false-positives">
+                              {Number(riskInsights.last30Days.falsePositives)}
                             </p>
                           </div>
                         </div>
@@ -632,7 +630,7 @@ export default function Analytics() {
                             </Badge>
                           )}
                         </div>
-                        <CardTitle className="text-sm font-mono truncate" data-testid={`text-hot-address-${token.rank}`}>
+                        <CardTitle className="text-sm font-mono truncate" data-testid={`text-hot-token-name-${token.rank}`}>
                           {token.tokenAddress.slice(0, 12)}...
                         </CardTitle>
                       </CardHeader>
@@ -640,7 +638,7 @@ export default function Analytics() {
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Price</span>
                           <span className="font-semibold" data-testid={`text-hot-price-${token.rank}`}>
-                            ${token.priceUsd?.toFixed(6) || "N/A"}
+                            ${Number(token.priceUsd || 0).toFixed(6)}
                           </span>
                         </div>
                         <div className="flex justify-between text-sm">
@@ -652,16 +650,25 @@ export default function Analytics() {
                             data-testid={`text-hot-change-${token.rank}`}
                           >
                             {token.priceChange24h !== null
-                              ? `${token.priceChange24h > 0 ? "+" : ""}${token.priceChange24h.toFixed(2)}%`
+                              ? `${token.priceChange24h > 0 ? "+" : ""}${Number(token.priceChange24h).toFixed(2)}%`
                               : "N/A"}
                           </span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Volume</span>
                           <span className="font-semibold" data-testid={`text-hot-volume-${token.rank}`}>
-                            ${token.volume24h?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || "N/A"}
+                            ${Number(token.volume24h || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                           </span>
                         </div>
+                        <Button
+                          size="sm"
+                          className="w-full mt-2"
+                          variant="outline"
+                          onClick={() => window.open(`/?token=${token.tokenAddress}`, '_blank')}
+                          data-testid={`button-analyze-hot-${token.rank}`}
+                        >
+                          Analyze
+                        </Button>
                       </CardContent>
                     </Card>
                   ))}
@@ -698,28 +705,28 @@ export default function Analytics() {
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="text-center p-4 bg-muted/20 rounded-md">
-                        <p className="text-sm text-muted-foreground mb-1">Detection Rate</p>
-                        <p className="text-3xl font-bold text-green-500" data-testid="text-perf-detection-7d">
-                          {performance.last7Days.detectionRate}%
+                        <p className="text-sm text-muted-foreground mb-1">Accuracy Rate</p>
+                        <p className="text-3xl font-bold text-green-500" data-testid="text-7d-accuracy">
+                          {Number(performance.last7Days.detectionRate).toFixed(2)}%
                         </p>
                       </div>
                       <div className="text-center p-4 bg-muted/20 rounded-md">
-                        <p className="text-sm text-muted-foreground mb-1">False Positive Rate</p>
-                        <p className="text-3xl font-bold text-amber-500" data-testid="text-perf-false-pos-7d">
-                          {performance.last7Days.falsePositiveRate}%
+                        <p className="text-sm text-muted-foreground mb-1">False Positives</p>
+                        <p className="text-3xl font-bold text-amber-500" data-testid="text-7d-false-positives">
+                          {Number(performance.last7Days.falsePositiveRate).toFixed(2)}%
                         </p>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm text-muted-foreground">Coverage</p>
-                        <p className="text-xl font-bold" data-testid="text-perf-coverage-7d">
-                          {performance.last7Days.coverage.toLocaleString()}
+                        <p className="text-xl font-bold" data-testid="text-7d-coverage">
+                          {Number(performance.last7Days.coverage).toLocaleString()}
                         </p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Avg Analysis Time</p>
-                        <p className="text-xl font-bold" data-testid="text-perf-time-7d">
+                        <p className="text-xl font-bold" data-testid="text-7d-time">
                           {performance.last7Days.avgAnalysisTime}
                         </p>
                       </div>
@@ -749,28 +756,28 @@ export default function Analytics() {
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="text-center p-4 bg-muted/20 rounded-md">
-                        <p className="text-sm text-muted-foreground mb-1">Detection Rate</p>
-                        <p className="text-3xl font-bold text-green-500" data-testid="text-perf-detection-30d">
-                          {performance.last30Days.detectionRate}%
+                        <p className="text-sm text-muted-foreground mb-1">Accuracy Rate</p>
+                        <p className="text-3xl font-bold text-green-500" data-testid="text-30d-accuracy">
+                          {Number(performance.last30Days.detectionRate).toFixed(2)}%
                         </p>
                       </div>
                       <div className="text-center p-4 bg-muted/20 rounded-md">
-                        <p className="text-sm text-muted-foreground mb-1">False Positive Rate</p>
-                        <p className="text-3xl font-bold text-amber-500" data-testid="text-perf-false-pos-30d">
-                          {performance.last30Days.falsePositiveRate}%
+                        <p className="text-sm text-muted-foreground mb-1">False Positives</p>
+                        <p className="text-3xl font-bold text-amber-500" data-testid="text-30d-false-positives">
+                          {Number(performance.last30Days.falsePositiveRate).toFixed(2)}%
                         </p>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm text-muted-foreground">Coverage</p>
-                        <p className="text-xl font-bold" data-testid="text-perf-coverage-30d">
-                          {performance.last30Days.coverage.toLocaleString()}
+                        <p className="text-xl font-bold" data-testid="text-30d-coverage">
+                          {Number(performance.last30Days.coverage).toLocaleString()}
                         </p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Avg Analysis Time</p>
-                        <p className="text-xl font-bold" data-testid="text-perf-time-30d">
+                        <p className="text-xl font-bold" data-testid="text-30d-time">
                           {performance.last30Days.avgAnalysisTime}
                         </p>
                       </div>

@@ -95,7 +95,7 @@ export class AnalyticsWorker {
               const priceData = priceCache.get(tokenAddress);
               
               // Get current analysis (lightweight - from cache if available)
-              const analysis = await tokenAnalyzer.analyze(tokenAddress);
+              const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
 
               // Extract transaction count
               const txCount24h = analysis.marketData?.txns24h
@@ -110,7 +110,7 @@ export class AnalyticsWorker {
                 holderCount: analysis.holderCount,
                 volume24h: priceData?.volume24h?.toString() || null,
                 liquidityUsd: priceData?.liquidity?.toString() || null,
-                riskFlags: analysis.redFlags.map(f => f.type),
+                riskFlags: analysis.redFlags.map((f: { type: string }) => f.type),
                 txCount24h,
                 analyzerVersion: "1.0",
               });
