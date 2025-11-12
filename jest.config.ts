@@ -51,6 +51,7 @@ const config: Config.InitialOptions = {
         '!server/vite.ts',
         '!server/index.ts',
       ],
+      coverageDirectory: '<rootDir>/coverage/unit',
       coverageThreshold: {
         'server/solana-analyzer.ts': {
           statements: 85,
@@ -82,6 +83,7 @@ const config: Config.InitialOptions = {
       },
       setupFilesAfterEnv: ['<rootDir>/tests/integration/setup.ts'],
       testTimeout: 30000,
+      coverageDirectory: '<rootDir>/coverage/integration',
     },
   ],
   collectCoverage: true,

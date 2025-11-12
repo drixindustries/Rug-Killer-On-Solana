@@ -1034,4 +1034,219 @@ describe('SolanaTokenAnalyzer', () => {
       expect(result.riskLevel).toBeDefined();
     });
   });
+
+  describe('API Resilience Tests', () => {
+    it('should handle Rugcheck API 429 rate limit response gracefully', async () => {
+      const { getMint } = require('@solana/spl-token');
+      const { Connection } = require('@solana/web3.js');
+
+      getMint.mockResolvedValue({
+        address: new PublicKey(PUMP_FUN_TOKEN.address),
+        mintAuthority: null,
+        freezeAuthority: null,
+        supply: BigInt(PUMP_FUN_TOKEN.supply),
+        decimals: PUMP_FUN_TOKEN.decimals,
+        isInitialized: true,
+      });
+
+      Connection.prototype.getTokenLargestAccounts = jest.fn().mockResolvedValue({
+        value: HOLDERS_PUMP_FUN.map(h => ({
+          address: new PublicKey(h.address),
+          amount: BigInt(h.balance),
+        })),
+      });
+
+      Connection.prototype.getProgramAccounts = jest.fn().mockResolvedValue([]);
+      Connection.prototype.getSignaturesForAddress = jest.fn().mockResolvedValue([]);
+
+      // Mock successful DexScreener and GoPlus
+      mockDexScreener(PUMP_FUN_TOKEN.address, 'pump');
+      mockGoPlus(PUMP_FUN_TOKEN.address, 'safe');
+
+      // Mock Rugcheck API 429 rate limit
+      const nock = require('nock');
+      nock('https://api.rugcheck.xyz')
+        .get(`/v1/tokens/${PUMP_FUN_TOKEN.address}/report`)
+        .reply(429, {
+          error: 'Too Many Requests',
+          message: 'Rate limit exceeded. Please try again later.',
+          retryAfter: 60,
+        });
+
+      const result = await analyzer.analyzeToken(PUMP_FUN_TOKEN.address);
+
+      // Should complete analysis without Rugcheck data
+      expect(result.tokenAddress).toBe(PUMP_FUN_TOKEN.address);
+      expect(result.rugcheckData).toBeUndefined();
+      expect(result.riskScore).toBeDefined();
+      expect(result.riskLevel).toBeDefined();
+      // Should still have data from other sources
+      expect(result.dexscreenerData).toBeDefined();
+      expect(result.goplusData).toBeDefined();
+      expect(result.topHolders.length).toBeGreaterThan(0);
+    });
+
+    it('should handle GoPlus API timeout scenario gracefully', async () => {
+      const { getMint } = require('@solana/spl-token');
+      const { Connection } = require('@solana/web3.js');
+
+      getMint.mockResolvedValue({
+        address: new PublicKey(PUMP_FUN_TOKEN.address),
+        mintAuthority: null,
+        freezeAuthority: null,
+        supply: BigInt(PUMP_FUN_TOKEN.supply),
+        decimals: PUMP_FUN_TOKEN.decimals,
+        isInitialized: true,
+      });
+
+      Connection.prototype.getTokenLargestAccounts = jest.fn().mockResolvedValue({
+        value: HOLDERS_PUMP_FUN.map(h => ({
+          address: new PublicKey(h.address),
+          amount: BigInt(h.balance),
+        })),
+      });
+
+      Connection.prototype.getProgramAccounts = jest.fn().mockResolvedValue([]);
+      Connection.prototype.getSignaturesForAddress = jest.fn().mockResolvedValue([]);
+
+      // Mock successful DexScreener and Rugcheck
+      mockDexScreener(PUMP_FUN_TOKEN.address, 'pump');
+      mockRugcheck(PUMP_FUN_TOKEN.address, 'safe');
+
+      // Mock GoPlus API timeout (using delay to simulate timeout)
+      const nock = require('nock');
+      nock('https://api.gopluslabs.io')
+        .get('/api/v1/token_security/solana')
+        .query({ contract_addresses: PUMP_FUN_TOKEN.address })
+        .delayConnection(30000)
+        .reply(200, GOPLUS_DATA_SAFE);
+
+      const result = await analyzer.analyzeToken(PUMP_FUN_TOKEN.address);
+
+      // Should complete analysis without waiting for GoPlus timeout
+      expect(result.tokenAddress).toBe(PUMP_FUN_TOKEN.address);
+      expect(result.riskScore).toBeDefined();
+      expect(result.riskLevel).toBeDefined();
+      // Should have data from other sources
+      expect(result.dexscreenerData).toBeDefined();
+      expect(result.rugcheckData).toBeDefined();
+      expect(result.topHolders.length).toBeGreaterThan(0);
+    });
+
+    it('should handle combined API failures with graceful degradation', async () => {
+      const { getMint } = require('@solana/spl-token');
+      const { Connection } = require('@solana/web3.js');
+
+      getMint.mockResolvedValue({
+        address: new PublicKey(PUMP_FUN_TOKEN.address),
+        mintAuthority: null,
+        freezeAuthority: null,
+        supply: BigInt(PUMP_FUN_TOKEN.supply),
+        decimals: PUMP_FUN_TOKEN.decimals,
+        isInitialized: true,
+      });
+
+      Connection.prototype.getTokenLargestAccounts = jest.fn().mockResolvedValue({
+        value: HOLDERS_PUMP_FUN.map(h => ({
+          address: new PublicKey(h.address),
+          amount: BigInt(h.balance),
+        })),
+      });
+
+      Connection.prototype.getProgramAccounts = jest.fn().mockResolvedValue(
+        new Array(1557).fill(null).map((_, i) => ({
+          account: {
+            data: Buffer.alloc(165),
+          },
+          pubkey: new PublicKey(`Holder${i}AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`),
+        }))
+      );
+
+      Connection.prototype.getSignaturesForAddress = jest.fn().mockResolvedValue([]);
+
+      // Mock different failure scenarios for different APIs
+      const nock = require('nock');
+      
+      // Rugcheck: 429 rate limit
+      nock('https://api.rugcheck.xyz')
+        .get(`/v1/tokens/${PUMP_FUN_TOKEN.address}/report`)
+        .reply(429, { error: 'Rate limit exceeded' });
+
+      // GoPlus: Network error
+      nock('https://api.gopluslabs.io')
+        .get('/api/v1/token_security/solana')
+        .query({ contract_addresses: PUMP_FUN_TOKEN.address })
+        .replyWithError({ code: 'ECONNREFUSED', message: 'Connection refused' });
+
+      // DexScreener: Server error
+      nock('https://api.dexscreener.com')
+        .get(`/latest/dex/tokens/${PUMP_FUN_TOKEN.address}`)
+        .reply(503, { error: 'Service temporarily unavailable' });
+
+      const result = await analyzer.analyzeToken(PUMP_FUN_TOKEN.address);
+
+      // Should still provide analysis based on on-chain data only
+      expect(result.tokenAddress).toBe(PUMP_FUN_TOKEN.address);
+      expect(result.topHolders.length).toBeGreaterThan(0);
+      expect(result.holderCount).toBe(1557);
+      expect(result.riskScore).toBeDefined();
+      expect(result.riskLevel).toBeDefined();
+      
+      // External API data should be undefined due to failures
+      expect(result.rugcheckData).toBeUndefined();
+      expect(result.goplusData).toBeUndefined();
+      expect(result.dexscreenerData).toBeUndefined();
+      
+      // Should still have valid mint authority analysis from on-chain data
+      expect(result.mintAuthority.isRevoked).toBe(true);
+      expect(result.freezeAuthority.isRevoked).toBe(true);
+    });
+
+    it('should handle partial API success with some failures', async () => {
+      const { getMint } = require('@solana/spl-token');
+      const { Connection } = require('@solana/web3.js');
+
+      getMint.mockResolvedValue({
+        address: new PublicKey(PUMP_FUN_TOKEN.address),
+        mintAuthority: null,
+        freezeAuthority: null,
+        supply: BigInt(PUMP_FUN_TOKEN.supply),
+        decimals: PUMP_FUN_TOKEN.decimals,
+        isInitialized: true,
+      });
+
+      Connection.prototype.getTokenLargestAccounts = jest.fn().mockResolvedValue({
+        value: HOLDERS_PUMP_FUN.map(h => ({
+          address: new PublicKey(h.address),
+          amount: BigInt(h.balance),
+        })),
+      });
+
+      Connection.prototype.getProgramAccounts = jest.fn().mockResolvedValue([]);
+      Connection.prototype.getSignaturesForAddress = jest.fn().mockResolvedValue([]);
+
+      // Mock partial success: DexScreener succeeds, others fail
+      mockDexScreener(PUMP_FUN_TOKEN.address, 'pump');
+
+      const nock = require('nock');
+      nock('https://api.rugcheck.xyz')
+        .get(`/v1/tokens/${PUMP_FUN_TOKEN.address}/report`)
+        .reply(500, { error: 'Internal server error' });
+
+      nock('https://api.gopluslabs.io')
+        .get('/api/v1/token_security/solana')
+        .query({ contract_addresses: PUMP_FUN_TOKEN.address })
+        .reply(429, { error: 'Too many requests' });
+
+      const result = await analyzer.analyzeToken(PUMP_FUN_TOKEN.address);
+
+      // Should have analysis with partial external data
+      expect(result.tokenAddress).toBe(PUMP_FUN_TOKEN.address);
+      expect(result.dexscreenerData).toBeDefined();
+      expect(result.rugcheckData).toBeUndefined();
+      expect(result.goplusData).toBeUndefined();
+      expect(result.riskScore).toBeDefined();
+      expect(result.riskLevel).toBeDefined();
+    });
+  });
 });

@@ -95,6 +95,7 @@ jobs:
   e2e-tests:
     name: E2E Tests (Playwright)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     
     steps:
       - name: Checkout code
@@ -113,7 +114,8 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E tests
-        run: npx playwright test
+        run: npx playwright test --reporter=line
+        timeout-minutes: 10
         
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
@@ -122,6 +124,15 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+      
+      - name: Cleanup processes
+        if: always()
+        run: |
+          echo "Cleaning up any remaining processes..."
+          pkill -f "npm run dev" || true
+          pkill -f "node.*vite" || true
+          pkill -f "tsx.*server" || true
+          echo "Cleanup complete"
 
   build:
     name: Build Application
