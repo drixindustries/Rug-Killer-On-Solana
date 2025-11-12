@@ -80,6 +80,7 @@ export function Footer() {
                   variant="outline"
                   size="icon"
                   asChild
+                  className="min-h-[44px] min-w-[44px]"
                   data-testid="footer-button-github"
                 >
                   <a href="https://github.com/yourusername/solana-rug-killer" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="View on GitHub">
@@ -92,6 +93,7 @@ export function Footer() {
                     variant="outline"
                     size="icon"
                     asChild
+                    className="min-h-[44px] min-w-[44px]"
                     data-testid="footer-button-telegram"
                   >
                     <a href={botLinks.telegram} target="_blank" rel="noopener noreferrer" title="Telegram" aria-label="Join Telegram bot">
@@ -105,6 +107,7 @@ export function Footer() {
                     variant="outline"
                     size="icon"
                     asChild
+                    className="min-h-[44px] min-w-[44px]"
                     data-testid="footer-button-discord"
                   >
                     <a href={botLinks.discord} target="_blank" rel="noopener noreferrer" title="Discord" aria-label="Join Discord server">

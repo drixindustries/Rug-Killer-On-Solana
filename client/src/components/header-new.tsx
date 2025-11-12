@@ -102,16 +102,16 @@ export function Header({ onNewAnalysis }: HeaderProps) {
 
           {/* Right: Actions */}
           <div className="flex items-center gap-2">
-            {/* Social Links */}
+            {/* Social Links - Hidden on mobile to reduce clutter */}
             <Button 
               variant="ghost"
               size="icon"
               asChild
-              className="hidden sm:inline-flex"
+              className="hidden md:inline-flex min-h-[44px] min-w-[44px]"
               data-testid="button-github"
             >
               <a href="https://github.com/yourusername/solana-rug-killer" target="_blank" rel="noopener noreferrer" title="View on GitHub" aria-label="View project on GitHub">
-                <SiGithub className="h-4 w-4" />
+                <SiGithub className="h-5 w-5" />
               </a>
             </Button>
             
@@ -120,11 +120,11 @@ export function Header({ onNewAnalysis }: HeaderProps) {
                 variant="ghost"
                 size="icon"
                 asChild
-                className="hidden sm:inline-flex"
+                className="hidden md:inline-flex min-h-[44px] min-w-[44px]"
                 data-testid="button-telegram-bot"
               >
                 <a href={botLinks.telegram} target="_blank" rel="noopener noreferrer" title="Join Telegram Bot" aria-label="Join Telegram bot">
-                  <SiTelegram className="h-4 w-4" />
+                  <SiTelegram className="h-5 w-5" />
                 </a>
               </Button>
             )}
@@ -134,11 +134,11 @@ export function Header({ onNewAnalysis }: HeaderProps) {
                 variant="ghost"
                 size="icon"
                 asChild
-                className="hidden sm:inline-flex"
+                className="hidden md:inline-flex min-h-[44px] min-w-[44px]"
                 data-testid="button-discord-bot"
               >
                 <a href={botLinks.discord} target="_blank" rel="noopener noreferrer" title="Join Discord Bot" aria-label="Join Discord bot">
-                  <SiDiscord className="h-4 w-4" />
+                  <SiDiscord className="h-5 w-5" />
                 </a>
               </Button>
             )}

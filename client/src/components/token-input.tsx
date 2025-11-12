@@ -46,29 +46,32 @@ export function TokenInput({ onAnalyze, isAnalyzing }: TokenInputProps) {
 
   return (
     <div className="w-full max-w-3xl mx-auto space-y-4">
-      <form onSubmit={handleSubmit} className="relative">
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Enter Solana token address (e.g., EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v)"
-            value={tokenAddress}
-            onChange={(e) => {
-              setTokenAddress(e.target.value);
-              setError("");
-            }}
-            className="pl-12 pr-32 h-12 text-base font-mono"
-            data-testid="input-token-address"
-            disabled={isAnalyzing}
-          />
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {/* Mobile-first: Stack vertically on small screens, inline on larger screens */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Enter token address..."
+              value={tokenAddress}
+              onChange={(e) => {
+                setTokenAddress(e.target.value);
+                setError("");
+              }}
+              className="pl-10 sm:pl-12 h-12 sm:h-14 text-sm sm:text-base font-mono"
+              data-testid="input-token-address"
+              disabled={isAnalyzing}
+            />
+          </div>
           <Button
             type="submit"
-            className="absolute right-2 top-1/2 -translate-y-1/2"
-            size="sm"
+            className="h-12 sm:h-14 min-w-[120px] sm:min-w-[140px]"
             disabled={isAnalyzing}
             data-testid="button-analyze"
           >
-            {isAnalyzing ? "Analyzing..." : "Analyze Token"}
+            <Search className="h-4 w-4 sm:hidden mr-2" />
+            {isAnalyzing ? "Analyzing..." : "Analyze"}
           </Button>
         </div>
       </form>

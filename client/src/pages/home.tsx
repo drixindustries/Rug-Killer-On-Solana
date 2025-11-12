@@ -64,12 +64,12 @@ export default function Home() {
       <Header onNewAnalysis={analysis ? handleNewAnalysis : undefined} />
       
       <main className="flex-1">
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="space-y-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+          <div className="space-y-6 sm:space-y-8">
             {!analysis && (
-              <div className="text-center space-y-6 py-12">
-                <h1 className="text-4xl font-bold">Solana Rug Detector</h1>
-                <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              <div className="text-center space-y-4 sm:space-y-6 py-8 sm:py-12">
+                <h1 className="text-3xl sm:text-4xl font-bold">Solana Rug Detector</h1>
+                <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto px-4">
                   Analyze Solana tokens for rug pull risks. Check mint authority, freeze authority, 
                   holder distribution, liquidity, and suspicious activity instantly.
                 </p>
@@ -80,8 +80,8 @@ export default function Home() {
                     <CheckCircle className="w-5 h-5 text-green-500" />
                     <span className="text-sm font-semibold text-muted-foreground">Official Contract Address</span>
                   </div>
-                  <div className="flex items-center gap-2 bg-muted px-4 py-2 rounded-md">
-                    <code className="font-mono text-sm select-all" data-testid="text-contract-address">
+                  <div className="flex items-center gap-2 bg-muted px-3 sm:px-4 py-2 rounded-md max-w-full overflow-x-auto">
+                    <code className="font-mono text-xs sm:text-sm select-all break-all" data-testid="text-contract-address">
                       {CONTRACT_ADDRESS}
                     </code>
                     <Button
@@ -110,8 +110,8 @@ export default function Home() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center gap-2 bg-muted px-3 py-2 rounded-md">
-                    <code className="font-mono text-sm flex-1 select-all" data-testid="text-contract-card">
+                  <div className="flex items-center gap-2 bg-muted px-3 py-2 rounded-md overflow-x-auto">
+                    <code className="font-mono text-xs sm:text-sm flex-1 select-all break-all" data-testid="text-contract-card">
                       {CONTRACT_ADDRESS}
                     </code>
                     <Button
