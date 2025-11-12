@@ -102,10 +102,22 @@ export function BundleVisualizationChart({ filtering, totalHolders }: BundleVisu
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
         <CardTitle>Holder Distribution Analysis</CardTitle>
         {filtering.totals.bundled > 0 && filtering.bundledDetection && (
-          <Badge variant="destructive" className="flex items-center gap-1" data-testid="badge-bundle-warning">
-            <AlertTriangle className="h-3 w-3" />
-            {filtering.totals.bundled} Bundle{filtering.totals.bundled > 1 ? 's' : ''} Detected
-          </Badge>
+          <div className="flex items-center gap-2">
+            {filtering.bundledDetection.bundleSupplyPct !== undefined && (
+              <Badge 
+                variant="outline" 
+                className="bg-orange-500/10 text-orange-600 border-orange-500/20 flex items-center gap-1"
+                data-testid="badge-bundle-percentage"
+              >
+                <AlertTriangle className="h-3 w-3" />
+                {filtering.bundledDetection.bundleSupplyPct.toFixed(2)}% Supply
+              </Badge>
+            )}
+            <Badge variant="destructive" className="flex items-center gap-1" data-testid="badge-bundle-warning">
+              <AlertTriangle className="h-3 w-3" />
+              {filtering.totals.bundled} Wallet{filtering.totals.bundled > 1 ? 's' : ''}
+            </Badge>
+          </div>
         )}
       </CardHeader>
       <CardContent>

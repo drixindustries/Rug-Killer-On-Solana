@@ -144,8 +144,14 @@ export class SolanaTokenAnalyzer {
       
       // Calculate bundle supply percentage (DevsNightmarePro-style)
       const bundledHolders = holders.filter(h => bundledWallets.includes(h.address));
+      
+      // Calculate percentage from holder data (safe for both on-chain and Rugcheck fallback)
       const bundleSupplyPct = bundledHolders.reduce((sum, h) => sum + (h.percentage || 0), 0);
-      const bundledSupplyAmount = bundledHolders.reduce((sum, h) => sum + (h.balance || 0), 0);
+      
+      // Calculate amount - only meaningful for on-chain data (Rugcheck sets balance=percentage)
+      const bundledSupplyAmount = onChainHolders.length > 0 
+        ? bundledHolders.reduce((sum, h) => sum + (h.balance || 0), 0)
+        : undefined; // Suppress when using Rugcheck fallback to avoid misleading figures
       
       // Determine confidence level based on bundle size and percentage
       let bundleConfidence: 'low' | 'medium' | 'high' = 'low';
