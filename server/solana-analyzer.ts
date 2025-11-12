@@ -142,6 +142,19 @@ export class SolanaTokenAnalyzer {
         });
       });
       
+      // Calculate bundle supply percentage (DevsNightmarePro-style)
+      const bundledHolders = holders.filter(h => bundledWallets.includes(h.address));
+      const bundleSupplyPct = bundledHolders.reduce((sum, h) => sum + (h.percentage || 0), 0);
+      const bundledSupplyAmount = bundledHolders.reduce((sum, h) => sum + (h.balance || 0), 0);
+      
+      // Determine confidence level based on bundle size and percentage
+      let bundleConfidence: 'low' | 'medium' | 'high' = 'low';
+      if (bundledWallets.length >= 5 || bundleSupplyPct >= 15) {
+        bundleConfidence = 'high';
+      } else if (bundledWallets.length >= 3 || bundleSupplyPct >= 5) {
+        bundleConfidence = 'medium';
+      }
+      
       const holderFiltering = {
         totals: {
           lp: lpAddresses.length,
@@ -153,8 +166,10 @@ export class SolanaTokenAnalyzer {
         excluded: excludedAddresses,
         bundledDetection: bundledWallets.length > 0 ? {
           strategy: 'percentageMatch' as const,
-          confidence: 'low' as const,
-          details: `Detected ${bundledWallets.length} wallets with suspicious patterns`
+          confidence: bundleConfidence,
+          details: `Detected ${bundledWallets.length} wallets with suspicious patterns`,
+          bundleSupplyPct: Math.min(100, Math.max(0, bundleSupplyPct)),
+          bundledSupplyAmount
         } : undefined
       };
       

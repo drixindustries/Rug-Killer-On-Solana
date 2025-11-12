@@ -212,6 +212,8 @@ export interface HolderFilteringMetadata {
     strategy: 'percentageMatch' | 'sameBlock' | 'fundingSource';
     confidence: 'low' | 'medium' | 'high';
     details?: string;
+    bundleSupplyPct?: number; // % of total supply controlled by bundled wallets
+    bundledSupplyAmount?: number; // Actual token amount held by bundled wallets
   };
 }
 
