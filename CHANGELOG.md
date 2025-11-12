@@ -10,11 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Testing Infrastructure (Option A)**:
+  - 32 comprehensive unit tests for `server/solana-analyzer.ts` covering risk scoring, bundle detection, holder filtering, and API resilience (429 rate limits, timeouts)
+  - 15+ integration tests using Supertest for API endpoints
+  - 16 end-to-end tests using Playwright for frontend flows (token search, bundle visualization, auto-refresh, risk indicators)
+  - Test fixtures and mocking utilities with deterministic Solana data
+  - Jest configuration with separate coverage directories (unit: 92%, integration, global: 70%)
+  - Playwright configuration with Chromium/Firefox/WebKit support
+  - Mock builder pattern for flexible test scenarios
 - Bundle percentage detection (DevsNightmarePro style) - calculates % of supply controlled by bundled wallets
 - Auto-refresh functionality - automatically re-analyzes tokens every 5 minutes
 - Orange UI highlighting for bundle warnings in MetricsGrid component
 - Comprehensive bundle visualization pie chart with interactive tooltips
-- GitHub Actions CI/CD pipeline for automated testing and building
 - This CHANGELOG.md file to track all changes
 
 ### Fixed
@@ -24,10 +31,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bundle percentage display logic - only shows prominent metric when bundles are detected
 
 ### Changed
+- **GitHub Actions CI/CD Pipeline Enhanced**:
+  - Split into separate jobs: lint/typecheck, unit tests, integration tests, e2e tests, build, security scan
+  - Codecov integration for test coverage tracking
+  - Playwright test reports uploaded as artifacts
+  - Process cleanup to prevent hung CI runners (10-15 minute timeouts)
+  - Separate coverage directories to prevent overwriting
 - MetricsGrid component now shows "Bundle Supply % (DevsNightmare)" metric when bundles detected
 - Updated market type detection to use prefix matching (`startsWith('pump_fun')`) instead of exact match
 - Enhanced holder filtering to expose bundle supply percentage in API response
 - Improved documentation in replit.md with pump_fun_amm market type handling
+- Exported Express app from server/index.ts for integration testing
 
 ---
 
