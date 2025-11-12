@@ -1,6 +1,34 @@
 import type { Config } from '@jest/types';
 
 const config: Config.InitialOptions = {
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/.cache/',
+    '/dist/',
+    '/coverage/',
+  ],
+  modulePathIgnorePatterns: [
+    '<rootDir>/.cache/',
+    '<rootDir>/dist/',
+    '<rootDir>/coverage/',
+    '<rootDir>/node_modules/',
+  ],
+  watchPathIgnorePatterns: [
+    '<rootDir>/.cache/',
+    '<rootDir>/dist/',
+    '<rootDir>/coverage/',
+    '<rootDir>/node_modules/',
+  ],
+  haste: {
+    enableSymlinks: false,
+    forceNodeFilesystemAPI: true,
+    throwOnModuleCollision: false,
+  },
+  transformIgnorePatterns: [
+    'node_modules/',
+    '\\.cache/',
+    '\\.pnp\\.[^\\\/]+$',
+  ],
   projects: [
     {
       displayName: 'server',
@@ -23,7 +51,7 @@ const config: Config.InitialOptions = {
         '!server/vite.ts',
         '!server/index.ts',
       ],
-      coverageThresholds: {
+      coverageThreshold: {
         'server/solana-analyzer.ts': {
           statements: 85,
           branches: 85,
