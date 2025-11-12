@@ -687,3 +687,108 @@ export type InsertWatchlistRequest = z.infer<typeof insertWatchlistSchema>;
 export type InsertPortfolioPositionRequest = z.infer<typeof insertPortfolioPositionSchema>;
 export type InsertPortfolioTransactionRequest = z.infer<typeof insertPortfolioTransactionSchema>;
 export type InsertPriceAlertRequest = z.infer<typeof insertPriceAlertSchema>;
+
+// ============================================================================
+// ANALYTICS TABLES (Option C: Advanced Analytics Dashboard)
+// ============================================================================
+
+// Token snapshots - historical data points for trend analysis
+export const tokenSnapshots = pgTable("token_snapshots", {
+  id: serial("id").primaryKey(),
+  tokenAddress: varchar("token_address", { length: 44 }).notNull(),
+  capturedAt: timestamp("captured_at").notNull().defaultNow(),
+  priceUsd: decimal("price_usd", { precision: 20, scale: 8 }),
+  riskScore: integer("risk_score").notNull(),
+  holderCount: integer("holder_count"),
+  volume24h: decimal("volume_24h", { precision: 20, scale: 2 }),
+  liquidityUsd: decimal("liquidity_usd", { precision: 20, scale: 2 }),
+  riskFlags: jsonb("risk_flags").$type<string[]>(), // Array of risk flag types
+  txCount24h: integer("tx_count_24h"),
+  analyzerVersion: varchar("analyzer_version", { length: 10 }).default("1.0"),
+}, (table) => [
+  index("idx_snapshots_token").on(table.tokenAddress),
+  index("idx_snapshots_captured").on(table.capturedAt),
+  index("idx_snapshots_token_time").on(table.tokenAddress, table.capturedAt),
+]);
+
+export type TokenSnapshot = typeof tokenSnapshots.$inferSelect;
+export type InsertTokenSnapshot = typeof tokenSnapshots.$inferInsert;
+
+// Trending tokens - calculated scores for hot/trending analysis
+export const trendingTokens = pgTable("trending_tokens", {
+  tokenAddress: varchar("token_address", { length: 44 }).primaryKey(),
+  score: decimal("score", { precision: 10, scale: 2 }).notNull(),
+  scoreBreakdown: jsonb("score_breakdown").$type<{
+    volumeScore: number;
+    velocityScore: number;
+    analysisScore: number;
+  }>().notNull(),
+  rank: integer("rank").notNull(),
+  volume24h: decimal("volume_24h", { precision: 20, scale: 2 }),
+  velocity: decimal("velocity", { precision: 10, scale: 2 }), // Rate of change
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_trending_rank").on(table.rank),
+  index("idx_trending_score").on(table.score),
+  index("idx_trending_updated").on(table.updatedAt),
+]);
+
+export type TrendingToken = typeof trendingTokens.$inferSelect;
+export type InsertTrendingToken = typeof trendingTokens.$inferInsert;
+
+// Risk statistics - aggregated risk data for dashboard insights
+export const riskStatistics = pgTable("risk_statistics", {
+  id: serial("id").primaryKey(),
+  windowStart: timestamp("window_start").notNull(),
+  windowEnd: timestamp("window_end").notNull(),
+  totalAnalyzed: integer("total_analyzed").notNull().default(0),
+  rugDetected: integer("rug_detected").notNull().default(0),
+  falsePositives: integer("false_positives").notNull().default(0),
+  commonFlags: jsonb("common_flags").$type<Record<string, number>>().notNull(), // { "mint_authority": 42, ... }
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_risk_stats_window").on(table.windowStart, table.windowEnd),
+  index("idx_risk_stats_updated").on(table.updatedAt),
+]);
+
+export type RiskStatistic = typeof riskStatistics.$inferSelect;
+export type InsertRiskStatistic = typeof riskStatistics.$inferInsert;
+
+// Zod schemas for analytics
+export const insertTokenSnapshotSchema = z.object({
+  tokenAddress: z.string().min(32).max(44),
+  priceUsd: z.string().or(z.number()).optional(),
+  riskScore: z.number().int().min(0).max(100),
+  holderCount: z.number().int().optional(),
+  volume24h: z.string().or(z.number()).optional(),
+  liquidityUsd: z.string().or(z.number()).optional(),
+  riskFlags: z.array(z.string()).optional(),
+  txCount24h: z.number().int().optional(),
+  analyzerVersion: z.string().max(10).optional(),
+});
+
+export const insertTrendingTokenSchema = z.object({
+  tokenAddress: z.string().min(32).max(44),
+  score: z.string().or(z.number()),
+  scoreBreakdown: z.object({
+    volumeScore: z.number(),
+    velocityScore: z.number(),
+    analysisScore: z.number(),
+  }),
+  rank: z.number().int(),
+  volume24h: z.string().or(z.number()).optional(),
+  velocity: z.string().or(z.number()).optional(),
+});
+
+export const insertRiskStatisticSchema = z.object({
+  windowStart: z.string().or(z.date()),
+  windowEnd: z.string().or(z.date()),
+  totalAnalyzed: z.number().int(),
+  rugDetected: z.number().int(),
+  falsePositives: z.number().int(),
+  commonFlags: z.record(z.number()),
+});
+
+export type InsertTokenSnapshotRequest = z.infer<typeof insertTokenSnapshotSchema>;
+export type InsertTrendingTokenRequest = z.infer<typeof insertTrendingTokenSchema>;
+export type InsertRiskStatisticRequest = z.infer<typeof insertRiskStatisticSchema>;

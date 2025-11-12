@@ -15,6 +15,11 @@ export const navigationConfig: NavSection[] = [
     title: "Tools",
     items: [
       {
+        title: "Analytics Dashboard",
+        href: "/analytics",
+        description: "Market intelligence and risk insights"
+      },
+      {
         title: "Portfolio Tracker",
         href: "/portfolio",
         description: "Track holdings, transactions, and P&L"

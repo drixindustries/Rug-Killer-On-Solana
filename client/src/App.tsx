@@ -21,6 +21,7 @@ import Watchlist from "@/pages/watchlist";
 import Portfolio from "@/pages/portfolio";
 import Alerts from "@/pages/alerts";
 import Comparison from "@/pages/comparison";
+import Analytics from "@/pages/analytics";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -37,6 +38,7 @@ function Router() {
       <Route path="/portfolio" component={Portfolio} />
       <Route path="/alerts" component={Alerts} />
       <Route path="/compare" component={Comparison} />
+      <Route path="/analytics" component={Analytics} />
       <Route path="/documentation" component={Documentation} />
       <Route path="/about" component={About} />
       <Route path="/terms" component={Terms} />

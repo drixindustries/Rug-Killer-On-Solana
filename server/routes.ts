@@ -794,6 +794,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // ============================================================================
+  // ANALYTICS ROUTES (Option C: Advanced Analytics Dashboard)
+  // ============================================================================
+  
+  // GET /api/analytics/market-overview - Market overview with trending tokens
+  app.get('/api/analytics/market-overview', async (req, res) => {
+    try {
+      const { priceCache } = await import('./services/price-cache');
+      const { getBlacklist } = await import('./ai-blacklist');
+      
+      // Get trending tokens (top 10)
+      const trending = await storage.getTrendingTokens(10);
+      
+      // Get recent snapshots for stats
+      const recentTokens = priceCache.getRecentlyUpdated(60); // Last hour
+      const totalAnalyzed = recentTokens.length;
+      
+      // Get blacklist count for rugs detected
+      const blacklist = await getBlacklist();
+      const rugsDetected = blacklist.length;
+      
+      // Calculate average risk score from trending tokens
+      let avgRiskScore = 0;
+      if (trending.length > 0) {
+        const riskScores = await Promise.all(
+          trending.slice(0, 5).map(async (t) => {
+            const snapshots = await storage.getHistoricalData(t.tokenAddress, 1);
+            return snapshots.length > 0 ? snapshots[snapshots.length - 1].riskScore : 0;
+          })
+        );
+        avgRiskScore = Math.round(riskScores.reduce((a, b) => a + b, 0) / riskScores.length);
+      }
+      
+      // Get active alerts count
+      const activeAlerts = await storage.getActivePriceAlerts();
+      
+      res.json({
+        totalAnalyzed,
+        rugsDetected,
+        avgRiskScore,
+        activeAlerts: activeAlerts.length,
+        trending: trending.map(t => ({
+          tokenAddress: t.tokenAddress,
+          score: parseFloat(t.score as string),
+          rank: t.rank,
+          volume24h: t.volume24h ? parseFloat(t.volume24h as string) : null,
+          velocity: t.velocity ? parseFloat(t.velocity as string) : null,
+        })),
+      });
+    } catch (error: any) {
+      console.error("Error fetching market overview:", error);
+      res.status(500).json({ message: "Failed to fetch market overview: " + error.message });
+    }
+  });
+  
+  // GET /api/analytics/historical/:tokenAddress - Historical token data
+  app.get('/api/analytics/historical/:tokenAddress', async (req, res) => {
+    try {
+      const { tokenAddress } = req.params;
+      const days = parseInt(req.query.days as string) || 7;
+      
+      if (!tokenAddress || tokenAddress.length < 32 || tokenAddress.length > 44) {
+        return res.status(400).json({ message: "Invalid token address" });
+      }
+      
+      if (days < 1 || days > 90) {
+        return res.status(400).json({ message: "Days must be between 1 and 90" });
+      }
+      
+      const historical = await storage.getHistoricalData(tokenAddress, days);
+      
+      res.json({
+        tokenAddress,
+        days,
+        dataPoints: historical.length,
+        data: historical.map(h => ({
+          timestamp: h.capturedAt,
+          priceUsd: h.priceUsd ? parseFloat(h.priceUsd as string) : null,
+          riskScore: h.riskScore,
+          holderCount: h.holderCount,
+          volume24h: h.volume24h ? parseFloat(h.volume24h as string) : null,
+          liquidityUsd: h.liquidityUsd ? parseFloat(h.liquidityUsd as string) : null,
+          riskFlags: h.riskFlags,
+          txCount24h: h.txCount24h,
+        })),
+      });
+    } catch (error: any) {
+      console.error("Error fetching historical data:", error);
+      res.status(500).json({ message: "Failed to fetch historical data: " + error.message });
+    }
+  });
+  
+  // GET /api/analytics/risk-insights - Aggregate risk patterns
+  app.get('/api/analytics/risk-insights', async (req, res) => {
+    try {
+      const stats7d = await storage.getRiskStatistics(7);
+      const stats30d = await storage.getRiskStatistics(30);
+      
+      res.json({
+        last7Days: stats7d ? {
+          totalAnalyzed: stats7d.totalAnalyzed,
+          rugDetected: stats7d.rugDetected,
+          falsePositives: stats7d.falsePositives,
+          detectionRate: stats7d.totalAnalyzed > 0 
+            ? (stats7d.rugDetected / stats7d.totalAnalyzed * 100).toFixed(2)
+            : 0,
+          commonFlags: stats7d.commonFlags,
+        } : null,
+        last30Days: stats30d ? {
+          totalAnalyzed: stats30d.totalAnalyzed,
+          rugDetected: stats30d.rugDetected,
+          falsePositives: stats30d.falsePositives,
+          detectionRate: stats30d.totalAnalyzed > 0 
+            ? (stats30d.rugDetected / stats30d.totalAnalyzed * 100).toFixed(2)
+            : 0,
+          commonFlags: stats30d.commonFlags,
+        } : null,
+      });
+    } catch (error: any) {
+      console.error("Error fetching risk insights:", error);
+      res.status(500).json({ message: "Failed to fetch risk insights: " + error.message });
+    }
+  });
+  
+  // GET /api/analytics/hot-tokens - Real-time trending tokens feed
+  app.get('/api/analytics/hot-tokens', async (req, res) => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+      const trending = await storage.getTrendingTokens(limit);
+      
+      // Enrich with latest price data
+      const { priceService } = await import('./services/price-service');
+      const enriched = await Promise.all(
+        trending.map(async (t) => {
+          const priceData = await priceService.getPrice(t.tokenAddress);
+          const snapshots = await storage.getHistoricalData(t.tokenAddress, 1);
+          const latestSnapshot = snapshots.length > 0 ? snapshots[snapshots.length - 1] : null;
+          
+          return {
+            tokenAddress: t.tokenAddress,
+            score: parseFloat(t.score as string),
+            rank: t.rank,
+            volume24h: t.volume24h ? parseFloat(t.volume24h as string) : null,
+            velocity: t.velocity ? parseFloat(t.velocity as string) : null,
+            priceUsd: priceData?.priceUsd || null,
+            priceChange24h: priceData?.priceChange24h || null,
+            riskScore: latestSnapshot?.riskScore || null,
+            updatedAt: t.updatedAt,
+          };
+        })
+      );
+      
+      res.json(enriched);
+    } catch (error: any) {
+      console.error("Error fetching hot tokens:", error);
+      res.status(500).json({ message: "Failed to fetch hot tokens: " + error.message });
+    }
+  });
+  
+  // GET /api/analytics/performance - Detection performance metrics
+  app.get('/api/analytics/performance', async (req, res) => {
+    try {
+      const stats7d = await storage.getRiskStatistics(7);
+      const stats30d = await storage.getRiskStatistics(30);
+      
+      const performance = {
+        last7Days: stats7d ? {
+          detectionRate: stats7d.totalAnalyzed > 0 
+            ? ((stats7d.rugDetected / stats7d.totalAnalyzed) * 100).toFixed(2)
+            : "0.00",
+          falsePositiveRate: stats7d.totalAnalyzed > 0 
+            ? ((stats7d.falsePositives / stats7d.totalAnalyzed) * 100).toFixed(2)
+            : "0.00",
+          coverage: stats7d.totalAnalyzed,
+          avgAnalysisTime: "~2s", // Static for now
+        } : null,
+        last30Days: stats30d ? {
+          detectionRate: stats30d.totalAnalyzed > 0 
+            ? ((stats30d.rugDetected / stats30d.totalAnalyzed) * 100).toFixed(2)
+            : "0.00",
+          falsePositiveRate: stats30d.totalAnalyzed > 0 
+            ? ((stats30d.falsePositives / stats30d.totalAnalyzed) * 100).toFixed(2)
+            : "0.00",
+          coverage: stats30d.totalAnalyzed,
+          avgAnalysisTime: "~2s", // Static for now
+        } : null,
+      };
+      
+      res.json(performance);
+    } catch (error: any) {
+      console.error("Error fetching performance metrics:", error);
+      res.status(500).json({ message: "Failed to fetch performance metrics: " + error.message });
+    }
+  });
+  
+  // ============================================================================
   // PORTFOLIO ROUTES
   // ============================================================================
   

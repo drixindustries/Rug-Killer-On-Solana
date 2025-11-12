@@ -71,6 +71,10 @@ app.use((req, res, next) => {
       console.error('Failed to start Alpha Alert service:', err);
     });
   }
+
+  // Start analytics worker (always enabled for dashboard)
+  const { analyticsWorker } = await import('./workers/analytics-worker');
+  analyticsWorker.start();
   
   const server = await registerRoutes(app);
 

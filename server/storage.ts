@@ -10,6 +10,9 @@ import {
   portfolioPositions,
   portfolioTransactions,
   priceAlerts,
+  tokenSnapshots,
+  trendingTokens,
+  riskStatistics,
   type User,
   type UpsertUser,
   type SubscriptionCode,
@@ -31,6 +34,12 @@ import {
   type InsertPortfolioTransaction,
   type PriceAlert,
   type InsertPriceAlert,
+  type TokenSnapshot,
+  type InsertTokenSnapshot,
+  type TrendingToken,
+  type InsertTrendingToken,
+  type RiskStatistic,
+  type InsertRiskStatistic,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, isNull, lt, inArray, desc, sql } from "drizzle-orm";
@@ -87,6 +96,14 @@ export interface IStorage {
   updatePriceAlert(alertId: string, data: Partial<InsertPriceAlert>): Promise<PriceAlert>;
   deletePriceAlert(userId: string, alertId: string): Promise<void>;
   triggerAlert(alertId: string, currentPrice: number): Promise<PriceAlert>;
+  
+  // Analytics operations
+  saveTokenSnapshot(snapshot: Omit<InsertTokenSnapshot, 'id' | 'capturedAt'>): Promise<TokenSnapshot>;
+  getHistoricalData(tokenAddress: string, days: number): Promise<TokenSnapshot[]>;
+  getTrendingTokens(limit?: number): Promise<TrendingToken[]>;
+  updateTrendingScores(tokens: InsertTrendingToken[]): Promise<void>;
+  getRiskStatistics(windowDays: number): Promise<RiskStatistic | undefined>;
+  saveRiskStatistics(stats: Omit<InsertRiskStatistic, 'id' | 'updatedAt'>): Promise<RiskStatistic>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -777,6 +794,84 @@ export class DatabaseStorage implements IStorage {
       .where(eq(priceAlerts.id, alertId))
       .returning();
     return updated;
+  }
+
+  // Analytics operations
+  async saveTokenSnapshot(snapshot: Omit<InsertTokenSnapshot, 'id' | 'capturedAt'>): Promise<TokenSnapshot> {
+    const [saved] = await db
+      .insert(tokenSnapshots)
+      .values(snapshot)
+      .returning();
+    return saved;
+  }
+
+  async getHistoricalData(tokenAddress: string, days: number): Promise<TokenSnapshot[]> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+
+    return await db
+      .select()
+      .from(tokenSnapshots)
+      .where(
+        and(
+          eq(tokenSnapshots.tokenAddress, tokenAddress),
+          sql`${tokenSnapshots.capturedAt} >= ${cutoffDate}`
+        )
+      )
+      .orderBy(tokenSnapshots.capturedAt);
+  }
+
+  async getTrendingTokens(limit: number = 50): Promise<TrendingToken[]> {
+    return await db
+      .select()
+      .from(trendingTokens)
+      .orderBy(trendingTokens.rank)
+      .limit(limit);
+  }
+
+  async updateTrendingScores(tokens: InsertTrendingToken[]): Promise<void> {
+    if (tokens.length === 0) return;
+
+    await db.transaction(async (tx) => {
+      for (const token of tokens) {
+        await tx
+          .insert(trendingTokens)
+          .values(token)
+          .onConflictDoUpdate({
+            target: trendingTokens.tokenAddress,
+            set: {
+              score: token.score,
+              scoreBreakdown: token.scoreBreakdown,
+              rank: token.rank,
+              volume24h: token.volume24h,
+              velocity: token.velocity,
+              updatedAt: new Date(),
+            },
+          });
+      }
+    });
+  }
+
+  async getRiskStatistics(windowDays: number): Promise<RiskStatistic | undefined> {
+    const windowStart = new Date();
+    windowStart.setDate(windowStart.getDate() - windowDays);
+
+    const [stats] = await db
+      .select()
+      .from(riskStatistics)
+      .where(sql`${riskStatistics.windowStart} >= ${windowStart}`)
+      .orderBy(desc(riskStatistics.windowEnd))
+      .limit(1);
+
+    return stats;
+  }
+
+  async saveRiskStatistics(stats: Omit<InsertRiskStatistic, 'id' | 'updatedAt'>): Promise<RiskStatistic> {
+    const [saved] = await db
+      .insert(riskStatistics)
+      .values(stats)
+      .returning();
+    return saved;
   }
 }
 
