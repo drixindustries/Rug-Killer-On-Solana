@@ -116,8 +116,8 @@ export class AlertWorker {
       const currentPrice = priceData.priceUsd;
       const targetValue = parseFloat(alert.targetValue);
 
-      // Update last checked price
-      await storage.updatePriceAlert(alert.id, { lastPrice: currentPrice.toString() });
+      // Update last checked price with fixed precision (avoid exponential notation)
+      await storage.updatePriceAlert(alert.id, { lastPrice: currentPrice.toFixed(8) });
 
       // Evaluate condition based on alert type
       let triggered = false;

@@ -828,9 +828,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const txResult = await storage.recordTransaction(userId, {
         tokenAddress,
         txType,
-        quantity,
-        priceUsd,
-        feeUsd,
+        quantity: String(quantity),
+        priceUsd: priceUsd !== undefined ? String(priceUsd) : undefined,
+        feeUsd: feeUsd !== undefined ? String(feeUsd) : undefined,
         note,
         executedAt: executedAt ? new Date(executedAt) : new Date(),
       });

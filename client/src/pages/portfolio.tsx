@@ -74,13 +74,23 @@ export default function Portfolio() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
+    // Parse and validate numeric fields (avoid empty string issues)
+    const quantity = formData.get('quantity');
+    const priceUsd = formData.get('priceUsd');
+    const feeUsd = formData.get('feeUsd');
+    
+    if (!quantity || isNaN(parseFloat(quantity as string))) {
+      toast({ title: "Error", description: "Invalid quantity", variant: "destructive" });
+      return;
+    }
+    
     addTransaction.mutate({
-      tokenAddress: formData.get('tokenAddress'),
-      txType: formData.get('txType'),
-      quantity: formData.get('quantity'),
-      priceUsd: formData.get('priceUsd') || undefined,
-      feeUsd: formData.get('feeUsd') || undefined,
-      note: formData.get('note') || undefined,
+      tokenAddress: formData.get('tokenAddress') as string,
+      txType: formData.get('txType') as string,
+      quantity: parseFloat(quantity as string),
+      priceUsd: priceUsd && priceUsd !== '' ? parseFloat(priceUsd as string) : undefined,
+      feeUsd: feeUsd && feeUsd !== '' ? parseFloat(feeUsd as string) : undefined,
+      note: formData.get('note') as string || undefined,
     });
   };
 

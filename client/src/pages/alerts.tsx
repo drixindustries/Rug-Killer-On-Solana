@@ -76,15 +76,25 @@ export default function Alerts() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const alertType = formData.get('alertType') as string;
+    const targetValue = formData.get('targetValue');
+    
+    // Validate numeric fields
+    if (!targetValue || isNaN(parseFloat(targetValue as string))) {
+      toast({ title: "Error", description: "Invalid target value", variant: "destructive" });
+      return;
+    }
     
     const data: any = {
-      tokenAddress: formData.get('tokenAddress'),
+      tokenAddress: formData.get('tokenAddress') as string,
       alertType,
-      targetValue: formData.get('targetValue'),
+      targetValue: parseFloat(targetValue as string),
     };
 
     if (alertType === 'percent_change' || alertType === 'percent_drop') {
-      data.lookbackWindowMinutes = parseInt(formData.get('lookbackWindowMinutes') as string);
+      const lookback = formData.get('lookbackWindowMinutes');
+      if (lookback && lookback !== '') {
+        data.lookbackWindowMinutes = parseInt(lookback as string);
+      }
     }
     
     createAlert.mutate(data);

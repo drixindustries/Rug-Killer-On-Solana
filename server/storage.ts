@@ -529,14 +529,22 @@ export class DatabaseStorage implements IStorage {
     const Decimal = (await import('decimal.js')).default;
     type DecimalType = InstanceType<typeof Decimal>;
     
-    // Validate required fields per txType
-    if ((tx.txType === 'buy' || tx.txType === 'sell') && !tx.priceUsd) {
-      throw new Error(`priceUsd is required for ${tx.txType} transactions`);
-    }
-    
-    const quantity = new Decimal(tx.quantity.toString());
+    // Coerce and validate numeric inputs (FormData sends strings)
+    const quantity = new Decimal(String(tx.quantity));
     if (quantity.isZero() || quantity.isNegative()) {
       throw new Error('Transaction quantity must be positive');
+    }
+    
+    // Validate required fields per txType
+    if (tx.txType === 'buy' || tx.txType === 'sell') {
+      if (!tx.priceUsd || tx.priceUsd === '' || tx.priceUsd === null) {
+        throw new Error(`priceUsd is required for ${tx.txType} transactions`);
+      }
+      // Validate priceUsd is numeric
+      const price = new Decimal(String(tx.priceUsd));
+      if (price.isNegative()) {
+        throw new Error('Price must be positive');
+      }
     }
 
     // Use database transaction with row-level locking
@@ -592,9 +600,15 @@ export class DatabaseStorage implements IStorage {
           break;
 
         case 'sell':
-          // Validate sufficient holdings
+          // Validate sufficient holdings BEFORE any calculations
           if (oldQuantity.lessThan(quantity)) {
-            throw new Error(`Insufficient holdings: have ${oldQuantity.toString()}, trying to sell ${quantity.toString()}`);
+            throw new Error(`Insufficient holdings: have ${oldQuantity.toFixed(4)}, trying to sell ${quantity.toFixed(4)}`);
+          }
+          
+          // Additional safety check - prevent negative quantities
+          const afterSellQuantity = oldQuantity.minus(quantity);
+          if (afterSellQuantity.isNegative()) {
+            throw new Error(`Sell would result in negative quantity`);
           }
           
           // Realized P&L: (sellPrice * sellQty - fee) - (avgCost * sellQty)
@@ -602,7 +616,7 @@ export class DatabaseStorage implements IStorage {
           const costBasis = oldAvgCost.times(quantity);
           const realizedGain = proceeds.minus(costBasis);
           
-          newQuantity = oldQuantity.minus(quantity);
+          newQuantity = afterSellQuantity;
           newRealizedPnl = oldRealizedPnl.plus(realizedGain);
           
           // Keep avgCost if position remains, reset to null if fully liquidated
