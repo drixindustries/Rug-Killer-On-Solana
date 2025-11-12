@@ -7,8 +7,7 @@ interface BubbleMapsCardProps {
 }
 
 export function BubbleMapsCard({ tokenAddress }: BubbleMapsCardProps) {
-  const bubbleMapsUrl = `https://app.bubblemaps.io/sol/token/${tokenAddress}`;
-  const embedUrl = `${bubbleMapsUrl}?embed=true`;
+  const bubbleMapsUrl = `https://bubblemaps.io/sol/token/${tokenAddress}`;
 
   return (
     <Card data-testid="card-bubblemaps">
@@ -30,16 +29,24 @@ export function BubbleMapsCard({ tokenAddress }: BubbleMapsCardProps) {
           </a>
         </Button>
       </CardHeader>
-      <CardContent className="p-0">
-        <div className="relative w-full aspect-[16/10] bg-muted">
-          <iframe
-            src={embedUrl}
-            className="absolute inset-0 w-full h-full border-0"
-            title="BubbleMaps Token Visualization"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            data-testid="iframe-bubblemaps"
-          />
+      <CardContent>
+        <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
+          <div className="text-sm text-muted-foreground">
+            BubbleMaps provides interactive visual holder distribution maps
+          </div>
+          <Button
+            variant="default"
+            asChild
+            data-testid="button-view-bubblemaps"
+          >
+            <a href={bubbleMapsUrl} target="_blank" rel="noopener noreferrer">
+              View on BubbleMaps
+              <ExternalLink className="h-4 w-4 ml-2" />
+            </a>
+          </Button>
+          <div className="text-xs text-muted-foreground">
+            Opens in new tab with full interactive visualization
+          </div>
         </div>
       </CardContent>
     </Card>

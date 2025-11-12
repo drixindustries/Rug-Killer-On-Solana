@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Header } from "@/components/header";
+import { Header } from "@/components/header-new";
 import { Footer } from "@/components/footer";
 import { TokenInput } from "@/components/token-input";
 import { RiskScoreCard } from "@/components/risk-score-card";
