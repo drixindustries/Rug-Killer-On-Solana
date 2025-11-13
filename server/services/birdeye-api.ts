@@ -28,44 +28,62 @@ interface BirdeyeHolder {
 }
 
 export async function getBirdeyeOverview(tokenAddress: string): Promise<BirdeyeOverview | null> {
+  if (!API_KEY) {
+    return null;
+  }
+  
   try {
     const response = await axios.get(`${BIRDEYE_API}/defi/overview`, {
       params: { address: tokenAddress },
-      headers: API_KEY ? { 'X-API-KEY': API_KEY } : {},
+      headers: { 'X-API-KEY': API_KEY },
       timeout: 10000
     });
     return response.data?.data || null;
-  } catch (error) {
-    console.error('[Birdeye] Overview error:', error);
+  } catch (error: any) {
+    if (error.response?.status === 401) {
+      console.error('[Birdeye] Invalid API key');
+    }
     return null;
   }
 }
 
 export async function getBirdeyePriceHistory(tokenAddress: string, days: number = 1): Promise<BirdeyePricePoint[]> {
+  if (!API_KEY) {
+    return [];
+  }
+  
   try {
     const timeFrom = Math.floor(Date.now() / 1000) - (days * 86400);
     const response = await axios.get(`${BIRDEYE_API}/defi/price_history`, {
       params: { address: tokenAddress, time_from: timeFrom },
-      headers: API_KEY ? { 'X-API-KEY': API_KEY } : {},
+      headers: { 'X-API-KEY': API_KEY },
       timeout: 10000
     });
     return response.data?.data || [];
-  } catch (error) {
-    console.error('[Birdeye] Price history error:', error);
+  } catch (error: any) {
+    if (error.response?.status === 401) {
+      console.error('[Birdeye] Invalid API key');
+    }
     return [];
   }
 }
 
 export async function getBirdeyeTopHolders(tokenAddress: string): Promise<BirdeyeHolder[]> {
+  if (!API_KEY) {
+    return [];
+  }
+  
   try {
     const response = await axios.get(`${BIRDEYE_API}/token/top_holders`, {
       params: { address: tokenAddress },
-      headers: API_KEY ? { 'X-API-KEY': API_KEY } : {},
+      headers: { 'X-API-KEY': API_KEY },
       timeout: 10000
     });
     return response.data?.data?.slice(0, 20) || [];
-  } catch (error) {
-    console.error('[Birdeye] Top holders error:', error);
+  } catch (error: any) {
+    if (error.response?.status === 401) {
+      console.error('[Birdeye] Invalid API key');
+    }
     return [];
   }
 }

@@ -39,7 +39,13 @@ export class SolanaTokenAnalyzer {
 
   async analyzeToken(tokenAddress: string): Promise<TokenAnalysisResponse> {
     try {
-      const mintPubkey = new PublicKey(tokenAddress);
+      // Validate address format before proceeding
+      let mintPubkey: PublicKey;
+      try {
+        mintPubkey = new PublicKey(tokenAddress);
+      } catch (error) {
+        throw new Error(`Invalid Solana address format: ${tokenAddress}`);
+      }
       
       // Fetch mint account info
       const connection = this.getConnection();

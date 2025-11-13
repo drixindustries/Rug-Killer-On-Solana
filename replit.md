@@ -20,7 +20,16 @@ Preferred communication style: Simple, everyday language.
   - Removed commented-out code blocks
   - Streamlined logging for clean production logs
 - Codebase is now GitHub-ready and production-ready
-- Added quick links to AXiom, Padre, and GMGN bots in both Telegram and Discord bot responses for easy cross-platform analysis
+- Added quick links in bot responses for cross-platform analysis:
+  - Fixed Padre bot link (corrected username to @padre_tg_bot)
+  - Removed AXiom (no official Telegram bot exists - only scams)
+  - Added Birdeye analytics platform
+  - Retained GMGN, Solscan, DexScreener, and Rugcheck
+- Improved API error handling:
+  - Birdeye API calls now skip gracefully when API key is not configured
+  - Jupiter API failures handled silently without error spam
+  - Better validation for invalid Solana addresses
+  - Analysis continues to work with core RPC data even when optional APIs fail
 
 ## System Architecture
 
