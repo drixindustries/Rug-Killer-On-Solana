@@ -21,10 +21,10 @@ Preferred communication style: Simple, everyday language.
   - Streamlined logging for clean production logs
 - Codebase is now GitHub-ready and production-ready
 - Added quick links in bot responses for cross-platform analysis:
-  - Fixed Padre bot link (corrected username to @padre_tg_bot)
-  - Removed AXiom (no official Telegram bot exists - only scams)
-  - Added Birdeye analytics platform
-  - Retained GMGN, Solscan, DexScreener, and Rugcheck
+  - AXiom trading platform (axiom.trade - Y Combinator-backed Solana DEX)
+  - Padre bot (corrected username to @padre_tg_bot)
+  - Birdeye analytics platform
+  - GMGN, Solscan, DexScreener, and Rugcheck
 - Improved API error handling:
   - Birdeye API calls now skip gracefully when API key is not configured
   - Jupiter API failures handled silently without error spam

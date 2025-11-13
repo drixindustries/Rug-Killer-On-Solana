@@ -126,6 +126,7 @@ Use /execute ${analysis.tokenAddress.slice(0, 8)}... for full analysis`;
   message += `• [Solscan](https://solscan.io/token/${analysis.tokenAddress})\n`;
   message += `• [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress})\n`;
   message += `• [Rugcheck](https://rugcheck.xyz/tokens/${analysis.tokenAddress})\n`;
+  message += `• [AXiom](https://axiom.trade)\n`;
   message += `• [Padre Bot](https://t.me/padre_tg_bot?start=${analysis.tokenAddress})\n`;
   message += `• [GMGN](https://gmgn.ai/sol/token/${analysis.tokenAddress})\n`;
   message += `• [Birdeye](https://birdeye.so/token/${analysis.tokenAddress}?chain=solana)\n`;
