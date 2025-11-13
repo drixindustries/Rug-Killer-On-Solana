@@ -70,3 +70,9 @@ attached_assets/*.html
 analysis_fullpage.png
 generated-icon.png
 delete.sh
+
+# Internal/dangerous files (NOT for public GitHub)
+replit.md
+design_guidelines.md
+server/sniper-bot.ts
+server/token-deployer.ts
