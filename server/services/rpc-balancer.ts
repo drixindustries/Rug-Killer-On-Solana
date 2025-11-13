@@ -1,7 +1,7 @@
 import { Connection } from "@solana/web3.js";
 
 interface RpcProvider {
-  url: string;
+  getUrl: () => string;
   weight: number;
   name: string;
   score: number;
@@ -10,27 +10,27 @@ interface RpcProvider {
 
 const RPC_PROVIDERS = [
   { 
-    url: `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_KEY || ""}`, 
+    getUrl: () => `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_KEY || ""}`,
     weight: 40, 
     name: "Helius" 
   },
   { 
-    url: `https://solana-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY || ""}`, 
+    getUrl: () => `https://solana-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY || ""}`,
     weight: 35, 
     name: "Alchemy" 
   },
   { 
-    url: "https://rpc.ankr.com/solana", 
+    getUrl: () => "https://rpc.ankr.com/solana",
     weight: 15, 
     name: "Ankr" 
   },
   { 
-    url: "https://solana-api.projectserum.com", 
+    getUrl: () => "https://solana-api.projectserum.com",
     weight: 10, 
     name: "Serum" 
   },
   { 
-    url: "https://api.mainnet-beta.solana.com", 
+    getUrl: () => "https://api.mainnet-beta.solana.com",
     weight: 5, 
     name: "Public" 
   },
@@ -69,7 +69,8 @@ export class SolanaRpcBalancer {
 
   getConnection(): Connection {
     const provider = this.select();
-    return new Connection(provider.url, { commitment: "confirmed" });
+    const url = provider.getUrl();
+    return new Connection(url, { commitment: "confirmed" });
   }
 
   getHealthStats() {
@@ -89,7 +90,8 @@ export const rpcBalancer = new SolanaRpcBalancer(RPC_PROVIDERS);
 setInterval(() => {
   rpcBalancer.providers.forEach(async (p) => {
     try {
-      const conn = new Connection(p.url, { commitment: "confirmed" });
+      const url = p.getUrl();
+      const conn = new Connection(url, { commitment: "confirmed" });
       await conn.getSlot();
       p.score = Math.min(100, p.score + 5);
     } catch (error) {
