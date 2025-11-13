@@ -18,6 +18,26 @@ export const KNOWN_EXCHANGES: KnownAddress[] = [
     source: 'Solscan labeled'
   },
   {
+    address: '5tzL3DfsF8i36KeUCjtzWP9zqS6zWjYhR76VA4Y5CzzJ',
+    label: 'Binance 1',
+    type: 'exchange',
+    source: 'Solscan labeled'
+  },
+  {
+    address: 'H8sMJSCQxfKiFTCfDR3DUYexta7Kxymr2gF3LceH44uR',
+    label: 'Binance 2',
+    type: 'exchange',
+    source: 'Solscan labeled'
+  },
+  // FTX (defunct, historical holdings)
+  {
+    address: '6ZRCB7AAqGre6c72PRz3MHLC73VMYvJ8bi9KHf1HFpNk',
+    label: 'FTX Cold Storage',
+    type: 'exchange',
+    source: 'Solscan labeled'
+  },
+  // User verified exchange
+  {
     address: '4xJLmpojrDeXEnfDoeG9UdHXozY2Qn48ZyiPyRhabAN3',
     label: 'Exchange Wallet',
     type: 'exchange',
