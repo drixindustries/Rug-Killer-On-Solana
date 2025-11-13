@@ -33,24 +33,26 @@ export function HolderDistributionChart({ holders, totalConcentration }: HolderD
           </p>
         </div>
 
-        <div className="w-full h-[400px]">
+        <div className="w-full h-[600px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
               layout="vertical"
-              margin={{ top: 5, right: 30, left: 60, bottom: 5 }}
+              margin={{ top: 20, right: 40, left: 100, bottom: 20 }}
+              barGap={8}
+              barCategoryGap="20%"
             >
               <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
               <XAxis 
                 type="number" 
                 domain={[0, 'auto']}
-                label={{ value: '% of Total Supply', position: 'insideBottom', offset: -5 }}
+                label={{ value: '% of Total Supply', position: 'insideBottom', offset: -10 }}
               />
               <YAxis 
                 type="category" 
                 dataKey="name" 
-                width={80}
-                style={{ fontSize: '12px', fontFamily: 'JetBrains Mono, monospace' }}
+                width={100}
+                style={{ fontSize: '13px', fontFamily: 'JetBrains Mono, monospace' }}
               />
               <Tooltip
                 formatter={(value: number) => [`${value.toFixed(2)}%`, 'Percentage']}
@@ -60,7 +62,7 @@ export function HolderDistributionChart({ holders, totalConcentration }: HolderD
                   borderRadius: '6px',
                 }}
               />
-              <Bar dataKey="percentage" radius={[0, 4, 4, 0]}>
+              <Bar dataKey="percentage" radius={[0, 4, 4, 0]} barSize={40}>
                 {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={getBarColor(entry.percentage)} />
                 ))}
