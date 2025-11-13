@@ -110,16 +110,18 @@ interface PerformanceData {
 }
 
 function getRiskBadgeVariant(score: number): "default" | "secondary" | "destructive" | "outline" {
-  if (score < 30) return "default";
-  if (score < 60) return "secondary";
-  if (score < 80) return "outline";
+  // REVERSED: 70-100 (green), 40-70 (yellow), 20-40 (orange), 0-20 (red)
+  if (score >= 70) return "default";
+  if (score >= 40) return "secondary";
+  if (score >= 20) return "outline";
   return "destructive";
 }
 
 function getRiskLevel(score: number): string {
-  if (score < 30) return "LOW";
-  if (score < 60) return "MODERATE";
-  if (score < 80) return "HIGH";
+  // REVERSED: 70-100 (green), 40-70 (yellow), 20-40 (orange), 0-20 (red)
+  if (score >= 70) return "LOW";
+  if (score >= 40) return "MODERATE";
+  if (score >= 20) return "HIGH";
   return "EXTREME";
 }
 

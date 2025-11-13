@@ -88,46 +88,73 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(color)
     .setTitle(`${emoji} ${analysis.metadata.name} (${analysis.metadata.symbol})`)
-    .setDescription(`Risk Score: **${analysis.riskScore}/100** (${analysis.riskLevel})`)
-    .addFields(
-      {
-        name: '📊 Token Info',
-        value: `Supply: ${formatNumber(analysis.metadata.supply)}\nHolders: ${analysis.holderCount}\nTop 10: ${analysis.topHolderConcentration.toFixed(2)}%`,
-        inline: true
-      },
-      {
-        name: '🔒 Authorities',
-        value: `Mint: ${analysis.mintAuthority.hasAuthority ? (analysis.mintAuthority.isRevoked ? '✅ Revoked' : '❌ Active') : '✅ None'}\nFreeze: ${analysis.freezeAuthority.hasAuthority ? (analysis.freezeAuthority.isRevoked ? '✅ Revoked' : '❌ Active') : '✅ None'}`,
-        inline: true
-      },
-      {
-        name: '💧 Liquidity',
-        value: getLiquidityFieldValue(analysis.liquidityPool),
-        inline: true
-      }
-    )
+    .setDescription(`**${analysis.riskScore}/100** (${analysis.riskLevel})\n_Higher = Safer (0=Dangerous, 100=Safe)_`)
     .setFooter({ text: `Contract: ${formatAddress(analysis.tokenAddress)}` })
     .setTimestamp();
   
-  // Add red flags if any
+  // AI VERDICT (Rick Bot feature)
+  if (analysis.aiVerdict) {
+    embed.addFields({
+      name: '🤖 AI VERDICT',
+      value: `${analysis.aiVerdict.rating} - ${analysis.aiVerdict.verdict}`,
+      inline: false
+    });
+  }
+  
+  // PRICE DATA
+  if (analysis.dexscreenerData?.pairs?.[0]) {
+    const pair = analysis.dexscreenerData.pairs[0];
+    const priceChange = pair.priceChange.h24 >= 0 ? '📈' : '📉';
+    embed.addFields({
+      name: '💰 PRICE',
+      value: `Price: $${parseFloat(pair.priceUsd).toFixed(8)}\n24h Vol: $${formatNumber(pair.volume.h24)}\n24h Change: ${priceChange} ${pair.priceChange.h24.toFixed(2)}%\nMCap: $${formatNumber(pair.marketCap || 0)}`,
+      inline: true
+    });
+  }
+  
+  // SECURITY
+  const burnPct = analysis.liquidityPool.burnPercentage;
+  const burnEmoji = burnPct !== undefined ? (burnPct >= 99.99 ? '✅' : burnPct >= 50 ? '⚠️' : '❌') : '❓';
+  const burnText = burnPct !== undefined ? `${burnPct.toFixed(1)}%` : 'Unknown';
+  
+  embed.addFields({
+    name: '🔐 SECURITY',
+    value: `Mint: ${analysis.mintAuthority.hasAuthority ? '❌ Active' : '✅ Revoked'}\nFreeze: ${analysis.freezeAuthority.hasAuthority ? '❌ Active' : '✅ Revoked'}\nLP Burn: ${burnEmoji} ${burnText}`,
+    inline: true
+  });
+  
+  // PUMP.FUN INFO (Rick Bot feature)
+  if (analysis.pumpFunData?.isPumpFun) {
+    embed.addFields({
+      name: '🎯 PUMP.FUN',
+      value: `Dev Bought: ${analysis.pumpFunData.devBought.toFixed(2)}%\nBonding Curve: ${analysis.pumpFunData.bondingCurve.toFixed(2)}%`,
+      inline: true
+    });
+  }
+  
+  // HOLDERS
+  embed.addFields({
+    name: '👛 HOLDERS',
+    value: `Total: ${analysis.holderCount}\nTop 10: ${analysis.topHolderConcentration.toFixed(2)}%\nSupply: ${formatNumber(analysis.metadata.supply)}`,
+    inline: true
+  });
+  
+  // RED FLAGS
   if (analysis.redFlags.length > 0) {
     const criticalFlags = analysis.redFlags.filter(f => f.severity === 'critical' || f.severity === 'high');
     if (criticalFlags.length > 0) {
       embed.addFields({
-        name: '⚠️ Red Flags',
-        value: criticalFlags.map(f => `${f.severity === 'critical' ? '🔴' : '🟠'} ${f.title}`).join('\n').slice(0, 1024)
+        name: '⚠️ ALERTS',
+        value: criticalFlags.slice(0, 3).map(f => `${f.severity === 'critical' ? '🔴' : '🟠'} ${f.title}`).join('\n').slice(0, 1024)
       });
     }
   }
   
-  // Add market data if available
-  if (analysis.dexscreenerData?.pairs?.[0]) {
-    const pair = analysis.dexscreenerData.pairs[0];
-    embed.addFields({
-      name: '💰 Market Data',
-      value: `Price: $${parseFloat(pair.priceUsd).toFixed(8)}\n24h Vol: $${formatNumber(pair.volume.h24)}\nLiquidity: $${formatNumber(pair.liquidity?.usd || 0)}\n24h Change: ${pair.priceChange.h24.toFixed(2)}%`
-    });
-  }
+  // QUICK LINKS
+  embed.addFields({
+    name: '🔗 QUICK LINKS',
+    value: `[Solscan](https://solscan.io/token/${analysis.tokenAddress}) • [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress}) • [Rugcheck](https://rugcheck.xyz/tokens/${analysis.tokenAddress})`
+  });
   
   embed.setURL(`https://solscan.io/token/${analysis.tokenAddress}`);
   

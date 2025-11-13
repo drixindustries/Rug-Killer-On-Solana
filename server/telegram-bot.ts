@@ -53,73 +53,76 @@ function formatAnalysis(analysis: TokenAnalysisResponse, compact: boolean = fals
 Use /execute ${analysis.tokenAddress.slice(0, 8)}... for full analysis`;
   }
   
-  let message = `${emoji} **${analysis.metadata.name} (${analysis.metadata.symbol})**\n\n`;
-  message += `🎯 **Risk Score: ${analysis.riskScore}/100** (${analysis.riskLevel})\n\n`;
+  // RICK BOT STYLE FORMATTING
+  let message = `━━━━━━━━━━━━━━━━━━━━━━\n`;
+  message += `${emoji} **${analysis.metadata.name} (${analysis.metadata.symbol})**\n`;
+  message += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   
-  message += `**TOKEN INFO**\n`;
-  message += `• Supply: ${formatNumber(analysis.metadata.supply)}\n`;
-  message += `• Holders: ${analysis.holderCount}\n`;
-  message += `• Top 10 Concentration: ${analysis.topHolderConcentration.toFixed(2)}%\n\n`;
-  
-  message += `**AUTHORITIES**\n`;
-  message += `• Mint: ${analysis.mintAuthority.hasAuthority ? (analysis.mintAuthority.isRevoked ? '✅ Revoked' : '❌ Active') : '✅ None'}\n`;
-  message += `• Freeze: ${analysis.freezeAuthority.hasAuthority ? (analysis.freezeAuthority.isRevoked ? '✅ Revoked' : '❌ Active') : '✅ None'}\n\n`;
-  
-  message += `**LIQUIDITY**\n`;
-  message += `• Status: ${analysis.liquidityPool.status}\n`;
-  if (analysis.liquidityPool.totalLiquidity && analysis.liquidityPool.totalLiquidity > 0) {
-    message += `• Total: $${formatNumber(analysis.liquidityPool.totalLiquidity)}\n`;
+  // AI VERDICT (Rick Bot feature)
+  if (analysis.aiVerdict) {
+    message += `🤖 **AI VERDICT**\n`;
+    message += `${analysis.aiVerdict.rating} - ${analysis.aiVerdict.verdict}\n\n`;
   }
   
-  // LP Burn Information - only show if data is available
+  // RISK SCORE
+  message += `🛡️ **RISK SCORE**\n`;
+  message += `Score: **${analysis.riskScore}/100** (${analysis.riskLevel})\n`;
+  message += `_Higher = Safer (0=Dangerous, 100=Safe)_\n\n`;
+  
+  // PRICE DATA
+  if (analysis.marketData || analysis.dexscreenerData?.pairs?.[0]) {
+    const pair = analysis.dexscreenerData?.pairs?.[0];
+    message += `💰 **PRICE**\n`;
+    if (pair) {
+      message += `• Price: $${parseFloat(pair.priceUsd).toFixed(8)}\n`;
+      message += `• 24h Vol: $${formatNumber(pair.volume.h24)}\n`;
+      message += `• 24h Change: ${pair.priceChange.h24 >= 0 ? '📈' : '📉'} ${pair.priceChange.h24.toFixed(2)}%\n`;
+      message += `• MCap: $${formatNumber(pair.marketCap || 0)}\n`;
+    }
+    message += `\n`;
+  }
+  
+  // SECURITY
+  message += `🔐 **SECURITY**\n`;
+  message += `• Mint: ${analysis.mintAuthority.hasAuthority ? '❌ Active' : '✅ Revoked'}\n`;
+  message += `• Freeze: ${analysis.freezeAuthority.hasAuthority ? '❌ Active' : '✅ Revoked'}\n`;
   if (analysis.liquidityPool.burnPercentage !== undefined) {
     const burnPct = analysis.liquidityPool.burnPercentage;
-    let burnEmoji = '🔥';
-    let burnStatus = '';
-    
-    if (analysis.liquidityPool.isBurned || burnPct >= 99.99) {
-      burnEmoji = '✅🔥';
-      burnStatus = '100% BURNED';
-    } else if (burnPct >= 90) {
-      burnEmoji = '⚠️🔥';
-      burnStatus = 'Partially Burned';
-    } else if (burnPct >= 50) {
-      burnEmoji = '🟡';
-      burnStatus = 'Low Burn';
-    } else {
-      burnEmoji = '❌';
-      burnStatus = 'Not Burned';
-    }
-    
-    message += `• LP Burn: ${burnEmoji} ${burnPct.toFixed(2)}% (${burnStatus})\n`;
-  } else {
-    // Data unavailable - don't mislead users
-    message += `• LP Burn: ❓ Data unavailable\n`;
+    let burnEmoji = burnPct >= 99.99 ? '✅' : burnPct >= 50 ? '⚠️' : '❌';
+    message += `• LP Burn: ${burnEmoji} ${burnPct.toFixed(1)}%\n`;
   }
-  
   message += `\n`;
   
+  // PUMP.FUN INFO (Rick Bot feature)
+  if (analysis.pumpFunData?.isPumpFun) {
+    message += `🎯 **PUMP.FUN**\n`;
+    message += `• Dev Bought: ${analysis.pumpFunData.devBought.toFixed(2)}%\n`;
+    message += `• Bonding Curve: ${analysis.pumpFunData.bondingCurve.toFixed(2)}%\n\n`;
+  }
+  
+  // HOLDERS
+  message += `👛 **HOLDERS**\n`;
+  message += `• Total: ${analysis.holderCount}\n`;
+  message += `• Top 10: ${analysis.topHolderConcentration.toFixed(2)}%\n`;
+  message += `• Supply: ${formatNumber(analysis.metadata.supply)}\n\n`;
+  
+  // RED FLAGS
   if (analysis.redFlags.length > 0) {
     const criticalFlags = analysis.redFlags.filter(f => f.severity === 'critical' || f.severity === 'high');
     if (criticalFlags.length > 0) {
-      message += `**⚠️ RED FLAGS**\n`;
-      criticalFlags.slice(0, 5).forEach(flag => {
-        message += `• ${flag.severity === 'critical' ? '🔴' : '🟠'} ${flag.title}\n`;
+      message += `⚠️ **ALERTS**\n`;
+      criticalFlags.slice(0, 3).forEach(flag => {
+        message += `${flag.severity === 'critical' ? '🔴' : '🟠'} ${flag.title}\n`;
       });
       message += `\n`;
     }
   }
   
-  if (analysis.dexscreenerData?.pairs?.[0]) {
-    const pair = analysis.dexscreenerData.pairs[0];
-    message += `**💰 MARKET DATA**\n`;
-    message += `• Price: $${parseFloat(pair.priceUsd).toFixed(8)}\n`;
-    message += `• 24h Vol: $${formatNumber(pair.volume.h24)}\n`;
-    message += `• Liquidity: $${formatNumber(pair.liquidity?.usd || 0)}\n`;
-    message += `• 24h Change: ${pair.priceChange.h24.toFixed(2)}%\n\n`;
-  }
-  
-  message += `🔗 [View on Solscan](https://solscan.io/token/${analysis.tokenAddress})`;
+  // QUICK LINKS
+  message += `🔗 **QUICK LINKS**\n`;
+  message += `• [Solscan](https://solscan.io/token/${analysis.tokenAddress})\n`;
+  message += `• [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress})\n`;
+  message += `• [Rugcheck](https://rugcheck.xyz/tokens/${analysis.tokenAddress})\n`;
   
   return message;
 }

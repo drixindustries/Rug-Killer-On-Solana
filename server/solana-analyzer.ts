@@ -15,6 +15,8 @@ import { GoPlusSecurityService } from "./goplus-service";
 import { DexScreenerService } from "./dexscreener-service";
 import { JupiterPriceService } from "./jupiter-service";
 import { isKnownAddress, getKnownAddressInfo, detectBundledWallets } from "./known-addresses";
+import { getBirdeyeOverview } from "./services/birdeye-api";
+import { checkPumpFun } from "./services/pumpfun-api";
 
 // Use public Solana RPC endpoint (can be configured later)
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
@@ -46,7 +48,7 @@ export class SolanaTokenAnalyzer {
       const freezeAuthority = this.analyzeFreezeAuthority(mintInfo.freezeAuthority);
       
       // Fetch token accounts (holders) from on-chain and external APIs in parallel
-      const [onChainHolders, totalHolderCount, recentTransactions, rugcheckData, goplusData, dexscreenerData, jupiterPriceData] = await Promise.all([
+      const [onChainHolders, totalHolderCount, recentTransactions, rugcheckData, goplusData, dexscreenerData, jupiterPriceData, birdeyeData, pumpFunData] = await Promise.all([
         this.fetchTopHolders(mintPubkey, mintInfo.decimals, mintInfo.supply),
         this.getTotalHolderCount(mintPubkey).catch(() => null),
         this.fetchRecentTransactions(mintPubkey),
@@ -54,6 +56,8 @@ export class SolanaTokenAnalyzer {
         this.goplusService.getTokenSecurity(tokenAddress).catch(() => null),
         this.dexscreenerService.getTokenData(tokenAddress).catch(() => null),
         this.jupiterPriceService.getTokenPrice(tokenAddress).catch(() => null),
+        getBirdeyeOverview(tokenAddress).catch(() => null),
+        checkPumpFun(tokenAddress).catch(() => ({ isPumpFun: false, devBought: 0, bondingCurve: 0 })),
       ]);
       
       // Enrich holders with Rugcheck data if on-chain fetch failed
@@ -216,6 +220,15 @@ export class SolanaTokenAnalyzer {
       const now = Date.now();
       const safeAnalyzedAt = isNaN(now) || !isFinite(now) ? Date.now() : now;
 
+      // Calculate AI verdict
+      const aiVerdict = this.calculateAIVerdict({
+        riskScore: safeRiskScore,
+        mintAuthority,
+        freezeAuthority,
+        liquidityPool: enrichedLiquidity,
+        marketData,
+      });
+
       return {
         tokenAddress,
         riskScore: safeRiskScore,
@@ -234,6 +247,9 @@ export class SolanaTokenAnalyzer {
         suspiciousActivityDetected: recentTransactions.some(tx => tx.suspicious),
         redFlags,
         creationDate: undefined,
+        aiVerdict,
+        pumpFunData: pumpFunData || undefined,
+        birdeyeData: birdeyeData || undefined,
         rugcheckData: rugcheckData || undefined,
         goplusData: goplusData || undefined,
         dexscreenerData: dexscreenerData || undefined,
@@ -247,7 +263,7 @@ export class SolanaTokenAnalyzer {
       
       return {
         tokenAddress,
-        riskScore: 100,
+        riskScore: 0,
         riskLevel: "EXTREME" as RiskLevel,
         analyzedAt: Date.now(),
         mintAuthority: { hasAuthority: true, authorityAddress: null, isRevoked: false },
@@ -615,33 +631,72 @@ export class SolanaTokenAnalyzer {
   }
 
   private calculateRiskScore(redFlags: RiskFlag[]): number {
-    let score = 0;
+    // REVERSED SCORING: Start at 100 (safe), subtract points for red flags (lower = worse)
+    let score = 100;
     
     for (const flag of redFlags) {
       switch (flag.severity) {
         case "critical":
-          score += 30;
+          score -= 30;
           break;
         case "high":
-          score += 20;
+          score -= 20;
           break;
         case "medium":
-          score += 10;
+          score -= 10;
           break;
         case "low":
-          score += 5;
+          score -= 5;
           break;
       }
     }
     
-    return Math.min(100, score);
+    return Math.max(0, score);
   }
 
   private getRiskLevel(score: number): RiskLevel {
-    if (score >= 70) return "EXTREME";
-    if (score >= 50) return "HIGH";
-    if (score >= 30) return "MODERATE";
-    return "LOW";
+    // REVERSED THRESHOLDS: 70-100 (green), 40-70 (yellow), 20-40 (orange), 0-20 (red)
+    if (score >= 70) return "LOW";
+    if (score >= 40) return "MODERATE";
+    if (score >= 20) return "HIGH";
+    return "EXTREME";
+  }
+
+  private calculateAIVerdict(analysis: {
+    riskScore: number;
+    mintAuthority: { hasAuthority: boolean };
+    freezeAuthority: { hasAuthority: boolean };
+    liquidityPool: { isBurned?: boolean; isLocked?: boolean };
+    marketData?: { marketCap: number | null };
+  }): { rating: string; verdict: string } {
+    const score = analysis.riskScore;
+    const mintRenounced = !analysis.mintAuthority.hasAuthority;
+    const freezeDisabled = !analysis.freezeAuthority.hasAuthority;
+    const lpBurned = analysis.liquidityPool.isBurned || analysis.liquidityPool.isLocked || false;
+    const mcap = analysis.marketData?.marketCap || 0;
+    
+    // Rick Bot style ratings (0=bad, 100=good)
+    if (score >= 75 && mintRenounced && freezeDisabled && lpBurned) {
+      return {
+        rating: '10/10',
+        verdict: '🟢 MOON SHOT - RICK BOT WOULD APE'
+      };
+    } else if (score >= 50 && mcap < 500000) {
+      return {
+        rating: '7/10',
+        verdict: '🟡 HIGH RISK/HIGH REWARD - PHANES SAYS WATCH'
+      };
+    } else if (score >= 30) {
+      return {
+        rating: '5/10',
+        verdict: '🟠 PROCEED WITH CAUTION - SMALL BAG ONLY'
+      };
+    } else {
+      return {
+        rating: '3/10',
+        verdict: '🔴 RUG CITY - TROJAN WOULD BLOCK'
+      };
+    }
   }
 }
 

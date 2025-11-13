@@ -233,6 +233,32 @@ export interface MarketData {
   updatedAt?: number | null;
 }
 
+// Birdeye Data
+export interface BirdeyeData {
+  price: number;
+  mc: number;
+  liquidity: number;
+  v24hUSD: number;
+  priceChange24hPercent: number;
+  lpBurned: boolean;
+  twitter?: string;
+  telegram?: string;
+  website?: string;
+}
+
+// Pump.fun Data
+export interface PumpFunData {
+  isPumpFun: boolean;
+  devBought: number;
+  bondingCurve: number;
+}
+
+// AI Verdict
+export interface AIVerdict {
+  rating: string;
+  verdict: string;
+}
+
 export interface TokenAnalysisResponse {
   tokenAddress: string;
   riskScore: number;
@@ -267,6 +293,11 @@ export interface TokenAnalysisResponse {
   
   // Creation info
   creationDate?: number;
+  
+  // Rick Bot features
+  aiVerdict?: AIVerdict;
+  pumpFunData?: PumpFunData;
+  birdeyeData?: BirdeyeData;
   
   // External API data (raw for debugging)
   rugcheckData?: RugcheckData;

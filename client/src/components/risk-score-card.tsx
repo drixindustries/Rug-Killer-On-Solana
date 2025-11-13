@@ -64,9 +64,10 @@ export function RiskScoreCard({ score, riskLevel, redFlagsCount, analyzedAt }: R
   };
 
   const getProgressColor = () => {
-    if (safeScore < 30) return "bg-green-600";
-    if (safeScore < 50) return "bg-yellow-600";
-    if (safeScore < 70) return "bg-orange-600";
+    // REVERSED: 70-100 (green), 40-70 (yellow), 20-40 (orange), 0-20 (red)
+    if (safeScore >= 70) return "bg-green-600";
+    if (safeScore >= 40) return "bg-yellow-600";
+    if (safeScore >= 20) return "bg-orange-600";
     return "bg-red-600";
   };
 
