@@ -303,7 +303,7 @@ Bots automatically reference these legal documents in their help commands.
 ## Support
 
 If you encounter issues:
-- **GitHub**: https://github.com/yourusername/solana-rug-killer/issues
+- **GitHub**: https://github.com/drixindustries/rugkillleronsol/issues
 - **Discord Server**: Join for community support
 - **Email**: support@yourwebsite.com
 

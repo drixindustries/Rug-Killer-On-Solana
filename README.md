@@ -63,8 +63,8 @@ Solana Rug Killer is a comprehensive web application that analyzes Solana SPL to
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/solana-rug-killer.git
-cd solana-rug-killer
+git clone https://github.com/drixindustries/rugkillleronsol.git
+cd rugkillleronsol
 ```
 
 2. **Install dependencies**

@@ -51,8 +51,8 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 1. Clone your fork:
 ```bash
-git clone https://github.com/your-username/solana-rug-killer.git
-cd solana-rug-killer
+git clone https://github.com/your-username/rugkillleronsol.git
+cd rugkillleronsol
 ```
 
 2. Install dependencies:
