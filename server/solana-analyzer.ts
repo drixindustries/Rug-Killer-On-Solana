@@ -368,14 +368,26 @@ export class SolanaTokenAnalyzer {
         return holders;
       } catch (error: any) {
         attempts++;
-        if (error.message?.includes('429') || error.message?.includes('Too Many Requests')) {
+        const isRateLimit = error.message?.includes('429') || error.message?.includes('Too Many Requests');
+        const isUnsupported = error.code === -32600 || error.message?.includes('not supported') || error.message?.includes('Too many accounts');
+        
+        if (isRateLimit) {
           console.log(`[RPC Balancer] Rate limited on attempt ${attempts}, rotating provider...`);
           if (attempts < maxAttempts) {
             await new Promise(resolve => setTimeout(resolve, 1000 * attempts)); // Exponential backoff
-            continue; // Retry with new connection from balancer
+            continue;
           }
+        } else if (isUnsupported && attempts < maxAttempts) {
+          // Silently retry with next provider - some RPCs don't support getProgramAccounts
+          await new Promise(resolve => setTimeout(resolve, 500));
+          continue;
         }
-        console.error(`Error fetching top holders (attempt ${attempts}/${maxAttempts}):`, error);
+        
+        // Only log unexpected errors on final attempt
+        if (attempts >= maxAttempts && !isUnsupported) {
+          console.error(`Error fetching top holders after ${maxAttempts} attempts:`, error.message);
+        }
+        
         if (attempts >= maxAttempts) {
           return [];
         }
@@ -422,14 +434,26 @@ export class SolanaTokenAnalyzer {
         return nonZeroAccounts.length;
       } catch (error: any) {
         attempts++;
-        if (error.message?.includes('429') || error.message?.includes('Too Many Requests')) {
+        const isRateLimit = error.message?.includes('429') || error.message?.includes('Too Many Requests');
+        const isUnsupported = error.code === -32600 || error.message?.includes('not supported') || error.message?.includes('Too many accounts');
+        
+        if (isRateLimit) {
           console.log(`[RPC Balancer] Rate limited on attempt ${attempts}, rotating provider...`);
           if (attempts < maxAttempts) {
             await new Promise(resolve => setTimeout(resolve, 1000 * attempts)); // Exponential backoff
-            continue; // Retry with new connection from balancer
+            continue;
           }
+        } else if (isUnsupported && attempts < maxAttempts) {
+          // Silently retry with next provider - some RPCs don't support getProgramAccounts
+          await new Promise(resolve => setTimeout(resolve, 500));
+          continue;
         }
-        console.error(`Error fetching total holder count (attempt ${attempts}/${maxAttempts}):`, error);
+        
+        // Only log unexpected errors on final attempt
+        if (attempts >= maxAttempts && !isUnsupported) {
+          console.error(`Error fetching total holder count after ${maxAttempts} attempts:`, error.message);
+        }
+        
         if (attempts >= maxAttempts) {
           return null;
         }
