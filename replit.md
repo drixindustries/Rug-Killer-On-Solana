@@ -10,6 +10,17 @@ The application uses an inverted risk scoring system (0=dangerous, 100=safe) wit
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+**November 13, 2025:**
+- Implemented Telegram bot command autocomplete menu using setMyCommands() API (5 commands: start, execute, first20, devtorture, blacklist)
+- Comprehensive codebase cleanup for production readiness:
+  - Removed all TODO/FIXME comments
+  - Removed excessive console.log statements (retained only critical startup and error messages)
+  - Removed commented-out code blocks
+  - Streamlined logging for clean production logs
+- Codebase is now GitHub-ready and production-ready
+
 ## System Architecture
 
 ### Frontend Architecture
