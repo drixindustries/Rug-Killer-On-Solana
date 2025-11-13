@@ -17,6 +17,12 @@ export const KNOWN_EXCHANGES: KnownAddress[] = [
     type: 'exchange',
     source: 'Solscan labeled'
   },
+  {
+    address: '4xJLmpojrDeXEnfDoeG9UdHXozY2Qn48ZyiPyRhabAN3',
+    label: 'Exchange Wallet',
+    type: 'exchange',
+    source: 'User verified'
+  },
   // Add more as they become publicly known
 ];
 
