@@ -1,12 +1,10 @@
-# Solana Rug Killer
+# Solana Rug Killer - Token Risk Analysis Platform
 
 ## Overview
 
-Solana Rug Killer is a comprehensive token analysis platform that helps traders identify potential rug pulls and scams on the Solana blockchain. The application provides real-time risk scoring, holder analysis, liquidity assessment, and AI-powered scam detection to protect users from fraudulent tokens.
+Solana Rug Killer is a comprehensive web application designed to protect Solana traders from rug pulls and scams. It provides real-time token analysis using 52+ risk metrics, integrating data from multiple sources including Rugcheck, GoPlus Security, DexScreener, Jupiter, and Birdeye. The platform features AI-powered blacklist detection, Telegram and Discord bots for instant analysis, and premium features like smart money tracking and PumpFun launch alerts.
 
-The platform combines data from multiple sources (Rugcheck, GoPlus Security, DexScreener, Jupiter, Birdeye) with proprietary analysis algorithms to generate a comprehensive risk score (0-100 scale, where 0 is most dangerous and 100 is safest). It includes premium features like Telegram/Discord bots for instant analysis, alpha alerts for new token launches, and social features like watchlists and community voting.
-
-**Official Token:** $RUGK (Contract: `2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt`)
+The application uses an inverted risk scoring system (0=dangerous, 100=safe) with color-coded risk levels: GREEN (70-100), YELLOW (40-70), ORANGE (20-40), RED (0-20). It includes subscription-based access control via Whop integration and token-gated access for holders of 10M+ $RUGK tokens (contract: `2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt`).
 
 ## User Preferences
 
@@ -16,227 +14,150 @@ Preferred communication style: Simple, everyday language.
 
 ### Frontend Architecture
 
-- **Framework:** React 18 with TypeScript, built using Vite
-- **UI Components:** Radix UI primitives with shadcn/ui component library
-- **Styling:** Tailwind CSS with custom dark cyberpunk theme (warm orange primary colors on near-black backgrounds)
-- **State Management:** TanStack Query (React Query) for server state caching and synchronization
-- **Routing:** Wouter for lightweight client-side routing
-- **Charts:** Recharts for data visualization (price history, holder distribution, risk statistics)
+**Technology Stack:**
+- React 18 with TypeScript for type safety
+- Vite for fast development and optimized production builds
+- TanStack Query (React Query) for server state management
+- Wouter for client-side routing
+- Tailwind CSS with shadcn/ui component library
+- Recharts for data visualization
 
-**Key Design Decisions:**
-- Single-page application with declarative routing for fast navigation
-- Component-driven architecture with atomic design principles
-- Real-time data updates via polling (no WebSocket connections from client)
-- Mobile-responsive design with accessibility considerations (ARIA labels, keyboard navigation)
+**Design Patterns:**
+- Component-based architecture with reusable UI components from shadcn/ui
+- Custom hooks for authentication (`useAuth`) and API interactions
+- Dark theme with warm cyberpunk aesthetic (near-black backgrounds with warm orange accents)
+- Responsive design with mobile-first approach
+
+**Key Frontend Features:**
+- Token analysis dashboard with real-time risk scoring
+- Portfolio tracking and watchlist management
+- Price alerts and notification system
+- Social features (comments, votes, leaderboard)
+- Analytics dashboard with historical tracking
 
 ### Backend Architecture
 
-- **Runtime:** Node.js with TypeScript (ESM modules)
-- **Framework:** Express.js for HTTP server and API routes
-- **API Design:** RESTful endpoints with Zod schema validation
-- **Background Workers:** Periodic jobs for analytics collection, alert monitoring, and social aggregation
-- **Rate Limiting:** RPC balancer with weighted failover across multiple Solana RPC providers
-- **Caching:** In-memory price cache with configurable TTL (20 seconds default) to reduce API calls
+**Technology Stack:**
+- Node.js with Express.js REST API
+- TypeScript for type-safe server code
+- Drizzle ORM for database interactions
+- Passport.js with OpenID Connect for Replit Auth
+- WebSocket support for real-time updates (Telegram/Discord bots)
 
-**Key Design Decisions:**
-- Express chosen for simplicity and middleware ecosystem
-- Modular service architecture (separate services for each external API)
-- Worker pattern for background tasks (analytics, alerts, social features) - designed for BullMQ but using setInterval for simplicity
-- RPC balancing to prevent rate limits and improve reliability (Helius, Alchemy, Ankr, Serum, Public RPC)
+**Design Patterns:**
+- Service-oriented architecture with dedicated services for each external API
+- RPC balancer for load distribution across multiple Solana RPC providers (Helius, Alchemy, Ankr, Serum, Public)
+- Worker pattern for background jobs (analytics, alerts, social aggregation)
+- Caching layer with TTL-based price cache (20-second default)
+- Middleware-based authentication and access control
 
-### Token Analysis Engine
+**Core Services:**
+- `SolanaTokenAnalyzer`: Main analysis engine coordinating all data sources
+- `RugcheckService`: Rugcheck API integration
+- `GoPlusSecurityService`: GoPlus security data
+- `DexScreenerService`: Market data and liquidity info
+- `JupiterPriceService`: Price data from Jupiter aggregator
+- `BirdeyeAPI`: Enhanced market data with LP burn status
+- `PumpFunAPI`: Pump.fun token detection and bonding curve tracking
+- `LPChecker`: Liquidity pool burn verification
+- `RpcBalancer`: Intelligent RPC provider selection with fallback
 
-The core analysis system evaluates 52+ risk metrics and produces a 0-100 risk score:
+**Risk Analysis Engine:**
+- 52-metric comprehensive analysis including:
+  - Mint/freeze authority checks
+  - Top holder concentration (excludes known exchanges, protocols, bundlers)
+  - Bundle detection for coordinated wallet activity
+  - Liquidity pool status and burn verification
+  - Market cap and volume analysis
+  - Social sentiment from Rugcheck and GoPlus
+- AI-powered verdict system with natural language recommendations
+- Automatic blacklist flagging based on 6 detection rules
 
-1. **Authority Checks:** Mint authority, freeze authority (revoked = safer)
-2. **Holder Analysis:** Top 20 concentration, bundle detection, whale identification
-3. **Liquidity Assessment:** LP burn status, liquidity depth, market cap validation
-4. **External API Integration:** Rugcheck risk scores, GoPlus security flags, DexScreener market data
-5. **Pump.fun Detection:** Direct API integration to detect launch platform and bonding curve progress
-6. **AI Verdict System:** Natural language recommendations based on aggregated risk factors
+### Data Storage Solutions
 
-**Risk Score Formula:** Inverted scale where 0 = extreme danger, 100 = safest. Combines weighted factors from all sources.
+**Database:** PostgreSQL via Neon (serverless)
 
-**Rationale:** Multi-source validation reduces false positives and provides comprehensive coverage of known scam patterns.
+**Schema Design:**
+- `users`: User accounts and profiles
+- `subscriptions`: Subscription tiers and status (Whop integration)
+- `subscription_codes`: Lifetime access codes with redemption tracking
+- `wallet_connections`: Solana wallet addresses for token-gated access
+- `watchlist_entries`: User token watchlists
+- `portfolio_positions`: Trading portfolio tracking
+- `price_alerts`: User-configured price alerts
+- `token_snapshots`: Historical token data for trend analysis
+- `trending_tokens`: Hot tokens feed with auto-refresh
+- `risk_statistics`: Aggregate rug pull metrics
+- `bad_actor_labels`: AI blacklist system
+- `kol_wallets`: KOL (Key Opinion Leader) wallet tracking for smart money alerts
+- `user_profiles`: Social features (reputation, bio)
+- `token_comments`: Community discussion
+- `community_votes`: Token safety voting
+- `shared_watchlists`: Public watchlist sharing
 
-### Bot Integration
+**Session Management:**
+- PostgreSQL-backed session store via connect-pg-simple
+- 7-day session TTL with automatic renewal
+- Secure cookies (httpOnly, secure flags)
 
-**Telegram Bot:**
-- Built with Telegraf framework
-- Commands: `/execute`, `/first20`, `/devtorture`, `/blacklist`
-- Rich formatted messages with emoji sections and color-coded risk levels
-- Deployed as singleton instance (started only when credentials are configured)
+### Authentication and Authorization
 
-**Discord Bot:**
-- Built with discord.js (v14+)
-- Slash commands with rich embeds
-- Color-coded by risk level (green/yellow/orange/red)
-- Auto-registered commands via REST API
-
-**Shared Logic:** Both bots use the same `SolanaTokenAnalyzer` service to ensure consistent results.
-
-### Access Control
-
-**Authentication:** Replit Auth (OpenID Connect) with session-based authentication
-- Session storage: PostgreSQL with connect-pg-simple
-- Session TTL: 7 days
-- Secure cookies with httpOnly and secure flags
+**Authentication:**
+- Replit Auth via OpenID Connect (Passport.js strategy)
+- Session-based authentication with encrypted cookies
+- Token refresh handling for expired sessions
 
 **Authorization Tiers:**
-1. **Free:** Limited to basic features (currently disabled for testing)
-2. **Individual ($20/month):** Full analysis, bot access, alerts
-3. **Group ($100/month):** Multi-user access for teams
-4. **Lifetime:** Token holders with 10M+ $RUGK OR redeemed subscription codes
+- **Public**: Landing pages, documentation
+- **Free**: Basic token analysis (rate-limited)
+- **Individual ($20)**: Full analysis, bot access, limited alerts
+- **Group ($100)**: Team features, unlimited alerts
+- **Lifetime**: Token-gated (10M+ $RUGK) or redeemable codes
 
-**Access Methods:**
-- Whop integration for paid subscriptions
-- Crypto payments (Solana-only, 6 confirmations required)
-- Token-gated access via wallet connection (checks $RUGK balance)
-- Redeemable subscription codes with transaction safety
+**Access Control:**
+- `hasActiveAccess` middleware gates premium endpoints
+- Checks both Whop subscription status AND token holdings
+- Admin bypass via `ADMIN_EMAILS` environment variable
+- Subscription verification includes expiration and payment status
 
-**Rationale:** Multiple access methods provide flexibility while the token-gating creates utility for $RUGK holders.
+### External Dependencies
 
-### Social Features
+**Solana Blockchain:**
+- `@solana/web3.js`: Blockchain interaction (v1.98.4)
+- `@solana/spl-token`: Token program operations
+- Multiple RPC providers with automatic failover:
+  - Helius (primary, requires `HELIUS_KEY`)
+  - Alchemy (secondary, requires `ALCHEMY_KEY`)
+  - Ankr (backup)
+  - Serum (backup)
+  - Public Solana RPC (fallback)
 
-- **Community Voting:** Users vote tokens as "safe", "risky", or "scam" with weighted reputation system
-- **Reputation Score:** Calculated from comment votes, report accuracy, and account age
-- **Watchlists:** Private and shareable watchlists with real-time updates
-- **Leaderboard:** Top analysts ranked by reputation and activity
-- **Token Comments:** Threaded discussions with upvote/downvote system
-- **Reporting:** User-submitted reports for moderation review
+**Third-Party APIs:**
+- **Rugcheck** (`https://api.rugcheck.xyz/v1`): Token safety reports (optional `RUGCHECK_API_KEY`)
+- **GoPlus Security** (`https://api.gopluslabs.io/api/v1`): Security analysis
+- **DexScreener** (`https://api.dexscreener.com`): Market data and liquidity
+- **Jupiter** (`https://api.jup.ag/price/v2`): Price aggregation
+- **Birdeye** (`https://public-api.birdeye.so`): Enhanced market data (optional `BIRDEYE_API_KEY`)
+- **Pump.fun** (`https://pump.fun/api`): Token launch detection
 
-**Rationale:** Crowdsourced intelligence complements automated analysis and builds community engagement.
+**Payment & Subscription:**
+- **Whop SDK**: Subscription management (requires `WHOP_API_KEY`, `WHOP_APP_ID`, `WHOP_COMPANY_ID`)
+- Solana crypto payments (requires `PHANTOM_WALLET_ADDRESS` for receiving)
 
-### Analytics System
+**Bot Platforms:**
+- **Telegram** via `telegraf`: Bot commands and alerts (requires `TELEGRAM_BOT_TOKEN`)
+- **Discord** via `discord.js`: Slash commands and rich embeds (requires `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_ID`)
 
-**Token Snapshots:** Historical tracking of risk scores, prices, and holder counts (collected every 5 minutes)
+**Development Tools:**
+- **Playwright**: E2E testing
+- **Jest**: Unit and integration testing
+- **Supertest**: API integration testing
+- **Nock**: HTTP mocking for tests
+- **TypeScript**: Type safety across stack
+- **ESBuild**: Production bundling
+- **Drizzle Kit**: Database migrations
 
-**Trending Tokens:** Real-time feed of high-volume tokens with auto-refresh (30s intervals)
-
-**Risk Statistics:** Aggregated metrics over 7-day and 30-day periods:
-- Total rugs detected
-- Common red flags (pie chart visualization)
-- Detection accuracy rates
-- False positive analysis
-
-**Performance Metrics:** Success rates, coverage, and system health KPIs
-
-**Rationale:** Historical data enables trend analysis and improves detection algorithms over time.
-
-## External Dependencies
-
-### Blockchain & RPC Services
-
-**Solana RPC Providers:**
-- Helius (primary, 40% weight) - requires `HELIUS_KEY`
-- Alchemy (35% weight) - requires `ALCHEMY_KEY`
-- Ankr (15% weight)
-- Serum (10% weight)
-- Public RPC (5% weight, fallback)
-
-**Connection Libraries:**
-- `@solana/web3.js` - Solana blockchain interaction
-- `@solana/spl-token` - Token program utilities
-
-### Token Analysis APIs
-
-**Rugcheck API:**
-- Endpoint: `https://api.rugcheck.xyz/v1`
-- Optional API key: `RUGCHECK_API_KEY`
-- Provides: Risk scores, authority status, holder concentration
-
-**GoPlus Security API:**
-- Endpoint: `https://api.gopluslabs.io/api/v1`
-- No authentication required
-- Provides: Honeypot detection, high sell tax, trading pause status
-
-**DexScreener API:**
-- Endpoint: `https://api.dexscreener.com`
-- No authentication required
-- Provides: Real-time prices, liquidity, volume, pair data
-
-**Jupiter Price API:**
-- Endpoint: `https://api.jup.ag/price/v2`
-- No authentication required
-- Provides: Token prices and market data
-
-**Birdeye API (Optional):**
-- Endpoint: `https://public-api.birdeye.so`
-- Optional API key: `BIRDEYE_API_KEY`
-- Provides: Enhanced market data, LP burn status, holder analysis
-- Graceful degradation if not configured
-
-**Pump.fun API:**
-- Endpoint: `https://pump.fun/api`
-- No authentication required
-- Provides: Launch platform detection, dev bought percentage, bonding curve progress
-
-### Database
-
-**PostgreSQL (Neon):**
-- Connection: `@neondatabase/serverless` with WebSocket support
-- ORM: Drizzle ORM with schema validation
-- Tables: 20+ tables including users, subscriptions, watchlists, portfolios, analytics, social features
-- Migrations: Drizzle Kit for schema management
-
-**Rationale:** Serverless Postgres chosen for Replit compatibility and automatic scaling.
-
-### Subscription & Payments
-
-**Whop:**
-- SDK: `@whop/sdk`
-- Purpose: Subscription management for Individual and Group tiers
-- Environment variables: `WHOP_API_KEY`, `WHOP_APP_ID`, `WHOP_COMPANY_ID`, plan IDs
-- Webhook integration for subscription status updates
-
-**Crypto Payments (Solana-only):**
-- Payment addresses generated per-user with expiry (1 hour)
-- 6 confirmations required before activation
-- Audit trail stored in `payment_audit` table
-- Requires: `PHANTOM_WALLET_ADDRESS` environment variable
-
-**Rationale:** Whop provides fiat payment infrastructure while crypto payments align with Web3 audience.
-
-### Bot Platforms
-
-**Telegram:**
-- Library: `telegraf`
-- Bot token: `TELEGRAM_BOT_TOKEN`
-- Application ID: `8506172883`
-- Username: `@RugKillerAlphaBot`
-
-**Discord:**
-- Library: `discord.js` (v14+)
-- Bot token: `DISCORD_BOT_TOKEN`
-- Client ID: `1437952073319714879`
-- Public key: `DISCORD_PUBLIC_KEY`
-- Slash commands auto-registered
-
-**Rationale:** Both platforms popular in crypto trading communities for instant alerts and analysis.
-
-### Testing & Quality
-
-**End-to-End Tests:**
-- Playwright for browser automation
-- Test runners: Chromium, Firefox, WebKit
-- Coverage: Token analysis flows, subscription checkout, bot interactions
-
-**Integration Tests:**
-- Supertest for API testing
-- Nock for HTTP mocking
-- Coverage: All API endpoints with success/error cases
-
-**Unit Tests:**
-- Jest with ts-jest
-- Mock utilities in `tests/utils/solana-mocks.ts`
-- Fixtures in `tests/fixtures/solana/token-fixtures.ts`
-
-**Rationale:** Multi-layer testing ensures reliability given the financial nature of token analysis.
-
-### Development Tools
-
-- **TypeScript:** Type safety across entire codebase
-- **Vite:** Fast development server with HMR
-- **ESBuild:** Production bundling for server code
-- **Drizzle Kit:** Database migrations and schema management
-- **Replit Plugins:** Dev banner, cartographer, runtime error overlay
+**Infrastructure:**
+- **Replit**: Hosting and deployment
+- **Neon**: Serverless PostgreSQL database (requires `DATABASE_URL`)
+- **WebSocket**: Real-time bot communication
