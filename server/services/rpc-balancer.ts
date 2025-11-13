@@ -4,7 +4,6 @@ interface RpcProvider {
   url: string;
   weight: number;
   name: string;
-  connection: Connection;
   score: number;
   fails: number;
 }
@@ -44,7 +43,6 @@ export class SolanaRpcBalancer {
   constructor(providers: typeof RPC_PROVIDERS) {
     this.providers = providers.map(p => ({
       ...p,
-      connection: new Connection(p.url, { commitment: "confirmed" }),
       score: 100,
       fails: 0,
     }));
@@ -69,30 +67,9 @@ export class SolanaRpcBalancer {
     return selected;
   }
 
-  async request(method: string, params: any[] = []): Promise<any> {
-    let attempts = 0;
-    const maxAttempts = this.providers.length * 2;
-    
-    while (attempts < maxAttempts) {
-      const p = this.select();
-      try {
-        const res = await (p.connection as any)._rpcRequest(method, params);
-        p.score = Math.min(100, p.score + 5);
-        return res.result;
-      } catch (err: any) {
-        p.score = Math.max(0, p.score - 20);
-        p.fails++;
-        if (err.message?.includes("429") || err.message?.includes("timeout")) {
-          console.log(`[RPC Balancer] Rotating from ${p.name} (429/timeout)`);
-        }
-        attempts++;
-      }
-    }
-    throw new Error("All RPCs failed after maximum attempts");
-  }
-
   getConnection(): Connection {
-    return this.select().connection;
+    const provider = this.select();
+    return new Connection(provider.url, { commitment: "confirmed" });
   }
 
   getHealthStats() {
@@ -110,7 +87,14 @@ export const rpcBalancer = new SolanaRpcBalancer(RPC_PROVIDERS);
 
 // Health check interval - ping all providers every 30 seconds
 setInterval(() => {
-  rpcBalancer.providers.forEach(p => {
-    p.connection.getSlot().catch(() => {});
+  rpcBalancer.providers.forEach(async (p) => {
+    try {
+      const conn = new Connection(p.url, { commitment: "confirmed" });
+      await conn.getSlot();
+      p.score = Math.min(100, p.score + 5);
+    } catch (error) {
+      p.score = Math.max(0, p.score - 10);
+      p.fails++;
+    }
   });
 }, 30000);
