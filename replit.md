@@ -24,7 +24,14 @@ The frontend features a modern, data-dense dashboard using React, TypeScript, Vi
 - **Frontend**: React, TypeScript, Vite, Wouter (routing), React Query (data fetching), Shadcn UI, Tailwind CSS, Recharts.
 - **Backend**: Express.js with TypeScript, using `@solana/web3.js` and `@solana/spl-token` for Solana blockchain interaction.
 - **Data Storage**: PostgreSQL for persistent data (users, subscriptions, subscription codes, code redemptions, wallet connections, crypto payment audit trails, AI blacklist data). In-memory storage (MemStorage) for session data.
-- **Solana Integration**: Connects to Solana mainnet via a configurable RPC URL (default: public Solana RPC, configurable via `SOLANA_RPC_URL` environment variable for premium providers like Helius/QuickNode/Alchemy).
+- **RPC Balancer (Nov 2024)**: God-tier weighted load balancer for Solana RPC providers with intelligent failover and health monitoring.
+  - **5 RPC Providers**: Helius (40% weight), Alchemy (35%), Ankr (15%), Serum (10%), Public (5%)
+  - **Health Tracking**: 0-100 score per provider, adjusts on success/failure with automatic recovery
+  - **Automatic Rotation**: Detects 429 rate limits and switches providers with exponential backoff (3 attempts: 1s, 2s, 3s)
+  - **Dynamic Provider Selection**: Fresh connection per RPC call based on current health scores
+  - **Optional Premium Keys**: Works with free public RPCs, supports HELIUS_KEY and ALCHEMY_KEY for higher rate limits
+  - **Monitoring Endpoint**: `/api/rpc/health` returns real-time provider statistics (name, score, fails, weight)
+  - **Zero Configuration**: Automatically falls back to free RPCs if premium keys not provided
 - **Data Accuracy Improvements (Nov 2024)**: 
   - **Complete Market Data**: Integrated DexScreener's full market metrics including price (USD/native), market cap, FDV, 24h volume, 24h price change, and 24h transactions (buys/sells). All metrics verified 100% accurate against DexScreener API.
   - **Actual Holder Counts**: Implemented `getProgramAccounts` RPC method to count ALL token holders, not just top 20. Example: Wonder Sites shows 1,557 holders, Bitty shows 11,828 holders. Fixed red flag system to use actual holder counts instead of top 20.
