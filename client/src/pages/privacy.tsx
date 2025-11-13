@@ -347,7 +347,7 @@ export default function Privacy() {
                   <li><strong>Legal Inquiries:</strong> legal@yourwebsite.com</li>
                   <li><strong>Discord:</strong> Join our community server</li>
                   <li><strong>Telegram:</strong> Contact via our bot</li>
-                  <li><strong>GitHub:</strong> https://github.com/yourusername/solana-rug-killer/issues</li>
+                  <li><strong>GitHub:</strong> https://github.com/drixindustries/rugkillleronsol/issues</li>
                 </ul>
               </CardContent>
             </Card>
