@@ -50,7 +50,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
             asChild
             data-testid="button-github"
           >
-            <a href="https://github.com/yourusername/solana-rug-killer" target="_blank" rel="noopener noreferrer" title="View on GitHub">
+            <a href="https://github.com/drixindustries/rugkillleronsol" target="_blank" rel="noopener noreferrer" title="View on GitHub">
               <SiGithub className="h-4 w-4" />
             </a>
           </Button>

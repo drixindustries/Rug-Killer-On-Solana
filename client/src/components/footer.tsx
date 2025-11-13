@@ -60,6 +60,7 @@ export function Footer() {
               <li><a href="/pricing" className="hover:text-foreground">Pricing</a></li>
               <li><a href="/documentation" className="hover:text-foreground">Documentation</a></li>
               <li><a href="/about" className="hover:text-foreground">About</a></li>
+              <li><a href="https://github.com/drixindustries/rugkillleronsol#roadmap" target="_blank" rel="noopener noreferrer" className="hover:text-foreground" data-testid="footer-link-roadmap">Roadmap</a></li>
               <li><a href="https://docs.solana.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Solana Docs</a></li>
             </ul>
           </div>
@@ -83,7 +84,7 @@ export function Footer() {
                   className="min-h-[44px] min-w-[44px]"
                   data-testid="footer-button-github"
                 >
-                  <a href="https://github.com/yourusername/solana-rug-killer" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="View on GitHub">
+                  <a href="https://github.com/drixindustries/rugkillleronsol" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="View on GitHub">
                     <SiGithub className="h-5 w-5" />
                   </a>
                 </Button>
