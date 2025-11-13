@@ -18,7 +18,7 @@
 
 ### Test Token Addresses
 
-Use the official **$RUGK** contract address for testing:
+Use the official **$ANTIRUG** contract address for testing:
 ```
 2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt
 ```
@@ -160,7 +160,7 @@ If token doesn't exist or has no data:
 
 ### Telegram Bot Tests
 - [ ] `/help` command shows all commands
-- [ ] `/execute` with $RUGK address returns analysis
+- [ ] `/execute` with $ANTIRUG address returns analysis
 - [ ] `/first20` shows top holders
 - [ ] `/devtorture` shows developer history
 - [ ] `/blacklist` checks wallet flags

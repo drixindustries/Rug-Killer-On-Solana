@@ -46,7 +46,7 @@ export default function Admin() {
               Deploy Token (Secure Local Script)
             </CardTitle>
             <CardDescription>
-              Download secure script to deploy $RUGK with vanity address ending in "tek"
+              Download secure script to deploy $ANTIRUG with vanity address ending in "tek"
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -55,7 +55,7 @@ export default function Admin() {
             </p>
             <div className="flex gap-2">
               <Button asChild className="flex-1" data-testid="button-download-script">
-                <a href="/DEPLOY_RUGK_LOCALLY.js" download>
+                <a href="/DEPLOY_ANTIRUG_LOCALLY.js" download>
                   Download Script
                 </a>
               </Button>
@@ -90,7 +90,7 @@ export default function Admin() {
             </p>
           </div>
           <div>
-            <h3 className="font-semibold mb-1">3. Deploy $RUGK Token</h3>
+            <h3 className="font-semibold mb-1">3. Deploy $ANTIRUG Token</h3>
             <p className="text-muted-foreground">
               The script generates a vanity address ending in "tek" (~5-15 minutes) and deploys the token to Solana mainnet. Costs ~0.05 SOL.
             </p>

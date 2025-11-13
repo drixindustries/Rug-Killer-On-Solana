@@ -1,4 +1,4 @@
-# 🚀 Secure $RUGK Token Deployment Guide
+# 🚀 Secure $ANTIRUG Token Deployment Guide
 
 ## Why Local Deployment?
 
@@ -22,7 +22,7 @@ Before you begin, make sure you have:
 
 ### 1. Download the Script
 
-Download `DEPLOY_RUGK_LOCALLY.js` from this repository.
+Download `DEPLOY_ANTIRUG_LOCALLY.js` from this repository.
 
 ### 2. Install Dependencies
 
@@ -48,7 +48,7 @@ Make sure you have:
 ### 1. Execute the Script
 
 ```bash
-node DEPLOY_RUGK_LOCALLY.js
+node DEPLOY_ANTIRUG_LOCALLY.js
 ```
 
 ### 2. Follow the Prompts
@@ -93,7 +93,7 @@ The script will generate a vanity address ending in "tek":
 Once the vanity address is found, the script will:
 - ✅ Create the token mint account
 - ✅ Initialize the mint
-- ✅ Mint 1 billion $RUGK tokens to your wallet
+- ✅ Mint 1 billion $ANTIRUG tokens to your wallet
 
 ---
 
@@ -128,7 +128,7 @@ You'll see something like this:
 2. Open **Phantom wallet**
 3. Settings → **"Import Private Key"**
 4. Paste the private key
-5. Give it a name like "RUGK Mint Authority"
+5. Give it a name like "ANTIRUG Mint Authority"
 
 **This gives you:**
 - ✅ Control over the token mint
@@ -142,7 +142,7 @@ You'll see something like this:
 ### Token Details
 
 - **Name:** RugKiller
-- **Symbol:** $RUGK
+- **Symbol:** $ANTIRUG
 - **Supply:** 1,000,000,000 (1 billion)
 - **Decimals:** 9
 - **Vanity Address:** Ends in "tek" (e.g., `9x7yZ...456tek`)
@@ -178,17 +178,17 @@ https://dexscreener.com/solana/[YOUR_TOKEN_ADDRESS]
 
 Send your deployed token address to update:
 - `client/src/constants.ts` → `CONTRACT_ADDRESS`
-- Token-gated access (10M+ $RUGK) will work automatically
+- Token-gated access (10M+ $ANTIRUG) will work automatically
 
 ### 2. Add Liquidity (Optional)
 
-To make $RUGK tradeable:
+To make $ANTIRUG tradeable:
 
 **Option A: Raydium**
 1. Visit [Raydium.io](https://raydium.io/)
 2. Connect Phantom wallet
-3. Create a liquidity pool (SOL/$RUGK)
-4. Add initial liquidity (e.g., 10 SOL + equivalent $RUGK)
+3. Create a liquidity pool (SOL/$ANTIRUG)
+4. Add initial liquidity (e.g., 10 SOL + equivalent $ANTIRUG)
 
 **Option B: Jupiter**
 1. Visit [Jupiter.ag](https://jup.ag/)
@@ -282,7 +282,7 @@ This secure deployment script:
 - ✅ Runs 100% locally on your computer
 - ✅ Never transmits your private keys
 - ✅ Generates vanity address ending in "tek"
-- ✅ Deploys $RUGK to Solana mainnet
+- ✅ Deploys $ANTIRUG to Solana mainnet
 - ✅ Gives you full control via Phantom import
 
 **Ready to deploy? Run the script and follow the prompts!** 🚀

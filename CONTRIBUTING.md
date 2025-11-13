@@ -4,7 +4,7 @@ First off, thank you for considering contributing to Solana Rug Killer! It's peo
 
 ## Official Token
 
-**Solana Rug Killer ($RUGK)**
+**Solana Rug Killer ($ANTIRUG)**
 - **Contract Address**: `2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt`
 - **Blockchain**: Solana
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 🚀 SECURE RUGKILLER ($RUGK) TOKEN DEPLOYMENT SCRIPT
+ * 🚀 SECURE ANTIRUGILLER ($ANTIRUG) TOKEN DEPLOYMENT SCRIPT
  * 
  * This script runs 100% locally on your machine.
  * Your private keys NEVER leave your computer.
@@ -44,7 +44,7 @@ const readline = require('readline');
 
 const TOKEN_CONFIG = {
   name: 'RugKiller',
-  symbol: 'RUGK',
+  symbol: 'ANTIRUG',
   decimals: 9,
   supply: 1_000_000_000, // 1 billion tokens
   description: 'The ultimate Solana rug pull detector',
@@ -107,7 +107,7 @@ function generateVanityAddress(suffix, maxAttempts = 50_000_000) {
 // ============================================
 
 async function deployToken(payerKeypair, mintKeypair) {
-  console.log('\n📦 Deploying $RUGK token to Solana mainnet...\n');
+  console.log('\n📦 Deploying $ANTIRUG token to Solana mainnet...\n');
   
   try {
     // Check balance
@@ -223,7 +223,7 @@ function askQuestion(query) {
 
 async function main() {
   console.log('╔═══════════════════════════════════════════════════════╗');
-  console.log('║    🔥 RUGKILLER ($RUGK) TOKEN DEPLOYMENT SCRIPT 🔥   ║');
+  console.log('║    🔥 ANTIRUGILLER ($ANTIRUG) TOKEN DEPLOYMENT SCRIPT 🔥   ║');
   console.log('║                                                       ║');
   console.log('║  100% Secure - Your keys never leave your computer   ║');
   console.log('╚═══════════════════════════════════════════════════════╝');
@@ -312,7 +312,7 @@ async function main() {
   console.log('   1. Copy the private key above');
   console.log('   2. Open Phantom → Settings → "Import Private Key"');
   console.log('   3. Paste the private key');
-  console.log('   4. You now control the $RUGK token!');
+  console.log('   4. You now control the $ANTIRUG token!');
   
   console.log('\n🔗 View on Blockchain:');
   console.log(`   Solscan:     https://solscan.io/token/${deploymentResult.mintAddress}`);

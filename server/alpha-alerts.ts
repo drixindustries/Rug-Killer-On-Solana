@@ -254,7 +254,7 @@ export class AlphaAlertService {
     console.log('[ALPHA ALERT] Service started successfully');
     
     // Send startup notification directly (not through sendAlert to avoid fake links)
-    const startupMessage = '🤖 **RUGKILLER ALPHA ALERTS ONLINE**\n\n' +
+    const startupMessage = '🤖 **ANTIRUGILLER ALPHA ALERTS ONLINE**\n\n' +
       `✅ Monitoring ${this.alphaCallers.filter(c => c.enabled).length} top alpha callers\n` +
       `✅ Connected to pump.fun live feed\n` +
       `✅ Quality filters active (RugCheck > 85, No honeypots, Liquidity > $5K)\n\n` +

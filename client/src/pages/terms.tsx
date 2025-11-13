@@ -165,7 +165,7 @@ export default function Terms() {
                   <li>Paid subscriptions renew automatically unless cancelled</li>
                   <li>Cryptocurrency payments are non-refundable once confirmed on-chain</li>
                   <li>We reserve the right to modify pricing with 30 days notice</li>
-                  <li>Token-gated access (10M+ $RUGK) requires maintaining the minimum balance</li>
+                  <li>Token-gated access (10M+ $ANTIRUG) requires maintaining the minimum balance</li>
                   <li>Subscription codes are single-use unless otherwise specified</li>
                   <li>All sales are final unless otherwise required by law</li>
                 </ul>

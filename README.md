@@ -40,13 +40,13 @@ Solana Rug Killer is a comprehensive web application that analyzes Solana SPL to
 
 ### Access Control
 - **Whop Integration** - Subscription management with Individual, Group, and Lifetime tiers
-- **Token-Gated Access** - Hold 10M+ $RUGK tokens for lifetime access
+- **Token-Gated Access** - Hold 10M+ $ANTIRUG tokens for lifetime access
 - **Crypto Payments** - Solana-only with 6 confirmations and audit trails
 - **Subscription Codes** - Redeemable lifetime access codes with transaction safety
 
 ## 🚀 Official Token
 
-**Solana Rug Killer ($RUGK)**
+**Solana Rug Killer ($ANTIRUG)**
 - **Contract Address**: `2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt`
 - **Blockchain**: Solana
 - **Deployment**: Launched via Pump.fun platform

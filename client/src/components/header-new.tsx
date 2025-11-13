@@ -167,7 +167,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
                     </p>
                     {connection?.tokenBalance !== undefined && (
                       <p className="text-xs mt-1">
-                        Balance: {connection.tokenBalance.toLocaleString()} $RUGK
+                        Balance: {connection.tokenBalance.toLocaleString()} $ANTIRUG
                       </p>
                     )}
                     {connection?.isEligible && (

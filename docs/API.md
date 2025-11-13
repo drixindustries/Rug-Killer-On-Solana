@@ -69,7 +69,7 @@ Performs comprehensive analysis of a Solana token.
   "analyzedAt": 1699564800000,
   "metadata": {
     "name": "Solana Rug Killer",
-    "symbol": "RUGK",
+    "symbol": "ANTIRUG",
     "decimals": 9,
     "supply": 1000000000
   },

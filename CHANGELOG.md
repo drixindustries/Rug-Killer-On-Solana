@@ -224,5 +224,5 @@ When adding to this changelog:
 
 - **Documentation**: See [replit.md](./replit.md)
 - **Issues**: Report bugs via GitHub Issues
-- **Token**: $RUGK - `2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt`
+- **Token**: $ANTIRUG - `2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt`
 - **Website**: https://rugkilleronsol.org

@@ -35,7 +35,7 @@ export default function AdminDeployToken() {
 
       const res = await apiRequest('POST', '/api/admin/token/deploy', {
         name: 'RugKiller',
-        symbol: 'RUGK',
+        symbol: 'ANTIRUG',
         decimals: 9,
         supply: 1000000000, // 1 billion tokens
         description: 'The ultimate Solana rug pull detector. AI-powered analysis, multi-source verification, and real-time alerts.',
@@ -51,7 +51,7 @@ export default function AdminDeployToken() {
         setShowPrivateKey(true);
         toast({
           title: "Token Deployed! 🚀",
-          description: `$RUGK deployed at ${data.mintAddress?.slice(0, 8)}...`,
+          description: `$ANTIRUG deployed at ${data.mintAddress?.slice(0, 8)}...`,
         });
       } else {
         toast({
@@ -86,14 +86,14 @@ export default function AdminDeployToken() {
           Deploy RugKiller Token
         </h1>
         <p className="text-muted-foreground mt-2">
-          Deploy $RUGK with a vanity address ending in "tek"
+          Deploy $ANTIRUG with a vanity address ending in "tek"
         </p>
       </div>
 
       {!deploymentResult ? (
         <Card data-testid="card-deployment-form">
           <CardHeader>
-            <CardTitle>Deploy $RUGK Token</CardTitle>
+            <CardTitle>Deploy $ANTIRUG Token</CardTitle>
             <CardDescription>
               This will generate a vanity address ending in "tek" and deploy the RugKiller token
             </CardDescription>
@@ -106,7 +106,7 @@ export default function AdminDeployToken() {
                   <p className="font-medium">Token Details:</p>
                   <ul className="list-disc list-inside space-y-1 text-sm">
                     <li>Name: RugKiller</li>
-                    <li>Symbol: $RUGK</li>
+                    <li>Symbol: $ANTIRUG</li>
                     <li>Supply: 1,000,000,000 (1 billion)</li>
                     <li>Decimals: 9</li>
                     <li>Vanity Address: Ending in "tek"</li>
@@ -151,7 +151,7 @@ export default function AdminDeployToken() {
                 size="lg"
                 data-testid="button-deploy"
               >
-                {deployMutation.isPending ? 'Deploying... (This may take a few minutes)' : 'Deploy $RUGK Token 🚀'}
+                {deployMutation.isPending ? 'Deploying... (This may take a few minutes)' : 'Deploy $ANTIRUG Token 🚀'}
               </Button>
             </div>
           </CardContent>
@@ -164,7 +164,7 @@ export default function AdminDeployToken() {
                 <CheckCircle2 className="h-4 w-4 text-green-500" />
                 <AlertDescription>
                   <p className="font-bold text-green-500 text-lg mb-2">
-                    🎉 $RUGK Token Deployed Successfully!
+                    🎉 $ANTIRUG Token Deployed Successfully!
                   </p>
                 </AlertDescription>
               </Alert>

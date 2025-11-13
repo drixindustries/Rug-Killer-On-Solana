@@ -16,7 +16,7 @@ export const PUMP_FUN_TOKEN = {
 export const BUNDLE_TOKEN = {
   address: '2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt',
   name: 'Solana Rug Killer',
-  symbol: 'RUGK',
+  symbol: 'ANTIRUG',
   decimals: 6,
   supply: 1000000000,
   mintAuthority: null,
@@ -181,7 +181,7 @@ export const RUGCHECK_DATA_WITH_BUNDLES = {
   ],
   fileMeta: {
     name: 'Solana Rug Killer',
-    symbol: 'RUGK',
+    symbol: 'ANTIRUG',
   },
 };
 

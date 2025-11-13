@@ -4,7 +4,7 @@
 
 Solana Rug Killer is a comprehensive web application designed to protect Solana traders from rug pulls and scams. It provides real-time token analysis using 52+ risk metrics, integrating data from multiple sources including Rugcheck, GoPlus Security, DexScreener, Jupiter, and Birdeye. The platform features AI-powered blacklist detection, Telegram and Discord bots for instant analysis, and premium features like smart money tracking and PumpFun launch alerts.
 
-The application uses an inverted risk scoring system (0=dangerous, 100=safe) with color-coded risk levels: GREEN (70-100), YELLOW (40-70), ORANGE (20-40), RED (0-20). It includes subscription-based access control via Whop integration and token-gated access for holders of 10M+ $RUGK tokens (contract: `2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt`).
+The application uses an inverted risk scoring system (0=dangerous, 100=safe) with color-coded risk levels: GREEN (70-100), YELLOW (40-70), ORANGE (20-40), RED (0-20). It includes subscription-based access control via Whop integration and token-gated access for holders of 10M+ $ANTIRUG tokens (contract: `2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt`).
 
 ## User Preferences
 
@@ -112,7 +112,7 @@ Preferred communication style: Simple, everyday language.
 - **Free**: Basic token analysis (rate-limited)
 - **Individual ($20)**: Full analysis, bot access, limited alerts
 - **Group ($100)**: Team features, unlimited alerts
-- **Lifetime**: Token-gated (10M+ $RUGK) or redeemable codes
+- **Lifetime**: Token-gated (10M+ $ANTIRUG) or redeemable codes
 
 **Access Control:**
 - `hasActiveAccess` middleware gates premium endpoints
