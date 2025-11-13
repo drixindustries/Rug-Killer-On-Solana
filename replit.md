@@ -14,6 +14,7 @@ Preferred communication style: Simple, everyday language.
 
 **November 13, 2025:**
 - Implemented Telegram bot command autocomplete menu using setMyCommands() API (5 commands: start, execute, first20, devtorture, blacklist)
+- **Telegram bot is currently ungated** - all features are publicly accessible with no subscription/token requirements
 - Comprehensive codebase cleanup for GitHub deployment:
   - Removed all TODO/FIXME comments
   - Removed excessive console.log statements (retained only critical startup and error messages)
