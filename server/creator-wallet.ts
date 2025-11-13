@@ -26,12 +26,9 @@ export class CreatorWalletService {
     if (privateKey && privateKey !== 'PLACEHOLDER') {
       try {
         this.keypair = Keypair.fromSecretKey(bs58.decode(privateKey));
-        console.log(`[CREATOR WALLET] Loaded wallet: ${this.keypair.publicKey.toBase58()}`);
       } catch (error) {
         console.error('[CREATOR WALLET] Failed to load keypair:', error);
       }
-    } else {
-      console.warn('[CREATOR WALLET] No private key configured. Set CREATOR_WALLET_PRIVATE_KEY to enable creator wallet features.');
     }
   }
 

@@ -16,63 +16,8 @@ import { VanityAddressGenerator } from "./vanity-generator";
 import { z } from "zod";
 import { rpcBalancer } from "./services/rpc-balancer";
 
-// Middleware: Requires active subscription OR 10M+ token holder status
-// This gates all premium features including token analysis, crypto payments, and bot access
-// TEMPORARILY DISABLED FOR TESTING
 export const hasActiveAccess = async (req: any, res: any, next: any) => {
-  console.log(`🔓 Access check DISABLED - allowing all requests for testing`);
   return next();
-  
-  /* ORIGINAL ACCESS CONTROL - COMMENTED OUT FOR TESTING
-  try {
-    // Must be authenticated first
-    if (!req.isAuthenticated() || !req.user?.claims?.sub) {
-      return res.status(401).json({ 
-        message: "Unauthorized. Please log in." 
-      });
-    }
-
-    const userId = req.user.claims.sub;
-    const userEmail = req.user.claims.email;
-    
-    // ADMIN BYPASS: Allow admin emails full access for testing
-    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(e => e);
-    if (adminEmails.length > 0 && adminEmails.includes(userEmail)) {
-      console.log(`✅ Admin bypass granted to ${userEmail}`);
-      return next();
-    }
-    
-    // Check access via storage helper
-    const accessCheck = await storage.hasActiveAccess(userId);
-    
-    if (accessCheck.hasAccess) {
-      // Log successful access for security monitoring
-      console.log(`✅ Access granted to ${userId}: ${accessCheck.reason}`);
-      return next();
-    }
-    
-    // Access denied - provide clear reason
-    console.warn(`❌ Access denied to ${userId}: ${accessCheck.reason}`);
-    return res.status(403).json({
-      message: accessCheck.reason,
-      subscription: accessCheck.subscription ? {
-        tier: accessCheck.subscription.tier,
-        status: accessCheck.subscription.status,
-        currentPeriodEnd: accessCheck.subscription.currentPeriodEnd,
-      } : null,
-      wallet: accessCheck.wallet ? {
-        isEligible: accessCheck.wallet.isEligible,
-        tokenBalance: accessCheck.wallet.tokenBalance,
-        lastVerifiedAt: accessCheck.wallet.lastVerifiedAt,
-      } : null,
-    });
-  } catch (error) {
-    console.error("Error checking access:", error);
-    return res.status(500).json({ 
-      message: "Failed to verify access. Please try again." 
-    });
-  }
-  */
 };
 
 // Admin middleware - checks if user is authorized admin access
@@ -268,16 +213,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         
         if (!isValidSignature) {
-          console.warn(`❌ Invalid signature for wallet ${walletAddress} by user ${userId}`);
           return res.status(403).json({
             message: "Invalid signature. Please sign the challenge message with the correct wallet."
           });
         }
         
-        // SECURITY: Mark challenge as used to prevent replay
         await storage.markChallengeUsed(challenge.id);
-        
-        console.log(`✅ Wallet ownership verified: ${walletAddress} by user ${userId} using challenge ${challengeStr}`);
         
         // Get token mint info for correct decimals
         const mintInfo = await getMint(connection, mintPubkey);
@@ -319,8 +260,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             isEligible,
           });
         }
-        
-        console.log(`✅ Wallet verified: ${walletAddress} - ${balance.toLocaleString()} tokens (${decimals} decimals) - eligible: ${isEligible}`);
         
         res.json({
           wallet,
@@ -412,13 +351,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/whop/webhook', async (req, res) => {
     try {
       const event = req.body;
-      
-      console.log(`Whop webhook received: ${event.action}`);
 
       switch (event.action) {
         case 'payment.succeeded': {
           const payment = event.data;
-          console.log(`Payment succeeded: ${payment.id}, membership: ${payment.membership}`);
           break;
         }
         
@@ -437,9 +373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (userId) {
             const dbSubscription = await storage.getSubscription(userId);
             
-            // CRITICAL: Protect lifetime subscriptions from being downgraded by Whop webhooks
             if (dbSubscription?.tier === 'lifetime') {
-              console.log(`⚠️  Ignoring Whop webhook for user ${userId} - already has lifetime subscription`);
               break;
             }
             
@@ -463,7 +397,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           
-          console.log(`Membership went valid: ${whopMembershipId} for user ${userId}`);
           break;
         }
         
@@ -473,9 +406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const dbSubscription = await storage.getSubscriptionByWhopId(whopMembershipId);
           
-          // CRITICAL: Protect lifetime subscriptions from being expired by Whop webhooks
           if (dbSubscription?.tier === 'lifetime') {
-            console.log(`⚠️  Ignoring Whop invalid webhook for lifetime subscription ${whopMembershipId}`);
             break;
           }
           
@@ -485,7 +416,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
           
-          console.log(`Membership went invalid: ${whopMembershipId}`);
           break;
         }
       }

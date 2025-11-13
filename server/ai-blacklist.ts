@@ -360,8 +360,6 @@ async function flagWallet(
             updatedAt: new Date(),
           })
           .where(eq(badActorLabels.id, existing.id));
-        
-        console.log(`🔄 Updated wallet ${walletAddress.slice(0, 8)}... label ${labelType} (severity: ${Math.max(severity, existing.severity)})`);
       }
     } else {
       // Create new label
@@ -374,11 +372,9 @@ async function flagWallet(
           [new Date().toISOString()]: evidence,
         },
         detectionMethod,
-        confidence: 80, // Rules-based has 80% confidence
+        confidence: 80,
         isActive: true,
       });
-      
-      console.log(`🚨 Flagged wallet ${walletAddress.slice(0, 8)}... as ${labelType} (severity: ${severity})`);
     }
   } catch (error) {
     // Ignore unique constraint violations (wallet already flagged with this type)

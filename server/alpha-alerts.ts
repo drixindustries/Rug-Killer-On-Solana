@@ -38,9 +38,6 @@ export class AlphaAlertService {
   }
 
   private async sendAlert(alert: AlphaAlert): Promise<void> {
-    console.log(`[ALPHA ALERT] ${alert.type} from ${alert.source}: ${alert.mint}`);
-    
-    // Format alert message
     let message = '';
     if (alert.type === 'caller_signal') {
       message = `🚨 **ALPHA CALL from ${alert.source}**\n\n` +
@@ -172,7 +169,6 @@ export class AlphaAlertService {
       );
 
       this.listeners.set(caller.wallet, listenerId);
-      console.log(`[ALPHA ALERT] Monitoring ${caller.name} (${caller.wallet})`);
     } catch (error) {
       console.error(`[ALPHA ALERT] Failed to monitor ${caller.name}:`, error);
     }
@@ -184,7 +180,6 @@ export class AlphaAlertService {
       const ws = new WebSocket('wss://pumpportal.fun/api/data');
 
       ws.on('open', () => {
-        console.log('[ALPHA ALERT] Connected to pump.fun WebSocket');
         ws.send(JSON.stringify({ method: "subscribeNewToken" }));
       });
 
@@ -218,11 +213,7 @@ export class AlphaAlertService {
       });
 
       ws.on('close', () => {
-        console.log('[ALPHA ALERT] pump.fun WebSocket closed');
-        
-        // Auto-reconnect if still running
         if (this.isRunning) {
-          console.log('[ALPHA ALERT] Reconnecting to pump.fun in 10 seconds...');
           setTimeout(() => this.startPumpFunMonitor(), 10000);
         }
       });
@@ -236,22 +227,16 @@ export class AlphaAlertService {
   // Start all monitoring
   async start(): Promise<void> {
     if (this.isRunning) {
-      console.log('[ALPHA ALERT] Service already running');
       return;
     }
 
     this.isRunning = true;
-    console.log('[ALPHA ALERT] Starting alpha alert service...');
 
-    // Monitor alpha callers
     for (const caller of this.alphaCallers) {
       this.monitorAlphaCaller(caller);
     }
 
-    // Monitor pump.fun
     this.startPumpFunMonitor();
-
-    console.log('[ALPHA ALERT] Service started successfully');
     
     // Send startup notification directly (not through sendAlert to avoid fake links)
     const startupMessage = '🤖 **ANTIRUGILLER ALPHA ALERTS ONLINE**\n\n' +
@@ -304,7 +289,6 @@ export class AlphaAlertService {
     for (const [wallet, listenerId] of Array.from(this.listeners.entries())) {
       try {
         await this.connection.removeOnLogsListener(listenerId);
-        console.log(`[ALPHA ALERT] Stopped monitoring ${wallet}`);
       } catch (error) {
         console.error(`[ALPHA ALERT] Error removing listener for ${wallet}:`, error);
       }
@@ -320,8 +304,6 @@ export class AlphaAlertService {
       }
     }
     this.wsConnections = [];
-
-    console.log('[ALPHA ALERT] Service stopped');
   }
 
   // Get current monitoring status
@@ -345,8 +327,6 @@ export class AlphaAlertService {
       if (this.isRunning) {
         this.monitorAlphaCaller(caller);
       }
-      
-      console.log(`[ALPHA ALERT] Added custom caller: ${name} (${wallet})`);
     }
   }
 
@@ -362,8 +342,6 @@ export class AlphaAlertService {
         this.connection.removeOnLogsListener(listenerId);
         this.listeners.delete(wallet);
       }
-      
-      console.log(`[ALPHA ALERT] Removed caller: ${caller.name} (${wallet})`);
     }
   }
 }
