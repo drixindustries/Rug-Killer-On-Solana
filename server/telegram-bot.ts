@@ -334,14 +334,37 @@ export async function startTelegramBot() {
   
   try {
     botInstance = createTelegramBot(BOT_TOKEN);
-    await botInstance.launch();
+    
+    // Clear any pending updates from previous instance to avoid 409 conflicts
+    await botInstance.launch({
+      dropPendingUpdates: true
+    });
     console.log('✅ Telegram bot started successfully');
     
     // Enable graceful stop
-    process.once('SIGINT', () => botInstance?.stop('SIGINT'));
-    process.once('SIGTERM', () => botInstance?.stop('SIGTERM'));
-  } catch (error) {
+    const cleanup = () => {
+      if (botInstance) {
+        botInstance.stop('SIGINT');
+        botInstance = null;
+      }
+    };
+    
+    process.once('SIGINT', cleanup);
+    process.once('SIGTERM', cleanup);
+    process.once('SIGQUIT', cleanup);
+  } catch (error: any) {
     console.error('Error starting Telegram bot:', error);
+    
+    // Handle 409 conflict gracefully - another instance is running
+    if (error?.response?.error_code === 409) {
+      console.log('⚠️  Another Telegram bot instance is running. This is normal during development restarts.');
+      console.log('   The conflict will resolve automatically when the old instance times out.');
+      botInstance = null;
+      // Don't throw for 409 - allow app to continue
+      return;
+    }
+    
+    // For other errors, reset instance and re-throw so deployment issues aren't hidden
     botInstance = null;
     throw error;
   }

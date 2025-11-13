@@ -143,15 +143,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Wallet connection routes
-  app.get('/api/wallet/status', isAuthenticated, async (req: any, res) => {
+  // Wallet connection routes - return proper status codes
+  app.get('/api/wallet/status', async (req: any, res) => {
     try {
+      // Return 401 if not authenticated - frontend will handle this gracefully
+      if (!req.isAuthenticated() || !req.user?.claims?.sub) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
       const userId = req.user.claims.sub;
       const wallet = await storage.getWalletConnection(userId);
       res.json(wallet || null);
     } catch (error) {
       console.error("Error fetching wallet:", error);
-      res.status(500).json({ message: "Failed to fetch wallet" });
+      res.status(500).json({ message: "Failed to fetch wallet status" });
     }
   });
 
@@ -1131,7 +1136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId,
         tokenAddress,
         alertType,
-        targetValue,
+        targetValue: typeof targetValue === 'number' ? targetValue.toString() : targetValue,
         lookbackWindowMinutes,
         isActive: true,
         lastPrice: null,
@@ -1686,7 +1691,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { socialService } = await import('./services/social-service');
       
-      const { username, bio, isPublic } = req.body;
+      const { username, bio, visibility } = req.body;
       
       // Sanitize text inputs
       const sanitizedBio = bio ? socialService.sanitizeContent(bio) : undefined;
@@ -1699,7 +1704,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId,
           username: username || null,
           bio: sanitizedBio || null,
-          isPublic: isPublic !== undefined ? isPublic : true,
+          visibility: visibility || 'public',
           reputationScore: 0,
           contributionCount: 0,
         });
@@ -1708,7 +1713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         profile = await storage.updateUserProfile(userId, {
           username,
           bio: sanitizedBio,
-          isPublic,
+          visibility,
         });
       }
       
@@ -1764,13 +1769,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sanitizedDescription = description ? socialService.sanitizeContent(description) : null;
       
       const sharedWatchlist = await storage.createSharedWatchlist({
-        userId,
+        ownerId: userId,
         name,
         description: sanitizedDescription,
-        tokenAddresses,
         shareSlug: slug,
         isPublic: isPublic !== undefined ? isPublic : true,
-        followerCount: 0,
+        followersCount: 0,
       });
       
       res.json(sharedWatchlist);
@@ -1885,11 +1889,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sanitizedEvidence = socialService.sanitizeContent(evidence);
       
       const report = await storage.createTokenReport({
-        userId,
+        reporterId: userId,
         tokenAddress,
         reportType: reportType as 'scam' | 'honeypot' | 'soft_rug' | 'other',
         evidence: sanitizedEvidence,
-        severity: severity || 3,
+        severityScore: severity || 3,
         status: 'pending',
       });
       
@@ -1919,7 +1923,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/reports/:id/review', isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const { status, reviewNotes } = req.body;
+      const { status, resolutionNotes } = req.body;
       
       if (!['pending', 'approved', 'dismissed'].includes(status)) {
         return res.status(400).json({ message: 'Invalid status' });
@@ -1927,7 +1931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const report = await storage.updateTokenReport(id, {
         status: status as 'pending' | 'approved' | 'dismissed',
-        reviewNotes,
+        resolutionNotes,
       });
       
       res.json(report);
@@ -2076,64 +2080,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========================================
   // TOKEN DEPLOYMENT ROUTES (Admin Only)
   // ========================================
+  // NOTE: Token deployment functionality is not yet implemented.
+  // These routes are disabled until the token-deployer module is created.
 
-  // POST /api/admin/token/deploy - Deploy SPL token (requires wallet private key in request)
+  // POST /api/admin/token/deploy - Deploy SPL token (NOT IMPLEMENTED)
   app.post('/api/admin/token/deploy', isAdmin, async (req, res) => {
-    try {
-      const { getTokenDeployer } = await import('./token-deployer');
-      const deployer = getTokenDeployer();
-      
-      const { 
-        name, 
-        symbol, 
-        decimals, 
-        supply, 
-        description,
-        walletPrivateKey, // User provides this in the request
-        mintKeypair, // Optional vanity address keypair
-        generateVanity, // Generate vanity address
-        vanitySuffix // Suffix for vanity address
-      } = req.body;
-
-      if (!walletPrivateKey) {
-        return res.status(400).json({ 
-          message: 'Wallet private key required for deployment' 
-        });
-      }
-
-      const result = await deployer.deployToken({
-        name,
-        symbol,
-        decimals,
-        supply,
-        description,
-        walletPrivateKey,
-        mintKeypair,
-        generateVanity,
-        vanitySuffix,
-      });
-
-      res.json(result);
-    } catch (error) {
-      console.error("Token deployment error:", error);
-      res.status(500).json({ 
-        message: "Failed to deploy token",
-        error: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
+    res.status(501).json({ 
+      message: 'Token deployment feature is not yet implemented. Please use Solana CLI or other tools for now.' 
+    });
   });
 
-  // GET /api/admin/token/info/:mintAddress - Get token info
+  // GET /api/admin/token/info/:mintAddress - Get token info (NOT IMPLEMENTED)
   app.get('/api/admin/token/info/:mintAddress', isAdmin, async (req, res) => {
-    try {
-      const { getTokenDeployer } = await import('./token-deployer');
-      const deployer = getTokenDeployer();
-      const info = await deployer.getTokenInfo(req.params.mintAddress);
-      res.json(info);
-    } catch (error) {
-      console.error("Error fetching token info:", error);
-      res.status(500).json({ message: "Failed to fetch token info" });
-    }
+    res.status(501).json({ 
+      message: 'Token info feature is not yet implemented.' 
+    });
   });
 
   const httpServer = createServer(app);

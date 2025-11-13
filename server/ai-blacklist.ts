@@ -415,6 +415,23 @@ export async function reportWallet(
 }
 
 /**
+ * Get all blacklisted wallets
+ */
+export async function getBlacklist() {
+  try {
+    const wallets = await db
+      .select()
+      .from(badActorLabels)
+      .where(eq(badActorLabels.isActive, true));
+    
+    return wallets;
+  } catch (error) {
+    console.error("Error getting blacklist:", error);
+    return [];
+  }
+}
+
+/**
  * Get blacklist statistics
  */
 export async function getBlacklistStats() {

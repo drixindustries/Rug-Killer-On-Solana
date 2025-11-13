@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import bs58 from "bs58";
 
 interface WalletConnection {
@@ -16,25 +17,58 @@ export function useWallet() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connection, setConnection] = useState<WalletConnection | null>(null);
   const { toast } = useToast();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
-    checkExistingConnection();
-  }, []);
+    if (isAuthenticated && !authLoading) {
+      checkExistingConnection();
+    }
+  }, [isAuthenticated, authLoading]);
 
   const checkExistingConnection = async () => {
+    if (!isAuthenticated) return;
+    
+    // Wallet verification requires real authentication
+    if ((useAuth() as any).isMockAuth) {
+      return; // Skip in mock mode
+    }
+    
     try {
       const response = await apiRequest("GET", "/api/wallet/status");
+      
+      // 401 = auth required (mock mode or not logged in)
+      if (response.status === 401) {
+        return; // Skip silently
+      }
+      
+      if (!response.ok) {
+        console.error("Failed to check wallet status:", response.status);
+        return;
+      }
+      
       const data = await response.json();
+      // data will be null if no wallet is connected
       if (data && data.walletAddress) {
         setConnection(data);
         setWalletAddress(data.walletAddress);
       }
     } catch (error) {
-      console.error("Failed to check existing connection:", error);
+      console.error("Error checking wallet connection:", error);
     }
   };
 
   const connectWallet = useCallback(async () => {
+    // Check if premium features are available
+    const auth = useAuth() as any;
+    if (auth.isMockAuth || !auth.hasPremiumAccess) {
+      toast({
+        title: "Authentication Required",
+        description: "Wallet verification requires real authentication. Enable Replit auth to use this feature.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (!window.solana || !window.solana.isPhantom) {
       toast({
         title: "Phantom Wallet Not Found",
