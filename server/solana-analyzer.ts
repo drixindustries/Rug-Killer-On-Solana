@@ -14,7 +14,7 @@ import { RugcheckService } from "./rugcheck-service";
 import { GoPlusSecurityService } from "./goplus-service";
 import { DexScreenerService } from "./dexscreener-service";
 import { JupiterPriceService } from "./jupiter-service";
-import { isKnownAddress, getKnownAddressInfo, detectBundledWallets } from "./known-addresses";
+import { isKnownAddress, getKnownAddressInfo, detectBundledWallets, getPumpFunBondingCurveAddress, getPumpFunAssociatedBondingCurveAddress } from "./known-addresses";
 import { getBirdeyeOverview } from "./services/birdeye-api";
 import { checkPumpFun } from "./services/pumpfun-api";
 import { rpcBalancer } from "./services/rpc-balancer";
@@ -93,10 +93,21 @@ export class SolanaTokenAnalyzer {
       // Detect bundled wallets (same-block purchases, suspicious patterns)
       const bundledWallets = detectBundledWallets(holders);
       
-      // Filter out LP addresses, known exchanges, and bundled wallets
+      // For pump.fun tokens, also exclude the bonding curve addresses
+      const pumpFunExclusions: string[] = [];
+      if (pumpFunData?.isPumpFun) {
+        const bondingCurve = getPumpFunBondingCurveAddress(tokenAddress);
+        const associatedBondingCurve = getPumpFunAssociatedBondingCurveAddress(tokenAddress);
+        
+        if (bondingCurve) pumpFunExclusions.push(bondingCurve);
+        if (associatedBondingCurve) pumpFunExclusions.push(associatedBondingCurve);
+      }
+      
+      // Filter out LP addresses, known exchanges, bundled wallets, and pump.fun bonding curve
       const addressesToExclude = new Set([
         ...lpAddresses,
         ...bundledWallets,
+        ...pumpFunExclusions,
       ]);
       
       // Also filter out known exchange/protocol addresses
@@ -146,6 +157,16 @@ export class SolanaTokenAnalyzer {
           address: addr,
           type: 'bundled',
           reason: 'Suspected bundled wallet (same purchase pattern)'
+        });
+      });
+      
+      // Add pump.fun bonding curve addresses
+      pumpFunExclusions.forEach(addr => {
+        excludedAddresses.push({
+          address: addr,
+          type: 'protocol',
+          label: 'Pump.fun Bonding Curve',
+          reason: 'Pump.fun bonding curve contract (not a real holder)'
         });
       });
       

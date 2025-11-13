@@ -149,7 +149,7 @@ export default function Pricing() {
     // Trigger wallet connection modal (if implemented)
     toast({
       title: "Connect Wallet",
-      description: "Please connect your Phantom wallet from the header menu to verify your $KILL token holdings.",
+      description: "Please connect your Phantom wallet from the header menu to verify your $ANTIRUG token holdings.",
     });
   };
 

@@ -1,6 +1,9 @@
 // Known Solana addresses that should be excluded from holder concentration calculations
 // These are exchanges, bundling bots, and protocol-owned addresses that don't represent individual whales
 
+import { PublicKey } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
+
 export interface KnownAddress {
   address: string;
   label: string;
@@ -122,6 +125,9 @@ export const PUMPFUN_ADDRESSES: KnownAddress[] = [
   },
 ];
 
+// Pump.fun Program ID for bonding curve derivation
+export const PUMPFUN_PROGRAM_ID = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P';
+
 // Bundler/Volume Bot Known Patterns
 // These are addresses known to be used by bundling services
 export const KNOWN_BUNDLERS: KnownAddress[] = [
@@ -154,6 +160,85 @@ export function isKnownAddress(address: string): boolean {
  */
 export function getKnownAddressInfo(address: string): KnownAddress | undefined {
   return ALL_KNOWN_ADDRESSES.find(a => a.address === address);
+}
+
+// Memoization cache for bonding curve addresses
+const bondingCurveCache = new Map<string, string>();
+const associatedBondingCurveCache = new Map<string, string>();
+
+/**
+ * Calculate the pump.fun bonding curve address for a given token mint
+ * This is a PDA (Program Derived Address) specific to each token
+ * Results are memoized for performance
+ */
+export function getPumpFunBondingCurveAddress(mintAddress: string): string | null {
+  // Check cache first
+  if (bondingCurveCache.has(mintAddress)) {
+    return bondingCurveCache.get(mintAddress)!;
+  }
+  
+  try {
+    const mint = new PublicKey(mintAddress);
+    const pumpProgram = new PublicKey(PUMPFUN_PROGRAM_ID);
+    
+    const [bondingCurve] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from('bonding-curve'),
+        mint.toBuffer()
+      ],
+      pumpProgram
+    );
+    
+    const address = bondingCurve.toString();
+    bondingCurveCache.set(mintAddress, address);
+    return address;
+  } catch (error) {
+    console.error('Error calculating pump.fun bonding curve address:', error);
+    return null;
+  }
+}
+
+/**
+ * Calculate the associated bonding curve token account for a given mint
+ * This account holds the actual tokens locked in the bonding curve
+ * Results are memoized for performance
+ */
+export function getPumpFunAssociatedBondingCurveAddress(mintAddress: string): string | null {
+  // Check cache first
+  if (associatedBondingCurveCache.has(mintAddress)) {
+    return associatedBondingCurveCache.get(mintAddress)!;
+  }
+  
+  try {
+    const mint = new PublicKey(mintAddress);
+    const pumpProgram = new PublicKey(PUMPFUN_PROGRAM_ID);
+    
+    // First get the bonding curve PDA
+    const [bondingCurve] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from('bonding-curve'),
+        mint.toBuffer()
+      ],
+      pumpProgram
+    );
+    
+    // Then get the associated token account
+    const [associatedBondingCurve] = PublicKey.findProgramAddressSync(
+      [
+        bondingCurve.toBuffer(),
+        TOKEN_PROGRAM_ID.toBuffer(),
+        mint.toBuffer()
+      ],
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    
+    const address = associatedBondingCurve.toString();
+    associatedBondingCurveCache.set(mintAddress, address);
+    return address;
+  } catch (error) {
+    console.error('Error calculating pump.fun associated bonding curve address:', error);
+    return null;
+  }
 }
 
 /**
