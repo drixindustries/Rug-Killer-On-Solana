@@ -53,7 +53,6 @@ function formatAnalysis(analysis: TokenAnalysisResponse, compact: boolean = fals
 Use /execute ${analysis.tokenAddress.slice(0, 8)}... for full analysis`;
   }
   
-  // RICK BOT STYLE FORMATTING
   let message = `━━━━━━━━━━━━━━━━━━━━━━\n`;
   message += `${emoji} **${analysis.metadata.name} (${analysis.metadata.symbol})**\n`;
   message += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
@@ -61,7 +60,7 @@ Use /execute ${analysis.tokenAddress.slice(0, 8)}... for full analysis`;
   // CONTRACT ADDRESS (prominently displayed)
   message += `📋 **Token Address**\n\`${analysis.tokenAddress}\`\n\n`;
   
-  // AI VERDICT (Rick Bot feature)
+  // AI VERDICT
   if (analysis.aiVerdict) {
     message += `🤖 **AI VERDICT**\n`;
     message += `${analysis.aiVerdict.rating} - ${analysis.aiVerdict.verdict}\n\n`;
@@ -96,7 +95,7 @@ Use /execute ${analysis.tokenAddress.slice(0, 8)}... for full analysis`;
   }
   message += `\n`;
   
-  // PUMP.FUN INFO (Rick Bot feature)
+  // PUMP.FUN INFO
   if (analysis.pumpFunData?.isPumpFun) {
     message += `🎯 **PUMP.FUN**\n`;
     message += `• Dev Bought: ${analysis.pumpFunData.devBought.toFixed(2)}%\n`;

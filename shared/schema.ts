@@ -294,7 +294,7 @@ export interface TokenAnalysisResponse {
   // Creation info
   creationDate?: number;
   
-  // Rick Bot features
+  // AI-powered analysis
   aiVerdict?: AIVerdict;
   pumpFunData?: PumpFunData;
   birdeyeData?: BirdeyeData;

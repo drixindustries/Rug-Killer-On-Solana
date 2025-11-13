@@ -793,7 +793,7 @@ export class SolanaTokenAnalyzer {
     const lpBurned = analysis.liquidityPool.isBurned || analysis.liquidityPool.isLocked || false;
     const mcap = analysis.marketData?.marketCap || 0;
     
-    // Rick Bot style ratings (0=bad, 100=good)
+    // Inverted risk scoring (0=dangerous, 100=safe)
     if (score >= 75 && mintRenounced && freezeDisabled && lpBurned) {
       return {
         rating: '10/10',

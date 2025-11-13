@@ -99,7 +99,7 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
     inline: false
   });
   
-  // AI VERDICT (Rick Bot feature)
+  // AI VERDICT
   if (analysis.aiVerdict) {
     embed.addFields({
       name: '🤖 AI VERDICT',
@@ -130,7 +130,7 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
     inline: true
   });
   
-  // PUMP.FUN INFO (Rick Bot feature)
+  // PUMP.FUN INFO
   if (analysis.pumpFunData?.isPumpFun) {
     embed.addFields({
       name: '🎯 PUMP.FUN',
