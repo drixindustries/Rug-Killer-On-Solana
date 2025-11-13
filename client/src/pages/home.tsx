@@ -400,6 +400,7 @@ export default function Home() {
 
                 <TabsContent value="analysis" className="space-y-8">
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Left Column - Main Analysis */}
                     <div className="lg:col-span-2 space-y-6">
                       <RiskScoreCard
                         score={analysis.riskScore}
@@ -408,100 +409,101 @@ export default function Home() {
                         analyzedAt={analysis.analyzedAt}
                       />
                     
-                    <CriticalAlerts 
-                      redFlags={analysis.redFlags || []}
-                      holderFiltering={analysis.holderFiltering}
-                    />
+                      <CriticalAlerts 
+                        redFlags={analysis.redFlags || []}
+                        holderFiltering={analysis.holderFiltering}
+                      />
 
-                    {/* LP Burn Checker - Only show if we have burn data */}
-                    {analysis.liquidityPool?.burnPercentage !== undefined && (
-                      <LiquidityBurnCard
-                        burnPercentage={analysis.liquidityPool.burnPercentage}
-                        lpMintAddress={analysis.liquidityPool.lpMintAddress}
-                        lpReserve={analysis.liquidityPool.lpReserve}
-                        actualSupply={analysis.liquidityPool.actualSupply}
-                        isBurned={analysis.liquidityPool.isBurned ?? false}
-                      />
-                    )}
-                    
-                    <MetricsGrid
-                      totalSupply={analysis.metadata?.supply || 0}
-                      holderCount={analysis.holderCount || 0}
-                      topHolderConcentration={analysis.topHolderConcentration || 0}
-                      liquidityStatus={analysis.liquidityPool?.status || "UNKNOWN"}
-                      creationDate={analysis.creationDate}
-                      decimals={analysis.metadata?.decimals || 0}
-                      bundledCount={analysis.holderFiltering?.totals.bundled}
-                      bundleConfidence={analysis.holderFiltering?.bundledDetection?.confidence}
-                      bundleSupplyPct={analysis.holderFiltering?.bundledDetection?.bundleSupplyPct}
-                    />
-
-                    {/* Bundle Visualization Chart */}
-                    {analysis.holderFiltering && analysis.holderFiltering.totals.total > 0 && (
-                      <BundleVisualizationChart 
-                        filtering={analysis.holderFiltering}
-                        totalHolders={analysis.holderCount || 0}
-                      />
-                    )}
-
-                    {/* Holder Filtering Details */}
-                    {analysis.holderFiltering && analysis.holderFiltering.totals.total > 0 && (
-                      <HolderFilteringCard filtering={analysis.holderFiltering} />
-                    )}
-                  </div>
-                  
-                  <div className="space-y-6">
-                    {/* Token Info Sidebar with copy-able addresses */}
-                    <TokenInfoSidebar
-                      tokenAddress={analysis.tokenAddress}
-                      mintAuthority={analysis.mintAuthority.hasAuthority ? analysis.mintAuthority.authorityAddress : null}
-                      freezeAuthority={analysis.freezeAuthority.hasAuthority ? analysis.freezeAuthority.authorityAddress : null}
-                      lpAddresses={analysis.liquidityPool?.lpAddresses || []}
-                    />
-
-                    <TokenMetadataCard 
-                      metadata={analysis.metadata}
-                      tokenAddress={analysis.tokenAddress}
-                    />
-                    
-                    {analysis.rugcheckData && (
-                      <RugcheckCard 
-                        data={analysis.rugcheckData}
-                        tokenAddress={analysis.tokenAddress}
-                      />
-                    )}
-                    
-                    {analysis.goplusData && (
-                      <GoPlusCard 
-                        data={analysis.goplusData}
-                        tokenAddress={analysis.tokenAddress}
-                      />
-                    )}
-                    
-                    {analysis.dexscreenerData && (
-                      <MarketDataCard 
-                        data={analysis.dexscreenerData}
-                        tokenAddress={analysis.tokenAddress}
-                      />
-                    )}
-                    
-                    <TransactionTimeline transactions={analysis.recentTransactions || []} />
-                    
-                    {analysis.topHolders && analysis.topHolders.length > 0 && (
-                      <>
-                        <TopHoldersTable 
-                          holders={analysis.topHolders}
-                          decimals={analysis.metadata?.decimals || 0}
+                      {/* LP Burn Checker - Only show if we have burn data */}
+                      {analysis.liquidityPool?.burnPercentage !== undefined && (
+                        <LiquidityBurnCard
+                          burnPercentage={analysis.liquidityPool.burnPercentage}
+                          lpMintAddress={analysis.liquidityPool.lpMintAddress}
+                          lpReserve={analysis.liquidityPool.lpReserve}
+                          actualSupply={analysis.liquidityPool.actualSupply}
+                          isBurned={analysis.liquidityPool.isBurned ?? false}
                         />
+                      )}
+                      
+                      <MetricsGrid
+                        totalSupply={analysis.metadata?.supply || 0}
+                        holderCount={analysis.holderCount || 0}
+                        topHolderConcentration={analysis.topHolderConcentration || 0}
+                        liquidityStatus={analysis.liquidityPool?.status || "UNKNOWN"}
+                        creationDate={analysis.creationDate}
+                        decimals={analysis.metadata?.decimals || 0}
+                        bundledCount={analysis.holderFiltering?.totals.bundled}
+                        bundleConfidence={analysis.holderFiltering?.bundledDetection?.confidence}
+                        bundleSupplyPct={analysis.holderFiltering?.bundledDetection?.bundleSupplyPct}
+                      />
 
-                        <HolderDistributionChart
-                          holders={analysis.topHolders}
-                          totalConcentration={analysis.topHolderConcentration || 0}
+                      {/* Bundle Visualization Chart */}
+                      {analysis.holderFiltering && analysis.holderFiltering.totals.total > 0 && (
+                        <BundleVisualizationChart 
+                          filtering={analysis.holderFiltering}
+                          totalHolders={analysis.holderCount || 0}
                         />
-                      </>
-                    )}
+                      )}
+
+                      {/* Holder Filtering Details */}
+                      {analysis.holderFiltering && analysis.holderFiltering.totals.total > 0 && (
+                        <HolderFilteringCard filtering={analysis.holderFiltering} />
+                      )}
+                    </div>
+                    
+                    {/* Right Column - Sidebar */}
+                    <div className="space-y-6">
+                      {/* Token Info Sidebar with copy-able addresses */}
+                      <TokenInfoSidebar
+                        tokenAddress={analysis.tokenAddress}
+                        mintAuthority={analysis.mintAuthority.hasAuthority ? analysis.mintAuthority.authorityAddress : null}
+                        freezeAuthority={analysis.freezeAuthority.hasAuthority ? analysis.freezeAuthority.authorityAddress : null}
+                        lpAddresses={analysis.liquidityPool?.lpAddresses || []}
+                      />
+
+                      <TokenMetadataCard 
+                        metadata={analysis.metadata}
+                        tokenAddress={analysis.tokenAddress}
+                      />
+                      
+                      {analysis.rugcheckData && (
+                        <RugcheckCard 
+                          data={analysis.rugcheckData}
+                          tokenAddress={analysis.tokenAddress}
+                        />
+                      )}
+                      
+                      {analysis.goplusData && (
+                        <GoPlusCard 
+                          data={analysis.goplusData}
+                          tokenAddress={analysis.tokenAddress}
+                        />
+                      )}
+                      
+                      {analysis.dexscreenerData && (
+                        <MarketDataCard 
+                          data={analysis.dexscreenerData}
+                          tokenAddress={analysis.tokenAddress}
+                        />
+                      )}
+                      
+                      <TransactionTimeline transactions={analysis.recentTransactions || []} />
+                      
+                      {analysis.topHolders && analysis.topHolders.length > 0 && (
+                        <>
+                          <TopHoldersTable 
+                            holders={analysis.topHolders}
+                            decimals={analysis.metadata?.decimals || 0}
+                          />
+
+                          <HolderDistributionChart
+                            holders={analysis.topHolders}
+                            totalConcentration={analysis.topHolderConcentration || 0}
+                          />
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
                 </TabsContent>
 
                 <TabsContent value="community" className="space-y-6">
