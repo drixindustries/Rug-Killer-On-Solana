@@ -106,12 +106,12 @@ export function useWallet() {
         if (verifyData.wallet.isEligible) {
           toast({
             title: "Wallet Connected Successfully!",
-            description: `You have ${verifyData.wallet.tokenBalance?.toLocaleString()} $KILL tokens. Premium access unlocked!`,
+            description: `You have ${verifyData.wallet.tokenBalance?.toLocaleString()} $ANTIRUG tokens. Premium access unlocked!`,
           });
         } else {
           toast({
             title: "Insufficient Token Balance",
-            description: `You need 10M+ $KILL tokens for premium access. Current: ${verifyData.wallet.tokenBalance?.toLocaleString() || 0}`,
+            description: `You need 10M+ $ANTIRUG tokens for premium access. Current: ${verifyData.wallet.tokenBalance?.toLocaleString() || 0}`,
             variant: "destructive",
           });
         }

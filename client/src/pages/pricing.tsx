@@ -65,7 +65,7 @@ const pricingTiers = [
     id: "whale",
     name: "WHALE",
     icon: Crown,
-    price: "$99",
+    price: "$120",
     period: "per month",
     description: "Premium features for whale investors",
     features: [
@@ -87,11 +87,11 @@ const pricingTiers = [
   },
   {
     id: "kill-holder",
-    name: "$KILL Holder",
+    name: "$ANTIRUG Holder",
     icon: Wallet,
     price: "FREE",
     period: "forever",
-    description: "Hold 10M+ $KILL tokens for lifetime access",
+    description: "Hold 10M+ $ANTIRUG tokens for lifetime access",
     features: [
       "Everything in WHALE tier",
       "Lifetime access (no monthly fees)",
@@ -275,9 +275,9 @@ export default function Pricing() {
               </CardHeader>
               <CardContent className="space-y-4 text-left">
                 <div>
-                  <h3 className="font-semibold mb-1">How do I become a $KILL holder?</h3>
+                  <h3 className="font-semibold mb-1">How do I become a $ANTIRUG holder?</h3>
                   <p className="text-sm text-muted-foreground">
-                    Purchase 10M+ $KILL tokens and connect your wallet to automatically unlock lifetime access to all premium features.
+                    Purchase 10M+ $ANTIRUG tokens and connect your wallet to automatically unlock lifetime access to all premium features.
                   </p>
                 </div>
                 <div>

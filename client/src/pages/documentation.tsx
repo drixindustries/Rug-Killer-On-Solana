@@ -156,9 +156,9 @@ const DocumentationPDF = () => (
           <Text style={pdfStyles.text}>• Custom webhook integrations</Text>
         </View>
 
-        <Text style={pdfStyles.subheading}>$KILL Holder - FREE Forever</Text>
+        <Text style={pdfStyles.subheading}>$ANTIRUG Holder - FREE Forever</Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Hold 10M+ official $KILL tokens</Text>
+          <Text style={pdfStyles.text}>• Hold 10M+ official $ANTIRUG tokens</Text>
           <Text style={pdfStyles.text}>• Lifetime access to WHALE tier features</Text>
           <Text style={pdfStyles.text}>• Exclusive holder perks and governance rights</Text>
           <Text style={pdfStyles.text}>• Connect wallet via Phantom to verify holdings</Text>
@@ -325,7 +325,7 @@ const DocumentationPDF = () => (
 
         <Text style={pdfStyles.subheading}>Step 4: Connect Phantom Wallet (Optional - Token Holders)</Text>
         <Text style={pdfStyles.text}>
-          If you hold 10M+ official $KILL tokens, you can gain instant WHALE tier access without 
+          If you hold 10M+ official $ANTIRUG tokens, you can gain instant WHALE tier access without 
           a paid subscription. First, install Phantom from phantom.app if you haven't already.
         </Text>
         <View style={pdfStyles.list}>
@@ -1024,7 +1024,7 @@ export default function Documentation() {
                 </div>
 
                 <div className="space-y-2 p-4 border rounded-lg bg-gradient-to-br from-primary/10 to-primary/5">
-                  <Badge variant="outline" className="bg-primary/10">$KILL Holder</Badge>
+                  <Badge variant="outline" className="bg-primary/10">$ANTIRUG Holder</Badge>
                   <p className="text-2xl font-bold">FREE</p>
                   <p className="text-sm text-muted-foreground">forever</p>
                   <ul className="text-xs space-y-1 text-muted-foreground">
@@ -1089,7 +1089,7 @@ export default function Documentation() {
                 <div>
                   <h4 className="font-semibold mb-1">Connect Phantom Wallet (Optional - Token Holders)</h4>
                   <p className="text-sm text-muted-foreground mb-2">
-                    If you hold 10M+ official $KILL tokens, you can gain instant WHALE tier access without 
+                    If you hold 10M+ official $ANTIRUG tokens, you can gain instant WHALE tier access without 
                     a paid subscription. First, install Phantom from <a href="https://phantom.app" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">phantom.app</a> if you haven't already.
                   </p>
                   <ol className="text-sm text-muted-foreground space-y-1 ml-4 list-decimal">

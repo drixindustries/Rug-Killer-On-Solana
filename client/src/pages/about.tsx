@@ -242,7 +242,7 @@ export default function About() {
                     </ul>
                   </div>
                   <div>
-                    <h3 className="font-semibold">Group - $99/month</h3>
+                    <h3 className="font-semibold">Group - $120/month</h3>
                     <ul className="text-sm text-muted-foreground space-y-1 mt-2 ml-4">
                       <li>• Everything in Individual</li>
                       <li>• Telegram group/channel alerts</li>
