@@ -13,14 +13,29 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 **November 13, 2025:**
+- **Implemented Whale Tier Commands (🐋 Premium Features):**
+  - `/whaletrack <token>` - Track smart money (KOL) wallets holding a token
+    - Cross-references top holders with KOL database from kolscan.io
+    - Shows influence scores, profit history, and holdings percentage
+    - Calculates total smart money concentration with risk tiers (LOW <15%, MODERATE 15-30%, HIGH >30%)
+  - `/kol <wallet>` - Check if a wallet is a tracked KOL
+    - Displays full trader profile: rank, influence score, total profit, win rate
+    - Tier classification: Highly Influential (80+), Influential (60-80), Tracked (<60)
+  - Both commands available in Telegram (/whaletrack, /kol) and Discord (/whaletrack, /kol)
+  - Commands use existing KOL wallet database seeded with real trader data
+- Updated Bot Usage Guide page (`/bot-guide`) with whale tier command documentation:
+  - Comprehensive usage examples and sample responses
+  - Key metrics explained (influence score, concentration levels, win rate)
+  - When to use guidance (before buying, after pumps, during volume spikes)
+  - Premium feature badge styling (🐋 Whale Tier gradient badge)
 - Created comprehensive Bot Usage Guide page (`/bot-guide`):
   - Detailed command reference for both Telegram and Discord bots
   - Full examples with sample responses for each command
   - Usage tips, best practices, and red flag warnings
   - Tabbed interface separating Telegram and Discord instructions
   - Accessible from header navigation (Automations > Bot Usage Guide), footer, and documentation page
-- Implemented Telegram bot command autocomplete menu using setMyCommands() API (5 commands: start, execute, first20, devtorture, blacklist)
-- **Telegram bot is currently ungated** - all features are publicly accessible with no subscription/token requirements
+- Implemented Telegram bot command autocomplete menu using setMyCommands() API (7 commands: start, execute, first20, devtorture, blacklist, whaletrack, kol)
+- **Telegram bot is currently ungated** - all features including whale tier are publicly accessible with no subscription/token requirements
 - Comprehensive codebase cleanup for GitHub deployment:
   - Removed all TODO/FIXME comments
   - Removed excessive console.log statements (retained only critical startup and error messages)
