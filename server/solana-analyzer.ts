@@ -18,6 +18,7 @@ import { isKnownAddress, getKnownAddressInfo, detectBundledWallets } from "./kno
 import { getBirdeyeOverview } from "./services/birdeye-api";
 import { checkPumpFun } from "./services/pumpfun-api";
 import { rpcBalancer } from "./services/rpc-balancer";
+import { LPChecker } from "./services/lp-checker";
 
 export class SolanaTokenAnalyzer {
   private rugcheckService: RugcheckService;
@@ -79,10 +80,11 @@ export class SolanaTokenAnalyzer {
       const liquidityPool = this.analyzeLiquidity(0); // Pass 0 initially, will recalculate
 
       // Enrich liquidity data with market information from Rugcheck and DexScreener
-      const enrichedLiquidity = this.enrichLiquidityWithMarketData(
+      const enrichedLiquidity = await this.enrichLiquidityWithMarketData(
         liquidityPool,
         rugcheckData,
-        dexscreenerData
+        dexscreenerData,
+        tokenAddress
       );
       
       // Filter out LP/exchange addresses from holder concentration calculation
@@ -504,11 +506,12 @@ export class SolanaTokenAnalyzer {
     };
   }
 
-  private enrichLiquidityWithMarketData(
+  private async enrichLiquidityWithMarketData(
     liquidityPool: LiquidityPoolStatus,
     rugcheckData: any,
-    dexscreenerData: any
-  ): LiquidityPoolStatus {
+    dexscreenerData: any,
+    tokenAddress: string
+  ): Promise<LiquidityPoolStatus> {
     // Extract LP addresses from DexScreener pairs
     const lpAddresses: string[] = [];
     if (dexscreenerData?.pairs) {
@@ -539,9 +542,14 @@ export class SolanaTokenAnalyzer {
     // Use DexScreener liquidity as primary source, fallback to Rugcheck
     let totalLiquidity = primaryPair?.liquidity?.usd;
     
-    // Extract LP burn data from Rugcheck markets
-    let maxBurnPercentage = 0;
-    let lpMintAddress: string | undefined;
+    // ON-CHAIN LP BURN CHECKING (Grok's Method)
+    // Instead of relying on Rugcheck percentages, check actual on-chain state
+    const connection = this.getConnection();
+    const lpChecker = new LPChecker(connection);
+    
+    let isBurned = false;
+    let isLocked = false;
+    let burnPercentage = 0;
 
     if (rugcheckData?.markets && rugcheckData.markets.length > 0) {
       // Find the market with highest liquidity
@@ -549,39 +557,48 @@ export class SolanaTokenAnalyzer {
         return (current.liquidity || 0) > (prev.liquidity || 0) ? current : prev;
       });
 
-      // Check if this is a Pump.fun token (bonding curve model)
-      // Rugcheck may return 'pump_fun' or 'pump_fun_amm' market types
-      const isPumpFun = primaryMarket.marketType?.startsWith('pump_fun') || false;
-      
-      // For Pump.fun tokens, use lpLockedPct from the lp object
-      // For regular tokens, use lpBurn field
-      if (isPumpFun && primaryMarket.lp) {
-        maxBurnPercentage = primaryMarket.lp.lpLockedPct || 0;
-        // Use locked USD liquidity for Pump.fun
-        if (!totalLiquidity && primaryMarket.lp.lpLockedUSD) {
-          totalLiquidity = primaryMarket.lp.lpLockedUSD;
-        }
-      } else {
-        maxBurnPercentage = primaryMarket.lpBurn || 0;
-      }
-      
       // Use Rugcheck liquidity if DexScreener didn't have it
       if (!totalLiquidity) {
         totalLiquidity = primaryMarket.liquidity;
       }
-      
-      // The percentage is already 0-100
-      const isBurned = maxBurnPercentage >= 99.99;
-      const isLocked = maxBurnPercentage >= 90;
 
-      // Cross-validate: if liquidity exists but burn is low, it's risky
+      // Check if this is a Pump.fun token (bonding curve model)
+      const isPumpFun = primaryMarket.marketType?.startsWith('pump_fun') || false;
+      
+      // For Pump.fun tokens, use lpLockedPct (they're locked in bonding curve, not burned)
+      // For regular tokens, check actual on-chain LP burn status
+      if (isPumpFun && primaryMarket.lp) {
+        burnPercentage = primaryMarket.lp.lpLockedPct || 0;
+        isLocked = burnPercentage >= 90;
+        isBurned = false; // Pump.fun tokens use locking, not burning
+        
+        // Use locked USD liquidity for Pump.fun
+        if (!totalLiquidity && primaryMarket.lp.lpLockedUSD) {
+          totalLiquidity = primaryMarket.lp.lpLockedUSD;
+        }
+      } else if (primaryPair?.pairAddress) {
+        // Regular AMM token - check on-chain if LP is actually burned
+        try {
+          isBurned = await lpChecker.isLPBurned(primaryPair.pairAddress);
+          burnPercentage = isBurned ? 100 : 0;
+          isLocked = false;
+        } catch (error) {
+          console.error('[LP Check] Failed to check LP burn status:', error);
+          // Fallback: LP exists but we can't verify burn status = RISKY
+          isBurned = false;
+          isLocked = false;
+          burnPercentage = 0;
+        }
+      }
+
+      // Cross-validate: if liquidity exists but not burned/locked, it's risky
       const hasLiquidity = (totalLiquidity && totalLiquidity > 1000) || false;
 
       let status: "SAFE" | "RISKY" | "UNKNOWN" = liquidityPool.status;
-      // For pump.fun tokens, locked >= 90% is safe. For regular tokens, burned >= 99.99% is safe.
+      // For pump.fun tokens, locked >= 90% is safe. For regular tokens, burned is safe.
       if ((isBurned || isLocked) && hasLiquidity) {
         status = "SAFE";
-      } else if (hasLiquidity && maxBurnPercentage < 50) {
+      } else if (hasLiquidity && !isBurned && !isLocked) {
         status = "RISKY";
       }
 
@@ -589,7 +606,7 @@ export class SolanaTokenAnalyzer {
         ...liquidityPool,
         isBurned,
         isLocked,
-        burnPercentage: maxBurnPercentage,
+        burnPercentage,
         totalLiquidity,
         lpAddresses: uniqueLpAddresses,
         status,

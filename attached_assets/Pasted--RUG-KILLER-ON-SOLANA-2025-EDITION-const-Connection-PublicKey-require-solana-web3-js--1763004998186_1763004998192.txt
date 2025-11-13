@@ -1,0 +1,97 @@
+// RUG KILLER ON SOLANA - 2025 EDITION
+const { Connection, PublicKey } = require('@solana/web3.js');
+const axios = require('axios');
+require('dotenv').config();
+
+const connection = new Connection(process.env.SOLANA_RPC || "https://api.mainnet-beta.solana.com");
+const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK;
+const BIRDEYE_KEY = process.env.BIRDEYE_API_KEY || "";
+
+// Send to Discord
+async function alert(msg) {
+  if (!DISCORD_WEBHOOK) return;
+  await axios.post(DISCORD_WEBHOOK, { content: msg });
+}
+
+// Check if LP is burned
+async function isLPBurned(poolAddress) {
+  try {
+    const accounts = await connection.getTokenLargestAccounts(new PublicKey(poolAddress));
+    return accounts.value.every(acc => acc.uiAmount === 0);
+  } catch { return false; }
+}
+
+// Check mint renounced
+async function isMintRenounced(mint) {
+  try {
+    const mintAcc = await connection.getAccountInfo(new PublicKey(mint));
+    return mintAcc.owner.toBase58() === "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"; // Token program = renounced
+  } catch { return false; }
+}
+
+// Honeypot check via Birdeye
+async function isHoneypot(mint) {
+  try {
+    const res = await axios.get(`https://public-api.birdeye.so/v1/token/security?address=${mint}`, {
+      headers: { "X-API-KEY": BIRDEYE_KEY }
+    });
+    return res.data.data?.honeypot === true;
+  } catch { return false; }
+}
+
+// Main scanner
+async function scanToken(mint) {
+  const birdeye = await axios.get(`https://public-api.birdeye.so/defi/overview?address=${mint}`, {
+    headers: { "X-API-KEY": BIRDEYE_KEY }
+  }).catch(() => ({ data: { data: {} } }));
+
+  const data = birdeye.data.data;
+  if (!data.liquidity || data.liquidity < 5000) return; // skip shitliq
+
+  const pool = data.liquidityPools?.[0]?.address;
+  if (!pool) return;
+
+  const lpBurned = await isLPBurned(pool);
+  const mintRenounced = await isMintRenounced(mint);
+  const honeypot = await isHoneypot(mint);
+  const devSold = data.mc?.toFixed(0) < data.highestMc * 0.3; // dev dumped
+
+  let rugScore = 0;
+  let warnings = [];
+
+  if (!lpBurned) { rugScore += 40; warnings.push("LP NOT BURNED"); }
+  if (!mintRenounced) { rugScore += 30; warnings.push("MINT NOT RENOUNCED"); }
+  if (honeypot) { rugScore += 20; warnings.push("HONEYPOT"); }
+  if (devSold) { rugScore += 10; warnings.push("DEV DUMPED"); }
+
+  if (rugScore >= 50) {
+    const msg = `
+RUG DETECTED — RUG KILLER BOT
+**Token:** ${data.symbol} (${mint})
+**Rug Score:** ${rugScore}/100
+**Warnings:** ${warnings.join(" • ")}
+**Liquidity:** $${data.liquidity?.toFixed(0)}
+**MC:** $${data.mc?.toFixed(0)}
+**Pool:** ${pool}
+https://birdeye.so/token/${mint}?chain=solana
+    `.trim();
+    await alert(msg);
+    console.log("RUG ALERT SENT:", data.symbol);
+  }
+}
+
+// Listen to new pools (Raydium + Pump.fun + Jupiter)
+setInterval(async () => {
+  try {
+    const res = await axios.get("https://api.birdeye.so/v1/token/new?chain=solana&limit=50", {
+      headers: { "X-API-KEY": BIRDEYE_KEY }
+    });
+    for (const token of res.data.data) {
+      await scanToken(token.address);
+      await new Promise(r => setTimeout(r, 1000)); // avoid rate limit
+    }
+  } catch (e) { console.log("Scan error:", e.message); }
+}, 30000); // every 30 sec
+
+console.log("RUG KILLER SCANNER IS LIVE — PROTECTING SOLANA");
+alert("**RUG KILLER BOT IS ONLINE** — Scanning every 30s");
