@@ -8,16 +8,34 @@ async function throwIfResNotOk(res: Response) {
 }
 
 export async function apiRequest(
-  method: string,
-  url: string,
+  methodOrUrl: string,
+  urlOrOptions?: string | (RequestInit & { body?: any }) | undefined,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  let fetchUrl: string;
+  let fetchOptions: RequestInit = { credentials: "include" };
+
+  // Signature A: apiRequest(method, url, data)
+  if (typeof urlOrOptions === "string" || data !== undefined) {
+    const method = methodOrUrl;
+    fetchUrl = urlOrOptions as string;
+    fetchOptions.method = method;
+    if (data !== undefined) {
+      fetchOptions.headers = { ...(fetchOptions.headers as any), "Content-Type": "application/json" };
+      fetchOptions.body = JSON.stringify(data);
+    }
+  } else {
+    // Signature B: apiRequest(url, options)
+    fetchUrl = methodOrUrl;
+    const options = (urlOrOptions || {}) as RequestInit & { body?: any };
+    fetchOptions = { ...fetchOptions, ...options };
+    if (options.body !== undefined && typeof options.body !== "string") {
+      fetchOptions.headers = { ...(fetchOptions.headers as any), "Content-Type": "application/json" };
+      fetchOptions.body = JSON.stringify(options.body);
+    }
+  }
+
+  const res = await fetch(fetchUrl, fetchOptions);
 
   await throwIfResNotOk(res);
   return res;

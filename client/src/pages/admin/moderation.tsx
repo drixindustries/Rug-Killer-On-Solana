@@ -103,10 +103,11 @@ export default function Moderation() {
     }
   };
 
-  const getSeverityBadge = (severity: number) => {
-    if (severity >= 4) return { label: "Critical", variant: "destructive" as const };
-    if (severity >= 3) return { label: "High", variant: "default" as const };
-    if (severity >= 2) return { label: "Medium", variant: "secondary" as const };
+  const getSeverityBadge = (severity: number | null | undefined) => {
+    const s = severity ?? 0;
+    if (s >= 4) return { label: "Critical", variant: "destructive" as const };
+    if (s >= 3) return { label: "High", variant: "default" as const };
+    if (s >= 2) return { label: "Medium", variant: "secondary" as const };
     return { label: "Low", variant: "outline" as const };
   };
 
@@ -189,7 +190,7 @@ export default function Moderation() {
                         </TableHeader>
                         <TableBody>
                           {pendingReports.map((report, index) => {
-                            const severityBadge = getSeverityBadge(report.severity);
+                            const severityBadge = getSeverityBadge(report.severityScore ?? 0);
 
                             return (
                               <TableRow key={report.id} data-testid={`report-${index}`}>
@@ -326,11 +327,11 @@ export default function Moderation() {
                 <div className="text-sm">
                   <span className="font-semibold">Severity:</span>
                   <Badge
-                    variant={getSeverityBadge(selectedReport.severity).variant}
+                    variant={getSeverityBadge(selectedReport.severityScore ?? 0).variant}
                     className="ml-2"
                     data-testid="dialog-report-severity"
                   >
-                    {getSeverityBadge(selectedReport.severity).label}
+                    {getSeverityBadge(selectedReport.severityScore ?? 0).label}
                   </Badge>
                 </div>
               </div>

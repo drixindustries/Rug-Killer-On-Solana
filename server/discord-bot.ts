@@ -433,7 +433,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             value += `Holdings: ${percentage}% of supply\n`;
             value += `Influence: ${kol.influenceScore !== null ? kol.influenceScore.toString() : 'N/A'}/100`;
             if (kol.profitSol) {
-              value += `\nProfit: ${formatNumber(kol.profitSol)} SOL`;
+              value += `\nProfit: ${formatNumber(Number(kol.profitSol) || 0)} SOL`;
             }
             
             return {
@@ -497,7 +497,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         statsValue += `• Influence Score: ${kol.influenceScore !== null ? kol.influenceScore.toString() : 'N/A'}/100\n`;
         
         if (kol.profitSol !== null) {
-          statsValue += `• Total Profit: ${formatNumber(kol.profitSol)} SOL\n`;
+          statsValue += `• Total Profit: ${formatNumber(Number(kol.profitSol) || 0)} SOL\n`;
         }
         
         if (kol.wins !== null && kol.losses !== null) {

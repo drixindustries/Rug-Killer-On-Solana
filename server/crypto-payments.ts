@@ -52,8 +52,8 @@ export async function generatePaymentAddress(
     throw new Error(`CRITICAL: Chain ${chain} is not yet supported. Only SOL is currently available. Attempting to use ${chain} will result in lost funds!`);
   }
   
-  // Use configured SOL wallet address
-  const address = process.env.PHANTOM_WALLET_ADDRESS;
+  // Use configured SOL wallet address (assert non-null after validation above)
+  const address = process.env.PHANTOM_WALLET_ADDRESS!;
   
   // Create crypto address record
   const [cryptoAddress] = await db
@@ -248,7 +248,6 @@ async function activateSubscription(
       .set({
         tier,
         status: "active",
-        currentPeriodStart: now,
         currentPeriodEnd: periodEnd,
         updatedAt: now,
       })
@@ -259,7 +258,6 @@ async function activateSubscription(
       userId,
       tier,
       status: "active",
-      currentPeriodStart: now,
       currentPeriodEnd: periodEnd,
     });
   }

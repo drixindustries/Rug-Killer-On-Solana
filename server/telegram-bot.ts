@@ -329,7 +329,7 @@ function createTelegramBot(botToken: string): Telegraf {
           message += `Holdings: ${percentage}% of supply\n`;
           message += `Influence: ${kol.influenceScore !== null ? kol.influenceScore.toString() : 'N/A'}/100\n`;
           if (kol.profitSol) {
-            message += `Profit: ${formatNumber(kol.profitSol)} SOL\n`;
+              message += `Profit: ${formatNumber(Number(kol.profitSol) || 0)} SOL\n`;
           }
           message += `\n`;
         }
@@ -390,7 +390,7 @@ function createTelegramBot(botToken: string): Telegraf {
       message += `• Influence Score: ${kol.influenceScore !== null ? kol.influenceScore.toString() : 'N/A'}/100\n`;
       
       if (kol.profitSol !== null) {
-        message += `• Total Profit: ${formatNumber(kol.profitSol)} SOL\n`;
+          message += `• Total Profit: ${formatNumber(Number(kol.profitSol) || 0)} SOL\n`;
       }
       
       if (kol.wins !== null && kol.losses !== null) {

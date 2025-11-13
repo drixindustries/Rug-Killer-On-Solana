@@ -80,7 +80,7 @@ export default function Profile() {
     if (profile) {
       setUsername(profile.username || "");
       setBio(profile.bio || "");
-      setIsPublic(profile.isPublic);
+      setIsPublic((profile as any).isPublic ?? profile.visibility === "public");
       setIsEditDialogOpen(true);
     }
   };
@@ -329,7 +329,7 @@ export default function Profile() {
                               <span className="font-medium capitalize" data-testid={`activity-type-${index}`}>
                                 {activity.activityType}
                               </span>
-                              <Badge variant="outline" size="sm" data-testid={`activity-points-${index}`}>
+                              <Badge variant="outline" data-testid={`activity-points-${index}`}>
                                 +{Number(activity.points)} pts
                               </Badge>
                             </div>
