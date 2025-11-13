@@ -13,6 +13,12 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 **November 13, 2025:**
+- Created comprehensive Bot Usage Guide page (`/bot-guide`):
+  - Detailed command reference for both Telegram and Discord bots
+  - Full examples with sample responses for each command
+  - Usage tips, best practices, and red flag warnings
+  - Tabbed interface separating Telegram and Discord instructions
+  - Accessible from header navigation (Automations > Bot Usage Guide), footer, and documentation page
 - Implemented Telegram bot command autocomplete menu using setMyCommands() API (5 commands: start, execute, first20, devtorture, blacklist)
 - **Telegram bot is currently ungated** - all features are publicly accessible with no subscription/token requirements
 - Comprehensive codebase cleanup for GitHub deployment:

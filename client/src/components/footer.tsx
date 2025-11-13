@@ -59,6 +59,7 @@ export function Footer() {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><a href="/pricing" className="hover:text-foreground">Pricing</a></li>
               <li><a href="/documentation" className="hover:text-foreground">Documentation</a></li>
+              <li><a href="/bot-guide" className="hover:text-foreground">Bot Guide</a></li>
               <li><a href="/about" className="hover:text-foreground">About</a></li>
               <li><a href="https://github.com/drixindustries/rugkillleronsol#roadmap" target="_blank" rel="noopener noreferrer" className="hover:text-foreground" data-testid="footer-link-roadmap">Roadmap</a></li>
               <li><a href="https://docs.solana.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Solana Docs</a></li>

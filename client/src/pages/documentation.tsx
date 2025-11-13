@@ -537,6 +537,7 @@ export default function Documentation() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3 text-sm">
+                  <Badge variant="secondary" className="mb-2">Currently Ungated - Public Access</Badge>
                   <div>
                     <p className="font-semibold mb-2">Available Commands:</p>
                     <ul className="space-y-2">
@@ -574,6 +575,14 @@ export default function Documentation() {
                     Both bots support rich formatting (Telegram markdown, Discord embeds) with 
                     green/yellow/orange/red color-coded risk indicators for quick visual assessment.
                   </p>
+                  <div className="pt-3 border-t">
+                    <a href="/bot-guide" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1">
+                      View Complete Bot Command Reference →
+                    </a>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Detailed examples and usage tips for all commands
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -90,6 +90,11 @@ export const navigationConfig: NavSection[] = [
         description: "Telegram & Discord bot configuration"
       },
       {
+        title: "Bot Usage Guide",
+        href: "/bot-guide",
+        description: "Complete command reference with examples"
+      },
+      {
         title: "Alpha Alerts",
         href: "/features#alpha-alerts",
         description: "Smart money tracking and new launches"

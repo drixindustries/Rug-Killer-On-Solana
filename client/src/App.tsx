@@ -10,6 +10,7 @@ import Subscription from "@/pages/subscription";
 import Pricing from "@/pages/pricing";
 import Features from "@/pages/features";
 import Documentation from "@/pages/documentation";
+import BotGuide from "@/pages/bot-guide";
 import About from "@/pages/about";
 import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
@@ -37,6 +38,7 @@ function Router() {
       <Route path="/pricing" component={Pricing} />
       <Route path="/features" component={Features} />
       <Route path="/bot-setup" component={BotSetup} />
+      <Route path="/bot-guide" component={BotGuide} />
       <Route path="/watchlist" component={Watchlist} />
       <Route path="/portfolio" component={Portfolio} />
       <Route path="/alerts" component={Alerts} />
