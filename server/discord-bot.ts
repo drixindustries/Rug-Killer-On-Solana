@@ -160,7 +160,7 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   // QUICK LINKS
   embed.addFields({
     name: '🔗 QUICK LINKS',
-    value: `[Solscan](https://solscan.io/token/${analysis.tokenAddress}) • [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress}) • [Rugcheck](https://rugcheck.xyz/tokens/${analysis.tokenAddress})`
+    value: `[Solscan](https://solscan.io/token/${analysis.tokenAddress}) • [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress}) • [Rugcheck](https://rugcheck.xyz/tokens/${analysis.tokenAddress})\n[AXiom](https://t.me/axiom_scanner_bot?start=${analysis.tokenAddress}) • [Padre](https://t.me/padre_tools_bot?start=${analysis.tokenAddress}) • [GMGN](https://gmgn.ai/sol/token/${analysis.tokenAddress})`
   });
   
   embed.setURL(`https://solscan.io/token/${analysis.tokenAddress}`);

@@ -20,6 +20,7 @@ Preferred communication style: Simple, everyday language.
   - Removed commented-out code blocks
   - Streamlined logging for clean production logs
 - Codebase is now GitHub-ready and production-ready
+- Added quick links to AXiom, Padre, and GMGN bots in both Telegram and Discord bot responses for easy cross-platform analysis
 
 ## System Architecture
 
