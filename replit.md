@@ -46,6 +46,31 @@ The frontend features a modern, data-dense dashboard using React, TypeScript, Vi
 - **AI Blacklist System**: A rules-based detection engine with 6 automated rules analyzing over 52 risk metrics to identify honeypots, high sell taxes, suspicious authorities, and wash trading patterns. Includes severity scoring, evidence tracking, and dedicated API endpoints.
 - **Alpha Alerts**: Live monitoring service that auto-pings Discord/Telegram channels when detecting: (1) Smart money signals from configurable wallet watchlists, (2) New token launches from pump.fun WebSocket, (3) Quality-filtered gems (RugCheck > 85, no honeypots, liquidity > $5K). Monitoring-only with no automated trading or private keys.
 - **Creator Wallet**: Secure wallet service for pump.fun creator rewards (0.05% of trading volume). Admin-only access with one-time private key generation, Phantom wallet import instructions, and balance monitoring. Stored in `CREATOR_WALLET_PRIVATE_KEY` secret.
+- **Rick Bot Features (Nov 2024 - BREAKING CHANGE)**: 
+  - **Risk Scoring Reversal**: Changed from 0=safe/100=dangerous to 0=dangerous/100=safe (Rick Bot standard). Breaking change affects all historical data and analytics.
+    - Core formula inverted: `100 - rawScore`
+    - New thresholds: GREEN/LOW (70-100), YELLOW/MODERATE (40-70), ORANGE/HIGH (20-40), RED/EXTREME (0-20)
+    - All frontend components, analytics endpoints, and bot outputs updated
+    - Error fallback returns riskScore: 0 (maximum caution)
+  - **Birdeye API Integration**: Enhanced market data via Birdeye.so (optional BIRDEYE_API_KEY secret)
+    - Real-time price, market cap, liquidity, and LP burn status
+    - Historical price data for trend analysis
+    - Top 20 holder distribution with sniper/bundle detection
+    - Graceful rate limit handling (works on free tier without key)
+  - **Pump.fun Direct API**: Dedicated detection for pump.fun token launches
+    - Dev bought percentage extraction
+    - Bonding curve progress tracking for Raydium graduation monitoring
+    - Safe defaults for non-pump.fun tokens
+  - **AI Verdict System**: Rick Bot style intelligent recommendations
+    - Ratings: 10/10 (MOON SHOT), 7/10 (HIGH RISK/HIGH REWARD), 5/10 (PROCEED WITH CAUTION), 3/10 (RUG CITY)
+    - Considers risk score, mint/freeze authority, LP status, and market cap
+    - Natural language verdicts for traders
+  - **Enhanced Bot Formatting**: Professional Rick Bot style sections
+    - Contract Address (📋) displayed prominently on every scan
+    - Emoji sections: 💰 PRICE, 🛡️ RISK, 🔐 SECURITY, 🎯 PUMP.FUN, 👛 HOLDERS, 🤖 AI VERDICT, 🔗 QUICK LINKS
+    - Color-coded risk levels in Telegram and Discord
+    - Clear, actionable recommendations
+  - **Error Handling**: Specific messaging for Solana RPC 429 rate limits and invalid addresses
 - **Advanced Analytics Dashboard (Option C - Nov 2024)**: 
   - **Market Overview**: Real-time summary statistics (total tokens analyzed, rugs detected, average risk score, active alerts). Top 10 trending tokens table with rank, risk score badges, 24h volume, and quick analyze buttons. Risk distribution visualization showing safety levels.
   - **Historical Tracking**: Interactive time-series charts for any token address showing performance over configurable timeframes (7/30/90 days). Responsive line/bar charts with tooltips. Supports trend analysis for risk scores, holder counts, and market metrics over time.
@@ -55,7 +80,7 @@ The frontend features a modern, data-dense dashboard using React, TypeScript, Vi
   - **Infrastructure**: PostgreSQL tables (token_snapshots, trending_tokens, risk_statistics). Background workers running via setInterval (snapshot collector every 5 mins, trending calculator every 5 mins, risk aggregator daily). 5 dedicated API endpoints with authentication. 195+ data-testid attributes for testing.
 
 ### Feature Specifications
-- **Token Analysis**: Authority checks, holder analysis, liquidity assessment, 0-100 risk scoring with red flags, and transaction history.
+- **Token Analysis**: Authority checks, holder analysis, liquidity assessment, 0-100 risk scoring (0=dangerous, 100=safe) with red flags, transaction history, AI verdict, and Rick Bot formatting.
 - **User Management**: Accounts, session management, and wallet connections.
 - **Subscription Tiers**: Individual, Group, and Lifetime plans with a 1-week free trial.
 - **Subscription Codes**: Redeemable codes for lifetime access with transaction-safe redemption, usage limits, expiration dates, and Whop webhook protection.
@@ -75,6 +100,8 @@ The frontend features a modern, data-dense dashboard using React, TypeScript, Vi
 - **Whop**: Subscription management and payment processing.
 - **Rugcheck.xyz**: Community-driven risk scores and liquidity analysis.
 - **GoPlus Security**: Honeypot detection, contract security scanning, and scam detection flags.
+- **Birdeye.so**: Enhanced market data, price history, and holder analysis (optional BIRDEYE_API_KEY for higher rate limits).
+- **Pump.fun API**: Direct pump.fun token detection for dev buy % and bonding curve tracking.
 - **DexScreener**: Real-time market data (price, volume, liquidity, market cap).
 - **Jupiter Aggregator**: Price verification and liquidity aggregation.
 - **Helius/QuickNode/Alchemy**: Recommended custom Solana RPC providers.

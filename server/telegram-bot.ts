@@ -58,6 +58,9 @@ Use /execute ${analysis.tokenAddress.slice(0, 8)}... for full analysis`;
   message += `${emoji} **${analysis.metadata.name} (${analysis.metadata.symbol})**\n`;
   message += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   
+  // CONTRACT ADDRESS (prominently displayed)
+  message += `📋 **Token Address**\n\`${analysis.tokenAddress}\`\n\n`;
+  
   // AI VERDICT (Rick Bot feature)
   if (analysis.aiVerdict) {
     message += `🤖 **AI VERDICT**\n`;

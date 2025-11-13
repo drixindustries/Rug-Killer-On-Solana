@@ -123,7 +123,7 @@ export async function analyzeAndFlag(
     if (
       analysis.mintAuthority.hasAuthority &&
       !analysis.mintAuthority.isRevoked &&
-      analysis.riskScore > 70 &&
+      analysis.riskScore <= 30 &&
       analysis.mintAuthority.authorityAddress
     ) {
       await flagWallet(
@@ -139,7 +139,7 @@ export async function analyzeAndFlag(
     if (
       analysis.freezeAuthority.hasAuthority &&
       !analysis.freezeAuthority.isRevoked &&
-      analysis.riskScore > 70 &&
+      analysis.riskScore <= 30 &&
       analysis.freezeAuthority.authorityAddress
     ) {
       await flagWallet(
@@ -169,7 +169,7 @@ export async function analyzeAndFlag(
     // RULE 6: Low liquidity + high risk
     if (
       analysis.liquidityPool.status === 'RISKY' &&
-      analysis.riskScore > 80 &&
+      analysis.riskScore <= 20 &&
       analysis.dexscreenerData?.pairs?.[0]
     ) {
       const pair = analysis.dexscreenerData.pairs[0];

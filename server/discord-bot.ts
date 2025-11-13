@@ -92,6 +92,13 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
     .setFooter({ text: `Contract: ${formatAddress(analysis.tokenAddress)}` })
     .setTimestamp();
   
+  // CONTRACT ADDRESS (prominently displayed)
+  embed.addFields({
+    name: '📋 Contract Address',
+    value: `\`${analysis.tokenAddress}\``,
+    inline: false
+  });
+  
   // AI VERDICT (Rick Bot feature)
   if (analysis.aiVerdict) {
     embed.addFields({

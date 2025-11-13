@@ -258,9 +258,26 @@ export class SolanaTokenAnalyzer {
     } catch (error) {
       console.error("Token analysis error:", error);
       
-      // Return a safe default response when analysis fails
+      // Detect specific error types for better user messaging
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const isRateLimitError = errorMessage.includes('429') || 
+                               errorMessage.toLowerCase().includes('rate limit') ||
+                               errorMessage.toLowerCase().includes('too many requests');
+      const isInvalidAddress = errorMessage.toLowerCase().includes('invalid') ||
+                               errorMessage.toLowerCase().includes('not found');
       
+      // Build appropriate error description
+      let errorDescription = "Unable to complete token analysis: ";
+      if (isRateLimitError) {
+        errorDescription += "Solana RPC rate limit reached. Please try again in a few moments.";
+      } else if (isInvalidAddress) {
+        errorDescription += "Invalid token address or token does not exist on-chain.";
+      } else {
+        errorDescription += `${errorMessage}. This may be due to network issues or an invalid token address.`;
+      }
+      
+      // Return a safe default response when analysis fails
+      // NOTE: Setting riskScore to 0 (EXTREME RISK) is intentional - failed analysis = maximum caution
       return {
         tokenAddress,
         riskScore: 0,
@@ -294,8 +311,8 @@ export class SolanaTokenAnalyzer {
         redFlags: [{
           type: "mint_authority",
           severity: "critical",
-          title: "Analysis Failed",
-          description: `Unable to complete token analysis: ${errorMessage}. This may be due to RPC rate limits or an invalid token address.`,
+          title: isRateLimitError ? "Rate Limit Reached" : "Analysis Failed",
+          description: errorDescription,
         }],
         creationDate: undefined,
       };

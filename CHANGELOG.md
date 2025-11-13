@@ -10,6 +10,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Rick Bot Features (Nov 2024 - COMPLETE)**:
+  - **BREAKING CHANGE: Risk Scoring Reversal**: Changed from 0=safe/100=dangerous to 0=dangerous/100=safe (Rick Bot standard)
+    - Core scoring formula inverted: returns `100 - rawScore`
+    - Updated all threshold logic: GREEN (70-100), YELLOW (40-70), ORANGE (20-40), RED (0-20)
+    - Fixed AI blacklist rules to use new scale (score <= 20 = extreme risk)
+    - Updated frontend color coding across all components
+    - Error fallback returns riskScore: 0 (most dangerous) for safety
+  - **Birdeye API Integration**: Enhanced market data with optional BIRDEYE_API_KEY
+    - getBirdeyeOverview() - real-time price, market cap, liquidity, LP burn status
+    - getBirdeyePriceHistory() - historical price data for trend analysis
+    - getBirdeyeTopHolders() - top 20 holder distribution with sniper detection
+    - Graceful error handling for rate limits (works without API key)
+  - **Pump.fun Direct API**: Dedicated pump.fun token detection
+    - Detects pump.fun launches and extracts dev bought percentage
+    - Tracks bonding curve progress for graduation monitoring
+    - Safe defaults for non-pump.fun tokens
+  - **AI Verdict System**: Rick Bot style intelligent recommendations
+    - Natural language ratings: 10/10, 7/10, 5/10, 3/10
+    - Contextual verdicts: "MOON SHOT", "HIGH RISK/HIGH REWARD", "PROCEED WITH CAUTION", "RUG CITY"
+    - Considers risk score, authorities, LP status, and market cap
+    - Integrated into token analysis response
+  - **Enhanced Bot Formatting**: Professional Rick Bot style output
+    - Telegram & Discord bots now display Contract Address prominently (📋 section)
+    - Rick Bot emoji sections: 💰 PRICE, 🛡️ RISK, 🔐 SECURITY, 🎯 PUMP.FUN, 👛 HOLDERS, 🤖 AI VERDICT, 🔗 QUICK LINKS
+    - Color-coded risk levels matching new scoring scale
+    - Clear, actionable recommendations for traders
+  - **Improved Error Handling**:
+    - Specific messaging for 429 rate limits from Solana RPC
+    - Invalid address detection with helpful error messages
+    - Graceful degradation when APIs are unavailable
+    - Safe fallback to highest risk level on failures
 - **Advanced Analytics Dashboard (Option C - COMPLETE)**:
   - **Market Overview**: Summary statistics (total analyzed, rugs detected, avg risk score, active alerts), top 10 trending tokens with risk scores and analyze buttons, risk distribution visualization
   - **Historical Tracking**: Time-series charts showing token performance over configurable timeframes (7d/30d/90d), supports any token address input, responsive line/bar charts with tooltips
