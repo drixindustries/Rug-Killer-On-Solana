@@ -291,7 +291,6 @@ export async function checkPendingPayments() {
       if (payment.chain === "SOL") {
         await checkSolPayment(payment.id);
       }
-      // TODO: Add ETH and BTC checks
     }
   } catch (error) {
     console.error("Error checking pending payments:", error);

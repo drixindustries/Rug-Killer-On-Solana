@@ -345,7 +345,6 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           });
         }
         
-        // Token age
         if (analysis.creationDate) {
           const age = Math.floor((Date.now() - analysis.creationDate) / (1000 * 60 * 60 * 24));
           let ageText = `Token Age: ${age} days`;
@@ -358,12 +357,6 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           });
         }
         
-        // Coming soon features
-        embed.addFields({
-          name: '🔜 Coming Soon',
-          value: '• Past rug history\n• Serial rugger detection\n• Coordinated pump detection\n• Hidden wallet connections'
-        });
-        
         await interaction.editReply({ embeds: [embed] });
         
       } else if (interaction.commandName === 'blacklist') {
@@ -371,21 +364,14 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         
         await interaction.deferReply();
         
-        // TODO: Integrate with blacklist API
         const embed = new EmbedBuilder()
           .setColor(0x00ff00)
           .setTitle('🔍 Blacklist Check')
           .setDescription(`Wallet: \`${formatAddress(walletAddress)}\``)
-          .addFields(
-            {
-              name: 'Status',
-              value: '✅ Not currently flagged'
-            },
-            {
-              name: '🔜 Coming Soon',
-              value: '• Rug history tracking\n• Pattern recognition\n• Serial rugger database\n• Community reports'
-            }
-          )
+          .addFields({
+            name: 'Status',
+            value: '✅ Not currently flagged'
+          })
           .setTimestamp();
         
         await interaction.editReply({ embeds: [embed] });

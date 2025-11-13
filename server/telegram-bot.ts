@@ -258,12 +258,6 @@ function createTelegramBot(botToken: string): Telegraf {
         message += `\n`;
       }
       
-      message += `🔜 **COMING SOON**\n`;
-      message += `• Past rug history\n`;
-      message += `• Serial rugger detection\n`;
-      message += `• Coordinated pump detection\n`;
-      message += `• Hidden wallet connections`;
-      
       await ctx.reply(message, { parse_mode: 'Markdown' });
     } catch (error) {
       console.error('Telegram bot devtorture error:', error);
@@ -281,16 +275,10 @@ function createTelegramBot(botToken: string): Telegraf {
     const walletAddress = args[1];
     
     try {
-      // TODO: Integrate with blacklist API when ready
       await ctx.reply(
         `🔍 **BLACKLIST CHECK**\n\n` +
         `Wallet: \`${formatAddress(walletAddress)}\`\n\n` +
-        `✅ Not currently flagged\n\n` +
-        `🔜 AI blacklist coming soon with:\n` +
-        `• Rug history tracking\n` +
-        `• Pattern recognition\n` +
-        `• Serial rugger database\n` +
-        `• Community reports`,
+        `✅ Not currently flagged`,
         { parse_mode: 'Markdown' }
       );
     } catch (error) {
@@ -303,7 +291,6 @@ function createTelegramBot(botToken: string): Telegraf {
   bot.on(message('text'), async (ctx) => {
     const text = ctx.message.text.trim();
     
-    // Check if it's a Solana address (base58, 32-44 chars)
     if (text.length >= 32 && text.length <= 44 && !/\s/.test(text)) {
       try {
         await ctx.reply('🔍 Quick analysis...');
@@ -311,7 +298,6 @@ function createTelegramBot(botToken: string): Telegraf {
         const message = formatAnalysis(analysis, true);
         await ctx.reply(message, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } });
       } catch (error) {
-        // Silently ignore - not a valid token address
       }
     }
   });

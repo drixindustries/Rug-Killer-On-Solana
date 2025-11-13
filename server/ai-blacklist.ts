@@ -401,13 +401,10 @@ export async function reportWallet(
     await flagWallet(
       walletAddress,
       reportType,
-      60, // User reports start at 60 severity
+      60,
       `User report: ${evidence}`,
       'manual_report'
     );
-    
-    // TODO: Implement review queue for manual reports
-    console.log(`📝 User report received for ${walletAddress.slice(0, 8)}...`);
   } catch (error) {
     console.error("Error reporting wallet:", error);
     throw error;
