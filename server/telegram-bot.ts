@@ -137,6 +137,17 @@ Use /execute ${analysis.tokenAddress.slice(0, 8)}... for full analysis`;
 function createTelegramBot(botToken: string): Telegraf {
   const bot = new Telegraf(botToken);
   
+  // Register bot commands for autocomplete menu
+  bot.telegram.setMyCommands([
+    { command: 'start', description: 'Show available commands' },
+    { command: 'execute', description: 'Full 52-metric scan - /execute <address>' },
+    { command: 'first20', description: 'Top 20 holder analysis - /first20 <address>' },
+    { command: 'devtorture', description: 'Dev wallet history - /devtorture <address>' },
+    { command: 'blacklist', description: 'Check wallet blacklist - /blacklist <wallet>' }
+  ]).catch(err => {
+    console.error('Failed to set Telegram bot commands:', err);
+  });
+  
   // /start command
   bot.command('start', async (ctx) => {
     await ctx.reply(
