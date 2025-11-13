@@ -17,9 +17,7 @@ import { JupiterPriceService } from "./jupiter-service";
 import { isKnownAddress, getKnownAddressInfo, detectBundledWallets } from "./known-addresses";
 import { getBirdeyeOverview } from "./services/birdeye-api";
 import { checkPumpFun } from "./services/pumpfun-api";
-
-// Use public Solana RPC endpoint (can be configured later)
-const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+import { rpcBalancer } from "./services/rpc-balancer";
 
 export class SolanaTokenAnalyzer {
   private connection: Connection;
@@ -29,7 +27,7 @@ export class SolanaTokenAnalyzer {
   private jupiterPriceService: JupiterPriceService;
 
   constructor() {
-    this.connection = new Connection(SOLANA_RPC_URL, "confirmed");
+    this.connection = rpcBalancer.getConnection();
     this.rugcheckService = new RugcheckService();
     this.goplusService = new GoPlusSecurityService();
     this.dexscreenerService = new DexScreenerService();
@@ -361,7 +359,33 @@ export class SolanaTokenAnalyzer {
         .slice(0, 20); // Top 20 holders
       
       return holders;
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
+        console.log(`[RPC Balancer] Rotating connection due to rate limit in fetchTopHolders`);
+        this.connection = rpcBalancer.getConnection();
+        // Retry once with new connection
+        try {
+          const tokenAccounts = await this.connection.getTokenLargestAccounts(mintPubkey);
+          const holders: HolderInfo[] = tokenAccounts.value
+            .map((account, index) => {
+              const balance = Number(account.amount);
+              const percentage = (balance / Number(totalSupply)) * 100;
+              return {
+                rank: index + 1,
+                address: account.address.toBase58(),
+                balance,
+                percentage,
+              };
+            })
+            .filter(h => h.balance > 0)
+            .sort((a, b) => b.balance - a.balance)
+            .slice(0, 20);
+          return holders;
+        } catch (retryError) {
+          console.error("Error fetching holders after rotation:", retryError);
+          return [];
+        }
+      }
       console.error("Error fetching holders:", error);
       return [];
     }
@@ -399,7 +423,41 @@ export class SolanaTokenAnalyzer {
       });
       
       return nonZeroAccounts.length;
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
+        console.log(`[RPC Balancer] Rotating connection due to rate limit in getTotalHolderCount`);
+        this.connection = rpcBalancer.getConnection();
+        // Retry once with new connection
+        try {
+          const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+          const accounts = await this.connection.getProgramAccounts(
+            TOKEN_PROGRAM_ID,
+            {
+              filters: [
+                { dataSize: 165 },
+                { 
+                  memcmp: { 
+                    offset: 0, 
+                    bytes: mintPubkey.toBase58() 
+                  } 
+                }
+              ],
+            }
+          );
+          const nonZeroAccounts = accounts.filter(account => {
+            const data = account.account.data;
+            if (Buffer.isBuffer(data)) {
+              const amount = data.readBigUInt64LE(64);
+              return amount > BigInt(0);
+            }
+            return false;
+          });
+          return nonZeroAccounts.length;
+        } catch (retryError) {
+          console.error("Error fetching total holder count after rotation:", retryError);
+          return null;
+        }
+      }
       console.error("Error fetching total holder count:", error);
       return null;
     }

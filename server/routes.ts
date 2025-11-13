@@ -14,6 +14,7 @@ import {
 } from "./whop-client";
 import { VanityAddressGenerator } from "./vanity-generator";
 import { z } from "zod";
+import { rpcBalancer } from "./services/rpc-balancer";
 
 // Middleware: Requires active subscription OR 10M+ token holder status
 // This gates all premium features including token analysis, crypto payments, and bot access
@@ -105,6 +106,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
     }
+  });
+
+  // RPC Health Check
+  app.get("/api/rpc/health", (req, res) => {
+    const stats = rpcBalancer.getHealthStats();
+    res.json({ providers: stats });
   });
 
   // Subscription routes
