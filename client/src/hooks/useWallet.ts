@@ -17,7 +17,7 @@ export function useWallet() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connection, setConnection] = useState<WalletConnection | null>(null);
   const { toast } = useToast();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, isMockAuth, hasPremiumAccess } = useAuth() as any;
 
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
@@ -29,7 +29,7 @@ export function useWallet() {
     if (!isAuthenticated) return;
     
     // Wallet verification requires real authentication
-    if ((useAuth() as any).isMockAuth) {
+    if (isMockAuth) {
       return; // Skip in mock mode
     }
     
@@ -59,8 +59,7 @@ export function useWallet() {
 
   const connectWallet = useCallback(async () => {
     // Check if premium features are available
-    const auth = useAuth() as any;
-    if (auth.isMockAuth || !auth.hasPremiumAccess) {
+    if (isMockAuth || !hasPremiumAccess) {
       toast({
         title: "Authentication Required",
         description: "Wallet verification requires real authentication. Enable Replit auth to use this feature.",
@@ -133,7 +132,7 @@ export function useWallet() {
     } finally {
       setIsConnecting(false);
     }
-  }, [toast]);
+  }, [toast, isMockAuth, hasPremiumAccess]);
 
   const disconnectWallet = useCallback(async () => {
     if (window.solana) {
