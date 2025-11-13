@@ -174,6 +174,9 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
 
 const commands = [
   new SlashCommandBuilder()
+    .setName('help')
+    .setDescription('Show all available commands and how to use the bot'),
+  new SlashCommandBuilder()
     .setName('execute')
     .setDescription('Full 52-metric rug detection scan')
     .addStringOption(option =>
@@ -212,10 +215,12 @@ const commands = [
 // ============================================================================
 
 function createDiscordClient(botToken: string, clientId: string): Client {
-  // Only use Guilds intent - slash commands don't need message content
+  // Use Guilds, GuildMessages, and MessageContent for slash commands + direct message analysis
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent,
     ],
   });
   
@@ -241,7 +246,27 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     if (!interaction.isChatInputCommand()) return;
     
     try {
-      if (interaction.commandName === 'execute') {
+      if (interaction.commandName === 'help') {
+        const helpEmbed = new EmbedBuilder()
+          .setColor(0x5865f2)
+          .setTitle('🔥 SOLANA RUG KILLER')
+          .setDescription('Protect yourself from rug pulls with comprehensive token analysis!')
+          .addFields(
+            {
+              name: '📋 Available Commands',
+              value: '`/execute <address>` - Full 52-metric scan\n`/first20 <address>` - Top 20 holder analysis\n`/devtorture <address>` - Dev wallet history\n`/blacklist <wallet>` - Check if wallet is flagged\n`/help` - Show this help message'
+            },
+            {
+              name: '💡 Quick Tip',
+              value: 'You can also paste any Solana token address directly in chat for instant analysis!'
+            }
+          )
+          .setFooter({ text: 'Solana Rug Killer • Protecting the Solana ecosystem' })
+          .setTimestamp();
+        
+        await interaction.reply({ embeds: [helpEmbed], ephemeral: true });
+        
+      } else if (interaction.commandName === 'execute') {
         const tokenAddress = interaction.options.getString('address', true);
         
         await interaction.deferReply();
@@ -373,6 +398,36 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         await interaction.editReply({ content: '❌ Error executing command. Please check the address and try again.' });
       } else {
         await interaction.reply({ content: '❌ Error executing command. Please check the address and try again.', ephemeral: true });
+      }
+    }
+  });
+  
+  // Handle direct messages with token addresses (like Telegram bot)
+  client.on('messageCreate', async message => {
+    // Ignore bot messages
+    if (message.author.bot) return;
+    
+    // Ignore empty messages
+    if (!message.content) return;
+    
+    const text = message.content.trim();
+    
+    // Check if it's a Solana address (base58, 32-44 chars, no spaces)
+    if (text.length >= 32 && text.length <= 44 && !/\s/.test(text)) {
+      try {
+        // Send "analyzing" message
+        const processingMsg = await message.reply('🔍 Quick analysis...');
+        
+        // Analyze the token
+        const analysis = await tokenAnalyzer.analyzeToken(text);
+        const embed = createAnalysisEmbed(analysis);
+        
+        // Delete the "analyzing" message and send the result
+        await processingMsg.delete();
+        await message.reply({ embeds: [embed] });
+      } catch (error) {
+        // Silently ignore - not a valid token address
+        // This prevents spam when users send normal messages
       }
     }
   });
