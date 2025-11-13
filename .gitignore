@@ -3,6 +3,7 @@ node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+package-lock.json
 
 # Build outputs
 dist
@@ -33,10 +34,14 @@ postgres-data/
 # Logs
 logs
 *.log
+/tmp/
 
 # Testing
-coverage
-.nyc_output
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+.last-run.json
 
 # Temporary files
 *.tmp
@@ -48,9 +53,20 @@ vite.config.ts.*
 Thumbs.db
 .DS_Store
 
-# Misc
+# Replit-specific (keep these if working on Replit, remove for pure GitHub)
 .replit
 .upm
-.config
+.config/
 replit.nix
 .breakpoints
+
+# Attached assets (old pasted files)
+attached_assets/Pasted-*.txt
+attached_assets/IMG_*.jpeg
+attached_assets/IMG_*.png
+attached_assets/*.html
+
+# Generated files
+analysis_fullpage.png
+generated-icon.png
+delete.sh
