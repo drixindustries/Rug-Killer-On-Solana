@@ -20,18 +20,20 @@ import { checkPumpFun } from "./services/pumpfun-api";
 import { rpcBalancer } from "./services/rpc-balancer";
 
 export class SolanaTokenAnalyzer {
-  private connection: Connection;
   private rugcheckService: RugcheckService;
   private goplusService: GoPlusSecurityService;
   private dexscreenerService: DexScreenerService;
   private jupiterPriceService: JupiterPriceService;
 
   constructor() {
-    this.connection = rpcBalancer.getConnection();
     this.rugcheckService = new RugcheckService();
     this.goplusService = new GoPlusSecurityService();
     this.dexscreenerService = new DexScreenerService();
     this.jupiterPriceService = new JupiterPriceService();
+  }
+
+  private getConnection(): Connection {
+    return rpcBalancer.getConnection();
   }
 
   async analyzeToken(tokenAddress: string): Promise<TokenAnalysisResponse> {
@@ -39,7 +41,8 @@ export class SolanaTokenAnalyzer {
       const mintPubkey = new PublicKey(tokenAddress);
       
       // Fetch mint account info
-      const mintInfo = await getMint(this.connection, mintPubkey);
+      const connection = this.getConnection();
+      const mintInfo = await getMint(connection, mintPubkey);
       
       // Analyze authorities
       const mintAuthority = this.analyzeMintAuthority(mintInfo.mintAuthority);
@@ -338,129 +341,101 @@ export class SolanaTokenAnalyzer {
     decimals: number,
     totalSupply: bigint
   ): Promise<HolderInfo[]> {
-    try {
-      // Get all token accounts for this mint
-      const tokenAccounts = await this.connection.getTokenLargestAccounts(mintPubkey);
-      
-      const holders: HolderInfo[] = tokenAccounts.value
-        .map((account, index) => {
-          const balance = Number(account.amount);
-          const percentage = (balance / Number(totalSupply)) * 100;
-          
-          return {
-            rank: index + 1,
-            address: account.address.toBase58(),
-            balance,
-            percentage,
-          };
-        })
-        .filter(h => h.balance > 0)
-        .sort((a, b) => b.balance - a.balance)
-        .slice(0, 20); // Top 20 holders
-      
-      return holders;
-    } catch (error: any) {
-      if (error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
-        console.log(`[RPC Balancer] Rotating connection due to rate limit in fetchTopHolders`);
-        this.connection = rpcBalancer.getConnection();
-        // Retry once with new connection
-        try {
-          const tokenAccounts = await this.connection.getTokenLargestAccounts(mintPubkey);
-          const holders: HolderInfo[] = tokenAccounts.value
-            .map((account, index) => {
-              const balance = Number(account.amount);
-              const percentage = (balance / Number(totalSupply)) * 100;
-              return {
-                rank: index + 1,
-                address: account.address.toBase58(),
-                balance,
-                percentage,
-              };
-            })
-            .filter(h => h.balance > 0)
-            .sort((a, b) => b.balance - a.balance)
-            .slice(0, 20);
-          return holders;
-        } catch (retryError) {
-          console.error("Error fetching holders after rotation:", retryError);
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      try {
+        const connection = this.getConnection(); // Get fresh connection each attempt
+        const tokenAccounts = await connection.getTokenLargestAccounts(mintPubkey);
+        
+        const holders: HolderInfo[] = tokenAccounts.value
+          .map((account, index) => {
+            const balance = Number(account.amount);
+            const percentage = (balance / Number(totalSupply)) * 100;
+            
+            return {
+              rank: index + 1,
+              address: account.address.toBase58(),
+              balance,
+              percentage,
+            };
+          })
+          .filter(h => h.balance > 0)
+          .sort((a, b) => b.balance - a.balance)
+          .slice(0, 20); // Top 20 holders
+        
+        return holders;
+      } catch (error: any) {
+        attempts++;
+        if (error.message?.includes('429') || error.message?.includes('Too Many Requests')) {
+          console.log(`[RPC Balancer] Rate limited on attempt ${attempts}, rotating provider...`);
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempts)); // Exponential backoff
+            continue; // Retry with new connection from balancer
+          }
+        }
+        console.error(`Error fetching top holders (attempt ${attempts}/${maxAttempts}):`, error);
+        if (attempts >= maxAttempts) {
           return [];
         }
       }
-      console.error("Error fetching holders:", error);
-      return [];
     }
+    return [];
   }
 
   private async getTotalHolderCount(mintPubkey: PublicKey): Promise<number | null> {
-    try {
-      // Use getProgramAccounts to count ALL token holders (expensive call)
-      const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-      
-      const accounts = await this.connection.getProgramAccounts(
-        TOKEN_PROGRAM_ID,
-        {
-          filters: [
-            { dataSize: 165 }, // Token account data size
-            { 
-              memcmp: { 
-                offset: 0, 
-                bytes: mintPubkey.toBase58() 
-              } 
-            }
-          ],
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      try {
+        const connection = this.getConnection(); // Get fresh connection each attempt
+        const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+        
+        const accounts = await connection.getProgramAccounts(
+          TOKEN_PROGRAM_ID,
+          {
+            filters: [
+              { dataSize: 165 }, // Token account data size
+              { 
+                memcmp: { 
+                  offset: 0, 
+                  bytes: mintPubkey.toBase58() 
+                } 
+              }
+            ],
+          }
+        );
+        
+        // Filter out accounts with 0 balance
+        const nonZeroAccounts = accounts.filter(account => {
+          const data = account.account.data;
+          if (Buffer.isBuffer(data)) {
+            // Read amount from token account (bytes 64-72)
+            const amount = data.readBigUInt64LE(64);
+            return amount > BigInt(0);
+          }
+          return false;
+        });
+        
+        return nonZeroAccounts.length;
+      } catch (error: any) {
+        attempts++;
+        if (error.message?.includes('429') || error.message?.includes('Too Many Requests')) {
+          console.log(`[RPC Balancer] Rate limited on attempt ${attempts}, rotating provider...`);
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempts)); // Exponential backoff
+            continue; // Retry with new connection from balancer
+          }
         }
-      );
-      
-      // Filter out accounts with 0 balance
-      const nonZeroAccounts = accounts.filter(account => {
-        const data = account.account.data;
-        if (Buffer.isBuffer(data)) {
-          // Read amount from token account (bytes 64-72)
-          const amount = data.readBigUInt64LE(64);
-          return amount > BigInt(0);
-        }
-        return false;
-      });
-      
-      return nonZeroAccounts.length;
-    } catch (error: any) {
-      if (error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
-        console.log(`[RPC Balancer] Rotating connection due to rate limit in getTotalHolderCount`);
-        this.connection = rpcBalancer.getConnection();
-        // Retry once with new connection
-        try {
-          const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-          const accounts = await this.connection.getProgramAccounts(
-            TOKEN_PROGRAM_ID,
-            {
-              filters: [
-                { dataSize: 165 },
-                { 
-                  memcmp: { 
-                    offset: 0, 
-                    bytes: mintPubkey.toBase58() 
-                  } 
-                }
-              ],
-            }
-          );
-          const nonZeroAccounts = accounts.filter(account => {
-            const data = account.account.data;
-            if (Buffer.isBuffer(data)) {
-              const amount = data.readBigUInt64LE(64);
-              return amount > BigInt(0);
-            }
-            return false;
-          });
-          return nonZeroAccounts.length;
-        } catch (retryError) {
-          console.error("Error fetching total holder count after rotation:", retryError);
+        console.error(`Error fetching total holder count (attempt ${attempts}/${maxAttempts}):`, error);
+        if (attempts >= maxAttempts) {
           return null;
         }
       }
-      console.error("Error fetching total holder count:", error);
-      return null;
     }
+    return null;
   }
 
   private analyzeLiquidity(topHolderConcentration: number): LiquidityPoolStatus {
@@ -621,8 +596,8 @@ export class SolanaTokenAnalyzer {
 
   private async fetchRecentTransactions(mintPubkey: PublicKey): Promise<TransactionInfo[]> {
     try {
-      // Get recent signatures for the mint account
-      const signatures = await this.connection.getSignaturesForAddress(mintPubkey, { limit: 10 });
+      const connection = this.getConnection(); // Get fresh connection
+      const signatures = await connection.getSignaturesForAddress(mintPubkey, { limit: 10 });
       
       return signatures.slice(0, 5).map((sig, index) => ({
         signature: sig.signature,

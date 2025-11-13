@@ -54,7 +54,7 @@ export class SolanaRpcBalancer {
   select(): RpcProvider {
     const healthy = this.providers.filter(p => p.score > 50);
     if (healthy.length === 0) {
-      // All unhealthy, reset scores and try again
+      console.log('[RPC Balancer] All providers unhealthy, resetting scores');
       this.providers.forEach(p => p.score = 100);
       return this.select();
     }
@@ -64,7 +64,9 @@ export class SolanaRpcBalancer {
         weighted.push(p);
       }
     }
-    return weighted[Math.floor(Math.random() * weighted.length)];
+    const selected = weighted[Math.floor(Math.random() * weighted.length)];
+    console.log(`[RPC Balancer] Selected provider: ${selected.name} (score: ${selected.score})`);
+    return selected;
   }
 
   async request(method: string, params: any[] = []): Promise<any> {
