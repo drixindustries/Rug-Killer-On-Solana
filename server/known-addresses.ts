@@ -25,7 +25,42 @@ export const KNOWN_EXCHANGES: KnownAddress[] = [
   },
   {
     address: 'H8sMJSCQxfKiFTCfDR3DUYexta7Kxymr2gF3LceH44uR',
-    label: 'Binance 2',
+    label: 'Binance 3',
+    type: 'exchange',
+    source: 'Solscan labeled'
+  },
+  // Coinbase
+  {
+    address: 'GJRs4FwHtemZ5ZE9x3FNvJ8TMwitKTh21yxdRPqn7npE',
+    label: 'Coinbase Hot Wallet 2',
+    type: 'exchange',
+    source: 'Solscan labeled'
+  },
+  // OKX
+  {
+    address: 'is6MTRHEgyFLNTfYcuV4QBWLjrZBfmhVNYR6ccgr8KV',
+    label: 'OKX Hot Wallet',
+    type: 'exchange',
+    source: 'Solscan labeled'
+  },
+  // Bybit
+  {
+    address: 'AC5RDfQFmDS1deWZos921JfqscXdByf8BKHs5ACWjtW2',
+    label: 'Bybit Hot Wallet',
+    type: 'exchange',
+    source: 'Solscan labeled'
+  },
+  // Gate.io
+  {
+    address: 'u6PJ8DtQuPFnfmwHbGFULQ4u4EgjDiyYKjVEsynXq2w',
+    label: 'Gate.io',
+    type: 'exchange',
+    source: 'Solscan labeled'
+  },
+  // MEXC
+  {
+    address: 'ASTyfSima4LLAdDgoFGkgqoKowG1LZFDr9fAQrg7iaJZ',
+    label: 'MEXC',
     type: 'exchange',
     source: 'Solscan labeled'
   },
