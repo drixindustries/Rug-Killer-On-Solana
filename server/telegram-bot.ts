@@ -1,6 +1,7 @@
 import { Telegraf, Context } from 'telegraf';
 import { message } from 'telegraf/filters';
 import { tokenAnalyzer } from './solana-analyzer';
+import { storage } from './storage';
 import type { TokenAnalysisResponse } from '@shared/schema';
 
 // Bot instance - only created when startTelegramBot() is called
@@ -146,7 +147,9 @@ function createTelegramBot(botToken: string): Telegraf {
     { command: 'execute', description: 'Full 52-metric scan - /execute <address>' },
     { command: 'first20', description: 'Top 20 holder analysis - /first20 <address>' },
     { command: 'devtorture', description: 'Dev wallet history - /devtorture <address>' },
-    { command: 'blacklist', description: 'Check wallet blacklist - /blacklist <wallet>' }
+    { command: 'blacklist', description: 'Check wallet blacklist - /blacklist <wallet>' },
+    { command: 'whaletrack', description: 'Smart money in token - /whaletrack <address>' },
+    { command: 'kol', description: 'Check if wallet is KOL - /kol <wallet>' }
   ]).catch(err => {
     console.error('Failed to set Telegram bot commands:', err);
   });
@@ -155,11 +158,14 @@ function createTelegramBot(botToken: string): Telegraf {
   bot.command('start', async (ctx) => {
     await ctx.reply(
       '🔥 **SOLANA RUG KILLER**\n\n' +
-      'Available commands:\n\n' +
+      '**Core Commands:**\n' +
       '/execute <address> - Full 52-metric scan\n' +
       '/first20 <address> - Top 20 holder analysis\n' +
       '/devtorture <address> - Dev wallet history\n' +
       '/blacklist <wallet> - Check if wallet is flagged\n\n' +
+      '**Whale Tier Commands:**\n' +
+      '/whaletrack <address> - Smart money tracking\n' +
+      '/kol <wallet> - Check if wallet is KOL\n\n' +
       'Send any token address for quick analysis!',
       { parse_mode: 'Markdown' }
     );
@@ -287,6 +293,132 @@ function createTelegramBot(botToken: string): Telegraf {
     } catch (error) {
       console.error('Telegram bot blacklist error:', error);
       ctx.reply('❌ Error checking blacklist.');
+    }
+  });
+  
+  // /whaletrack command - Smart money tracking
+  bot.command('whaletrack', async (ctx) => {
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) {
+      return ctx.reply('❌ Please provide a token address.\n\nExample: `/whaletrack EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`', { parse_mode: 'Markdown' });
+    }
+    
+    const tokenAddress = args[1];
+    
+    try {
+      await ctx.reply('🐋 Tracking smart money wallets...');
+      
+      const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      const holderAddresses = analysis.topHolders.map(h => h.address);
+      const kolHolders = await storage.getKolWalletsByAddresses(holderAddresses);
+      
+      let message = `🐋 **WHALE TRACKING - ${analysis.metadata.symbol}**\n\n`;
+      
+      if (kolHolders.length === 0) {
+        message += `✅ No known smart money wallets detected in top holders\n\n`;
+        message += `This could be a good sign - no influential traders have entered yet, or it could mean the token hasn't attracted attention from experienced traders.`;
+      } else {
+        message += `⚠️ **${kolHolders.length} Smart Money Wallet${kolHolders.length > 1 ? 's' : ''} Detected**\n\n`;
+        
+        for (const kol of kolHolders.slice(0, 10)) {
+          const holder = analysis.topHolders.find(h => h.address === kol.walletAddress);
+          const percentage = holder ? holder.percentage.toFixed(2) : 'N/A';
+          
+          message += `💎 **${kol.displayName || 'Unknown KOL'}**\n`;
+          message += `Wallet: \`${formatAddress(kol.walletAddress)}\`\n`;
+          message += `Holdings: ${percentage}% of supply\n`;
+          message += `Influence: ${kol.influenceScore !== null ? kol.influenceScore.toString() : 'N/A'}/100\n`;
+          if (kol.profitSol) {
+            message += `Profit: ${formatNumber(kol.profitSol)} SOL\n`;
+          }
+          message += `\n`;
+        }
+        
+        const totalKolPercentage = kolHolders.reduce((sum, kol) => {
+          const holder = analysis.topHolders.find(h => h.address === kol.walletAddress);
+          return sum + (holder?.percentage || 0);
+        }, 0);
+        
+        message += `📊 **Total Smart Money Holdings: ${totalKolPercentage.toFixed(2)}%**\n\n`;
+        
+        if (totalKolPercentage > 30) {
+          message += `🚨 HIGH concentration - Smart money controls significant supply!`;
+        } else if (totalKolPercentage > 15) {
+          message += `⚠️ MODERATE concentration - Watch for coordinated sells`;
+        } else {
+          message += `✅ LOW concentration - Smart money has small positions`;
+        }
+      }
+      
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (error) {
+      console.error('Telegram bot whaletrack error:', error);
+      ctx.reply('❌ Error tracking smart money. Please check the address and try again.');
+    }
+  });
+  
+  // /kol command - Check if wallet is a KOL
+  bot.command('kol', async (ctx) => {
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) {
+      return ctx.reply('❌ Please provide a wallet address.\n\nExample: `/kol AbCd1234...`', { parse_mode: 'Markdown' });
+    }
+    
+    const walletAddress = args[1];
+    
+    try {
+      await ctx.reply('🔍 Checking KOL database...');
+      
+      const kol = await storage.getKolWallet(walletAddress);
+      
+      if (!kol) {
+        await ctx.reply(
+          `📊 **KOL CHECK**\n\n` +
+          `Wallet: \`${formatAddress(walletAddress)}\`\n\n` +
+          `❌ Not found in KOL database\n\n` +
+          `This wallet is not currently tracked as a known influential trader.`,
+          { parse_mode: 'Markdown' }
+        );
+        return;
+      }
+      
+      let message = `💎 **KOL PROFILE FOUND**\n\n`;
+      message += `👤 **${kol.displayName || 'Unknown'}**\n`;
+      message += `Wallet: \`${formatAddress(kol.walletAddress)}\`\n\n`;
+      message += `📊 **Stats:**\n`;
+      message += `• Rank: #${kol.rank !== null ? kol.rank.toString() : 'N/A'}\n`;
+      message += `• Influence Score: ${kol.influenceScore !== null ? kol.influenceScore.toString() : 'N/A'}/100\n`;
+      
+      if (kol.profitSol !== null) {
+        message += `• Total Profit: ${formatNumber(kol.profitSol)} SOL\n`;
+      }
+      
+      if (kol.wins !== null && kol.losses !== null) {
+        const total = kol.wins + kol.losses;
+        const winRate = total > 0 ? ((kol.wins / total) * 100).toFixed(1) : 'N/A';
+        message += `• Wins: ${kol.wins} | Losses: ${kol.losses}\n`;
+        message += `• Win Rate: ${winRate}%\n`;
+      }
+      
+      if (kol.lastActiveAt) {
+        const lastActive = new Date(kol.lastActiveAt);
+        message += `• Last Active: ${lastActive.toLocaleDateString()}\n`;
+      }
+      
+      message += `\n`;
+      
+      if (kol.influenceScore && kol.influenceScore > 80) {
+        message += `🔥 **HIGHLY INFLUENTIAL** - Top tier trader`;
+      } else if (kol.influenceScore && kol.influenceScore > 60) {
+        message += `⭐ **INFLUENTIAL** - Experienced trader`;
+      } else {
+        message += `📈 **TRACKED** - Known trader`;
+      }
+      
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (error) {
+      console.error('Telegram bot kol error:', error);
+      ctx.reply('❌ Error checking KOL database.');
     }
   });
   

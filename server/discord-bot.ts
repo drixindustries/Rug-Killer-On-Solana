@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, EmbedBuilder, SlashCommandBuilder, REST, Routes } from 'discord.js';
 import { tokenAnalyzer } from './solana-analyzer';
+import { storage } from './storage';
 import type { TokenAnalysisResponse } from '@shared/schema';
 
 // Client instance - only created when startDiscordBot() is called
@@ -208,6 +209,22 @@ const commands = [
         .setDescription('Wallet address to check')
         .setRequired(true)
     ),
+  new SlashCommandBuilder()
+    .setName('whaletrack')
+    .setDescription('Track smart money wallets in a token')
+    .addStringOption(option =>
+      option.setName('address')
+        .setDescription('Token contract address')
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName('kol')
+    .setDescription('Check if a wallet is a known KOL')
+    .addStringOption(option =>
+      option.setName('wallet')
+        .setDescription('Wallet address to check')
+        .setRequired(true)
+    ),
 ].map(command => command.toJSON());
 
 // ============================================================================
@@ -253,8 +270,12 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           .setDescription('Protect yourself from rug pulls with comprehensive token analysis!')
           .addFields(
             {
-              name: '📋 Available Commands',
+              name: '📋 Core Commands',
               value: '`/execute <address>` - Full 52-metric scan\n`/first20 <address>` - Top 20 holder analysis\n`/devtorture <address>` - Dev wallet history\n`/blacklist <wallet>` - Check if wallet is flagged\n`/help` - Show this help message'
+            },
+            {
+              name: '🐋 Whale Tier Commands',
+              value: '`/whaletrack <address>` - Smart money tracking\n`/kol <wallet>` - Check if wallet is KOL'
             },
             {
               name: '💡 Quick Tip',
@@ -373,6 +394,145 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             value: '✅ Not currently flagged'
           })
           .setTimestamp();
+        
+        await interaction.editReply({ embeds: [embed] });
+        
+      } else if (interaction.commandName === 'whaletrack') {
+        const tokenAddress = interaction.options.getString('address', true);
+        
+        await interaction.deferReply();
+        
+        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        const holderAddresses = analysis.topHolders.map(h => h.address);
+        const kolHolders = await storage.getKolWalletsByAddresses(holderAddresses);
+        
+        const embed = new EmbedBuilder()
+          .setColor(kolHolders.length > 0 ? 0xff9900 : 0x00ff00)
+          .setTitle(`🐋 Whale Tracking - ${analysis.metadata.symbol}`)
+          .setTimestamp();
+        
+        if (kolHolders.length === 0) {
+          embed.setDescription('✅ No known smart money wallets detected in top holders')
+            .addFields({
+              name: 'Analysis',
+              value: 'This could be a good sign - no influential traders have entered yet, or it could mean the token hasn\'t attracted attention from experienced traders.'
+            });
+        } else {
+          const totalKolPercentage = kolHolders.reduce((sum, kol) => {
+            const holder = analysis.topHolders.find(h => h.address === kol.walletAddress);
+            return sum + (holder?.percentage || 0);
+          }, 0);
+          
+          embed.setDescription(`⚠️ **${kolHolders.length} Smart Money Wallet${kolHolders.length > 1 ? 's' : ''} Detected**`);
+          
+          const kolData = kolHolders.slice(0, 5).map(kol => {
+            const holder = analysis.topHolders.find(h => h.address === kol.walletAddress);
+            const percentage = holder ? holder.percentage.toFixed(2) : 'N/A';
+            
+            let value = `Wallet: \`${formatAddress(kol.walletAddress)}\`\n`;
+            value += `Holdings: ${percentage}% of supply\n`;
+            value += `Influence: ${kol.influenceScore !== null ? kol.influenceScore.toString() : 'N/A'}/100`;
+            if (kol.profitSol) {
+              value += `\nProfit: ${formatNumber(kol.profitSol)} SOL`;
+            }
+            
+            return {
+              name: `💎 ${kol.displayName || 'Unknown KOL'}`,
+              value,
+              inline: false
+            };
+          });
+          
+          embed.addFields(...kolData);
+          
+          let statusText = `**Total Smart Money Holdings: ${totalKolPercentage.toFixed(2)}%**\n\n`;
+          if (totalKolPercentage > 30) {
+            statusText += '🚨 HIGH concentration - Smart money controls significant supply!';
+          } else if (totalKolPercentage > 15) {
+            statusText += '⚠️ MODERATE concentration - Watch for coordinated sells';
+          } else {
+            statusText += '✅ LOW concentration - Smart money has small positions';
+          }
+          
+          embed.addFields({
+            name: '📊 Summary',
+            value: statusText
+          });
+        }
+        
+        await interaction.editReply({ embeds: [embed] });
+        
+      } else if (interaction.commandName === 'kol') {
+        const walletAddress = interaction.options.getString('wallet', true);
+        
+        await interaction.deferReply();
+        
+        const kol = await storage.getKolWallet(walletAddress);
+        
+        if (!kol) {
+          const embed = new EmbedBuilder()
+            .setColor(0x808080)
+            .setTitle('📊 KOL Check')
+            .setDescription(`Wallet: \`${formatAddress(walletAddress)}\``)
+            .addFields({
+              name: 'Status',
+              value: '❌ Not found in KOL database\n\nThis wallet is not currently tracked as a known influential trader.'
+            })
+            .setTimestamp();
+          
+          await interaction.editReply({ embeds: [embed] });
+          return;
+        }
+        
+        const influenceScore = kol.influenceScore !== null ? kol.influenceScore : 0;
+        const color = influenceScore > 80 ? 0xff6b2c : influenceScore > 60 ? 0xffa500 : 0x3498db;
+        
+        const embed = new EmbedBuilder()
+          .setColor(color)
+          .setTitle('💎 KOL Profile Found')
+          .setDescription(`**${kol.displayName || 'Unknown'}**\nWallet: \`${formatAddress(kol.walletAddress)}\``)
+          .setTimestamp();
+        
+        let statsValue = `• Rank: #${kol.rank !== null ? kol.rank.toString() : 'N/A'}\n`;
+        statsValue += `• Influence Score: ${kol.influenceScore !== null ? kol.influenceScore.toString() : 'N/A'}/100\n`;
+        
+        if (kol.profitSol !== null) {
+          statsValue += `• Total Profit: ${formatNumber(kol.profitSol)} SOL\n`;
+        }
+        
+        if (kol.wins !== null && kol.losses !== null) {
+          const total = kol.wins + kol.losses;
+          const winRate = total > 0 ? ((kol.wins / total) * 100).toFixed(1) : 'N/A';
+          statsValue += `• Wins: ${kol.wins} | Losses: ${kol.losses}\n`;
+          statsValue += `• Win Rate: ${winRate}%`;
+        }
+        
+        embed.addFields({
+          name: '📊 Stats',
+          value: statsValue
+        });
+        
+        if (kol.lastActiveAt) {
+          const lastActive = new Date(kol.lastActiveAt);
+          embed.addFields({
+            name: '📅 Last Active',
+            value: lastActive.toLocaleDateString()
+          });
+        }
+        
+        let tierText = '';
+        if (kol.influenceScore && kol.influenceScore > 80) {
+          tierText = '🔥 **HIGHLY INFLUENTIAL** - Top tier trader';
+        } else if (kol.influenceScore && kol.influenceScore > 60) {
+          tierText = '⭐ **INFLUENTIAL** - Experienced trader';
+        } else {
+          tierText = '📈 **TRACKED** - Known trader';
+        }
+        
+        embed.addFields({
+          name: 'Tier',
+          value: tierText
+        });
         
         await interaction.editReply({ embeds: [embed] });
       }
