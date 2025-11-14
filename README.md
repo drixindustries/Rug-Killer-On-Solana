@@ -54,17 +54,19 @@ Solana Rug Killer is a comprehensive web application that analyzes Solana SPL to
 ## 📋 Prerequisites
 
 - Node.js 18+ and npm
-- PostgreSQL database (Neon recommended)
+- PostgreSQL database
 - Solana RPC endpoint (Helius, QuickNode, or Alchemy recommended)
 - Whop account for subscription management
 - Optional: Telegram Bot Token and Discord Bot Token
 
-## ⚙️ Installation
+## ⚙️ Installation & Deployment
+
+### Local Development
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/drixindustries/rugkillleronsol.git
-cd rugkillleronsol
+git clone https://github.com/drixindustries/Rug-Killer-On-Solana.git
+cd Rug-Killer-On-Solana
 ```
 
 2. **Install dependencies**
@@ -82,6 +84,9 @@ DATABASE_URL=postgresql://user:password@host:5432/dbname
 
 # Solana RPC
 SOLANA_RPC_URL=https://your-rpc-endpoint.com
+
+# Base URL (for share links)
+BASE_URL=http://localhost:5000
 
 # Session Secret
 SESSION_SECRET=your-random-secret-here
@@ -122,6 +127,15 @@ npm run dev
 
 The application will be available at `http://localhost:5000`
 
+### Production Deployment (Railway)
+
+For production deployment on Railway, see [RAILWAY_DEPLOYMENT.md](./RAILWAY_DEPLOYMENT.md) for detailed step-by-step instructions including:
+- PostgreSQL database setup
+- Environment variable configuration
+- Custom domain setup with automatic SSL
+- Database migration commands
+- Troubleshooting common issues
+
 ## 🔧 Configuration
 
 ### Solana RPC Providers
@@ -135,6 +149,7 @@ See [BOT_SETUP_GUIDE.md](./BOT_SETUP_GUIDE.md) for detailed instructions on sett
 
 ## 📚 Documentation
 
+- [Railway Deployment Guide](./RAILWAY_DEPLOYMENT.md) - Production deployment on Railway
 - [Bot Setup Guide](./BOT_SETUP_GUIDE.md) - Complete guide for Telegram and Discord bot configuration
 - [API Documentation](./docs/API.md) - REST API endpoints and usage
 - [Contributing Guidelines](./CONTRIBUTING.md) - How to contribute to the project
@@ -165,13 +180,17 @@ These legal documents are available in-app at `/terms` and `/privacy` routes for
 - BullMQ for job queues
 
 **Integrations:**
-- Replit Auth for user authentication
 - Whop for subscription management
 - Stripe for payment processing
 - Rugcheck.xyz for risk scores
 - GoPlus Security for scam detection
 - DexScreener for market data
 - Jupiter for price verification
+
+**Deployment:**
+- Railway for production hosting
+- Automatic SSL with custom domains
+- PostgreSQL database on Railway
 
 ## 🛣️ Roadmap
 
@@ -203,8 +222,9 @@ This tool is for educational and informational purposes only. It does not consti
 
 ## 🔗 Links
 
-- **Website**: [https://yourwebsite.com](https://yourwebsite.com)
+- **Website**: [https://rugkilleralphabot.fun](https://rugkilleralphabot.fun)
 - **Token Contract**: `2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt`
+- **GitHub**: [https://github.com/drixindustries/Rug-Killer-On-Solana](https://github.com/drixindustries/Rug-Killer-On-Solana)
 - **Telegram**: [Join our community](https://t.me/yourgroup)
 - **Discord**: [Join our server](https://discord.gg/yourinvite)
 - **Twitter**: [@YourHandle](https://twitter.com/yourhandle)
