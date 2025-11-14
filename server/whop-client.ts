@@ -51,7 +51,7 @@ export async function createWhopCheckout(params: {
       },
       body: JSON.stringify({
         plan_id: params.planId,
-        redirect_url: `${process.env.REPL_HOME || "http://localhost:5000"}/subscription/success`,
+        redirect_url: `${process.env.BASE_URL || "http://localhost:5000"}/subscription/success`,
         metadata: {
           user_id: params.userId,
           user_email: params.userEmail || "",

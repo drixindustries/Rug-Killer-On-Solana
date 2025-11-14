@@ -366,7 +366,7 @@ export default function Features() {
             <CardContent className="space-y-3">
               <div>
                 <code className="text-sm font-semibold">/execute [token]</code>
-                <p className="text-xs text-muted-foreground mt-1">Full 52-metric analysis</p>
+                <p className="text-xs text-muted-foreground mt-1">Complete risk analysis with all metrics</p>
               </div>
               <div>
                 <code className="text-sm font-semibold">/first20 [token]</code>

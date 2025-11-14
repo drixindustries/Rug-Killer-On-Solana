@@ -296,7 +296,7 @@ export default function Home() {
           <div className="space-y-6 sm:space-y-8">
             {!analysis && (
               <div className="text-center space-y-4 sm:space-y-6 py-8 sm:py-12">
-                <h1 className="text-3xl sm:text-4xl font-bold">Solana Rug Detector</h1>
+                <h1 className="text-3xl sm:text-4xl font-bold">Solana Rug Killer</h1>
                 <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto px-4">
                   Analyze Solana tokens for rug pull risks. Check mint authority, freeze authority, 
                   holder distribution, liquidity, and suspicious activity instantly.

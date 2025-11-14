@@ -38,7 +38,7 @@ interface BotInviteLinks {
 
 export function Header({ onNewAnalysis }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { data: botLinks } = useQuery<BotInviteLinks>({
+  const { data: botLinks, isLoading: botLinksLoading } = useQuery<BotInviteLinks>({
     queryKey: ['/api/bot/invite-links'],
     retry: false,
     refetchOnWindowFocus: false,
@@ -108,37 +108,46 @@ export function Header({ onNewAnalysis }: HeaderProps) {
               className="hidden md:inline-flex min-h-[44px] min-w-[44px]"
               data-testid="button-github"
             >
-              <a href="https://github.com/drixindustries/rugkillleronsol" target="_blank" rel="noopener noreferrer" title="View on GitHub" aria-label="View project on GitHub">
+              <a href="https://github.com/drixindustries/rugkilleronsol" target="_blank" rel="noopener noreferrer" title="View on GitHub" aria-label="View project on GitHub">
                 <SiGithub className="h-5 w-5" />
               </a>
             </Button>
             
-            {botLinks?.telegram && (
-              <Button 
-                variant="ghost"
-                size="icon"
-                asChild
-                className="hidden md:inline-flex min-h-[44px] min-w-[44px]"
-                data-testid="button-telegram-bot"
-              >
-                <a href={botLinks.telegram} target="_blank" rel="noopener noreferrer" title="Join Telegram Bot" aria-label="Join Telegram bot">
-                  <SiTelegram className="h-5 w-5" />
-                </a>
-              </Button>
-            )}
-            
-            {botLinks?.discord && (
-              <Button 
-                variant="ghost"
-                size="icon"
-                asChild
-                className="hidden md:inline-flex min-h-[44px] min-w-[44px]"
-                data-testid="button-discord-bot"
-              >
-                <a href={botLinks.discord} target="_blank" rel="noopener noreferrer" title="Join Discord Bot" aria-label="Join Discord bot">
-                  <SiDiscord className="h-5 w-5" />
-                </a>
-              </Button>
+            {botLinksLoading ? (
+              <>
+                <div className="hidden md:inline-flex h-10 w-10 rounded-md bg-muted animate-pulse" />
+                <div className="hidden md:inline-flex h-10 w-10 rounded-md bg-muted animate-pulse" />
+              </>
+            ) : (
+              <>
+                {botLinks?.telegram && (
+                  <Button 
+                    variant="ghost"
+                    size="icon"
+                    asChild
+                    className="hidden md:inline-flex min-h-[44px] min-w-[44px]"
+                    data-testid="button-telegram-bot"
+                  >
+                    <a href={botLinks.telegram} target="_blank" rel="noopener noreferrer" title="Join Telegram Bot" aria-label="Join Telegram bot">
+                      <SiTelegram className="h-5 w-5" />
+                    </a>
+                  </Button>
+                )}
+                
+                {botLinks?.discord && (
+                  <Button 
+                    variant="ghost"
+                    size="icon"
+                    asChild
+                    className="hidden md:inline-flex min-h-[44px] min-w-[44px]"
+                    data-testid="button-discord-bot"
+                  >
+                    <a href={botLinks.discord} target="_blank" rel="noopener noreferrer" title="Join Discord Bot" aria-label="Join Discord bot">
+                      <SiDiscord className="h-5 w-5" />
+                    </a>
+                  </Button>
+                )}
+              </>
             )}
 
             {/* Wallet Connect */}
@@ -299,7 +308,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
                       size="icon"
                       asChild
                     >
-                      <a href="https://github.com/drixindustries/rugkillleronsol" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="View project on GitHub">
+                      <a href="https://github.com/drixindustries/rugkilleronsol" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="View project on GitHub">
                         <SiGithub className="h-4 w-4" />
                       </a>
                     </Button>

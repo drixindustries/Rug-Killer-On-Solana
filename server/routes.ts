@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { analyzeTokenSchema, insertWatchlistSchema } from "@shared/schema";
 import { tokenAnalyzer } from "./solana-analyzer";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+// import { setupAuth, isAuthenticated } from "./replitAuth"; // Disabled for non-Replit deployments
 import { storage } from "./storage";
 import { 
   createWhopCheckout, 
@@ -1892,9 +1892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { tokenAddress } = req.params;
       
       // You could fetch token analysis here to generate preview
-      const baseUrl = process.env.REPL_SLUG 
-        ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
-        : 'http://localhost:5000';
+      const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
       
       const preview = {
         url: `${baseUrl}/?token=${tokenAddress}`,
@@ -1910,13 +1908,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // GET /api/bot/invite-links - Bot invite links
+  app.get('/api/bot/invite-links', async (req, res) => {
+    try {
+      res.json({
+        telegram: 'https://t.me/RugKillerAlphaBot',
+        discord: process.env.DISCORD_INVITE_URL || undefined,
+      });
+    } catch (error) {
+      console.error('Error fetching bot invite links:', error);
+      res.status(500).json({ message: 'Failed to fetch bot invite links' });
+    }
+  });
+
   // GET /api/share/twitter/:tokenAddress - Twitter URL
   app.get('/api/share/twitter/:tokenAddress', async (req, res) => {
     try {
       const { tokenAddress } = req.params;
-      const baseUrl = process.env.REPL_SLUG 
-        ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
-        : 'http://localhost:5000';
+      const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
       
       const url = `${baseUrl}/?token=${tokenAddress}`;
       const text = `Check out this token analysis on Solana Rug Killer`;
@@ -1933,9 +1942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/share/telegram/:tokenAddress', async (req, res) => {
     try {
       const { tokenAddress } = req.params;
-      const baseUrl = process.env.REPL_SLUG 
-        ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
-        : 'http://localhost:5000';
+      const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
       
       const url = `${baseUrl}/?token=${tokenAddress}`;
       const text = `Check out this token analysis on Solana Rug Killer`;

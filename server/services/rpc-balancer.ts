@@ -10,29 +10,24 @@ interface RpcProvider {
 
 const RPC_PROVIDERS = [
   { 
-    getUrl: () => `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_KEY || ""}`,
+    getUrl: () => "https://api.mainnet-beta.solana.com",
     weight: 40, 
+    name: "Public" 
+  },
+  { 
+    getUrl: () => `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_KEY || ""}`,
+    weight: 30, 
     name: "Helius" 
   },
   { 
     getUrl: () => `https://solana-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY || ""}`,
-    weight: 35, 
+    weight: 20, 
     name: "Alchemy" 
-  },
-  { 
-    getUrl: () => "https://rpc.ankr.com/solana",
-    weight: 15, 
-    name: "Ankr" 
   },
   { 
     getUrl: () => "https://solana-api.projectserum.com",
     weight: 10, 
     name: "Serum" 
-  },
-  { 
-    getUrl: () => "https://api.mainnet-beta.solana.com",
-    weight: 5, 
-    name: "Public" 
   },
 ];
 

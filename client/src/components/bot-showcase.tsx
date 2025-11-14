@@ -57,11 +57,11 @@ export function BotShowcase() {
               <Button 
                 className="w-full" 
                 variant="default"
-                onClick={() => window.location.href = '/api/login'}
+                onClick={() => window.location.href = '/pricing'}
                 data-testid="button-telegram-cta"
               >
                 <SiTelegram className="h-4 w-4 mr-2" />
-                Get Access
+                View Plans
               </Button>
             </CardContent>
           </Card>
@@ -105,11 +105,11 @@ export function BotShowcase() {
               <Button 
                 className="w-full" 
                 variant="default"
-                onClick={() => window.location.href = '/api/login'}
+                onClick={() => window.location.href = '/pricing'}
                 data-testid="button-discord-cta"
               >
                 <SiDiscord className="h-4 w-4 mr-2" />
-                Get Access
+                View Plans
               </Button>
             </CardContent>
           </Card>
@@ -119,15 +119,15 @@ export function BotShowcase() {
           <Card className="max-w-2xl mx-auto" data-testid="card-bot-access">
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground mb-4">
-                <strong>Bot access included with:</strong> PRO, WHALE subscriptions or 10M+ $ANTIRUG token holders
+                <strong>Bot access included with:</strong> PRO and WHALE subscriptions, or hold 10M+ $ANTIRUG tokens for free access
               </p>
               <div className="flex gap-3 justify-center">
                 <Button 
                   variant="outline"
-                  onClick={() => window.location.href = '/api/login'}
+                  onClick={() => window.location.href = '/pricing'}
                   data-testid="button-view-pricing"
                 >
-                  View Pricing
+                  View Pricing Plans
                 </Button>
               </div>
             </CardContent>

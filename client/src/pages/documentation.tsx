@@ -389,12 +389,40 @@ const DocumentationPDF = () => (
 );
 
 export default function Documentation() {
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      const offset = 80;
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - offset;
+      window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       
       <main className="flex-1">
-        <div className="max-w-6xl mx-auto px-6 py-12">
+        <div className="max-w-7xl mx-auto px-6 py-12">
+          <div className="lg:grid lg:grid-cols-[240px_1fr] lg:gap-12">
+            <aside className="hidden lg:block">
+              <div className="sticky top-20 space-y-1">
+                <h3 className="font-semibold text-sm mb-3 text-muted-foreground">On This Page</h3>
+                <nav className="space-y-1">
+                  <button onClick={() => scrollToSection('overview')} className="block text-sm hover:text-primary transition-colors text-left w-full py-1">Overview</button>
+                  <button onClick={() => scrollToSection('multi-source')} className="block text-sm hover:text-primary transition-colors text-left w-full py-1">Multi-Source Analysis</button>
+                  <button onClick={() => scrollToSection('token-analysis')} className="block text-sm hover:text-primary transition-colors text-left w-full py-1">Token Analysis</button>
+                  <button onClick={() => scrollToSection('bots')} className="block text-sm hover:text-primary transition-colors text-left w-full py-1">Bots</button>
+                  <button onClick={() => scrollToSection('security')} className="block text-sm hover:text-primary transition-colors text-left w-full py-1">Security</button>
+                  <button onClick={() => scrollToSection('ai-blacklist')} className="block text-sm hover:text-primary transition-colors text-left w-full py-1">AI Blacklist</button>
+                  <button onClick={() => scrollToSection('pricing')} className="block text-sm hover:text-primary transition-colors text-left w-full py-1">Pricing</button>
+                  <button onClick={() => scrollToSection('getting-started')} className="block text-sm hover:text-primary transition-colors text-left w-full py-1">Getting Started</button>
+                  <button onClick={() => scrollToSection('api-endpoints')} className="block text-sm hover:text-primary transition-colors text-left w-full py-1">API</button>
+                </nav>
+              </div>
+            </aside>
+            <div className="lg:col-start-2">
           {/* Header Section */}
           <div className="text-center mb-12">
             <div className="flex items-center justify-center gap-3 mb-4">
@@ -419,7 +447,7 @@ export default function Documentation() {
           </div>
 
           {/* Overview Section */}
-          <Card className="mb-8" data-testid="card-overview">
+          <Card className="mb-8" data-testid="card-overview" id="overview">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="h-5 w-5" />
@@ -443,7 +471,7 @@ export default function Documentation() {
 
           {/* Features Grid */}
           <div className="grid md:grid-cols-2 gap-6 mb-8">
-            <Card data-testid="card-multi-source">
+            <Card data-testid="card-multi-source" id="multi-source">
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <Database className="h-5 w-5 text-primary" />
@@ -485,7 +513,7 @@ export default function Documentation() {
               </CardContent>
             </Card>
 
-            <Card data-testid="card-token-analysis">
+            <Card data-testid="card-token-analysis" id="token-analysis">
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <Zap className="h-5 w-5 text-primary" />
@@ -527,7 +555,7 @@ export default function Documentation() {
               </CardContent>
             </Card>
 
-            <Card data-testid="card-bots">
+            <Card data-testid="card-bots" id="bots">
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <Bot className="h-5 w-5 text-primary" />
@@ -882,7 +910,7 @@ export default function Documentation() {
               </CardContent>
             </Card>
 
-            <Card data-testid="card-security">
+            <Card data-testid="card-security" id="security">
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <Lock className="h-5 w-5 text-primary" />
@@ -918,7 +946,7 @@ export default function Documentation() {
           </div>
 
           {/* AI Blacklist System */}
-          <Card className="mb-8" data-testid="card-ai-blacklist">
+          <Card className="mb-8" data-testid="card-ai-blacklist" id="ai-blacklist">
             <CardHeader>
               <div className="flex items-center gap-2 mb-2">
                 <AlertTriangle className="h-5 w-5 text-primary" />
@@ -984,7 +1012,7 @@ export default function Documentation() {
           </Card>
 
           {/* Pricing Section */}
-          <Card className="mb-8" data-testid="card-pricing">
+          <Card className="mb-8" data-testid="card-pricing" id="pricing">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
@@ -1049,7 +1077,7 @@ export default function Documentation() {
           </Card>
 
           {/* Getting Started */}
-          <Card data-testid="card-getting-started">
+          <Card data-testid="card-getting-started" id="getting-started">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Wallet className="h-5 w-5" />
@@ -1160,7 +1188,7 @@ export default function Documentation() {
           </Card>
 
           {/* API Endpoints */}
-          <Card className="mb-8" data-testid="card-api-endpoints">
+          <Card className="mb-8" data-testid="card-api-endpoints" id="api-endpoints">
             <CardHeader>
               <div className="flex items-center gap-2 mb-2">
                 <Code className="h-5 w-5 text-primary" />
@@ -1234,7 +1262,7 @@ export default function Documentation() {
           </Card>
 
           {/* Environment Setup */}
-          <Card data-testid="card-environment">
+          <Card data-testid="card-environment" id="environment">
             <CardHeader>
               <div className="flex items-center gap-2 mb-2">
                 <Database className="h-5 w-5 text-primary" />
@@ -1304,6 +1332,8 @@ export default function Documentation() {
                 </Button>
               )}
             </PDFDownloadLink>
+          </div>
+          </div>
           </div>
         </div>
       </main>

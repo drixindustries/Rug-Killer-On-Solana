@@ -250,15 +250,15 @@ export default function Landing() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
               <Card>
                 <CardHeader>
-                  <CardTitle>Free Trial</CardTitle>
+                  <CardTitle>FREE Trial</CardTitle>
                   <div className="text-3xl font-bold">$0</div>
                   <CardDescription>7 days</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2 text-sm">
-                    <li>Token risk analysis</li>
-                    <li>Market data insights</li>
-                    <li>PumpFun live monitor</li>
+                    <li>3 token analyses per day</li>
+                    <li>Basic risk score</li>
+                    <li>Top 20 holder analysis</li>
                     <li>No credit card required</li>
                   </ul>
                 </CardContent>
@@ -266,15 +266,15 @@ export default function Landing() {
 
               <Card className="border-primary">
                 <CardHeader>
-                  <CardTitle>Basic</CardTitle>
-                  <div className="text-3xl font-bold">$20</div>
+                  <CardTitle>PRO</CardTitle>
+                  <div className="text-3xl font-bold">$29</div>
                   <CardDescription>per month</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2 text-sm">
-                    <li>Everything in Free Trial</li>
-                    <li>Discord DM alerts</li>
-                    <li>Telegram DM alerts</li>
+                    <li>Unlimited analyses</li>
+                    <li>Full AI detection</li>
+                    <li>Bot access (Discord & Telegram)</li>
                     <li>Priority support</li>
                   </ul>
                 </CardContent>
@@ -282,22 +282,22 @@ export default function Landing() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Premium</CardTitle>
-                  <div className="text-3xl font-bold">$100</div>
+                  <CardTitle>WHALE</CardTitle>
+                  <div className="text-3xl font-bold">$120</div>
                   <CardDescription>per month</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2 text-sm">
-                    <li>Everything in Basic</li>
-                    <li>Discord group alerts</li>
-                    <li>Telegram group alerts</li>
-                    <li>Custom alert filters</li>
+                    <li>Everything in PRO</li>
+                    <li>Real-time alpha alerts</li>
+                    <li>Custom watchlists</li>
+                    <li>Team collaboration (5 users)</li>
                   </ul>
                 </CardContent>
               </Card>
             </div>
             <p className="text-center text-muted-foreground mt-8">
-              Hold 10M+ tokens to get full access for free!
+              Hold 10M+ $ANTIRUG tokens to get full access for free!
             </p>
           </div>
         </section>
@@ -305,7 +305,7 @@ export default function Landing() {
 
       <footer className="border-t py-6">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>Solana Rug Detector - Protect your investments</p>
+          <p>Solana Rug Killer - Protect your investments</p>
         </div>
       </footer>
     </div>
