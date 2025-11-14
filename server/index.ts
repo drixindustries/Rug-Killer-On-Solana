@@ -1,4 +1,4 @@
-import './tracing';
+// import './tracing'; // Disabled - dd-trace not needed for Railway deployment
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
