@@ -19,18 +19,30 @@ import { getBirdeyeOverview } from "./services/birdeye-api";
 import { checkPumpFun } from "./services/pumpfun-api";
 import { rpcBalancer } from "./services/rpc-balancer";
 import { LPChecker } from "./services/lp-checker";
+import { BundleDetectorService } from "./services/bundle-detector";
+import { BubblemapsService } from "./services/bubblemaps-service";
+import { QuillCheckService } from "./services/quillcheck-service";
+import { WhaleDetectorService } from "./services/whale-detector";
 
 export class SolanaTokenAnalyzer {
   private rugcheckService: RugcheckService;
   private goplusService: GoPlusSecurityService;
   private dexscreenerService: DexScreenerService;
   private jupiterPriceService: JupiterPriceService;
+  private bundleDetector: BundleDetectorService;
+  private bubblemapsService: BubblemapsService;
+  private quillcheckService: QuillCheckService;
+  private whaleDetector: WhaleDetectorService;
 
   constructor() {
     this.rugcheckService = new RugcheckService();
     this.goplusService = new GoPlusSecurityService();
     this.dexscreenerService = new DexScreenerService();
     this.jupiterPriceService = new JupiterPriceService();
+    this.bundleDetector = new BundleDetectorService();
+    this.bubblemapsService = new BubblemapsService();
+    this.quillcheckService = new QuillCheckService();
+    this.whaleDetector = new WhaleDetectorService();
   }
 
   private getConnection(): Connection {
@@ -89,7 +101,7 @@ export class SolanaTokenAnalyzer {
       const freezeAuthority = this.analyzeFreezeAuthority(mintInfo.freezeAuthority);
       
       // Fetch token accounts (holders) from on-chain and external APIs in parallel
-      const [onChainHolders, totalHolderCount, recentTransactions, rugcheckData, goplusData, dexscreenerData, jupiterPriceData, birdeyeData, pumpFunData] = await Promise.all([
+      const [onChainHolders, totalHolderCount, recentTransactions, rugcheckData, goplusData, dexscreenerData, jupiterPriceData, birdeyeData, pumpFunData, quillcheckData] = await Promise.all([
         this.fetchTopHolders(mintPubkey, mintInfo.decimals, mintInfo.supply),
         this.getTotalHolderCount(mintPubkey).catch(() => null),
         this.fetchRecentTransactions(mintPubkey),
@@ -99,6 +111,7 @@ export class SolanaTokenAnalyzer {
         this.jupiterPriceService.getTokenPrice(tokenAddress).catch(() => null),
         getBirdeyeOverview(tokenAddress).catch(() => null),
         checkPumpFun(tokenAddress).catch(() => ({ isPumpFun: false, devBought: 0, bondingCurve: 0 })),
+        this.quillcheckService.checkToken(tokenAddress).catch(() => null),
       ]);
       
       // Enrich holders with Rugcheck data if on-chain fetch failed
@@ -263,6 +276,24 @@ export class SolanaTokenAnalyzer {
           bundledSupplyAmount
         } : undefined
       };
+
+      // Advanced bundle detection using Jito timing analysis
+      let advancedBundleData = null;
+      try {
+        advancedBundleData = await this.bundleDetector.detectBundles(tokenAddress, holders);
+        console.log(`[Bundle Detector] Score: ${advancedBundleData?.bundleScore || 0}, Bundled Supply: ${advancedBundleData?.bundledSupplyPercent || 0}%`);
+      } catch (error) {
+        console.error('[Bundle Detector] Analysis failed:', error);
+      }
+
+      // Wallet network analysis with Bubblemaps
+      let networkAnalysis = null;
+      try {
+        networkAnalysis = await this.bubblemapsService.analyzeNetwork(tokenAddress);
+        console.log(`[Bubblemaps] Network Risk: ${networkAnalysis?.networkRiskScore || 0}, Clustered Wallets: ${networkAnalysis?.clusteredWallets || 0}`);
+      } catch (error) {
+        console.error('[Bubblemaps] Analysis failed:', error);
+      }
       
       // Build metadata - prioritize DexScreener data over on-chain defaults
       const supply = Number(mintInfo.supply);
@@ -290,7 +321,10 @@ export class SolanaTokenAnalyzer {
         freezeAuthority,
         enrichedLiquidity,
         topHolderConcentration,
-        holderCount
+        holderCount,
+        advancedBundleData,
+        networkAnalysis,
+        quillcheckData
       );
       
       // Calculate overall risk score with safety check
@@ -335,6 +369,9 @@ export class SolanaTokenAnalyzer {
         goplusData: goplusData || undefined,
         dexscreenerData: dexscreenerData || undefined,
         jupiterPriceData: jupiterPriceData || undefined,
+        quillcheckData: quillcheckData || undefined,
+        advancedBundleData: advancedBundleData as any || undefined,
+        networkAnalysis: networkAnalysis || undefined,
       };
     } catch (error) {
       console.error("Token analysis error:", error);
@@ -759,9 +796,94 @@ export class SolanaTokenAnalyzer {
     freezeAuthority: AuthorityStatus,
     liquidityPool: LiquidityPoolStatus,
     topHolderConcentration: number,
-    holderCount: number
+    holderCount: number,
+    advancedBundleData?: any,
+    networkAnalysis?: any,
+    quillcheckData?: any
   ): RiskFlag[] {
     const flags: RiskFlag[] = [];
+
+    // QuillCheck honeypot detection (CRITICAL - highest priority)
+    if (quillcheckData) {
+      if (quillcheckData.isHoneypot) {
+        flags.push({
+          type: "honeypot",
+          severity: "critical",
+          title: "HONEYPOT DETECTED",
+          description: "This token cannot be sold. QuillCheck AI simulation detected sell restrictions.",
+        });
+      }
+
+      if (!quillcheckData.canSell && !quillcheckData.isHoneypot) {
+        flags.push({
+          type: "honeypot",
+          severity: "critical",
+          title: "Sell Function Restricted",
+          description: "Selling this token may be disabled or restricted.",
+        });
+      }
+
+      if (quillcheckData.sellTax > 15) {
+        flags.push({
+          type: "tax",
+          severity: "high",
+          title: `Excessive Sell Tax: ${quillcheckData.sellTax}%`,
+          description: `Selling this token incurs a ${quillcheckData.sellTax}% tax, which may prevent profitable exits.`,
+        });
+      }
+
+      if (quillcheckData.sellTax - quillcheckData.buyTax > 5) {
+        flags.push({
+          type: "tax",
+          severity: "high",
+          title: "Asymmetric Tax Structure",
+          description: `Buy tax: ${quillcheckData.buyTax}%, Sell tax: ${quillcheckData.sellTax}% - major red flag for honeypot.`,
+        });
+      }
+
+      if (quillcheckData.liquidityRisk) {
+        flags.push({
+          type: "liquidity_drain",
+          severity: "critical",
+          title: "Liquidity Can Be Drained",
+          description: "Contract owner can drain liquidity, resulting in total loss for holders.",
+        });
+      }
+    }
+
+    // Advanced bundle detection (80% of rugs use bundles)
+    if (advancedBundleData && advancedBundleData.bundleScore >= 60) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "critical",
+        title: `Jito Bundle Detected: ${advancedBundleData.bundleScore}/100 Risk`,
+        description: `${advancedBundleData.bundledSupplyPercent.toFixed(1)}% of supply held in ${advancedBundleData.suspiciousWallets.length} bundled wallets. ${advancedBundleData.risks.join(' ')}`,
+      });
+    } else if (advancedBundleData && advancedBundleData.bundleScore >= 35) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "high",
+        title: `Possible Bundle Activity: ${advancedBundleData.bundleScore}/100 Risk`,
+        description: `${advancedBundleData.suspiciousWallets.length} wallets detected with suspicious patterns controlling ${advancedBundleData.bundledSupplyPercent.toFixed(1)}% of supply.`,
+      });
+    }
+
+    // Wallet network clustering (Bubblemaps)
+    if (networkAnalysis && networkAnalysis.networkRiskScore >= 60) {
+      flags.push({
+        type: "wallet_network",
+        severity: "critical",
+        title: `Connected Wallet Network: ${networkAnalysis.networkRiskScore}/100 Risk`,
+        description: `${networkAnalysis.clusteredWallets} wallets appear to be controlled by the same entity. ${networkAnalysis.risks.join(' ')}`,
+      });
+    } else if (networkAnalysis && networkAnalysis.networkRiskScore >= 35) {
+      flags.push({
+        type: "wallet_network",
+        severity: "high",
+        title: `Suspicious Wallet Clustering`,
+        description: `${networkAnalysis.clusteredWallets} wallets show clustering patterns that may indicate coordinated control.`,
+      });
+    }
 
     // Mint authority not revoked
     if (mintAuthority.hasAuthority) {

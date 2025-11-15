@@ -67,18 +67,18 @@ export function CriticalAlerts({ redFlags, holderFiltering }: CriticalAlertsProp
   };
 
   return (
-    <div className="space-y-2">
-      <h2 className="text-xl font-semibold mb-4">Critical Alerts</h2>
+    <div className="space-y-2 sm:space-y-3">
+      <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Critical Alerts</h2>
       {allAlerts.map((flag, index) => (
         <Card
           key={index}
-          className={`p-4 ${getSeverityColor(flag.severity)}`}
+          className={`p-3 sm:p-4 ${getSeverityColor(flag.severity)}`}
           data-testid={`alert-${flag.type}`}
         >
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-2.5 sm:gap-3">
             {getIconForType(flag.type)}
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm" data-testid={`text-alert-title-${index}`}>
+              <h3 className="font-semibold text-sm sm:text-base" data-testid={`text-alert-title-${index}`}>
                 {flag.title}
               </h3>
               <p className="text-sm mt-1 opacity-90" data-testid={`text-alert-description-${index}`}>

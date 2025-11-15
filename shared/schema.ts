@@ -78,7 +78,7 @@ export interface TokenMetadata {
 
 // Risk Flag
 export interface RiskFlag {
-  type: "mint_authority" | "freeze_authority" | "low_liquidity" | "holder_concentration" | "suspicious_transactions" | "mutable_metadata" | "recent_creation";
+  type: "mint_authority" | "freeze_authority" | "low_liquidity" | "holder_concentration" | "suspicious_transactions" | "mutable_metadata" | "recent_creation" | "honeypot" | "tax" | "liquidity_drain" | "bundle_manipulation" | "wallet_network";
   severity: "low" | "medium" | "high" | "critical";
   title: string;
   description: string;
@@ -259,6 +259,61 @@ export interface AIVerdict {
   verdict: string;
 }
 
+// QuillCheck Data (Honeypot & Tax Detection)
+export interface QuillCheckData {
+  riskScore: number; // 0-100
+  isHoneypot: boolean;
+  buyTax: number;
+  sellTax: number;
+  canSell: boolean;
+  liquidityRisk: boolean;
+  risks: string[];
+}
+
+// Advanced Bundle Detection Data (Jito Timing Analysis)
+export interface BundleDetectionData {
+  bundleScore: number; // 0-100
+  bundledSupplyPercent: number; // % of supply in bundled wallets
+  suspiciousWallets: string[]; // Wallet addresses involved in bundle
+  earlyBuyCluster?: {
+    avgTimingGapMs: number; // Average gap between buys in cluster
+    walletCount: number;
+  };
+  risks: string[];
+}
+
+// Network Analysis Data (Bubblemaps)
+export interface NetworkAnalysisData {
+  networkRiskScore: number; // 0-100
+  clusteredWallets: number; // Number of wallets in clusters
+  connectedGroups: Array<{
+    wallets: string[];
+    totalSupplyPercent: number;
+  }>;
+  risks: string[];
+}
+
+// Whale Buy Detection Data
+export interface WhaleBuy {
+  wallet: string;
+  timestamp: number;
+  amountTokens: number;
+  percentageOfSupply: number;
+  priceUSD?: number;
+  txSignature: string;
+  isExchange: boolean;
+}
+
+export interface WhaleDetectionData {
+  whaleCount: number;
+  totalWhaleSupplyPercent: number;
+  whaleBuys: WhaleBuy[];
+  largestBuy: WhaleBuy | null;
+  averageBuySize: number;
+  risks: string[];
+  insight?: string; // Smart insight message
+}
+
 export interface TokenAnalysisResponse {
   tokenAddress: string;
   riskScore: number;
@@ -304,6 +359,12 @@ export interface TokenAnalysisResponse {
   goplusData?: GoPlusSecurityData;
   dexscreenerData?: DexScreenerData;
   jupiterPriceData?: JupiterPriceData;
+  
+  // Advanced rug detection (2025)
+  quillcheckData?: QuillCheckData;
+  advancedBundleData?: BundleDetectionData;
+  networkAnalysis?: NetworkAnalysisData;
+  whaleDetection?: WhaleDetectionData; // NEW: Whale buy detection
 }
 
 // Storage schema (not used for in-memory but kept for consistency)
@@ -1069,3 +1130,34 @@ export type InsertCommunityVoteRequest = z.infer<typeof insertCommunityVoteSchem
 export type InsertSharedWatchlistRequest = z.infer<typeof insertSharedWatchlistSchema>;
 export type InsertTokenReportRequest = z.infer<typeof insertTokenReportSchema>;
 export type InsertUserActivityRequest = z.infer<typeof insertUserActivitySchema>;
+
+// ============================================================================
+// LIVE SCAN HISTORY (Pump.fun Webhook)
+// ============================================================================
+
+export const scanHistory = pgTable("scan_history", {
+  id: serial("id").primaryKey(),
+  tokenAddress: varchar("token_address", { length: 44 }).notNull(),
+  symbol: varchar("symbol", { length: 50 }).notNull(),
+  name: varchar("name", { length: 200 }),
+  riskScore: integer("risk_score").notNull(),
+  riskLevel: varchar("risk_level", { length: 20 }).notNull(),
+  grade: varchar("grade", { length: 20 }), // Diamond, Gold, Silver, Bronze, Red Flag
+  whaleCount: integer("whale_count").default(0),
+  bundleScore: integer("bundle_score"),
+  honeypotDetected: boolean("honeypot_detected").default(false),
+  analysisData: jsonb("analysis_data"), // Full TokenAnalysisResponse
+  insight: text("insight"), // Smart professional insight
+  chartUrl: text("chart_url"), // Base64 chart image
+  source: varchar("source", { length: 50 }).default("pumpfun"), // pumpfun, manual, api
+  scannedAt: timestamp("scanned_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  tokenAddressIdx: index("scan_history_token_address_idx").on(table.tokenAddress),
+  scannedAtIdx: index("scan_history_scanned_at_idx").on(table.scannedAt),
+  riskScoreIdx: index("scan_history_risk_score_idx").on(table.riskScore),
+  sourceIdx: index("scan_history_source_idx").on(table.source),
+}));
+
+export type ScanHistory = typeof scanHistory.$inferSelect;
+export type InsertScanHistory = typeof scanHistory.$inferInsert;

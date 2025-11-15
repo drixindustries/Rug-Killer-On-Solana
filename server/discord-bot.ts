@@ -147,6 +147,63 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
     inline: true
   });
   
+  // ADVANCED DETECTION (2025)
+  // Honeypot Detection
+  if (analysis.quillcheckData) {
+    const qc = analysis.quillcheckData;
+    let honeypotValue = '';
+    if (qc.isHoneypot) {
+      honeypotValue = '🚨 **HONEYPOT DETECTED**\n⛔ Cannot sell tokens!';
+    } else if (!qc.canSell) {
+      honeypotValue = '⚠️ Sell restrictions detected';
+    } else if (qc.sellTax > 15 || (qc.sellTax - qc.buyTax > 5)) {
+      honeypotValue = `⚠️ High Risk Taxes\nBuy: ${qc.buyTax}% / Sell: ${qc.sellTax}%`;
+    } else if (qc.buyTax > 0 || qc.sellTax > 0) {
+      honeypotValue = `Buy: ${qc.buyTax}% / Sell: ${qc.sellTax}%`;
+    }
+    if (honeypotValue) {
+      embed.addFields({
+        name: '🍯 HONEYPOT CHECK',
+        value: honeypotValue,
+        inline: false
+      });
+    }
+  }
+  
+  // Bundle Detection
+  if (analysis.advancedBundleData && analysis.advancedBundleData.bundleScore >= 35) {
+    const bd = analysis.advancedBundleData;
+    const bundleEmoji = bd.bundleScore >= 60 ? '🚨' : '⚠️';
+    embed.addFields({
+      name: `${bundleEmoji} BUNDLE DETECTED`,
+      value: `Score: ${bd.bundleScore}/100\n${bd.bundledSupplyPercent.toFixed(1)}% in ${bd.suspiciousWallets.length} bundled wallets`,
+      inline: true
+    });
+  }
+  
+  // Network Analysis
+  if (analysis.networkAnalysis && analysis.networkAnalysis.networkRiskScore >= 35) {
+    const na = analysis.networkAnalysis;
+    const networkEmoji = na.networkRiskScore >= 60 ? '🚨' : '⚠️';
+    embed.addFields({
+      name: `${networkEmoji} WALLET NETWORK`,
+      value: `Risk: ${na.networkRiskScore}/100\n${na.clusteredWallets} clustered wallets detected`,
+      inline: true
+    });
+  }
+  
+  // Whale Detection
+  if (analysis.whaleDetection && analysis.whaleDetection.whaleCount > 0) {
+    const wd = analysis.whaleDetection;
+    const whaleEmoji = wd.whaleCount >= 5 ? '🚨🐋' : wd.whaleCount >= 3 ? '⚠️🐋' : '🐋';
+    const largestBuy = wd.largestBuy ? `Largest: ${wd.largestBuy.percentageOfSupply.toFixed(2)}%` : '';
+    embed.addFields({
+      name: `${whaleEmoji} WHALE ACTIVITY`,
+      value: `${wd.whaleCount} whale${wd.whaleCount > 1 ? 's' : ''} detected\n${wd.totalWhaleSupplyPercent.toFixed(1)}% total supply\n${largestBuy}`,
+      inline: true
+    });
+  }
+  
   // RED FLAGS
   if (analysis.redFlags.length > 0) {
     const criticalFlags = analysis.redFlags.filter(f => f.severity === 'critical' || f.severity === 'high');
@@ -617,10 +674,6 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           
           if (pair.fdv) {
             embed.addFields({ name: '🌐 FDV', value: `$${formatNumber(pair.fdv)}`, inline: true });
-          }
-          
-          if (pair.url) {
-            embed.setURL(pair.url);
           }
         } else {
           embed.setColor(0x808080);

@@ -2346,6 +2346,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // LIVE SCAN HISTORY & PUMP.FUN WEBHOOK ROUTES
+  // ============================================================================
+
+  // GET /api/scan-history - Get recent scan history
+  app.get('/api/scan-history', async (req, res) => {
+    try {
+      const { getScanHistory } = await import('./live-scan-websocket');
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      const scans = await getScanHistory(limit, offset);
+      res.json({ scans, total: scans.length });
+    } catch (error) {
+      console.error("Error fetching scan history:", error);
+      res.status(500).json({ message: "Failed to fetch scan history" });
+    }
+  });
+
+  // GET /api/scan-stats - Get scan statistics
+  app.get('/api/scan-stats', async (req, res) => {
+    try {
+      const { getScanStats } = await import('./live-scan-websocket');
+      const stats = await getScanStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching scan stats:", error);
+      res.status(500).json({ message: "Failed to fetch scan stats" });
+    }
+  });
+
+  // GET /api/live-scan/status - Get WebSocket and Pump.fun status
+  app.get('/api/live-scan/status', async (req, res) => {
+    try {
+      const { liveScanWS } = await import('./live-scan-websocket');
+      const stats = liveScanWS.getStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching live scan status:", error);
+      res.status(500).json({ message: "Failed to fetch status" });
+    }
+  });
+
   const httpServer = createServer(app);
+  
+  // Initialize WebSocket for live scans
+  (async () => {
+    try {
+      const { liveScanWS } = await import('./live-scan-websocket');
+      const { pumpFunWebhook } = await import('./services/pumpfun-webhook');
+      
+      // Initialize WebSocket server
+      liveScanWS.initialize(httpServer);
+      
+      // Connect to Pump.fun webhook (only if enabled)
+      if (process.env.ENABLE_PUMPFUN_WEBHOOK === 'true') {
+        await pumpFunWebhook.connect();
+        console.log('✅ Pump.fun webhook enabled and connected');
+      } else {
+        console.log('ℹ️  Pump.fun webhook disabled (set ENABLE_PUMPFUN_WEBHOOK=true to enable)');
+      }
+    } catch (error) {
+      console.error('❌ Error initializing live scan WebSocket:', error);
+    }
+  })();
+  
   return httpServer;
 }

@@ -29,60 +29,60 @@ export function Footer() {
 
   return (
     <footer className="border-t bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-6">
-          <div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 sm:gap-8 mb-6">
+          <div className="sm:col-span-2 lg:col-span-1">
             <div className="flex items-center gap-2 mb-3">
               <Shield className="h-5 w-5 text-primary" />
               <span className="text-sm font-semibold">Rug Killer Alpha Bot</span>
             </div>
-            <p className="text-sm text-muted-foreground mb-3">
+            <p className="text-xs sm:text-sm text-muted-foreground mb-3">
               Protecting Solana investors from rug pulls since 2025
             </p>
             <div className="text-xs text-muted-foreground">
               <p className="font-semibold mb-1">Official Token: $ANTIRUG</p>
               <div 
-                className="flex items-center gap-1 bg-muted px-2 py-1 rounded group cursor-pointer hover-elevate" 
+                className="flex items-center gap-1 bg-muted px-2 py-1.5 rounded group cursor-pointer hover:bg-muted/80 transition-colors" 
                 onClick={copyCA}
                 data-testid="button-copy-ca-footer"
               >
-                <code className="font-mono text-[10px] flex-1 truncate">
+                <code className="font-mono text-[10px] sm:text-xs flex-1 truncate">
                   {CONTRACT_ADDRESS}
                 </code>
-                <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
               </div>
             </div>
           </div>
           
           <div>
             <h3 className="text-sm font-semibold mb-3">Resources</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><a href="/pricing" className="hover:text-foreground">Pricing</a></li>
-              <li><a href="/documentation" className="hover:text-foreground">Documentation</a></li>
-              <li><a href="/bot-guide" className="hover:text-foreground">Bot Guide</a></li>
-              <li><a href="/about" className="hover:text-foreground">About</a></li>
-              <li><a href="https://github.com/drixindustries/Rug-Killer-On-Solana#roadmap" target="_blank" rel="noopener noreferrer" className="hover:text-foreground" data-testid="footer-link-roadmap">Roadmap</a></li>
-              <li><a href="https://docs.solana.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Solana Docs</a></li>
+            <ul className="space-y-2 text-xs sm:text-sm text-muted-foreground">
+              <li><a href="/pricing" className="hover:text-foreground transition-colors">Pricing</a></li>
+              <li><a href="/documentation" className="hover:text-foreground transition-colors">Documentation</a></li>
+              <li><a href="/bot-guide" className="hover:text-foreground transition-colors">Bot Guide</a></li>
+              <li><a href="/about" className="hover:text-foreground transition-colors">About</a></li>
+              <li><a href="https://github.com/drixindustries/Rug-Killer-On-Solana#roadmap" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors" data-testid="footer-link-roadmap">Roadmap</a></li>
+              <li><a href="https://docs.solana.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Solana Docs</a></li>
             </ul>
           </div>
           
           <div>
             <h3 className="text-sm font-semibold mb-3">Legal</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><a href="/terms" className="hover:text-foreground" data-testid="footer-link-terms">Terms of Service</a></li>
-              <li><a href="/privacy" className="hover:text-foreground" data-testid="footer-link-privacy">Privacy Policy</a></li>
+            <ul className="space-y-2 text-xs sm:text-sm text-muted-foreground">
+              <li><a href="/terms" className="hover:text-foreground transition-colors" data-testid="footer-link-terms">Terms of Service</a></li>
+              <li><a href="/privacy" className="hover:text-foreground transition-colors" data-testid="footer-link-privacy">Privacy Policy</a></li>
             </ul>
           </div>
           
-          <div className="lg:col-span-2">
+          <div className="sm:col-span-2 lg:col-span-2">
             <h3 className="text-sm font-semibold mb-3">Community</h3>
             <div className="space-y-3">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button 
                   variant="outline"
                   size="icon"
                   asChild
-                  className="min-h-[44px] min-w-[44px]"
+                  className="h-10 w-10 sm:h-11 sm:w-11"
                   data-testid="footer-button-github"
                 >
                   <a href="https://github.com/drixindustries/Rug-Killer-On-Solana" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="View on GitHub">
@@ -95,7 +95,7 @@ export function Footer() {
                     variant="outline"
                     size="icon"
                     asChild
-                    className="min-h-[44px] min-w-[44px]"
+                    className="h-10 w-10 sm:h-11 sm:w-11"
                     data-testid="footer-button-telegram"
                   >
                     <a href={botLinks.telegram} target="_blank" rel="noopener noreferrer" title="Telegram" aria-label="Join Telegram bot">
@@ -109,7 +109,7 @@ export function Footer() {
                     variant="outline"
                     size="icon"
                     asChild
-                    className="min-h-[44px] min-w-[44px]"
+                    className="h-10 w-10 sm:h-11 sm:w-11"
                     data-testid="footer-button-discord"
                   >
                     <a href={botLinks.discord} target="_blank" rel="noopener noreferrer" title="Discord" aria-label="Join Discord server">
@@ -122,7 +122,7 @@ export function Footer() {
                 variant="default"
                 size="sm"
                 asChild
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto text-xs sm:text-sm"
                 data-testid="footer-button-invite-discord"
               >
                 <a 
@@ -138,7 +138,7 @@ export function Footer() {
           </div>
         </div>
         
-        <div className="border-t pt-6">
+        <div className="border-t pt-4 sm:pt-6">
           <p className="text-xs text-muted-foreground text-center">
             © 2025 Rug Killer Alpha Bot. All rights reserved.
           </p>

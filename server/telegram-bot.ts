@@ -109,6 +109,74 @@ Use /execute ${analysis.tokenAddress.slice(0, 8)}... for full analysis`;
   message += `• Top 10: ${analysis.topHolderConcentration.toFixed(2)}%\n`;
   message += `• Supply: ${formatNumber(analysis.metadata.supply)}\n\n`;
   
+  // ADVANCED DETECTION (2025)
+  // Honeypot Detection
+  if (analysis.quillcheckData) {
+    const qc = analysis.quillcheckData;
+    message += `🍯 **HONEYPOT CHECK**\n`;
+    if (qc.isHoneypot) {
+      message += `🚨 **HONEYPOT DETECTED**\n`;
+      message += `⛔ Cannot sell tokens!\n\n`;
+    } else if (!qc.canSell) {
+      message += `⚠️ Sell restrictions detected\n\n`;
+    } else {
+      message += `• Buy Tax: ${qc.buyTax}%\n`;
+      message += `• Sell Tax: ${qc.sellTax}%\n`;
+      if (qc.sellTax > 15) message += `⚠️ High sell tax!\n`;
+      if (qc.sellTax - qc.buyTax > 5) message += `⚠️ Asymmetric taxes (honeypot risk)\n`;
+      if (qc.liquidityRisk) message += `🚨 Liquidity can be drained!\n`;
+      message += `\n`;
+    }
+  }
+  
+  // Bundle Detection
+  if (analysis.advancedBundleData && analysis.advancedBundleData.bundleScore >= 35) {
+    const bd = analysis.advancedBundleData;
+    const bundleEmoji = bd.bundleScore >= 60 ? '🚨' : '⚠️';
+    message += `${bundleEmoji} **BUNDLE DETECTED**\n`;
+    message += `• Bundle Score: ${bd.bundleScore}/100\n`;
+    message += `• Bundled Supply: ${bd.bundledSupplyPercent.toFixed(1)}%\n`;
+    message += `• Suspicious Wallets: ${bd.suspiciousWallets.length}\n`;
+    if (bd.earlyBuyCluster) {
+      message += `• Early Buy Cluster: ${bd.earlyBuyCluster.walletCount} wallets in ${bd.earlyBuyCluster.avgTimingGapMs}ms\n`;
+    }
+    message += `\n`;
+  }
+  
+  // Network Analysis
+  if (analysis.networkAnalysis && analysis.networkAnalysis.networkRiskScore >= 35) {
+    const na = analysis.networkAnalysis;
+    const networkEmoji = na.networkRiskScore >= 60 ? '🚨' : '⚠️';
+    message += `${networkEmoji} **WALLET NETWORK**\n`;
+    message += `• Network Risk: ${na.networkRiskScore}/100\n`;
+    message += `• Clustered Wallets: ${na.clusteredWallets}\n`;
+    if (na.connectedGroups.length > 0) {
+      message += `• Connected Groups: ${na.connectedGroups.length}\n`;
+      const topGroup = na.connectedGroups[0];
+      message += `• Largest Group: ${topGroup.wallets.length} wallets, ${topGroup.totalSupplyPercent.toFixed(1)}% supply\n`;
+    }
+    message += `\n`;
+  }
+  
+  // Whale Detection
+  if (analysis.whaleDetection && analysis.whaleDetection.whaleCount > 0) {
+    const wd = analysis.whaleDetection;
+    const whaleEmoji = wd.whaleCount >= 5 ? '🚨🐋' : wd.whaleCount >= 3 ? '⚠️🐋' : '🐋';
+    message += `${whaleEmoji} **WHALE ACTIVITY**\n`;
+    message += `• Whale Count: ${wd.whaleCount}\n`;
+    message += `• Total Supply: ${wd.totalWhaleSupplyPercent.toFixed(1)}%\n`;
+    message += `• Avg Buy Size: ${wd.averageBuySize.toFixed(2)}%\n`;
+    if (wd.largestBuy) {
+      message += `• Largest Buy: ${wd.largestBuy.percentageOfSupply.toFixed(2)}%`;
+      if (wd.largestBuy.isExchange) message += ` (CEX)`;
+      message += `\n`;
+    }
+    if (wd.insight) {
+      message += `\n_${wd.insight}_\n`;
+    }
+    message += `\n`;
+  }
+  
   // RED FLAGS
   if (analysis.redFlags.length > 0) {
     const criticalFlags = analysis.redFlags.filter(f => f.severity === 'critical' || f.severity === 'high');
@@ -473,8 +541,6 @@ function createTelegramBot(botToken: string): Telegraf {
         if (pair.fdv) {
           message += `🌐 **FDV**: $${formatNumber(pair.fdv)}\n`;
         }
-        
-        message += `\n🔗 [View on DEXScreener](${pair.url})`;
       } else {
         message += `⚠️ Price data not available\n\nToken may not have active trading pairs yet.`;
       }

@@ -48,15 +48,15 @@ export function Header({ onNewAnalysis }: HeaderProps) {
   const { user } = useAuth();
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-[100] w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 lg:px-6">
         {/* Main Navigation Bar */}
-        <div className="flex h-14 items-center justify-between">
+        <div className="flex h-16 items-center justify-between gap-4">
           {/* Left: Logo */}
           <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity shrink-0">
               <Shield className="h-6 w-6 text-primary" />
-              <span className="font-bold text-lg hidden sm:inline">Rug Killer Alpha Bot</span>
+              <span className="font-bold text-lg hidden sm:inline whitespace-nowrap">Rug Killer Alpha Bot</span>
               <span className="font-bold text-lg sm:hidden">RKAB</span>
             </Link>
 
@@ -69,7 +69,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
                       <NavigationMenuTrigger className="text-sm">
                         {section.title}
                       </NavigationMenuTrigger>
-                      <NavigationMenuContent>
+                      <NavigationMenuContent className="z-[110]">
                         <ul className="grid w-[400px] gap-3 p-4">
                           {section.items.map((item) => (
                             <li key={item.href}>
@@ -99,13 +99,13 @@ export function Header({ onNewAnalysis }: HeaderProps) {
           </div>
 
           {/* Right: Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             {/* Social Links - Hidden on mobile to reduce clutter */}
             <Button 
               variant="ghost"
               size="icon"
               asChild
-              className="hidden md:inline-flex min-h-[44px] min-w-[44px]"
+              className="hidden md:inline-flex h-10 w-10"
               data-testid="button-github"
             >
               <a href="https://github.com/drixindustries/Rug-Killer-On-Solana" target="_blank" rel="noopener noreferrer" title="View on GitHub" aria-label="View project on GitHub">
@@ -125,7 +125,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
                     variant="ghost"
                     size="icon"
                     asChild
-                    className="hidden md:inline-flex min-h-[44px] min-w-[44px]"
+                    className="hidden md:inline-flex h-10 w-10"
                     data-testid="button-telegram-bot"
                   >
                     <a href={botLinks.telegram} target="_blank" rel="noopener noreferrer" title="Join Telegram Bot" aria-label="Join Telegram bot">
@@ -139,7 +139,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
                     variant="ghost"
                     size="icon"
                     asChild
-                    className="hidden md:inline-flex min-h-[44px] min-w-[44px]"
+                    className="hidden md:inline-flex h-10 w-10"
                     data-testid="button-discord-bot"
                   >
                     <a href={botLinks.discord} target="_blank" rel="noopener noreferrer" title="Join Discord Bot" aria-label="Join Discord bot">
@@ -254,14 +254,14 @@ export function Header({ onNewAnalysis }: HeaderProps) {
                 <Button 
                   variant="ghost"
                   size="icon"
-                  className="lg:hidden"
+                  className="lg:hidden h-10 w-10"
                   data-testid="button-mobile-menu"
                   aria-label="Open menu"
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+              <SheetContent side="right" className="w-[300px] sm:w-[400px] z-[120]">
                 <SheetHeader>
                   <SheetTitle>Menu</SheetTitle>
                 </SheetHeader>

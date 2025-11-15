@@ -19,6 +19,10 @@ import { TokenInfoSidebar } from "@/components/token-info-sidebar";
 import { LiquidityBurnCard } from "@/components/liquidity-burn-card";
 import { HolderFilteringCard } from "@/components/holder-filtering-card";
 import { BundleVisualizationChart } from "@/components/bundle-visualization-chart";
+import { HoneypotDetectionCard } from "@/components/honeypot-detection-card";
+import { BundleDetectionCard } from "@/components/bundle-detection-card";
+import { NetworkAnalysisCard } from "@/components/network-analysis-card";
+import { WhaleDetectionCard } from "@/components/whale-detection-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -294,30 +298,33 @@ export default function Home() {
       
       <Header onNewAnalysis={analysis ? handleNewAnalysis : undefined} />
       
-      <main className="flex-1">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="flex-1 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
           <div className="space-y-6 sm:space-y-8">
             {!analysis && (
-              <div className="text-center space-y-4 sm:space-y-6 py-8 sm:py-12">
-                <h1 className="text-3xl sm:text-4xl font-bold">Rug Killer Alpha Bot</h1>
-                <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto px-4">
-                  Analyze Solana tokens for rug pull risks. Check mint authority, freeze authority, 
-                  holder distribution, liquidity, and suspicious activity instantly.
-                </p>
+              <div className="text-center space-y-4 sm:space-y-6 py-8 sm:py-12 lg:py-16">
+                <div className="space-y-3">
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">Rug Killer Alpha Bot</h1>
+                  <p className="text-base sm:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
+                    Advanced Solana token security platform with 99%+ rug detection using AI-powered honeypot simulation, 
+                    bundle timing analysis, and wallet network clustering.
+                  </p>
+                </div>
                 
                 {/* Official Contract Address */}
-                <div className="flex flex-col items-center gap-3 pt-4">
+                <div className="flex flex-col items-center gap-3 pt-6">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-5 h-5 text-green-500" />
                     <span className="text-sm font-semibold text-muted-foreground">Official Contract Address</span>
                   </div>
-                  <div className="flex items-center gap-2 bg-muted px-3 sm:px-4 py-2 rounded-md max-w-full overflow-x-auto">
+                  <div className="flex items-center gap-2 bg-muted/50 backdrop-blur-sm px-3 sm:px-4 py-2.5 rounded-lg max-w-full overflow-x-auto border border-border/50">
                     <code className="font-mono text-xs sm:text-sm select-all break-all" data-testid="text-contract-address">
                       {CONTRACT_ADDRESS}
                     </code>
                     <Button
                       size="icon"
                       variant="ghost"
+                      className="h-8 w-8 shrink-0"
                       onClick={() => copyToClipboard(CONTRACT_ADDRESS)}
                       aria-label="Copy contract address"
                       data-testid="button-copy-contract"
@@ -333,21 +340,22 @@ export default function Home() {
 
             {/* Contract Address Card - Always visible */}
             {!analysis && (
-              <Card data-testid="card-contract-address">
-                <CardHeader>
+              <Card data-testid="card-contract-address" className="border-border/50 shadow-sm">
+                <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base">
                     <CheckCircle className="w-4 h-4 text-green-500" />
                     Official Contract Address
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center gap-2 bg-muted px-3 py-2 rounded-md overflow-x-auto">
+                  <div className="flex items-center gap-2 bg-muted/50 px-3 py-2.5 rounded-lg overflow-x-auto border border-border/50">
                     <code className="font-mono text-xs sm:text-sm flex-1 select-all break-all" data-testid="text-contract-card">
                       {CONTRACT_ADDRESS}
                     </code>
                     <Button
                       size="sm"
                       variant="ghost"
+                      className="h-8 w-8 p-0 shrink-0"
                       onClick={() => copyToClipboard(CONTRACT_ADDRESS)}
                       aria-label="Copy contract address"
                       data-testid="button-copy-contract-card"
@@ -416,6 +424,30 @@ export default function Home() {
                         redFlags={analysis.redFlags || []}
                         holderFiltering={analysis.holderFiltering}
                       />
+
+                      {/* ADVANCED DETECTION (2025) */}
+                      {/* Honeypot Detection */}
+                      {analysis.quillcheckData && (
+                        <HoneypotDetectionCard data={analysis.quillcheckData} />
+                      )}
+
+                      {/* Bundle Detection */}
+                      {analysis.advancedBundleData && (
+                        <BundleDetectionCard data={analysis.advancedBundleData} />
+                      )}
+
+                      {/* Network Analysis */}
+                      {analysis.networkAnalysis && (
+                        <NetworkAnalysisCard data={analysis.networkAnalysis} />
+                      )}
+
+                      {/* Whale Detection */}
+                      {analysis.whaleDetection && (
+                        <WhaleDetectionCard 
+                          data={analysis.whaleDetection} 
+                          symbol={analysis.metadata?.symbol || 'TOKEN'} 
+                        />
+                      )}
 
                       {/* LP Burn Checker - Only show if we have burn data */}
                       {analysis.liquidityPool?.burnPercentage !== undefined && (

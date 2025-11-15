@@ -12,7 +12,7 @@ import { getWalletDiscoveryService } from './services/wallet-discovery';
 import { getExternalWalletService } from './services/external-wallet-sources';
 import { db } from './db';
 import { kolWallets } from '../shared/schema';
-import { lt, lte } from 'drizzle-orm';
+import { and, eq, or, lt, lte } from 'drizzle-orm';
 
 export class WalletDiscoveryScheduler {
   private discoveryInterval: NodeJS.Timeout | null = null;
@@ -119,11 +119,11 @@ export class WalletDiscoveryScheduler {
       const result = await db
         .delete(kolWallets)
         .where(
-          db.and(
-            db.eq(kolWallets.source, 'auto-discovered'),
-            db.or(
-              db.lt(kolWallets.lastActiveAt, thirtyDaysAgo),
-              db.lte(kolWallets.influenceScore, 40)
+          and(
+            eq(kolWallets.source, 'auto-discovered'),
+            or(
+              lt(kolWallets.lastActiveAt, thirtyDaysAgo),
+              lte(kolWallets.influenceScore, 40)
             )
           )
         )
@@ -156,7 +156,7 @@ export class WalletDiscoveryScheduler {
             await db
               .update(kolWallets)
               .set({ influenceScore: newScore, updatedAt: new Date() })
-              .where(db.eq(kolWallets.id, wallet.id));
+              .where(eq(kolWallets.id, wallet.id));
           }
         }
       }

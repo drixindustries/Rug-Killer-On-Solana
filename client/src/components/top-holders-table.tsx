@@ -30,18 +30,19 @@ export function TopHoldersTable({ holders, decimals }: TopHoldersTableProps) {
   };
 
   return (
-    <Card className="p-6" data-testid="card-top-holders">
-      <h2 className="text-xl font-semibold mb-4">Top Holders</h2>
+    <Card className="p-3 sm:p-4 lg:p-6" data-testid="card-top-holders">
+      <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Top Holders</h2>
       
-      <div className="overflow-x-auto">
-        <table className="w-full">
+      <div className="overflow-x-auto -mx-3 sm:mx-0">
+        <table className="w-full min-w-[500px] sm:min-w-0">
           <thead className="sticky top-0 bg-card border-b">
-            <tr className="text-sm text-muted-foreground uppercase tracking-wide">
-              <th className="text-left py-3 px-2 font-medium">Rank</th>
-              <th className="text-left py-3 px-2 font-medium">Address</th>
-              <th className="text-right py-3 px-2 font-medium">Balance</th>
-              <th className="text-right py-3 px-2 font-medium">% of Supply</th>
-              <th className="w-12"></th>
+            <tr className="text-xs sm:text-sm text-muted-foreground uppercase tracking-wide">
+              <th className="text-left py-2 sm:py-3 px-2 font-medium">Rank</th>
+              <th className="text-left py-2 sm:py-3 px-2 font-medium">Address</th>
+              <th className="text-right py-2 sm:py-3 px-2 font-medium">Balance</th>
+              <th className="text-right py-2 sm:py-3 px-2 font-medium hidden sm:table-cell">% of Supply</th>
+              <th className="text-right py-2 sm:py-3 px-2 font-medium sm:hidden">%</th>
+              <th className="w-10 sm:w-12"></th>
             </tr>
           </thead>
           <tbody>
@@ -51,30 +52,31 @@ export function TopHoldersTable({ holders, decimals }: TopHoldersTableProps) {
                 className="border-b last:border-b-0 hover:bg-muted/50"
                 data-testid={`row-holder-${index}`}
               >
-                <td className="py-3 px-2 text-sm font-medium">
+                <td className="py-2 sm:py-3 px-2 text-xs sm:text-sm font-medium">
                   #{holder.rank}
                 </td>
-                <td className="py-3 px-2 font-mono text-sm" data-testid={`text-holder-address-${index}`}>
-                  {holder.address.slice(0, 4)}...{holder.address.slice(-4)}
+                <td className="py-2 sm:py-3 px-2 font-mono text-xs sm:text-sm" data-testid={`text-holder-address-${index}`}>
+                  <span className="hidden sm:inline">{holder.address.slice(0, 4)}...{holder.address.slice(-4)}</span>
+                  <span className="sm:hidden">{holder.address.slice(0, 3)}...{holder.address.slice(-3)}</span>
                 </td>
-                <td className="py-3 px-2 text-sm text-right font-semibold" data-testid={`text-holder-balance-${index}`}>
+                <td className="py-2 sm:py-3 px-2 text-xs sm:text-sm text-right font-semibold" data-testid={`text-holder-balance-${index}`}>
                   {formatBalance(holder.balance)}
                 </td>
-                <td className="py-3 px-2 text-sm text-right font-semibold" data-testid={`text-holder-percentage-${index}`}>
+                <td className="py-2 sm:py-3 px-2 text-xs sm:text-sm text-right font-semibold" data-testid={`text-holder-percentage-${index}`}>
                   {holder.percentage.toFixed(2)}%
                 </td>
-                <td className="py-3 px-2">
+                <td className="py-2 sm:py-3 px-2">
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => copyToClipboard(holder.address)}
                     data-testid={`button-copy-${index}`}
-                    className="h-8 w-8"
+                    className="h-7 w-7 sm:h-8 sm:w-8"
                   >
                     {copiedAddress === holder.address ? (
-                      <Check className="h-4 w-4 text-green-600" />
+                      <Check className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
                     ) : (
-                      <Copy className="h-4 w-4" />
+                      <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
                     )}
                   </Button>
                 </td>

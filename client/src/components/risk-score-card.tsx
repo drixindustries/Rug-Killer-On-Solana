@@ -76,15 +76,15 @@ export function RiskScoreCard({ score, riskLevel, redFlagsCount, analyzedAt }: R
     : analyzedAt;
 
   return (
-    <Card className="p-8" data-testid="card-risk-score">
-      <div className="flex flex-col items-center text-center space-y-6">
+    <Card className="p-4 sm:p-6 lg:p-8" data-testid="card-risk-score">
+      <div className="flex flex-col items-center text-center space-y-4 sm:space-y-6">
         {getRiskIcon()}
         
         <div className="space-y-2">
-          <div className={`text-6xl font-bold ${getRiskColor()}`} data-testid="text-risk-score">
+          <div className={`text-5xl sm:text-6xl lg:text-7xl font-bold ${getRiskColor()}`} data-testid="text-risk-score">
             {displayScore}
           </div>
-          <div className="text-sm text-muted-foreground uppercase tracking-wide">
+          <div className="text-xs sm:text-sm text-muted-foreground uppercase tracking-wide font-medium">
             Risk Score (0-100)
           </div>
         </div>
@@ -92,13 +92,13 @@ export function RiskScoreCard({ score, riskLevel, redFlagsCount, analyzedAt }: R
         <div className="w-full max-w-md">
           <Progress 
             value={displayScore} 
-            className="h-2" 
+            className="h-2.5 sm:h-3" 
             data-testid="progress-risk-score"
           />
         </div>
 
         <div className="space-y-1">
-          <div className={`text-2xl font-semibold ${getRiskColor()}`} data-testid="text-risk-level">
+          <div className={`text-xl sm:text-2xl font-semibold ${getRiskColor()}`} data-testid="text-risk-level">
             {riskLevel} RISK
           </div>
           <div className="text-sm text-muted-foreground" data-testid="text-red-flags">
