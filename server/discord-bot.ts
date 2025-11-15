@@ -424,13 +424,12 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         try {
           const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
           
-          const embed = new EmbedBuilder()
-            .setColor(hasFlags ? 0xff0000 : 0x00ff00)
-            .setTitle(`🔥 Dev Torture Report - ${analysis.metadata.symbol}`)
-            .setDescription(`Full token: \`${tokenAddress}\``)
-            .setTimestamp();
-          
           let hasFlags = false;
+          
+          const embed = new EmbedBuilder()
+            .setTitle(`🔥 Dev Torture Report - ${analysis.metadata.symbol}`)
+            .setDescription(`Contract: \`${tokenAddress}\``)
+            .setTimestamp();
           
           // Mint authority
           let mintValue = '';
@@ -484,6 +483,9 @@ function createDiscordClient(botToken: string, clientId: string): Client {
               inline: false
             });
           }
+          
+          // Set color based on flags
+          embed.setColor(hasFlags ? 0xff0000 : 0x00ff00);
           
           // Add overall verdict
           embed.addFields({
