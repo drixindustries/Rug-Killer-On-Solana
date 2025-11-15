@@ -447,66 +447,74 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
           
           const embed = new EmbedBuilder()
-            .setColor(0xff6b2c)
+            .setColor(hasFlags ? 0xff0000 : 0x00ff00)
             .setTitle(`🔥 Dev Torture Report - ${analysis.metadata.symbol}`)
-            .setDescription(`Contract: \`${tokenAddress.slice(0, 4)}...${tokenAddress.slice(-4)}\``)
+            .setDescription(`Full token: \`${tokenAddress}\``)
             .setTimestamp();
           
           let hasFlags = false;
           
           // Mint authority
+          let mintValue = '';
           if (analysis.mintAuthority.hasAuthority && !analysis.mintAuthority.isRevoked) {
-            embed.addFields({
-              name: '❌ Mint Authority Active',
-              value: `Dev can mint unlimited tokens!\nAuthority: \`${formatAddress(analysis.mintAuthority.authorityAddress || 'Unknown')}\``
-            });
+            mintValue = `❌ **ACTIVE**\nDev can mint unlimited tokens!`;
+            if (analysis.mintAuthority.authorityAddress) {
+              mintValue += `\nAuthority: \`${formatAddress(analysis.mintAuthority.authorityAddress)}\``;
+            }
             hasFlags = true;
           } else {
-            embed.addFields({
-              name: '✅ Mint Authority',
-              value: 'Revoked - Dev cannot mint new tokens'
-            });
+            mintValue = '✅ **REVOKED**\nDev cannot mint new tokens';
           }
+          embed.addFields({
+            name: '🪙 Mint Authority',
+            value: mintValue,
+            inline: false
+          });
           
           // Freeze authority
+          let freezeValue = '';
           if (analysis.freezeAuthority.hasAuthority && !analysis.freezeAuthority.isRevoked) {
-            embed.addFields({
-              name: '❌ Freeze Authority Active',
-              value: `Dev can freeze accounts!\nAuthority: \`${formatAddress(analysis.freezeAuthority.authorityAddress || 'Unknown')}\``
-            });
+            freezeValue = `❌ **ACTIVE**\nDev can freeze accounts!`;
+            if (analysis.freezeAuthority.authorityAddress) {
+              freezeValue += `\nAuthority: \`${formatAddress(analysis.freezeAuthority.authorityAddress)}\``;
+            }
             hasFlags = true;
           } else {
-            embed.addFields({
-              name: '✅ Freeze Authority',
-              value: 'Revoked - Dev cannot freeze accounts'
-            });
+            freezeValue = '✅ **REVOKED**\nDev cannot freeze accounts';
           }
+          embed.addFields({
+            name: '🧊 Freeze Authority',
+            value: freezeValue,
+            inline: false
+          });
           
+          // Token age
           if (analysis.creationDate) {
             const age = Math.floor((Date.now() - analysis.creationDate) / (1000 * 60 * 60 * 24));
-            let ageText = `Token Age: ${age} days`;
+            let ageText = `${age} days old`;
             if (age < 7) {
               ageText += '\n⚠️ Very new token - high risk!';
               hasFlags = true;
+            } else if (age < 30) {
+              ageText += '\n⚠️ New token - exercise caution';
+            } else {
+              ageText += '\n✅ Established token';
             }
             embed.addFields({
-              name: '📅 Age',
-              value: ageText
+              name: '📅 Token Age',
+              value: ageText,
+              inline: false
             });
           }
           
           // Add overall verdict
-          if (!hasFlags) {
-            embed.addFields({
-              name: '🎉 Overall',
-              value: '✅ Token passes basic dev torture checks!'
-            });
-          } else {
-            embed.addFields({
-              name: '⚠️ Overall',
-              value: '🚨 Token has concerning dev permissions!'
-            });
-          }
+          embed.addFields({
+            name: '━━━━━━━━━━━━━━━━',
+            value: !hasFlags 
+              ? '🎉 **VERDICT: SAFE**\n✅ Token passes dev torture checks!' 
+              : '⚠️ **VERDICT: CONCERNING**\n🚨 Token has concerning dev permissions!',
+            inline: false
+          });
           
           await interaction.editReply({ embeds: [embed] });
         } catch (error: any) {

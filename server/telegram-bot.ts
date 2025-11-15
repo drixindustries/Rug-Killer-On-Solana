@@ -319,31 +319,60 @@ function createTelegramBot(botToken: string): Telegraf {
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
       
       let message = `🔥 **DEV TORTURE REPORT - ${analysis.metadata.symbol}**\n\n`;
-      message += `Contract: \`${formatAddress(tokenAddress)}\`\n\n`;
+      message += `Token: \`${tokenAddress}\`\n\n`;
       
+      let hasFlags = false;
+      
+      // Mint Authority Check
+      message += `🪙 **MINT AUTHORITY**\n`;
       if (analysis.mintAuthority.hasAuthority && !analysis.mintAuthority.isRevoked) {
-        message += `❌ **MINT AUTHORITY ACTIVE**\n`;
-        message += `Dev can mint unlimited tokens!\n`;
+        message += `❌ ACTIVE - Dev can mint unlimited tokens!\n`;
         if (analysis.mintAuthority.authorityAddress) {
-          message += `Authority: \`${formatAddress(analysis.mintAuthority.authorityAddress)}\`\n\n`;
+          message += `Authority: \`${formatAddress(analysis.mintAuthority.authorityAddress)}\`\n`;
         }
+        hasFlags = true;
+      } else {
+        message += `✅ REVOKED - Dev cannot mint new tokens\n`;
       }
+      message += `\n`;
       
+      // Freeze Authority Check
+      message += `🧊 **FREEZE AUTHORITY**\n`;
       if (analysis.freezeAuthority.hasAuthority && !analysis.freezeAuthority.isRevoked) {
-        message += `❌ **FREEZE AUTHORITY ACTIVE**\n`;
-        message += `Dev can freeze accounts!\n`;
+        message += `❌ ACTIVE - Dev can freeze accounts!\n`;
         if (analysis.freezeAuthority.authorityAddress) {
-          message += `Authority: \`${formatAddress(analysis.freezeAuthority.authorityAddress)}\`\n\n`;
+          message += `Authority: \`${formatAddress(analysis.freezeAuthority.authorityAddress)}\`\n`;
         }
+        hasFlags = true;
+      } else {
+        message += `✅ REVOKED - Dev cannot freeze accounts\n`;
       }
+      message += `\n`;
       
+      // Token Age Check
       if (analysis.creationDate) {
         const age = Math.floor((Date.now() - analysis.creationDate) / (1000 * 60 * 60 * 24));
-        message += `📅 **AGE**: ${age} days\n`;
+        message += `📅 **TOKEN AGE**\n`;
+        message += `${age} days old\n`;
         if (age < 7) {
           message += `⚠️ Very new token - high risk!\n`;
+          hasFlags = true;
+        } else if (age < 30) {
+          message += `⚠️ New token - exercise caution\n`;
+        } else {
+          message += `✅ Established token\n`;
         }
         message += `\n`;
+      }
+      
+      // Overall Verdict
+      message += `━━━━━━━━━━━━━━━━\n`;
+      if (!hasFlags) {
+        message += `🎉 **VERDICT: SAFE**\n`;
+        message += `✅ Token passes dev torture checks!`;
+      } else {
+        message += `⚠️ **VERDICT: CONCERNING**\n`;
+        message += `🚨 Token has dev permissions!`;
       }
       
       await ctx.reply(message, { parse_mode: 'Markdown' });
