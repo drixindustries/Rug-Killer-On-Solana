@@ -43,6 +43,7 @@ const BundleDetectionCard = lazy(() => import("@/components/bundle-detection-car
 const NetworkAnalysisCard = lazy(() => import("@/components/network-analysis-card").then(m => ({ default: m.NetworkAnalysisCard })));
 const WhaleDetectionCard = lazy(() => import("@/components/whale-detection-card").then(m => ({ default: m.WhaleDetectionCard })));
 const AgedWalletDetectionCard = lazy(() => import("@/components/aged-wallet-detection-card").then(m => ({ default: m.AgedWalletDetectionCard })));
+const FundingAnalysisCard = lazy(() => import("@/components/funding-analysis-card").then(m => ({ default: m.FundingAnalysisCard })));
 
 // Loading fallback component for lazy-loaded components
 const ComponentLoader = () => <Skeleton className="h-48 w-full" />;
@@ -443,6 +444,13 @@ export default function Home() {
                       {analysis.agedWalletData && analysis.agedWalletData.agedWalletCount > 0 && (
                         <Suspense fallback={<ComponentLoader />}>
                           <AgedWalletDetectionCard data={analysis.agedWalletData} />
+                        </Suspense>
+                      )}
+
+                      {/* Funding Source Analysis */}
+                      {analysis.fundingAnalysis && (
+                        <Suspense fallback={<ComponentLoader />}>
+                          <FundingAnalysisCard fundingData={analysis.fundingAnalysis} />
                         </Suspense>
                       )}
 

@@ -129,6 +129,25 @@ Use /execute ${analysis.tokenAddress.slice(0, 8)}... for full analysis`;
     }
   }
   
+  // Funding Analysis (Nova-style detection)
+  if (analysis.fundingAnalysis && analysis.fundingAnalysis.suspiciousFunding) {
+    const fa = analysis.fundingAnalysis;
+    message += `🚨 **FUNDING ALERT**\n`;
+    message += `Suspicious funding: ${fa.totalSuspiciousPercentage.toFixed(1)}% from high-risk sources\n`;
+    
+    // Show breakdown like Nova: "Swopshop (42%) and FixedFloat (10.5%)"
+    const breakdown = Object.entries(fa.fundingSourceBreakdown)
+      .filter(([_, percentage]) => percentage >= 5)
+      .map(([source, percentage]) => `${source} (${percentage.toFixed(1)}%)`)
+      .join(' and ');
+    
+    if (breakdown) {
+      message += `Sources: ${breakdown}\n`;
+    }
+    
+    message += `⚠️ Don't buy that shit, stay away.\n\n`;
+  }
+
   // Bundle Detection
   if (analysis.advancedBundleData && analysis.advancedBundleData.bundleScore >= 35) {
     const bd = analysis.advancedBundleData;

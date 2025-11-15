@@ -428,6 +428,39 @@ export interface HolderTrackingData {
   risks: string[];
 }
 
+// Funding Source Analysis (NEW)
+export interface WalletFunding {
+  wallet: string;
+  fundingSource: string | null;
+  fundingSourceType: 'exchange' | 'swap' | 'bridge' | 'dex' | 'unknown';
+  riskLevel: 'HIGH_RISK' | 'MEDIUM_RISK' | 'LOW_RISK' | 'UNKNOWN';
+  fundingAmount?: number;
+  fundingTime?: number;
+  isRecentlyCreated: boolean;
+}
+
+export interface FundingPattern {
+  type: 'coordinated_funding' | 'fresh_wallet_funding' | 'single_source_dominance' | 'swap_service_cluster';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  confidence: number;
+  description: string;
+  evidence: {
+    fundingSource?: string;
+    walletCount?: number;
+    totalPercentage?: number;
+    avgWalletAge?: number;
+  };
+}
+
+export interface FundingAnalysisData {
+  suspiciousFunding: boolean;
+  totalSuspiciousPercentage: number;
+  fundingPatterns: FundingPattern[];
+  walletFunding: WalletFunding[];
+  fundingSourceBreakdown: Record<string, number>;
+  risks: string[];
+}
+
 export interface TokenAnalysisResponse {
   tokenAddress: string;
   riskScore: number;
@@ -484,6 +517,7 @@ export interface TokenAnalysisResponse {
   pumpDumpData?: PumpDumpData; // Pump & dump pattern detection
   liquidityMonitor?: LiquidityMonitorData; // Real-time liquidity tracking
   holderTracking?: HolderTrackingData; // Top holder sell-off detection
+  fundingAnalysis?: FundingAnalysisData; // Wallet funding source analysis
 }
 
 // Storage schema (not used for in-memory but kept for consistency)

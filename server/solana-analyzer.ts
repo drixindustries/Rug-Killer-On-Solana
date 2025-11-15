@@ -28,6 +28,7 @@ import { AgedWalletDetector } from "./services/aged-wallet-detector";
 import { PumpDumpDetectorService } from "./services/pump-dump-detector";
 import { LiquidityMonitorService } from "./services/liquidity-monitor";
 import { HolderTrackingService } from "./services/holder-tracking";
+import { FundingSourceAnalyzer } from "./services/funding-source-analyzer";
 
 export class SolanaTokenAnalyzer {
   private rugcheckService: RugcheckService;
@@ -43,6 +44,7 @@ export class SolanaTokenAnalyzer {
   private pumpDumpDetector: PumpDumpDetectorService;
   private liquidityMonitor: LiquidityMonitorService;
   private holderTracker: HolderTrackingService;
+  private fundingAnalyzer: FundingSourceAnalyzer;
 
   constructor() {
     this.rugcheckService = new RugcheckService();
@@ -58,6 +60,7 @@ export class SolanaTokenAnalyzer {
     this.pumpDumpDetector = new PumpDumpDetectorService();
     this.liquidityMonitor = new LiquidityMonitorService();
     this.holderTracker = new HolderTrackingService();
+    this.fundingAnalyzer = new FundingSourceAnalyzer();
   }
 
   private getConnection(): Connection {
@@ -379,6 +382,15 @@ export class SolanaTokenAnalyzer {
       } catch (error) {
         console.error('[Holder Tracking] Analysis failed:', error);
       }
+
+      // Funding source analysis (Nova-style detection)
+      let fundingAnalysisData = null;
+      try {
+        fundingAnalysisData = await this.fundingAnalyzer.analyzeFundingSources(tokenAddress, holders);
+        console.log(`[Funding Analysis] Suspicious: ${fundingAnalysisData.suspiciousFunding}, Sources: ${Object.keys(fundingAnalysisData.fundingSourceBreakdown).length}`);
+      } catch (error) {
+        console.error('[Funding Analysis] Failed:', error);
+      }
       
       // Build metadata - prioritize DexScreener data over on-chain defaults
       const supply = Number(mintInfo.supply);
@@ -414,7 +426,8 @@ export class SolanaTokenAnalyzer {
         agedWalletData,
         pumpDumpData,
         liquidityMonitorData,
-        holderTrackingData
+        holderTrackingData,
+        fundingAnalysisData
       );
       
       // Calculate overall risk score with safety check
@@ -467,6 +480,7 @@ export class SolanaTokenAnalyzer {
         pumpDumpData: pumpDumpData || undefined,
         liquidityMonitor: liquidityMonitorData || undefined,
         holderTracking: holderTrackingData || undefined,
+        fundingAnalysis: fundingAnalysisData || undefined,
       };
     } catch (error) {
       console.error("Token analysis error:", error);
@@ -899,7 +913,8 @@ export class SolanaTokenAnalyzer {
     agedWalletData?: any,
     pumpDumpData?: any,
     liquidityMonitorData?: any,
-    holderTrackingData?: any
+    holderTrackingData?: any,
+    fundingAnalysisData?: any
   ): RiskFlag[] {
     const flags: RiskFlag[] = [];
 
@@ -1145,6 +1160,59 @@ export class SolanaTokenAnalyzer {
         severity: "critical",
         title: "Mass Exodus: Top Holders Dumping",
         description: "Multiple top holders are actively selling. Price collapse imminent.",
+      });
+    }
+
+    // ============================================================================
+    // FUNDING SOURCE ANALYSIS (NEW - Nova-style detection)
+    // ============================================================================
+    
+    if (fundingAnalysisData?.suspiciousFunding) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "critical",
+        title: `Suspicious Funding: ${fundingAnalysisData.totalSuspiciousPercentage.toFixed(1)}% from High-Risk Sources`,
+        description: `Token holders funded by high-risk swap services. ${fundingAnalysisData.risks.join(' ')}`,
+      });
+    }
+
+    // Critical funding patterns (Nova-level detection)
+    fundingAnalysisData?.fundingPatterns.forEach((pattern: any) => {
+      if (pattern.severity === 'critical') {
+        flags.push({
+          type: "bundle_manipulation",
+          severity: "critical",
+          title: `FUNDING ALERT: ${pattern.description}`,
+          description: `Evidence: ${JSON.stringify(pattern.evidence)}. Similar to Nova's $PEKO detection.`,
+        });
+      }
+    });
+
+    // High concentration from swap services (Swopshop, FixedFloat pattern)
+    if (fundingAnalysisData?.fundingSourceBreakdown) {
+      Object.entries(fundingAnalysisData.fundingSourceBreakdown).forEach(([source, percentage]: [string, any]) => {
+        if (percentage >= 30 && ['Swopshop', 'FixedFloat', 'ChangeNOW', 'SimpleSwap'].includes(source)) {
+          flags.push({
+            type: "bundle_manipulation",
+            severity: "critical",
+            title: `${source} Dominance: ${percentage.toFixed(1)}% of supply`,
+            description: `Heavy concentration from high-risk swap service. Classic bundling pattern detected.`,
+          });
+        }
+      });
+    }
+
+    // Fresh wallet funding (recently created + high-risk funding)
+    const freshHighRiskWallets = fundingAnalysisData?.walletFunding?.filter(
+      (w: any) => w.isRecentlyCreated && w.riskLevel === 'HIGH_RISK'
+    ) || [];
+    
+    if (freshHighRiskWallets.length >= 5) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "critical",
+        title: `Fresh Wallet Cluster: ${freshHighRiskWallets.length} recently created wallets`,
+        description: "Multiple fresh wallets (<7 days) funded by high-risk sources. Coordinated operation detected.",
       });
     }
         // Mint authority not revoked

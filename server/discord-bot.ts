@@ -162,6 +162,17 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
     warnings.push(`${bundleEmoji} Bundle: ${bd.bundleScore}/100 (${bd.bundledSupplyPercent.toFixed(1)}% in ${bd.suspiciousWallets.length} wallets)`);
   }
   
+  // Funding Analysis (Nova-style alerts)
+  if (analysis.fundingAnalysis && analysis.fundingAnalysis.suspiciousFunding) {
+    const fa = analysis.fundingAnalysis;
+    const breakdown = Object.entries(fa.fundingSourceBreakdown)
+      .filter(([_, percentage]) => percentage >= 5)
+      .map(([source, percentage]) => `${source} (${percentage.toFixed(1)}%)`)
+      .join(' and ');
+    
+    warnings.push(`🚨 Funding Alert: ${fa.totalSuspiciousPercentage.toFixed(1)}% from high-risk sources (${breakdown})`);
+  }
+
   // Network Analysis
   if (analysis.networkAnalysis && analysis.networkAnalysis.networkRiskScore >= 35) {
     const na = analysis.networkAnalysis;
