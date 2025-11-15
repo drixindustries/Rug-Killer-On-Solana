@@ -180,7 +180,7 @@ Rug Killer Alpha Bot is the most advanced Solana token security platform, combin
 ## 📁 Project Structure
 
 ```
-Rug-Killer-on-Solana/
+Rug-Killer-On-Solana/
 ├─ client/                          # React frontend
 │  ├─ src/
 │  │  ├─ components/
@@ -270,6 +270,10 @@ VITE_API_URL=http://localhost:5000
 ### Installation
 
 ```bash
+# Clone repository
+git clone https://github.com/drixindustries/Rug-Killer-On-Solana.git
+cd Rug-Killer-On-Solana
+
 # Install dependencies
 npm install
 
