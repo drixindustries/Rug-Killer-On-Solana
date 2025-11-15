@@ -46,7 +46,7 @@ export interface AgedWalletDetectionResult {
 }
 
 export class AgedWalletDetector {
-  private readonly MIN_WALLET_AGE_DAYS = 30; // Wallet must be at least 30 days old
+  private readonly MIN_WALLET_AGE_DAYS = 400; // Wallet must be at least 400 days old
   private readonly SIMILAR_AGE_WINDOW_DAYS = 7; // Wallets created within 7 days of each other
   private readonly COORDINATED_BUY_WINDOW_MS = 60000; // 1 minute window for coordinated buys
   
@@ -78,7 +78,7 @@ export class AgedWalletDetector {
         
         const walletAgeDays = (now - analysis.firstTransactionDate) / (1000 * 60 * 60 * 24);
         
-        // Flag if: wallet is old (30+ days) but just bought this token
+        // Flag if: wallet is old (400+ days) but just bought this token
         if (walletAgeDays >= this.MIN_WALLET_AGE_DAYS && analysis.totalTransactions > 10) {
           suspiciousAgedWallets.push({
             wallet: analysis.wallet,
