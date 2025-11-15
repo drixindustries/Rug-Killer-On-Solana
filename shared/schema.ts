@@ -314,6 +314,18 @@ export interface WhaleDetectionData {
   insight?: string; // Smart insight message
 }
 
+// GMGN.AI Bundle & Insider Data
+export interface GMGNData {
+  isBundled: boolean;
+  bundleWalletCount: number;
+  bundleSupplyPercent: number;
+  insiderCount: number;
+  sniperCount: number;
+  suspiciousWallets: string[];
+  confidence: number; // 0-100
+  smartMoneyActive: boolean; // True if smart traders are involved
+}
+
 export interface TokenAnalysisResponse {
   tokenAddress: string;
   riskScore: number;
@@ -364,7 +376,8 @@ export interface TokenAnalysisResponse {
   quillcheckData?: QuillCheckData;
   advancedBundleData?: BundleDetectionData;
   networkAnalysis?: NetworkAnalysisData;
-  whaleDetection?: WhaleDetectionData; // NEW: Whale buy detection
+  whaleDetection?: WhaleDetectionData;
+  gmgnData?: GMGNData; // GMGN.AI bundle & insider detection
 }
 
 // Storage schema (not used for in-memory but kept for consistency)

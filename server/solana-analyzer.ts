@@ -23,6 +23,7 @@ import { BundleDetectorService } from "./services/bundle-detector";
 import { BubblemapsService } from "./services/bubblemaps-service";
 import { QuillCheckService } from "./services/quillcheck-service";
 import { WhaleDetectorService } from "./services/whale-detector";
+import { GMGNService } from "./services/gmgn-service";
 
 export class SolanaTokenAnalyzer {
   private rugcheckService: RugcheckService;
@@ -33,6 +34,7 @@ export class SolanaTokenAnalyzer {
   private bubblemapsService: BubblemapsService;
   private quillcheckService: QuillCheckService;
   private whaleDetector: WhaleDetectorService;
+  private gmgnService: GMGNService;
 
   constructor() {
     this.rugcheckService = new RugcheckService();
@@ -43,6 +45,7 @@ export class SolanaTokenAnalyzer {
     this.bubblemapsService = new BubblemapsService();
     this.quillcheckService = new QuillCheckService();
     this.whaleDetector = new WhaleDetectorService();
+    this.gmgnService = new GMGNService();
   }
 
   private getConnection(): Connection {
@@ -101,7 +104,7 @@ export class SolanaTokenAnalyzer {
       const freezeAuthority = this.analyzeFreezeAuthority(mintInfo.freezeAuthority);
       
       // Fetch token accounts (holders) from on-chain and external APIs in parallel
-      const [onChainHolders, totalHolderCount, recentTransactions, rugcheckData, goplusData, dexscreenerData, jupiterPriceData, birdeyeData, pumpFunData, quillcheckData] = await Promise.all([
+      const [onChainHolders, totalHolderCount, recentTransactions, rugcheckData, goplusData, dexscreenerData, jupiterPriceData, birdeyeData, pumpFunData, quillcheckData, gmgnRawData] = await Promise.all([
         this.fetchTopHolders(mintPubkey, mintInfo.decimals, mintInfo.supply),
         this.getTotalHolderCount(mintPubkey).catch(() => null),
         this.fetchRecentTransactions(mintPubkey),
@@ -112,6 +115,7 @@ export class SolanaTokenAnalyzer {
         getBirdeyeOverview(tokenAddress).catch(() => null),
         checkPumpFun(tokenAddress).catch(() => ({ isPumpFun: false, devBought: 0, bondingCurve: 0 })),
         this.quillcheckService.checkToken(tokenAddress).catch(() => null),
+        this.gmgnService.getTokenAnalysis(tokenAddress).catch(() => null),
       ]);
       
       // Enrich holders with Rugcheck data if on-chain fetch failed
@@ -294,6 +298,21 @@ export class SolanaTokenAnalyzer {
       } catch (error) {
         console.error('[Bubblemaps] Analysis failed:', error);
       }
+
+      // GMGN.AI bundle & insider detection
+      let gmgnData = null;
+      try {
+        if (gmgnRawData) {
+          gmgnData = this.gmgnService.extractBundleInfo(gmgnRawData);
+          const smartMoneyActive = this.gmgnService.hasSmartMoneyActivity(gmgnRawData);
+          if (gmgnData) {
+            gmgnData.smartMoneyActive = smartMoneyActive;
+          }
+          console.log(`[GMGN] Bundled: ${gmgnData?.isBundled}, Insiders: ${gmgnData?.insiderCount}, Snipers: ${gmgnData?.sniperCount}, Confidence: ${gmgnData?.confidence}%`);
+        }
+      } catch (error) {
+        console.error('[GMGN] Data processing failed:', error);
+      }
       
       // Build metadata - prioritize DexScreener data over on-chain defaults
       const supply = Number(mintInfo.supply);
@@ -324,7 +343,8 @@ export class SolanaTokenAnalyzer {
         holderCount,
         advancedBundleData,
         networkAnalysis,
-        quillcheckData
+        quillcheckData,
+        gmgnData
       );
       
       // Calculate overall risk score with safety check
@@ -372,6 +392,7 @@ export class SolanaTokenAnalyzer {
         quillcheckData: quillcheckData || undefined,
         advancedBundleData: advancedBundleData as any || undefined,
         networkAnalysis: networkAnalysis || undefined,
+        gmgnData: gmgnData || undefined,
       };
     } catch (error) {
       console.error("Token analysis error:", error);
@@ -799,7 +820,8 @@ export class SolanaTokenAnalyzer {
     holderCount: number,
     advancedBundleData?: any,
     networkAnalysis?: any,
-    quillcheckData?: any
+    quillcheckData?: any,
+    gmgnData?: any
   ): RiskFlag[] {
     const flags: RiskFlag[] = [];
 
@@ -883,6 +905,43 @@ export class SolanaTokenAnalyzer {
         title: `Suspicious Wallet Clustering`,
         description: `${networkAnalysis.clusteredWallets} wallets show clustering patterns that may indicate coordinated control.`,
       });
+    }
+
+    // GMGN.AI bundle & insider detection
+    if (gmgnData) {
+      if (gmgnData.isBundled && gmgnData.confidence >= 70) {
+        flags.push({
+          type: "bundle_manipulation",
+          severity: "critical",
+          title: `GMGN: Confirmed Bundle (${gmgnData.confidence}% confidence)`,
+          description: `${gmgnData.bundleWalletCount} bundled wallets control ${gmgnData.bundleSupplyPercent.toFixed(1)}% of supply. ${gmgnData.insiderCount} insiders and ${gmgnData.sniperCount} snipers detected.`,
+        });
+      } else if (gmgnData.isBundled && gmgnData.confidence >= 40) {
+        flags.push({
+          type: "bundle_manipulation",
+          severity: "high",
+          title: `GMGN: Likely Bundle (${gmgnData.confidence}% confidence)`,
+          description: `${gmgnData.bundleWalletCount} suspected bundled wallets with ${gmgnData.insiderCount} insiders and ${gmgnData.sniperCount} snipers.`,
+        });
+      }
+
+      if (gmgnData.insiderCount >= 10) {
+        flags.push({
+          type: "bundle_manipulation",
+          severity: "high",
+          title: `High Insider Activity: ${gmgnData.insiderCount} detected`,
+          description: "GMGN detected significant insider trading activity among early buyers.",
+        });
+      }
+
+      if (gmgnData.sniperCount >= 5) {
+        flags.push({
+          type: "bundle_manipulation",
+          severity: "medium",
+          title: `Sniper Bot Activity: ${gmgnData.sniperCount} detected`,
+          description: "Multiple sniper bots detected in early transactions, indicating coordinated buying.",
+        });
+      }
     }
 
     // Mint authority not revoked
