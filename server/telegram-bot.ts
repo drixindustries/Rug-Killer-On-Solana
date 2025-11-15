@@ -149,7 +149,12 @@ function createTelegramBot(botToken: string): Telegraf {
     { command: 'devtorture', description: 'Dev wallet history - /devtorture <address>' },
     { command: 'blacklist', description: 'Check wallet blacklist - /blacklist <wallet>' },
     { command: 'whaletrack', description: 'Smart money in token - /whaletrack <address>' },
-    { command: 'kol', description: 'Check if wallet is KOL - /kol <wallet>' }
+    { command: 'kol', description: 'Check if wallet is KOL - /kol <wallet>' },
+    { command: 'price', description: 'Quick price lookup - /price <address>' },
+    { command: 'rugcheck', description: 'Instant rug scan - /rugcheck <address>' },
+    { command: 'liquidity', description: 'LP analysis - /liquidity <address>' },
+    { command: 'compare', description: 'Compare 2 tokens - /compare <addr1> <addr2>' },
+    { command: 'trending', description: 'Show trending tokens by volume' }
   ]).catch(err => {
     console.error('Failed to set Telegram bot commands:', err);
   });
@@ -166,6 +171,12 @@ function createTelegramBot(botToken: string): Telegraf {
       '**Whale Tier Commands:**\n' +
       '/whaletrack <address> - Smart money tracking\n' +
       '/kol <wallet> - Check if wallet is KOL\n\n' +
+      '**Quick Commands:**\n' +
+      '/price <address> - Quick price lookup\n' +
+      '/rugcheck <address> - Instant rug detection\n' +
+      '/liquidity <address> - LP pool analysis\n' +
+      '/compare <addr1> <addr2> - Compare 2 tokens\n' +
+      '/trending - Show trending tokens\n\n' +
       'Send any token address for quick analysis!',
       { parse_mode: 'Markdown' }
     );
