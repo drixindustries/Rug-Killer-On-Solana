@@ -44,6 +44,8 @@ const NetworkAnalysisCard = lazy(() => import("@/components/network-analysis-car
 const WhaleDetectionCard = lazy(() => import("@/components/whale-detection-card").then(m => ({ default: m.WhaleDetectionCard })));
 const AgedWalletDetectionCard = lazy(() => import("@/components/aged-wallet-detection-card").then(m => ({ default: m.AgedWalletDetectionCard })));
 const FundingAnalysisCard = lazy(() => import("@/components/funding-analysis-card").then(m => ({ default: m.FundingAnalysisCard })));
+const CondensedTokenHeader = lazy(() => import("@/components/condensed-token-header").then(m => ({ default: m.CondensedTokenHeader })));
+const CondensedAlerts = lazy(() => import("@/components/condensed-alerts").then(m => ({ default: m.CondensedAlerts })));
 
 // Loading fallback component for lazy-loaded components
 const ComponentLoader = () => <Skeleton className="h-48 w-full" />;
@@ -392,69 +394,70 @@ export default function Home() {
                   <TabsTrigger value="community" data-testid="tab-community">Community</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="analysis" className="space-y-8">
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Left Column - Main Analysis */}
-                    <div className="lg:col-span-2 space-y-6">
-                      <RiskScoreCard
-                        score={analysis.riskScore}
-                        riskLevel={analysis.riskLevel}
-                        redFlagsCount={analysis.redFlags?.length || 0}
-                        analyzedAt={analysis.analyzedAt}
-                      />
-                    
-                      <CriticalAlerts 
-                        redFlags={analysis.redFlags || []}
-                        holderFiltering={analysis.holderFiltering}
-                      />
+                <TabsContent value="analysis" className="space-y-6">
+                  {/* New Condensed Header - Like DeepNets */}
+                  <Suspense fallback={<ComponentLoader />}>
+                    <CondensedTokenHeader analysis={analysis} />
+                  </Suspense>
 
-                      {/* ADVANCED DETECTION (2025) */}
-                      {/* Honeypot Detection */}
-                      {analysis.quillcheckData && (
-                        <Suspense fallback={<ComponentLoader />}>
-                          <HoneypotDetectionCard data={analysis.quillcheckData} />
-                        </Suspense>
-                      )}
+                  {/* Condensed Critical Alerts */}
+                  <Suspense fallback={<ComponentLoader />}>
+                    <CondensedAlerts redFlags={analysis.redFlags || []} />
+                  </Suspense>
 
-                      {/* Bundle Detection */}
-                      {analysis.advancedBundleData && (
-                        <Suspense fallback={<ComponentLoader />}>
-                          <BundleDetectionCard data={analysis.advancedBundleData} />
-                        </Suspense>
-                      )}
+                  {/* Main Content Grid - More Compact */}
+                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    {/* Left Column - Detection Results (3/4 width) */}
+                    <div className="lg:col-span-3 space-y-4">
+                      
+                      {/* Advanced Detection Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Honeypot Detection */}
+                        {analysis.quillcheckData && (
+                          <Suspense fallback={<ComponentLoader />}>
+                            <HoneypotDetectionCard data={analysis.quillcheckData} />
+                          </Suspense>
+                        )}
 
-                      {/* Network Analysis */}
-                      {analysis.networkAnalysis && (
-                        <Suspense fallback={<ComponentLoader />}>
-                          <NetworkAnalysisCard data={analysis.networkAnalysis} />
-                        </Suspense>
-                      )}
+                        {/* Bundle Detection */}
+                        {analysis.advancedBundleData && (
+                          <Suspense fallback={<ComponentLoader />}>
+                            <BundleDetectionCard data={analysis.advancedBundleData} />
+                          </Suspense>
+                        )}
 
-                      {/* Whale Detection */}
-                      {analysis.whaleDetection && (
-                        <Suspense fallback={<ComponentLoader />}>
-                          <WhaleDetectionCard 
-                            data={analysis.whaleDetection} 
-                            symbol={analysis.metadata?.symbol || 'TOKEN'} 
-                          />
-                        </Suspense>
-                      )}
+                        {/* Whale Detection */}
+                        {analysis.whaleDetection && (
+                          <Suspense fallback={<ComponentLoader />}>
+                            <WhaleDetectionCard 
+                              data={analysis.whaleDetection} 
+                              symbol={analysis.metadata?.symbol || 'TOKEN'} 
+                            />
+                          </Suspense>
+                        )}
 
-                      {/* Aged Wallet Detection (Fake Volume) */}
+                        {/* Network Analysis */}
+                        {analysis.networkAnalysis && (
+                          <Suspense fallback={<ComponentLoader />}>
+                            <NetworkAnalysisCard data={analysis.networkAnalysis} />
+                          </Suspense>
+                        )}
+                      </div>
+
+                      {/* Special Detection Results */}
                       {analysis.agedWalletData && analysis.agedWalletData.agedWalletCount > 0 && (
                         <Suspense fallback={<ComponentLoader />}>
                           <AgedWalletDetectionCard data={analysis.agedWalletData} />
                         </Suspense>
                       )}
 
-                      {/* Funding Source Analysis */}
                       {analysis.fundingAnalysis && (
                         <Suspense fallback={<ComponentLoader />}>
                           <FundingAnalysisCard fundingData={analysis.fundingAnalysis} />
                         </Suspense>
                       )}
 
-                      {/* LP Burn Checker - Only show if we have burn data */}
+                      {/* LP Burn Information */}
                       {analysis.liquidityPool?.burnPercentage !== undefined && (
                         <Suspense fallback={<ComponentLoader />}>
                           <LiquidityBurnCard
@@ -466,41 +469,25 @@ export default function Home() {
                           />
                         </Suspense>
                       )}
-                      
-                      <Suspense fallback={<ComponentLoader />}>
-                        <MetricsGrid
-                          totalSupply={analysis.metadata?.supply || 0}
-                          holderCount={analysis.holderCount || 0}
-                          topHolderConcentration={analysis.topHolderConcentration || 0}
-                          liquidityStatus={analysis.liquidityPool?.status || "UNKNOWN"}
-                          creationDate={analysis.creationDate}
-                          decimals={analysis.metadata?.decimals || 0}
-                          bundledCount={analysis.holderFiltering?.totals.bundled}
-                          bundleConfidence={analysis.holderFiltering?.bundledDetection?.confidence}
-                          bundleSupplyPct={analysis.holderFiltering?.bundledDetection?.bundleSupplyPct}
-                        />
-                      </Suspense>
 
-                      {/* Bundle Visualization Chart */}
+                      {/* Holder Analysis */}
                       {analysis.holderFiltering && analysis.holderFiltering.totals.total > 0 && (
-                        <Suspense fallback={<ComponentLoader />}>
-                          <BundleVisualizationChart 
-                            filtering={analysis.holderFiltering}
-                            totalHolders={analysis.holderCount || 0}
-                          />
-                        </Suspense>
-                      )}
-
-                      {/* Holder Filtering Details */}
-                      {analysis.holderFiltering && analysis.holderFiltering.totals.total > 0 && (
-                        <Suspense fallback={<ComponentLoader />}>
-                          <HolderFilteringCard filtering={analysis.holderFiltering} />
-                        </Suspense>
+                        <div className="space-y-4">
+                          <Suspense fallback={<ComponentLoader />}>
+                            <BundleVisualizationChart 
+                              filtering={analysis.holderFiltering}
+                              totalHolders={analysis.holderCount || 0}
+                            />
+                          </Suspense>
+                          <Suspense fallback={<ComponentLoader />}>
+                            <HolderFilteringCard filtering={analysis.holderFiltering} />
+                          </Suspense>
+                        </div>
                       )}
                     </div>
                     
-                    {/* Right Column - STICKY Sidebar */}
-                    <div className="sticky top-4 self-start space-y-6 max-h-screen overflow-y-auto">
+                    {/* Right Column - STICKY Sidebar (1/4 width) */}
+                    <div className="sticky top-4 self-start space-y-4 max-h-screen overflow-y-auto">
                       {/* Token Info Sidebar with copy-able addresses */}
                       <Suspense fallback={<ComponentLoader />}>
                         <TokenInfoSidebar
