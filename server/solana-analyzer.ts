@@ -994,22 +994,22 @@ export class SolanaTokenAnalyzer {
     if (score >= 75 && mintRenounced && freezeDisabled && lpBurned) {
       return {
         rating: '10/10',
-        verdict: '🟢 MOON SHOT - RICK BOT WOULD APE'
+        verdict: '🟢 SAFE - Strong fundamentals, low risk'
       };
     } else if (score >= 50 && mcap < 500000) {
       return {
         rating: '7/10',
-        verdict: '🟡 HIGH RISK/HIGH REWARD - PHANES SAYS WATCH'
+        verdict: '🟡 SPECULATIVE - High risk/reward, monitor closely'
       };
     } else if (score >= 30) {
       return {
         rating: '5/10',
-        verdict: '🟠 PROCEED WITH CAUTION - SMALL BAG ONLY'
+        verdict: '🟠 RISKY - Proceed with extreme caution'
       };
     } else {
       return {
         rating: '3/10',
-        verdict: '🔴 RUG CITY - TROJAN WOULD BLOCK'
+        verdict: '🔴 DANGEROUS - High probability of rug pull'
       };
     }
   }

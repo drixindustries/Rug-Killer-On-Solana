@@ -89,84 +89,69 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(color)
     .setTitle(`${emoji} ${analysis.metadata.name} (${analysis.metadata.symbol})`)
-    .setDescription(`**${analysis.riskScore}/100** (${analysis.riskLevel})\n_Higher = Safer (0=Dangerous, 100=Safe)_`)
-    .setFooter({ text: `Contract: ${formatAddress(analysis.tokenAddress)}` })
+    .setDescription(`**Risk Score: ${analysis.riskScore}/100** (${analysis.riskLevel})\n_Higher = Safer • 0=Dangerous, 100=Safe_`)
+    .setFooter({ text: `Contract: ${analysis.tokenAddress}` })
     .setTimestamp();
   
-  // CONTRACT ADDRESS (prominently displayed)
-  embed.addFields({
-    name: '📋 Contract Address',
-    value: `\`${analysis.tokenAddress}\``,
-    inline: false
-  });
-  
-  // AI VERDICT
+  // AI ANALYSIS
   if (analysis.aiVerdict) {
     embed.addFields({
-      name: '🤖 AI VERDICT',
+      name: '🤖 AI Analysis',
       value: `${analysis.aiVerdict.rating} - ${analysis.aiVerdict.verdict}`,
       inline: false
     });
   }
   
-  // PRICE DATA
-  if (analysis.dexscreenerData?.pairs?.[0]) {
-    const pair = analysis.dexscreenerData.pairs[0];
-    const priceChange = pair.priceChange.h24 >= 0 ? '📈' : '📉';
-    embed.addFields({
-      name: '💰 PRICE',
-      value: `Price: $${parseFloat(pair.priceUsd).toFixed(8)}\n24h Vol: $${formatNumber(pair.volume.h24)}\n24h Change: ${priceChange} ${pair.priceChange.h24.toFixed(2)}%\nMCap: $${formatNumber(pair.marketCap || 0)}`,
-      inline: true
-    });
-  }
-  
-  // SECURITY
+  // CORE METRICS (3 columns)
   const burnPct = analysis.liquidityPool.burnPercentage;
   const burnEmoji = burnPct !== undefined ? (burnPct >= 99.99 ? '✅' : burnPct >= 50 ? '⚠️' : '❌') : '❓';
   const burnText = burnPct !== undefined ? `${burnPct.toFixed(1)}%` : 'Unknown';
   
-  embed.addFields({
-    name: '🔐 SECURITY',
-    value: `Mint: ${analysis.mintAuthority.hasAuthority ? '❌ Active' : '✅ Revoked'}\nFreeze: ${analysis.freezeAuthority.hasAuthority ? '❌ Active' : '✅ Revoked'}\nLP Burn: ${burnEmoji} ${burnText}`,
-    inline: true
-  });
+  embed.addFields(
+    {
+      name: '🔐 Security',
+      value: `Mint: ${analysis.mintAuthority.hasAuthority ? '❌' : '✅'}\nFreeze: ${analysis.freezeAuthority.hasAuthority ? '❌' : '✅'}\nLP: ${burnEmoji} ${burnText}`,
+      inline: true
+    },
+    {
+      name: '👥 Holders',
+      value: `Total: ${analysis.holderCount}\nTop 10: ${analysis.topHolderConcentration.toFixed(1)}%\nSupply: ${formatNumber(analysis.metadata.supply)}`,
+      inline: true
+    }
+  );
   
-  // PUMP.FUN INFO
-  if (analysis.pumpFunData?.isPumpFun) {
+  // PRICE DATA (if available)
+  if (analysis.dexscreenerData?.pairs?.[0]) {
+    const pair = analysis.dexscreenerData.pairs[0];
+    const priceChange = pair.priceChange.h24 >= 0 ? '📈' : '📉';
     embed.addFields({
-      name: '🎯 PUMP.FUN',
-      value: `Dev Bought: ${analysis.pumpFunData.devBought.toFixed(2)}%\nBonding Curve: ${analysis.pumpFunData.bondingCurve.toFixed(2)}%`,
+      name: '💰 Market',
+      value: `$${parseFloat(pair.priceUsd).toFixed(8)}\nMCap: $${formatNumber(pair.marketCap || 0)}\n${priceChange} ${pair.priceChange.h24.toFixed(1)}% (24h)`,
       inline: true
     });
   }
   
-  // HOLDERS
-  embed.addFields({
-    name: '👛 HOLDERS',
-    value: `Total: ${analysis.holderCount}\nTop 10: ${analysis.topHolderConcentration.toFixed(2)}%\nSupply: ${formatNumber(analysis.metadata.supply)}`,
-    inline: true
-  });
+  // PUMP.FUN INFO (if applicable)
+  if (analysis.pumpFunData?.isPumpFun) {
+    embed.addFields({
+      name: '🎯 Pump.fun',
+      value: `Dev: ${analysis.pumpFunData.devBought.toFixed(1)}%\nCurve: ${analysis.pumpFunData.bondingCurve.toFixed(1)}%`,
+      inline: true
+    });
+  }
   
-  // ADVANCED DETECTION (2025)
+  // ADVANCED WARNINGS (Consolidate critical issues)
+  const warnings = [];
+  
   // Honeypot Detection
   if (analysis.quillcheckData) {
     const qc = analysis.quillcheckData;
-    let honeypotValue = '';
     if (qc.isHoneypot) {
-      honeypotValue = '🚨 **HONEYPOT DETECTED**\n⛔ Cannot sell tokens!';
+      warnings.push('🚨 **HONEYPOT** - Cannot sell!');
     } else if (!qc.canSell) {
-      honeypotValue = '⚠️ Sell restrictions detected';
+      warnings.push('⚠️ Sell restrictions detected');
     } else if (qc.sellTax > 15 || (qc.sellTax - qc.buyTax > 5)) {
-      honeypotValue = `⚠️ High Risk Taxes\nBuy: ${qc.buyTax}% / Sell: ${qc.sellTax}%`;
-    } else if (qc.buyTax > 0 || qc.sellTax > 0) {
-      honeypotValue = `Buy: ${qc.buyTax}% / Sell: ${qc.sellTax}%`;
-    }
-    if (honeypotValue) {
-      embed.addFields({
-        name: '🍯 HONEYPOT CHECK',
-        value: honeypotValue,
-        inline: false
-      });
+      warnings.push(`⚠️ High taxes: ${qc.buyTax}%/${qc.sellTax}%`);
     }
   }
   
@@ -174,51 +159,44 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   if (analysis.advancedBundleData && analysis.advancedBundleData.bundleScore >= 35) {
     const bd = analysis.advancedBundleData;
     const bundleEmoji = bd.bundleScore >= 60 ? '🚨' : '⚠️';
-    embed.addFields({
-      name: `${bundleEmoji} BUNDLE DETECTED`,
-      value: `Score: ${bd.bundleScore}/100\n${bd.bundledSupplyPercent.toFixed(1)}% in ${bd.suspiciousWallets.length} bundled wallets`,
-      inline: true
-    });
+    warnings.push(`${bundleEmoji} Bundle: ${bd.bundleScore}/100 (${bd.bundledSupplyPercent.toFixed(1)}% in ${bd.suspiciousWallets.length} wallets)`);
   }
   
   // Network Analysis
   if (analysis.networkAnalysis && analysis.networkAnalysis.networkRiskScore >= 35) {
     const na = analysis.networkAnalysis;
     const networkEmoji = na.networkRiskScore >= 60 ? '🚨' : '⚠️';
-    embed.addFields({
-      name: `${networkEmoji} WALLET NETWORK`,
-      value: `Risk: ${na.networkRiskScore}/100\n${na.clusteredWallets} clustered wallets detected`,
-      inline: true
-    });
+    warnings.push(`${networkEmoji} Network risk: ${na.networkRiskScore}/100 (${na.clusteredWallets} clustered wallets)`);
   }
   
   // Whale Detection
   if (analysis.whaleDetection && analysis.whaleDetection.whaleCount > 0) {
     const wd = analysis.whaleDetection;
-    const whaleEmoji = wd.whaleCount >= 5 ? '🚨🐋' : wd.whaleCount >= 3 ? '⚠️🐋' : '🐋';
-    const largestBuy = wd.largestBuy ? `Largest: ${wd.largestBuy.percentageOfSupply.toFixed(2)}%` : '';
-    embed.addFields({
-      name: `${whaleEmoji} WHALE ACTIVITY`,
-      value: `${wd.whaleCount} whale${wd.whaleCount > 1 ? 's' : ''} detected\n${wd.totalWhaleSupplyPercent.toFixed(1)}% total supply\n${largestBuy}`,
-      inline: true
+    const whaleEmoji = wd.whaleCount >= 5 ? '🚨' : wd.whaleCount >= 3 ? '⚠️' : '🐋';
+    warnings.push(`${whaleEmoji} ${wd.whaleCount} whale${wd.whaleCount > 1 ? 's' : ''}: ${wd.totalWhaleSupplyPercent.toFixed(1)}% supply`);
+  }
+  
+  // Critical Red Flags
+  if (analysis.redFlags.length > 0) {
+    const criticalFlags = analysis.redFlags.filter(f => f.severity === 'critical' || f.severity === 'high');
+    criticalFlags.slice(0, 2).forEach(f => {
+      warnings.push(`${f.severity === 'critical' ? '🔴' : '🟠'} ${f.title}`);
     });
   }
   
-  // RED FLAGS
-  if (analysis.redFlags.length > 0) {
-    const criticalFlags = analysis.redFlags.filter(f => f.severity === 'critical' || f.severity === 'high');
-    if (criticalFlags.length > 0) {
-      embed.addFields({
-        name: '⚠️ ALERTS',
-        value: criticalFlags.slice(0, 3).map(f => `${f.severity === 'critical' ? '🔴' : '🟠'} ${f.title}`).join('\n').slice(0, 1024)
-      });
-    }
+  // Add warnings field if any exist
+  if (warnings.length > 0) {
+    embed.addFields({
+      name: '⚠️ Alerts',
+      value: warnings.join('\\n').slice(0, 1024),
+      inline: false
+    });
   }
   
   // QUICK LINKS
   embed.addFields({
-    name: '🔗 QUICK LINKS',
-    value: `[Solscan](https://solscan.io/token/${analysis.tokenAddress}) • [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress}) • [Rugcheck](https://rugcheck.xyz/tokens/${analysis.tokenAddress})\n[AXiom](https://axiom.trade) • [Padre Bot](https://t.me/padre_tg_bot?start=${analysis.tokenAddress}) • [GMGN](https://gmgn.ai/sol/token/${analysis.tokenAddress}) • [Birdeye](https://birdeye.so/token/${analysis.tokenAddress}?chain=solana)`
+    name: '🔗 Quick Links',
+    value: `[Solscan](https://solscan.io/token/${analysis.tokenAddress}) • [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress}) • [Rugcheck](https://rugcheck.xyz/tokens/${analysis.tokenAddress})\\n[GMGN](https://gmgn.ai/sol/token/${analysis.tokenAddress}) • [Birdeye](https://birdeye.so/token/${analysis.tokenAddress}?chain=solana) • [Padre](https://t.me/padre_tg_bot?start=${analysis.tokenAddress})`
   });
   
   embed.setURL(`https://solscan.io/token/${analysis.tokenAddress}`);
