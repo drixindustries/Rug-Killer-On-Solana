@@ -205,7 +205,7 @@ export default function About() {
                   <Badge variant="secondary">Solana Web3.js</Badge>
                   <Badge variant="secondary">Express.js</Badge>
                   <Badge variant="secondary">PostgreSQL</Badge>
-                  <Badge variant="secondary">Replit Auth</Badge>
+                  <Badge variant="secondary">Phantom Wallet</Badge>
                   <Badge variant="secondary">Whop Payments</Badge>
                   <Badge variant="secondary">Telegram Bot API</Badge>
                   <Badge variant="secondary">Discord API</Badge>

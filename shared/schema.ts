@@ -317,10 +317,10 @@ export const tokenAnalysisSchema = z.object({
 export type TokenAnalysis = z.infer<typeof tokenAnalysisSchema>;
 
 // ============================================================================
-// DATABASE TABLES (Replit Auth + Subscription System)
+// DATABASE TABLES (Wallet Auth + Subscription System)
 // ============================================================================
 
-// Session storage table (required by Replit Auth)
+// Session storage table (required by express-session)
 export const sessions = pgTable(
   "sessions",
   {
@@ -331,7 +331,7 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table (required by Replit Auth)
+// User storage table (wallet-based authentication)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),

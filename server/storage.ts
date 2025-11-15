@@ -72,7 +72,7 @@ import { db } from "./db";
 import { eq, and, isNull, lt, inArray, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
-  // User operations (required by Replit Auth)
+  // User operations (wallet-based authentication)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserWhopInfo(userId: string, whopUserId: string): Promise<User>;

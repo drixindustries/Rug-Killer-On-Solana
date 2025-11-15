@@ -212,7 +212,7 @@ export default function BotSetup() {
                 <span className="text-sm">2. Click "Copy" button next to it</span>
               </div>
               <p className="text-sm font-semibold text-orange-600">
-                ⚠️ SAVE THIS ID! You'll need it for Replit secrets.
+                ⚠️ SAVE THIS ID! You'll need it for your environment configuration.
               </p>
             </CardContent>
           </Card>
@@ -293,14 +293,14 @@ export default function BotSetup() {
 
         <section>
           <div className="mb-4">
-            <h2 className="text-3xl font-bold mb-2">Part 3: Add Secrets to Replit</h2>
-            <p className="text-muted-foreground">Now configure your Replit project with the bot credentials</p>
+            <h2 className="text-3xl font-bold mb-2">Part 3: Configure Environment Variables</h2>
+            <p className="text-muted-foreground">Add bot credentials to your deployment environment</p>
           </div>
 
-          <Card data-testid="card-replit-secrets">
+          <Card data-testid="card-environment-secrets">
             <CardHeader>
-              <CardTitle>Required Secrets</CardTitle>
-              <CardDescription>Add these in Replit → Secrets (🔒 icon in left sidebar)</CardDescription>
+              <CardTitle>Required Environment Variables</CardTitle>
+              <CardDescription>Add these to your .env file or deployment platform (Railway, Heroku, etc.)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -358,7 +358,7 @@ export default function BotSetup() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm">
-              After adding the secrets, your Replit app will auto-restart and both bots will start automatically!
+              After adding the environment variables and redeploying, both bots will start automatically!
             </p>
             <p className="text-sm">
               Check the logs for: <code className="bg-muted px-2 py-1 rounded text-xs">✅ Telegram bot started</code>

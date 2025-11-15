@@ -374,7 +374,7 @@ const DocumentationPDF = () => (
       <View style={pdfStyles.section}>
         <Text style={pdfStyles.heading}>Support & Resources</Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Website: https://solana-rug-killer.replit.app</Text>
+          <Text style={pdfStyles.text}>• Website: https://rugkilleralphabot.fun</Text>
           <Text style={pdfStyles.text}>• Documentation: /documentation route</Text>
           <Text style={pdfStyles.text}>• Pricing: /pricing route</Text>
           <Text style={pdfStyles.text}>• Contact: Available through the website</Text>
@@ -1089,10 +1089,10 @@ export default function Documentation() {
               <div className="flex items-start gap-3">
                 <Badge className="mt-1">1</Badge>
                 <div>
-                  <h4 className="font-semibold mb-1">Create Account</h4>
+                  <h4 className="font-semibold mb-1">Connect Your Wallet</h4>
                   <p className="text-sm text-muted-foreground">
-                    Sign up with Google, GitHub, X (Twitter), Apple, or email/password through our 
-                    Replit Auth integration. Account creation is instant and free.
+                    Click "Sign In" and connect your Phantom wallet. Sign the challenge message to authenticate.
+                    No email or password required - your wallet address is your account.
                   </p>
                 </div>
               </div>

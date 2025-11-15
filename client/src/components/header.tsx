@@ -284,7 +284,15 @@ function UserMenu({ user }: UserMenuProps) {
           </>
         )}
         <DropdownMenuItem 
-          onClick={() => window.location.href = '/api/logout'}
+          onClick={async () => {
+            try {
+              await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+              window.location.href = '/';
+            } catch (error) {
+              console.error('Logout failed:', error);
+              window.location.href = '/';
+            }
+          }}
           data-testid="button-logout"
         >
           <LogOut className="h-4 w-4 mr-2" />

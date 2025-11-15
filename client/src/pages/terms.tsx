@@ -198,7 +198,7 @@ export default function Terms() {
               <CardContent className="space-y-4 text-muted-foreground">
                 <p>
                   Our Service integrates with third-party APIs and services (Rugcheck, GoPlus, DexScreener, 
-                  Jupiter, Replit Auth, Whop, Telegram, Discord). You acknowledge that:
+                  Jupiter, Phantom Wallet, Whop, Telegram, Discord). You acknowledge that:
                 </p>
                 <ul className="list-disc pl-6 space-y-2">
                   <li>We are not responsible for the availability or accuracy of third-party services</li>

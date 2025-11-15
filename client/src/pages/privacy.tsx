@@ -33,7 +33,7 @@ export default function Privacy() {
                 <h3 className="font-semibold text-foreground">1.1 Personal Information</h3>
                 <p>When you use Solana Rug Killer, we may collect:</p>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li><strong>Account Information:</strong> Email address, username (via Replit Auth)</li>
+                  <li><strong>Account Information:</strong> Wallet address (via Phantom Wallet signature)</li>
                   <li><strong>Authentication Data:</strong> OAuth tokens from Google, GitHub, X (Twitter), or Apple</li>
                   <li><strong>Wallet Addresses:</strong> Solana wallet addresses you connect for token-gated access</li>
                   <li><strong>Payment Information:</strong> Processed securely by Whop (we don't store card details)</li>
@@ -89,7 +89,7 @@ export default function Privacy() {
                 
                 <h3 className="font-semibold text-foreground mt-4">3.1 Third-Party Service Providers</h3>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li><strong>Replit Auth:</strong> Authentication and account management</li>
+                  <li><strong>Phantom Wallet:</strong> Wallet-based authentication and signature verification</li>
                   <li><strong>Whop:</strong> Subscription payment processing</li>
                   <li><strong>Telegram/Discord:</strong> Bot functionality and message delivery</li>
                   <li><strong>Rugcheck, GoPlus, DexScreener, Jupiter:</strong> Token analysis data</li>
@@ -147,7 +147,7 @@ export default function Privacy() {
                   <li><strong>Encryption:</strong> HTTPS/TLS for data transmission, encrypted database storage</li>
                   <li><strong>Access Controls:</strong> Role-based permissions and admin-only features</li>
                   <li><strong>Secure Sessions:</strong> HTTP-only cookies with session expiration</li>
-                  <li><strong>Environment Secrets:</strong> API keys and private keys stored securely in Replit Secrets</li>
+                  <li><strong>Environment Variables:</strong> API keys and secrets stored securely in environment configuration</li>
                   <li><strong>Regular Audits:</strong> Security reviews and dependency updates</li>
                   <li><strong>Rate Limiting:</strong> Protection against brute force and DDoS attacks</li>
                 </ul>
