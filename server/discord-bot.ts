@@ -443,43 +443,78 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         
         await interaction.deferReply();
         
-        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
-        
-        const embed = new EmbedBuilder()
-          .setColor(0xff6b2c)
-          .setTitle(`🔥 Dev Torture Report - ${analysis.metadata.symbol}`)
-          .setDescription(`Contract: \`${formatAddress(tokenAddress)}\``)
-          .setTimestamp();
-        
-        // Mint authority
-        if (analysis.mintAuthority.hasAuthority && !analysis.mintAuthority.isRevoked) {
-          embed.addFields({
-            name: '❌ Mint Authority Active',
-            value: `Dev can mint unlimited tokens!\nAuthority: \`${formatAddress(analysis.mintAuthority.authorityAddress || 'Unknown')}\``
-          });
-        }
-        
-        // Freeze authority
-        if (analysis.freezeAuthority.hasAuthority && !analysis.freezeAuthority.isRevoked) {
-          embed.addFields({
-            name: '❌ Freeze Authority Active',
-            value: `Dev can freeze accounts!\nAuthority: \`${formatAddress(analysis.freezeAuthority.authorityAddress || 'Unknown')}\``
-          });
-        }
-        
-        if (analysis.creationDate) {
-          const age = Math.floor((Date.now() - analysis.creationDate) / (1000 * 60 * 60 * 24));
-          let ageText = `Token Age: ${age} days`;
-          if (age < 7) {
-            ageText += '\n⚠️ Very new token - high risk!';
+        try {
+          const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+          
+          const embed = new EmbedBuilder()
+            .setColor(0xff6b2c)
+            .setTitle(`🔥 Dev Torture Report - ${analysis.metadata.symbol}`)
+            .setDescription(`Contract: \`${tokenAddress.slice(0, 4)}...${tokenAddress.slice(-4)}\``)
+            .setTimestamp();
+          
+          let hasFlags = false;
+          
+          // Mint authority
+          if (analysis.mintAuthority.hasAuthority && !analysis.mintAuthority.isRevoked) {
+            embed.addFields({
+              name: '❌ Mint Authority Active',
+              value: `Dev can mint unlimited tokens!\nAuthority: \`${formatAddress(analysis.mintAuthority.authorityAddress || 'Unknown')}\``
+            });
+            hasFlags = true;
+          } else {
+            embed.addFields({
+              name: '✅ Mint Authority',
+              value: 'Revoked - Dev cannot mint new tokens'
+            });
           }
-          embed.addFields({
-            name: '📅 Age',
-            value: ageText
+          
+          // Freeze authority
+          if (analysis.freezeAuthority.hasAuthority && !analysis.freezeAuthority.isRevoked) {
+            embed.addFields({
+              name: '❌ Freeze Authority Active',
+              value: `Dev can freeze accounts!\nAuthority: \`${formatAddress(analysis.freezeAuthority.authorityAddress || 'Unknown')}\``
+            });
+            hasFlags = true;
+          } else {
+            embed.addFields({
+              name: '✅ Freeze Authority',
+              value: 'Revoked - Dev cannot freeze accounts'
+            });
+          }
+          
+          if (analysis.creationDate) {
+            const age = Math.floor((Date.now() - analysis.creationDate) / (1000 * 60 * 60 * 24));
+            let ageText = `Token Age: ${age} days`;
+            if (age < 7) {
+              ageText += '\n⚠️ Very new token - high risk!';
+              hasFlags = true;
+            }
+            embed.addFields({
+              name: '📅 Age',
+              value: ageText
+            });
+          }
+          
+          // Add overall verdict
+          if (!hasFlags) {
+            embed.addFields({
+              name: '🎉 Overall',
+              value: '✅ Token passes basic dev torture checks!'
+            });
+          } else {
+            embed.addFields({
+              name: '⚠️ Overall',
+              value: '🚨 Token has concerning dev permissions!'
+            });
+          }
+          
+          await interaction.editReply({ embeds: [embed] });
+        } catch (error: any) {
+          console.error('DevTorture command error:', error);
+          await interaction.editReply({ 
+            content: `❌ Error analyzing token: ${error.message}\n\nMake sure the address is a valid Solana token contract.` 
           });
         }
-        
-        await interaction.editReply({ embeds: [embed] });
         
       } else if (interaction.commandName === 'blacklist') {
         const walletAddress = interaction.options.getString('wallet', true);
