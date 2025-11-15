@@ -195,6 +195,7 @@ export class BundleDetectorService {
   /**
    * Analyzes holder concentration for bundle patterns
    * Looks for multiple wallets with similar percentages (1-3% each)
+   * Updated: More conservative thresholds to reduce false positives
    */
   private analyzeHolderConcentration(holders: Array<{ address: string; percentage: number }>) {
     const risks: string[] = [];
@@ -205,25 +206,55 @@ export class BundleDetectorService {
     // Check top 20 holders for suspicious patterns
     const top20 = holders.slice(0, 20);
     
-    // Pattern 1: Multiple wallets with 1-3% each (classic bundle)
-    const smallHolders = top20.filter(h => h.percentage >= 1 && h.percentage <= 3);
-    if (smallHolders.length >= 5) {
-      score += 25;
-      bundledPercent += smallHolders.reduce((sum, h) => sum + h.percentage, 0);
-      suspiciousWallets.push(...smallHolders.map(h => h.address));
-      risks.push(`${smallHolders.length} wallets hold 1-3% each (${bundledPercent.toFixed(1)}% total) - classic bundle pattern`);
+    // Pattern 1: Multiple wallets with very similar percentages (within 0.1% of each other)
+    // This is more indicative of bundles than just 1-3% range
+    const similarityGroups = new Map<number, Array<{ address: string; percentage: number }>>();
+    
+    for (const holder of top20) {
+      // Round to 0.1% for grouping
+      const rounded = Math.round(holder.percentage * 10) / 10;
+      if (!similarityGroups.has(rounded)) {
+        similarityGroups.set(rounded, []);
+      }
+      similarityGroups.get(rounded)!.push(holder);
     }
     
-    // Pattern 2: Top 5 holders own >50% (high concentration)
+    // Check for groups of 8+ wallets with EXACTLY the same percentage (strong bundle signal)
+    similarityGroups.forEach((group, percentage) => {
+      if (group.length >= 8 && percentage >= 0.5 && percentage <= 5) {
+        score += 35;
+        const groupPercent = group.reduce((sum, h) => sum + h.percentage, 0);
+        bundledPercent += groupPercent;
+        suspiciousWallets.push(...group.map(h => h.address));
+        risks.push(`${group.length} wallets hold ${percentage.toFixed(1)}% each (${groupPercent.toFixed(1)}% total) - classic bundle pattern`);
+      }
+    });
+    
+    // Pattern 2: Check for 10+ wallets in 1-3% range with very similar amounts
+    const smallHolders = top20.filter(h => h.percentage >= 1 && h.percentage <= 3);
+    if (smallHolders.length >= 10) {
+      // Check if they're suspiciously similar (within 0.2% of each other)
+      const avgPercentage = smallHolders.reduce((sum, h) => sum + h.percentage, 0) / smallHolders.length;
+      const variance = smallHolders.reduce((sum, h) => sum + Math.pow(h.percentage - avgPercentage, 2), 0) / smallHolders.length;
+      
+      if (variance < 0.04) { // Very low variance = likely coordinated
+        score += 25;
+        bundledPercent += smallHolders.reduce((sum, h) => sum + h.percentage, 0);
+        suspiciousWallets.push(...smallHolders.map(h => h.address));
+        risks.push(`${smallHolders.length} wallets hold 1-3% each (${bundledPercent.toFixed(1)}% total) - suspicious similarity`);
+      }
+    }
+    
+    // Pattern 3: Top 5 holders own >60% (VERY extreme concentration - reduced from 50%)
     const top5Percent = top20.slice(0, 5).reduce((sum, h) => sum + h.percentage, 0);
-    if (top5Percent > 50) {
+    if (top5Percent > 60) {
       score += 20;
       risks.push(`Top 5 holders control ${top5Percent.toFixed(1)}% of supply - extreme concentration`);
     }
     
-    // Pattern 3: Top 10 holders own >70% (very high concentration)
+    // Pattern 4: Top 10 holders own >80% (reduced from 70% to be more conservative)
     const top10Percent = top20.slice(0, 10).reduce((sum, h) => sum + h.percentage, 0);
-    if (top10Percent > 70) {
+    if (top10Percent > 80) {
       score += 15;
       risks.push(`Top 10 holders control ${top10Percent.toFixed(1)}% of supply`);
     }
@@ -234,6 +265,7 @@ export class BundleDetectorService {
   /**
    * Detects wallet networks based on balance similarity
    * Bundlers often create wallets with similar amounts
+   * Updated: More strict threshold to reduce false positives
    */
   private detectWalletNetworks(holders: Array<{ address: string; balance: number; percentage: number }>) {
     const risks: string[] = [];
@@ -241,11 +273,12 @@ export class BundleDetectorService {
     
     const top20 = holders.slice(0, 20);
     
-    // Group by similar percentages (within 0.5%)
+    // Group by very similar percentages (within 0.05% - more strict)
     const similarGroups = new Map<string, string[]>();
     
     for (const holder of top20) {
-      const roundedPercent = Math.round(holder.percentage * 2) / 2; // Round to nearest 0.5%
+      // Only flag if percentages are VERY similar (0.05% precision)
+      const roundedPercent = Math.round(holder.percentage * 20) / 20; // Round to nearest 0.05%
       const key = roundedPercent.toString();
       
       if (!similarGroups.has(key)) {
@@ -254,9 +287,9 @@ export class BundleDetectorService {
       similarGroups.get(key)!.push(holder.address);
     }
     
-    // Check for groups of 3+ wallets with identical percentages
+    // Check for groups of 5+ wallets with near-identical percentages (more strict)
     similarGroups.forEach((wallets, percent) => {
-      if (wallets.length >= 3) {
+      if (wallets.length >= 5) {
         score += 15;
         risks.push(`${wallets.length} wallets hold ~${percent}% each - likely coordinated`);
       }
