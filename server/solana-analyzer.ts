@@ -133,13 +133,31 @@ export class SolanaTokenAnalyzer {
       const bundledWallets = detectBundledWallets(holders);
       
       // For pump.fun tokens, also exclude the bonding curve addresses
+      // Detect pump.fun from multiple sources for reliability
+      const isPumpFunFromAPI = pumpFunData?.isPumpFun || false;
+      const isPumpFunFromRugcheck = rugcheckData?.markets?.some((m: any) => 
+        m.marketType?.startsWith('pump_fun')
+      ) || false;
+      const isPumpFunToken = isPumpFunFromAPI || isPumpFunFromRugcheck;
+      
       const pumpFunExclusions: string[] = [];
-      if (pumpFunData?.isPumpFun) {
-        const bondingCurve = getPumpFunBondingCurveAddress(tokenAddress);
-        const associatedBondingCurve = getPumpFunAssociatedBondingCurveAddress(tokenAddress);
-        
-        if (bondingCurve) pumpFunExclusions.push(bondingCurve);
-        if (associatedBondingCurve) pumpFunExclusions.push(associatedBondingCurve);
+      if (isPumpFunToken) {
+        try {
+          const bondingCurve = getPumpFunBondingCurveAddress(tokenAddress);
+          const associatedBondingCurve = getPumpFunAssociatedBondingCurveAddress(tokenAddress);
+          
+          if (bondingCurve) {
+            pumpFunExclusions.push(bondingCurve);
+            console.log(`[Pump.fun] Excluding bonding curve: ${bondingCurve}`);
+          }
+          if (associatedBondingCurve) {
+            pumpFunExclusions.push(associatedBondingCurve);
+            console.log(`[Pump.fun] Excluding associated bonding curve: ${associatedBondingCurve}`);
+          }
+        } catch (error) {
+          console.error('[Pump.fun] Failed to calculate bonding curve addresses:', error);
+          // Continue without exclusions rather than failing entirely
+        }
       }
       
       // Filter out LP addresses, known exchanges, bundled wallets, and pump.fun bonding curve
@@ -648,9 +666,17 @@ export class SolanaTokenAnalyzer {
         isLocked = burnPercentage >= 90;
         isBurned = false; // Pump.fun tokens use locking, not burning
         
+        console.log(`[Pump.fun] Detected bonding curve liquidity: ${burnPercentage}% locked`);
+        
         // Use locked USD liquidity for Pump.fun
         if (!totalLiquidity && primaryMarket.lp.lpLockedUSD) {
           totalLiquidity = primaryMarket.lp.lpLockedUSD;
+        }
+        
+        // Fallback: If lpLockedPct is missing but we detected pump.fun, treat as risky
+        if (burnPercentage === 0 && !primaryMarket.lp.lpLockedPct) {
+          console.warn(`[Pump.fun] Missing lpLockedPct data for ${tokenAddress}`);
+          isLocked = false; // Unknown lock status = risky
         }
       } else if (primaryPair?.pairAddress) {
         // Regular AMM token - check on-chain if LP is actually burned

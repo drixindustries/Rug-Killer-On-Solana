@@ -191,9 +191,10 @@ export function getPumpFunBondingCurveAddress(mintAddress: string): string | nul
     
     const address = bondingCurve.toString();
     bondingCurveCache.set(mintAddress, address);
+    console.log(`[Pump.fun PDA] Calculated bonding curve for ${mintAddress}: ${address}`)
     return address;
   } catch (error) {
-    console.error('Error calculating pump.fun bonding curve address:', error);
+    console.error(`[Pump.fun PDA] Error calculating bonding curve address for ${mintAddress}:`, error instanceof Error ? error.message : error);
     return null;
   }
 }
@@ -234,9 +235,10 @@ export function getPumpFunAssociatedBondingCurveAddress(mintAddress: string): st
     
     const address = associatedBondingCurve.toString();
     associatedBondingCurveCache.set(mintAddress, address);
+    console.log(`[Pump.fun PDA] Calculated associated bonding curve for ${mintAddress}: ${address}`);
     return address;
   } catch (error) {
-    console.error('Error calculating pump.fun associated bonding curve address:', error);
+    console.error(`[Pump.fun PDA] Error calculating associated bonding curve address for ${mintAddress}:`, error instanceof Error ? error.message : error);
     return null;
   }
 }
