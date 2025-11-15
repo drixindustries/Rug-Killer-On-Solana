@@ -4,7 +4,7 @@
     "type": "module",
     "license": "MIT",
     "scripts": {
-        "db:push": "drizzle-kit push --config=drizzle.config.ts",
+        "db:push": "echo Skipping db:push in production",
         "check": "tsc",
         "build": "vite build --config vite.config.ts && esbuild server/prod.ts --platform=node --packages=external --external:./vite.dev.js --external:../vite.config.js --bundle --format=esm --outdir=dist --out-extension:.js=.js",
         "dev": "NODE_ENV=development tsx server/index.ts",
@@ -133,4 +133,5 @@
         "vite": "^5.4.20"
     }
 }
+
 
