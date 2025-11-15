@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
 
 // Toggle this to switch between mock and real authentication
-const USE_MOCK_AUTH = true;
+const USE_MOCK_AUTH = false;
 
 export function useAuth() {
   // Real authentication using Replit OIDC

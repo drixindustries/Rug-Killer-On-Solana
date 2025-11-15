@@ -3,11 +3,24 @@
  * Clean separation between development (Vite) and production (static files)
  */
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
 import { registerRoutes } from "./routes";
 import path from "path";
 import fs from "fs";
 
 export const app = express();
+
+// Session middleware for wallet authentication
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'default-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
+  },
+}));
 
 // Request body parsing
 declare module 'http' {

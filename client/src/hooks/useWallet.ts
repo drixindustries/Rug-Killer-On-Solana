@@ -58,16 +58,6 @@ export function useWallet() {
   };
 
   const connectWallet = useCallback(async () => {
-    // Check if premium features are available
-    if (isMockAuth || !hasPremiumAccess) {
-      toast({
-        title: "Authentication Required",
-        description: "Wallet verification requires real authentication. Enable Replit auth to use this feature.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     if (!window.solana || !window.solana.isPhantom) {
       toast({
         title: "Phantom Wallet Not Found",
@@ -75,7 +65,7 @@ export function useWallet() {
         variant: "destructive",
       });
       window.open("https://phantom.app/", "_blank");
-      return;
+      return { success: false };
     }
 
     setIsConnecting(true);
@@ -84,7 +74,8 @@ export function useWallet() {
       const publicKey = resp.publicKey.toString();
       setWalletAddress(publicKey);
 
-      const challengeResponse = await apiRequest("GET", "/api/wallet/challenge");
+      // Use public login-challenge endpoint
+      const challengeResponse = await apiRequest("GET", `/api/wallet/login-challenge?walletAddress=${publicKey}`);
       const challengeData = await challengeResponse.json();
 
       const encodedMessage = new TextEncoder().encode(challengeData.challenge);
@@ -92,47 +83,41 @@ export function useWallet() {
       
       const signatureBase58 = bs58.encode(signedMessage.signature);
 
-      const verifyResponse = await apiRequest("POST", "/api/wallet/verify", {
+      // Use public login endpoint
+      const loginResponse = await apiRequest("POST", "/api/wallet/login", {
         walletAddress: publicKey,
         signature: signatureBase58,
         challenge: challengeData.challenge,
       });
 
-      const verifyData = await verifyResponse.json();
+      const loginData = await loginResponse.json();
 
-      if (verifyData.wallet) {
-        setConnection(verifyData.wallet);
-        
-        if (verifyData.wallet.isEligible) {
-          toast({
-            title: "Wallet Connected Successfully!",
-            description: `You have ${verifyData.wallet.tokenBalance?.toLocaleString()} $ANTIRUG tokens. Premium access unlocked!`,
-          });
-        } else {
-          toast({
-            title: "Insufficient Token Balance",
-            description: `You need 10M+ $ANTIRUG tokens for premium access. Current: ${verifyData.wallet.tokenBalance?.toLocaleString() || 0}`,
-            variant: "destructive",
-          });
-        }
+      if (loginData.user) {
+        toast({
+          title: "Logged In Successfully!",
+          description: `Welcome! You're now logged in with your Phantom wallet.`,
+        });
+        return { success: true, user: loginData.user };
       } else {
         toast({
-          title: "Verification Failed",
-          description: verifyData.message || "Failed to verify wallet ownership.",
+          title: "Login Failed",
+          description: loginData.message || "Failed to login with wallet.",
           variant: "destructive",
         });
+        return { success: false };
       }
     } catch (error: any) {
-      console.error("Wallet connection error:", error);
+      console.error("Wallet login error:", error);
       toast({
         title: "Connection Failed",
         description: error.message || "Failed to connect wallet. Please try again.",
         variant: "destructive",
       });
+      return { success: false };
     } finally {
       setIsConnecting(false);
     }
-  }, [toast, isMockAuth, hasPremiumAccess]);
+  }, [toast]);
 
   const disconnectWallet = useCallback(async () => {
     if (window.solana) {

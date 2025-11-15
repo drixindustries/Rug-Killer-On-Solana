@@ -155,11 +155,24 @@ export function Header({ onNewAnalysis }: HeaderProps) {
               <Button
                 variant="default"
                 size="sm"
-                onClick={() => window.location.href = '/api/login'}
+                onClick={async () => {
+                  // Try wallet login first, fallback to OAuth
+                  try {
+                    const result = await connectWallet();
+                    if (result.success) {
+                      // Wallet connected, trigger page reload to update auth state
+                      window.location.reload();
+                    }
+                  } catch (error) {
+                    console.error("Wallet login failed:", error);
+                    // Fallback to OAuth login
+                    window.location.href = '/api/login';
+                  }
+                }}
                 className="hidden md:inline-flex"
                 data-testid="button-sign-in"
               >
-                <User className="h-4 w-4 mr-1" />
+                <Wallet className="h-4 w-4 mr-1" />
                 Sign In
               </Button>
             )}

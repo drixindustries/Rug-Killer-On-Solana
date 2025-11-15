@@ -23,8 +23,12 @@ const setupAuth = async (app: Express) => {
 };
 
 const isAuthenticated = async (req: any, res: any, next: any) => {
-  // Mock authentication - allow all requests
-  req.user = { claims: { sub: 'guest', email: 'guest@example.com' } };
+  // Return 401 if not authenticated - client will redirect to login
+  if (!req.session?.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+  
+  req.user = { claims: { sub: req.session.userId, email: req.session.userEmail } };
   req.isAuthenticated = () => true;
   next();
 };
@@ -140,6 +144,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/wallet/login-challenge - Public endpoint for wallet-based login
+  // Generates challenge without requiring authentication
+  app.get('/api/wallet/login-challenge', async (req: any, res) => {
+    try {
+      const { walletAddress } = req.query;
+      
+      if (!walletAddress) {
+        return res.status(400).json({ message: "Wallet address is required" });
+      }
+      
+      // Use wallet address as temporary user ID for challenge
+      const challenge = await storage.createChallenge(walletAddress as string);
+      
+      res.json({
+        challenge: challenge.challenge,
+        expiresAt: challenge.expiresAt,
+        message: "Sign this message with your Phantom wallet to login. This challenge expires in 5 minutes.",
+      });
+    } catch (error: any) {
+      console.error("Error creating login challenge:", error);
+      res.status(500).json({ 
+        message: "Failed to create challenge: " + error.message 
+      });
+    }
+  });
+
+  // POST /api/wallet/login - Public endpoint for wallet-based login
+  // Verifies signature and creates user session
+  app.post('/api/wallet/login', async (req: any, res) => {
+    try {
+      const { walletAddress, signature, challenge: challengeStr } = req.body;
+      
+      if (!walletAddress) {
+        return res.status(400).json({ message: "Wallet address is required" });
+      }
+
+      if (!signature || !challengeStr) {
+        return res.status(400).json({
+          message: "Signature and challenge are required. First call GET /api/wallet/login-challenge to get a challenge, then sign it with your wallet."
+        });
+      }
+
+      // Import Solana connection and crypto utilities
+      const { PublicKey } = await import('@solana/web3.js');
+      const nacl = await import('tweetnacl');
+      const bs58 = await import('bs58');
+
+      // SECURITY: Validate challenge to prevent replay attacks
+      const challenge = await storage.getChallenge(challengeStr);
+      
+      if (!challenge) {
+        return res.status(403).json({
+          message: "Invalid challenge. Please request a new challenge via GET /api/wallet/login-challenge."
+        });
+      }
+      
+      if (challenge.userId !== walletAddress) {
+        return res.status(403).json({
+          message: "Challenge was issued to a different wallet."
+        });
+      }
+      
+      if (challenge.usedAt) {
+        return res.status(403).json({
+          message: "This challenge has already been used. Please request a new challenge."
+        });
+      }
+      
+      const now = new Date();
+      if (challenge.expiresAt < now) {
+        return res.status(403).json({
+          message: "This challenge has expired. Please request a new challenge."
+        });
+      }
+
+      try {
+        const walletPubkey = new PublicKey(walletAddress);
+        
+        // SECURITY: Verify wallet ownership via signature
+        const messageBytes = new TextEncoder().encode(challengeStr);
+        const signatureBytes = bs58.default.decode(signature);
+        const publicKeyBytes = walletPubkey.toBytes();
+        
+        const isValidSignature = nacl.default.sign.detached.verify(
+          messageBytes,
+          signatureBytes,
+          publicKeyBytes
+        );
+        
+        if (!isValidSignature) {
+          return res.status(403).json({
+            message: "Invalid signature. Please sign the challenge message with the correct wallet."
+          });
+        }
+        
+        await storage.markChallengeUsed(challenge.id);
+        
+        // Create user session from wallet signature
+        if (!req.session) {
+          req.session = {};
+        }
+        req.session.userId = walletAddress;
+        req.session.userEmail = `${walletAddress.slice(0, 8)}@wallet.solana`;
+        
+        // Ensure user exists in database
+        await storage.upsertUser({
+          id: walletAddress,
+          email: req.session.userEmail,
+          firstName: null,
+          lastName: null,
+          profileImageUrl: null,
+        });
+        
+        const user = await storage.getUser(walletAddress);
+        
+        res.json({
+          user,
+          message: "Successfully logged in with Phantom wallet!",
+        });
+        
+      } catch (error: any) {
+        console.error("Wallet login error:", error);
+        throw error;
+      }
+      
+    } catch (error: any) {
+      console.error("Error logging in with wallet:", error);
+      res.status(500).json({ 
+        message: "Failed to login with wallet: " + error.message 
+      });
+    }
+  });
+
   // POST /api/wallet/verify - Verify token holder status (10M+ tokens)
   // Note: Uses isAuthenticated (not hasActiveAccess) to allow users to verify eligibility
   // SECURITY: Requires signature proof of wallet ownership AND validates official token mint
@@ -232,6 +369,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         await storage.markChallengeUsed(challenge.id);
+        
+        // WALLET LOGIN: Create user session from wallet signature
+        // This allows users to login with just their Phantom wallet
+        if (!req.session) {
+          req.session = {};
+        }
+        req.session.userId = walletAddress; // Use wallet address as user ID
+        req.session.userEmail = `${walletAddress.slice(0, 8)}@wallet.solana`;
+        
+        // Ensure user exists in database
+        await storage.upsertUser({
+          id: walletAddress,
+          email: req.session.userEmail,
+          firstName: null,
+          lastName: null,
+          profileImageUrl: null,
+        });
         
         // Get token mint info for correct decimals
         const mintInfo = await getMint(connection, mintPubkey);
