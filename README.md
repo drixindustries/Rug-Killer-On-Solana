@@ -32,11 +32,18 @@ Solana Rug Killer is a comprehensive web application that analyzes Solana SPL to
 ### Bot Integration
 - **Telegram Bot** - Full command suite with instant token analysis
 - **Discord Bot** - Rich embeds with color-coded risk levels
-- **Available Commands**:
+- **11 Available Commands**:
   - `/execute [token]` - Full 52-metric rug detection scan
   - `/first20 [token]` - Top 20 holder concentration analysis
   - `/devtorture [token]` - Developer wallet history tracking
   - `/blacklist [wallet]` - Check if wallet is flagged for scams
+  - `/whaletrack [token]` - Track smart money wallets in a token
+  - `/kol [wallet]` - Check if a wallet is a known KOL
+  - `/price [token]` - Quick price lookup with 24h change
+  - `/rugcheck [token]` - Instant rug detection with danger flags
+  - `/liquidity [token]` - Detailed liquidity pool analysis
+  - `/compare [token1] [token2]` - Side-by-side token comparison
+  - `/trending` - Top 10 Solana tokens by 24h volume
 
 ### Access Control
 - **Whop Integration** - Subscription management with Individual, Group, and Lifetime tiers
