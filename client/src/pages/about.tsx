@@ -89,6 +89,53 @@ export default function About() {
               </CardContent>
             </Card>
 
+            {/* Recent Updates */}
+            <Card>
+              <CardHeader>
+                <CardTitle>🎉 Recent Updates (November 15, 2025)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex gap-3">
+                    <Globe className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="font-semibold text-sm">Auto-Link Explorer</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Paste any Solana address in chat, get instant links to GMGN, Padre, Axiom, Solscan
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Bot className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="font-semibold text-sm">Enhanced Bot Features</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Auto-detection in Telegram & Discord, no commands needed
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Code className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="font-semibold text-sm">GROUP Tier (Renamed)</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Perfect for Discord/Telegram groups - $120/month with group alerts
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Wallet className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="font-semibold text-sm">$ANTIRUG Branding</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Prominent ticker display and official token integration
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Key Features */}
             <Card>
               <CardHeader>
@@ -119,7 +166,7 @@ export default function About() {
                     <div>
                       <h3 className="font-semibold text-sm">Telegram & Discord Bots</h3>
                       <p className="text-sm text-muted-foreground">
-                        /execute, /first20, /devtorture, /blacklist
+                        /execute, /first20, /devtorture + auto-link detection
                       </p>
                     </div>
                   </div>

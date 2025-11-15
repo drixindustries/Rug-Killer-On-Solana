@@ -439,3 +439,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 **Built with ❤️ by the Rug Killer team**
 
 *Protecting Solana investors since 2024. Now with real-time Pump.fun auto-scanning and whale detection.*
+
