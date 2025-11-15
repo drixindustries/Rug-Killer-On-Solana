@@ -168,20 +168,20 @@ export default function Landing() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <CardDescription className="text-base">
-                    Full token analysis directly in your messaging apps
+                    11 powerful commands for instant token analysis
                   </CardDescription>
                   <div className="space-y-2 pt-2">
                     <div className="flex items-center gap-2 text-sm">
                       <CheckCircle className="w-4 h-4 text-green-500" />
-                      <span>/execute for analysis</span>
+                      <span>/price, /rugcheck, /liquidity</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <CheckCircle className="w-4 h-4 text-green-500" />
-                      <span>/first20 holder breakdown</span>
+                      <span>/compare, /trending, /execute</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <CheckCircle className="w-4 h-4 text-green-500" />
-                      <span>/blacklist scam checks</span>
+                      <span>/whaletrack, /kol + 4 more</span>
                     </div>
                   </div>
                 </CardContent>

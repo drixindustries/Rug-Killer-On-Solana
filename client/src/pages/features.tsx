@@ -360,27 +360,60 @@ export default function Features() {
             <CardHeader>
               <div className="flex items-center gap-2 mb-2">
                 <SiTelegram className="h-8 w-8 text-[#0088cc]" />
-                <CardTitle>Telegram Bot</CardTitle>
+                <CardTitle>Telegram Bot - 11 Commands</CardTitle>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <code className="text-sm font-semibold">/execute [token]</code>
-                <p className="text-xs text-muted-foreground mt-1">Complete risk analysis with all metrics</p>
+            <CardContent className="space-y-2">
+              <div className="space-y-2 text-sm">
+                <div>
+                  <code className="font-semibold">/execute</code>
+                  <span className="text-muted-foreground ml-2">Full 52-metric analysis</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/first20</code>
+                  <span className="text-muted-foreground ml-2">Top 20 holders</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/devtorture</code>
+                  <span className="text-muted-foreground ml-2">Dev wallet history</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/blacklist</code>
+                  <span className="text-muted-foreground ml-2">Check scam flags</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/whaletrack</code>
+                  <span className="text-muted-foreground ml-2">Smart money wallets</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/kol</code>
+                  <span className="text-muted-foreground ml-2">KOL wallet check</span>
+                </div>
+                <div className="pt-1 border-t">
+                  <p className="text-xs font-semibold text-primary mb-1">🔥 NEW COMMANDS</p>
+                </div>
+                <div>
+                  <code className="font-semibold">/price</code>
+                  <span className="text-muted-foreground ml-2">Quick price lookup</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/rugcheck</code>
+                  <span className="text-muted-foreground ml-2">Instant rug detection</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/liquidity</code>
+                  <span className="text-muted-foreground ml-2">LP analysis</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/compare</code>
+                  <span className="text-muted-foreground ml-2">Side-by-side comparison</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/trending</code>
+                  <span className="text-muted-foreground ml-2">Top 10 by volume</span>
+                </div>
               </div>
-              <div>
-                <code className="text-sm font-semibold">/first20 [token]</code>
-                <p className="text-xs text-muted-foreground mt-1">Top 20 holder breakdown</p>
-              </div>
-              <div>
-                <code className="text-sm font-semibold">/devtorture [token]</code>
-                <p className="text-xs text-muted-foreground mt-1">Dev wallet history</p>
-              </div>
-              <div>
-                <code className="text-sm font-semibold">/blacklist [wallet]</code>
-                <p className="text-xs text-muted-foreground mt-1">Check scam flags</p>
-              </div>
-              <div className="pt-2">
+              <div className="pt-3 border-t">
                 <p className="text-xs text-muted-foreground">
                   💡 Tip: Send any token address for quick analysis
                 </p>
@@ -392,27 +425,60 @@ export default function Features() {
             <CardHeader>
               <div className="flex items-center gap-2 mb-2">
                 <SiDiscord className="h-8 w-8 text-[#5865F2]" />
-                <CardTitle>Discord Bot</CardTitle>
+                <CardTitle>Discord Bot - 11 Commands</CardTitle>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <code className="text-sm font-semibold">/execute [token]</code>
-                <p className="text-xs text-muted-foreground mt-1">Rich embeds with color-coded risk</p>
+            <CardContent className="space-y-2">
+              <div className="space-y-2 text-sm">
+                <div>
+                  <code className="font-semibold">/execute</code>
+                  <span className="text-muted-foreground ml-2">Full 52-metric analysis</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/first20</code>
+                  <span className="text-muted-foreground ml-2">Top 20 holders</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/devtorture</code>
+                  <span className="text-muted-foreground ml-2">Dev wallet history</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/blacklist</code>
+                  <span className="text-muted-foreground ml-2">Check scam flags</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/whaletrack</code>
+                  <span className="text-muted-foreground ml-2">Smart money wallets</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/kol</code>
+                  <span className="text-muted-foreground ml-2">KOL wallet check</span>
+                </div>
+                <div className="pt-1 border-t">
+                  <p className="text-xs font-semibold text-primary mb-1">🔥 NEW COMMANDS</p>
+                </div>
+                <div>
+                  <code className="font-semibold">/price</code>
+                  <span className="text-muted-foreground ml-2">Quick price lookup</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/rugcheck</code>
+                  <span className="text-muted-foreground ml-2">Instant rug detection</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/liquidity</code>
+                  <span className="text-muted-foreground ml-2">LP analysis</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/compare</code>
+                  <span className="text-muted-foreground ml-2">Side-by-side comparison</span>
+                </div>
+                <div>
+                  <code className="font-semibold">/trending</code>
+                  <span className="text-muted-foreground ml-2">Top 10 by volume</span>
+                </div>
               </div>
-              <div>
-                <code className="text-sm font-semibold">/first20 [token]</code>
-                <p className="text-xs text-muted-foreground mt-1">Holder concentration report</p>
-              </div>
-              <div>
-                <code className="text-sm font-semibold">/devtorture [token]</code>
-                <p className="text-xs text-muted-foreground mt-1">Transaction history tracking</p>
-              </div>
-              <div>
-                <code className="text-sm font-semibold">/blacklist [wallet]</code>
-                <p className="text-xs text-muted-foreground mt-1">Scammer verification</p>
-              </div>
-              <div className="pt-2">
+              <div className="pt-3 border-t">
                 <p className="text-xs text-muted-foreground">
                   🎨 Beautiful embeds with red/yellow/green risk indicators
                 </p>
