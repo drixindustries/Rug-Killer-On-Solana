@@ -5,8 +5,8 @@ RUN npm ci
 COPY . .
 
 # Build the project (expects a root-level build script creating dist/)
-# Cache bust: 2025-11-15-vite-fix
-RUN npm run build
+# Cache bust: 2025-11-15-vite-fix-v2
+RUN rm -rf dist && npm run build
 
 FROM node:20-alpine AS runtime
 WORKDIR /app
