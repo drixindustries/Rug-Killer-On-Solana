@@ -947,6 +947,35 @@ function createTelegramBot(botToken: string): Telegraf {
     }
   });
   
+  // Auto-detect Solana addresses and provide explorer links
+  bot.on(message('text'), async (ctx) => {
+    const text = ctx.message.text.trim();
+    
+    // Check if it's a Solana address (base58, 32-44 chars, no command prefix)
+    if (text.length >= 32 && text.length <= 44 && !/\s/.test(text) && !text.startsWith('/')) {
+      try {
+        // Validate it looks like a Solana address (base58)
+        const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+        if (!base58Regex.test(text)) return;
+        
+        // Send quick links message
+        const linksMessage = `🔗 **Quick Links for \`${text.slice(0, 4)}...${text.slice(-4)}\`**\n\n` +
+          `📊 [GMGN.ai](https://gmgn.ai/sol/token/${text})\n` +
+          `🎯 [Padre](https://padre.fun/token/${text})\n` +
+          `📈 [Axiom.trade](https://axiom.trade/token/${text})\n` +
+          `🔍 [Solscan](https://solscan.io/token/${text})\n\n` +
+          `💡 _Use /execute ${text.slice(0, 8)}... for full rug analysis_`;
+        
+        await ctx.reply(linksMessage, { 
+          parse_mode: 'Markdown',
+          disable_web_page_preview: true 
+        });
+      } catch (error) {
+        // Silently ignore if not a valid address
+      }
+    }
+  });
+
   // Error handling
   bot.catch((err, ctx) => {
     console.error(`Telegram bot error for ${ctx.updateType}`, err);

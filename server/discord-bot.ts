@@ -1055,21 +1055,25 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     // Check if it's a Solana address (base58, 32-44 chars, no spaces)
     if (text.length >= 32 && text.length <= 44 && !/\s/.test(text)) {
       try {
-        const quickReplies = [
-          '🔍 Ooh, a shiny new token! Let me check if it\'s a gem or a trap...',
-          '💣 ANALYZING! If this is a rug I\'m gonna be SO disappointed...',
-          '🎪 Time for the Harley Rug Test! Let\'s see what we got here...',
-          '🔨 Hold tight puddin\', running diagnostics on this bad boy...',
-        ];
-        const processingMsg = await message.reply(quickReplies[Math.floor(Math.random() * quickReplies.length)]);
+        // Validate it looks like a Solana address (base58)
+        const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+        if (!base58Regex.test(text)) return;
         
-        // Analyze the token
-        const analysis = await tokenAnalyzer.analyzeToken(text);
-        const embed = createAnalysisEmbed(analysis);
+        // Create embed with explorer links
+        const linksEmbed = new EmbedBuilder()
+          .setColor(0x5865f2)
+          .setTitle(`🔗 Quick Links`)
+          .setDescription(`Token: \`${text.slice(0, 4)}...${text.slice(-4)}\``)
+          .addFields(
+            { name: '📊 GMGN.ai', value: `[View on GMGN](https://gmgn.ai/sol/token/${text})`, inline: true },
+            { name: '🎯 Padre', value: `[View on Padre](https://padre.fun/token/${text})`, inline: true },
+            { name: '📈 Axiom.trade', value: `[View on Axiom](https://axiom.trade/token/${text})`, inline: true },
+            { name: '🔍 Solscan', value: `[View on Solscan](https://solscan.io/token/${text})`, inline: true }
+          )
+          .setFooter({ text: `💡 Use /execute ${text.slice(0, 8)}... for full rug analysis` })
+          .setTimestamp();
         
-        // Delete the "analyzing" message and send the result
-        await processingMsg.delete();
-        await message.reply({ embeds: [embed] });
+        await message.reply({ embeds: [linksEmbed] });
       } catch (error) {
         // Silently ignore - not a valid token address
         // This prevents spam when users send normal messages
