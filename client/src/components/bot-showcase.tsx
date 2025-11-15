@@ -137,7 +137,7 @@ export function BotShowcase() {
           <Card className="max-w-2xl mx-auto" data-testid="card-bot-access">
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground mb-4">
-                <strong>Bot access included with:</strong> PRO and WHALE subscriptions, or hold 10M+ $ANTIRUG tokens for free access
+                <strong>Bot access included with:</strong> PRO and GROUP subscriptions, or hold 10M+ $ANTIRUG tokens for free access
               </p>
               <div className="flex gap-3 justify-center">
                 <Button 

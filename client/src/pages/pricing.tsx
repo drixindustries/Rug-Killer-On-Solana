@@ -62,12 +62,12 @@ const pricingTiers = [
     tier: "individual" as const
   },
   {
-    id: "whale",
-    name: "WHALE",
+    id: "group",
+    name: "GROUP",
     icon: Crown,
     price: "$120",
     period: "per month",
-    description: "Premium features for whale investors",
+    description: "Premium features for Discord/Telegram groups",
     features: [
       "Everything in PRO",
       "Real-time alerts",
@@ -79,10 +79,10 @@ const pricingTiers = [
       "White-glove support",
       "Team collaboration (up to 5 users)"
     ],
-    cta: "Subscribe to WHALE",
+    cta: "Subscribe to GROUP",
     ctaVariant: "default" as const,
     badge: "Premium",
-    testId: "card-tier-whale",
+    testId: "card-tier-group",
     tier: "group" as const
   },
   {
@@ -93,7 +93,7 @@ const pricingTiers = [
     period: "forever",
     description: "Hold 10M+ $ANTIRUG tokens for lifetime access",
     features: [
-      "Everything in WHALE tier",
+      "Everything in GROUP tier",
       "Lifetime access (no monthly fees)",
       "Exclusive holder perks",
       "Early access to new features",

@@ -253,6 +253,7 @@ export default function About() {
                     <ul className="text-sm text-muted-foreground space-y-1 mt-2 ml-4">
                       <li>• Everything in Individual</li>
                       <li>• Telegram group/channel alerts</li>
+                      <li>• Discord group/channel alerts</li>
                       <li>• Priority support</li>
                       <li>• Team collaboration features</li>
                     </ul>

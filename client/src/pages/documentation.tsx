@@ -146,7 +146,7 @@ const DocumentationPDF = () => (
           <Text style={pdfStyles.text}>• Priority support</Text>
         </View>
 
-        <Text style={pdfStyles.subheading}>WHALE - $99/month</Text>
+        <Text style={pdfStyles.subheading}>GROUP - $120/month</Text>
         <View style={pdfStyles.list}>
           <Text style={pdfStyles.text}>• Everything in PRO tier</Text>
           <Text style={pdfStyles.text}>• Real-time liquidity alerts</Text>
@@ -159,7 +159,7 @@ const DocumentationPDF = () => (
         <Text style={pdfStyles.subheading}>$ANTIRUG Holder - FREE Forever</Text>
         <View style={pdfStyles.list}>
           <Text style={pdfStyles.text}>• Hold 10M+ official $ANTIRUG tokens</Text>
-          <Text style={pdfStyles.text}>• Lifetime access to WHALE tier features</Text>
+          <Text style={pdfStyles.text}>• Lifetime access to GROUP tier features</Text>
           <Text style={pdfStyles.text}>• Exclusive holder perks and governance rights</Text>
           <Text style={pdfStyles.text}>• Connect wallet via Phantom to verify holdings</Text>
         </View>
@@ -184,7 +184,7 @@ const DocumentationPDF = () => (
           <Text style={pdfStyles.text}>3. User submits POST /api/wallet/verify with wallet address, signature, and challenge</Text>
           <Text style={pdfStyles.text}>4. Server validates: challenge exists, not expired, not used, signature valid, 10M+ tokens</Text>
           <Text style={pdfStyles.text}>5. Challenge marked as used (single-use enforcement)</Text>
-          <Text style={pdfStyles.text}>6. Access granted for 24 hours, then revalidation required</Text>
+          <Text style={pdfStyles.text}>6. GROUP tier access granted for 24 hours, then revalidation required</Text>
         </View>
       </View>
 
@@ -284,7 +284,7 @@ const DocumentationPDF = () => (
           <Text style={pdfStyles.text}>WHOP_APP_ID - Whop application ID</Text>
           <Text style={pdfStyles.text}>WHOP_COMPANY_ID - Whop company/business ID</Text>
           <Text style={pdfStyles.text}>WHOP_PLAN_ID_BASIC - Plan ID for $29/mo PRO tier</Text>
-          <Text style={pdfStyles.text}>WHOP_PLAN_ID_PREMIUM - Plan ID for $99/mo WHALE tier</Text>
+          <Text style={pdfStyles.text}>WHOP_PLAN_ID_PREMIUM - Plan ID for $120/mo GROUP tier</Text>
         </View>
 
         <Text style={pdfStyles.subheading}>Required for Token Gating</Text>
@@ -325,7 +325,7 @@ const DocumentationPDF = () => (
 
         <Text style={pdfStyles.subheading}>Step 4: Connect Phantom Wallet (Optional - Token Holders)</Text>
         <Text style={pdfStyles.text}>
-          If you hold 10M+ official $ANTIRUG tokens, you can gain instant WHALE tier access without 
+          If you hold 10M+ official $ANTIRUG tokens, you can gain instant GROUP tier access without 
           a paid subscription. First, install Phantom from phantom.app if you haven't already.
         </Text>
         <View style={pdfStyles.list}>
@@ -349,7 +349,7 @@ const DocumentationPDF = () => (
         </Text>
         <View style={pdfStyles.list}>
           <Text style={pdfStyles.text}>1. Navigate to /pricing page from header or visit directly</Text>
-          <Text style={pdfStyles.text}>2. Review tier comparison: PRO ($29/mo) or WHALE ($99/mo)</Text>
+          <Text style={pdfStyles.text}>2. Review tier comparison: PRO ($29/mo) or GROUP ($120/mo)</Text>
           <Text style={pdfStyles.text}>3. Click "Subscribe" button on your preferred tier card</Text>
           <Text style={pdfStyles.text}>4. Redirect to Whop's secure hosted checkout page</Text>
           <Text style={pdfStyles.text}>5. Enter payment details (credit card, debit card, or crypto)</Text>
@@ -1066,7 +1066,7 @@ export default function Documentation() {
                   <p className="text-sm text-muted-foreground">forever</p>
                   <ul className="text-xs space-y-1 text-muted-foreground">
                     <li>• Hold 10M+ tokens</li>
-                    <li>• WHALE tier access</li>
+                    <li>• GROUP tier access</li>
                     <li>• Exclusive perks</li>
                     <li>• Governance rights</li>
                     <li>• Connect via Phantom</li>
@@ -1126,7 +1126,7 @@ export default function Documentation() {
                 <div>
                   <h4 className="font-semibold mb-1">Connect Phantom Wallet (Optional - Token Holders)</h4>
                   <p className="text-sm text-muted-foreground mb-2">
-                    If you hold 10M+ official $ANTIRUG tokens, you can gain instant WHALE tier access without 
+                    If you hold 10M+ official $ANTIRUG tokens, you can gain instant GROUP tier access without 
                     a paid subscription. First, install Phantom from <a href="https://phantom.app" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">phantom.app</a> if you haven't already.
                   </p>
                   <ol className="text-sm text-muted-foreground space-y-1 ml-4 list-decimal">
@@ -1135,7 +1135,7 @@ export default function Documentation() {
                     <li>Approve the connection request in Phantom</li>
                     <li>Sign the cryptographic challenge message (proves wallet ownership)</li>
                     <li>System validates your token balance (requires 10M+ tokens)</li>
-                    <li>Upon success, WHALE tier access is granted for 24 hours</li>
+                    <li>Upon success, GROUP tier access is granted for 24 hours</li>
                     <li>Reconnect every 24 hours to maintain access</li>
                   </ol>
                   <p className="text-xs text-muted-foreground mt-2 italic">
@@ -1155,7 +1155,7 @@ export default function Documentation() {
                   </p>
                   <ol className="text-sm text-muted-foreground space-y-1 ml-4 list-decimal">
                     <li>Navigate to <a href="/pricing" className="text-primary hover:underline">/pricing</a> page from header or visit directly</li>
-                    <li>Review tier comparison: PRO ($29/mo) or WHALE ($99/mo)</li>
+                    <li>Review tier comparison: PRO ($29/mo) or GROUP ($120/mo)</li>
                     <li>Click "Subscribe" button on your preferred tier card</li>
                     <li>Redirect to Whop's secure hosted checkout page</li>
                     <li>Enter payment details (credit card, debit card, or crypto)</li>
@@ -1279,7 +1279,7 @@ export default function Documentation() {
                     <li>• WHOP_APP_ID</li>
                     <li>• WHOP_COMPANY_ID</li>
                     <li>• WHOP_PLAN_ID_BASIC ($29/mo tier)</li>
-                    <li>• WHOP_PLAN_ID_PREMIUM ($99/mo tier)</li>
+                    <li>• WHOP_PLAN_ID_PREMIUM ($120/mo tier)</li>
                   </ul>
                 </div>
 

@@ -236,7 +236,7 @@ function createTelegramBot(botToken: string): Telegraf {
       '/first20 <address> - Top 20 holder analysis\n' +
       '/devtorture <address> - Dev wallet history\n' +
       '/blacklist <wallet> - Check if wallet is flagged\n\n' +
-      '**Whale Tier Commands:**\n' +
+      '**Group Tier Commands:**\n' +
       '/whaletrack <address> - Smart money tracking\n' +
       '/kol <wallet> - Check if wallet is KOL\n\n' +
       '**Quick Commands:**\n' +

@@ -371,7 +371,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
               value: '`/execute <address>` - Full 52-metric scan\n`/first20 <address>` - Top 20 holder analysis\n`/devtorture <address>` - Dev wallet history\n`/blacklist <wallet>` - Check if wallet is flagged\n`/help` - Show this help message'
             },
             {
-              name: '🐋 Whale Tier Commands',
+              name: '👥 Group Tier Commands',
               value: '`/whaletrack <address>` - Smart money tracking\n`/kol <wallet>` - Check if wallet is KOL'
             },
             {
