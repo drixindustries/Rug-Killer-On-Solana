@@ -28,4 +28,4 @@ ENV NODE_ENV=production
 EXPOSE 5000
 
 # Start server
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/prod.js"]
