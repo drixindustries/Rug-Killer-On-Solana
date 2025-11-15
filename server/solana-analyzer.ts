@@ -67,6 +67,11 @@ export class SolanaTokenAnalyzer {
     return rpcBalancer.getConnection();
   }
 
+  // Get multiple connections for concurrent operations
+  private getMultipleConnections(count: number = 3): Connection[] {
+    return rpcBalancer.getMultipleConnections(count);
+  }
+
   async analyzeToken(tokenAddress: string): Promise<TokenAnalysisResponse> {
     try {
       // Validate address format before proceeding
