@@ -241,6 +241,12 @@ export default function About() {
                       Interactive holder distribution visualization and wallet clustering
                     </p>
                   </div>
+                  <div className="flex items-start gap-3">
+                    <Badge variant="outline">MobyScreener</Badge>
+                    <p className="text-sm text-muted-foreground flex-1">
+                      Advanced token screening and analytics platform for Solana
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
