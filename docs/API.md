@@ -410,6 +410,6 @@ analysis = response.json()
 ## Support
 
 For API support:
-- GitHub Issues: [Create an issue](https://github.com/drixindustries/rugkillleronsol/issues)
+- GitHub Issues: [Create an issue](https://github.com/drixindustries/Rug-Killer-On-Solana/issues)
 - Discord: [Join our server](https://discord.gg/yourinvite)
 - Email: support@yourwebsite.com

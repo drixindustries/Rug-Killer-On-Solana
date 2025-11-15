@@ -361,7 +361,7 @@ export default function Terms() {
                   <li><strong>Email:</strong> legal@yourwebsite.com</li>
                   <li><strong>Discord:</strong> Join our community server</li>
                   <li><strong>Telegram:</strong> Contact via our bot</li>
-                  <li><strong>GitHub:</strong> https://github.com/drixindustries/rugkillleronsol</li>
+                  <li><strong>GitHub:</strong> https://github.com/drixindustries/Rug-Killer-On-Solana</li>
                 </ul>
               </CardContent>
             </Card>

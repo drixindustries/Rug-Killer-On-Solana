@@ -108,7 +108,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
               className="hidden md:inline-flex min-h-[44px] min-w-[44px]"
               data-testid="button-github"
             >
-              <a href="https://github.com/drixindustries/rugkilleronsol" target="_blank" rel="noopener noreferrer" title="View on GitHub" aria-label="View project on GitHub">
+              <a href="https://github.com/drixindustries/Rug-Killer-On-Solana" target="_blank" rel="noopener noreferrer" title="View on GitHub" aria-label="View project on GitHub">
                 <SiGithub className="h-5 w-5" />
               </a>
             </Button>
@@ -308,7 +308,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
                       size="icon"
                       asChild
                     >
-                      <a href="https://github.com/drixindustries/rugkilleronsol" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="View project on GitHub">
+                      <a href="https://github.com/drixindustries/Rug-Killer-On-Solana" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="View project on GitHub">
                         <SiGithub className="h-4 w-4" />
                       </a>
                     </Button>
