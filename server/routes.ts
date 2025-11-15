@@ -16,6 +16,19 @@ import { VanityAddressGenerator } from "./vanity-generator";
 import { z } from "zod";
 import { rpcBalancer } from "./services/rpc-balancer";
 
+// Stub authentication for Railway deployment (no Replit OIDC)
+const setupAuth = async (app: Express) => {
+  // No-op: Authentication disabled for Railway
+  console.log('ℹ️ Authentication disabled (Railway deployment)');
+};
+
+const isAuthenticated = async (req: any, res: any, next: any) => {
+  // Mock authentication - allow all requests
+  req.user = { claims: { sub: 'guest', email: 'guest@example.com' } };
+  req.isAuthenticated = () => true;
+  next();
+};
+
 export const hasActiveAccess = async (req: any, res: any, next: any) => {
   return next();
 };
