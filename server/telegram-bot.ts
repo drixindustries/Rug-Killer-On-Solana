@@ -702,8 +702,10 @@ function createTelegramBot(botToken: string): Telegraf {
       
       // Risk scores
       message += `🛡️ **RISK SCORE**\n`;
-      message += `A: ${analysis1.riskScore}/100 (${analysis1.riskLevel}) ${getRiskEmoji(analysis1.riskLevel)}\n`;
-      message += `B: ${analysis2.riskScore}/100 (${analysis2.riskLevel)} ${getRiskEmoji(analysis2.riskLevel)}\n`;
+      const emoji1 = getRiskEmoji(analysis1.riskLevel);
+      const emoji2 = getRiskEmoji(analysis2.riskLevel);
+      message += `A: ${analysis1.riskScore}/100 (${analysis1.riskLevel}) ${emoji1}\n`;
+      message += `B: ${analysis2.riskScore}/100 (${analysis2.riskLevel}) ${emoji2}\n`;
       
       const betterRisk = analysis1.riskScore > analysis2.riskScore ? 'A' : 'B';
       message += `👑 Winner: Token ${betterRisk}\n\n`;
