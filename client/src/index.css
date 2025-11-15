@@ -337,4 +337,31 @@
   .glow-amber {
     box-shadow: 0 0 20px rgba(255, 165, 0, 0.3);
   }
+  
+  /* Rug Killer mascot background */
+  .mascot-background {
+    position: fixed;
+    bottom: -5%;
+    left: -5%;
+    width: 500px;
+    height: 500px;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.15;
+    filter: blur(1px);
+    background-image: url('/images/rug-killer-mascot.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: bottom left;
+    animation: mascot-float 8s ease-in-out infinite;
+  }
+  
+  @keyframes mascot-float {
+    0%, 100% {
+      transform: translateY(0px) scale(1);
+    }
+    50% {
+      transform: translateY(-10px) scale(1.02);
+    }
+  }
 }

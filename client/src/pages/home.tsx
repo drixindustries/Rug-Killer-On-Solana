@@ -289,6 +289,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      {/* Mascot background */}
+      <div className="mascot-background" />
+      
       <Header onNewAnalysis={analysis ? handleNewAnalysis : undefined} />
       
       <main className="flex-1">

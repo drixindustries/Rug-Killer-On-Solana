@@ -7,6 +7,9 @@ import { ContractAddress } from "@/components/contract-address";
 export default function Landing() {
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Mascot background */}
+      <div className="mascot-background" />
+      
       <header className="border-b">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
