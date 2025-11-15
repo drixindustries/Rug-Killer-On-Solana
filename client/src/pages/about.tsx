@@ -38,26 +38,33 @@ export default function About() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-green-500" />
-                  Official Contract Address
+                  Official Token - $ANTIRUG
                 </CardTitle>
                 <CardDescription>
                   Vanity address generated for the Solana Rug Killer project
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2 bg-muted px-3 py-2 rounded-md">
-                  <code className="font-mono text-sm flex-1 select-all" data-testid="text-about-contract">
-                    {CONTRACT_ADDRESS}
-                  </code>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => copyToClipboard(CONTRACT_ADDRESS)}
-                    aria-label="Copy contract address"
-                    data-testid="button-copy-about"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </Button>
+              <CardContent className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-muted-foreground">Ticker:</span>
+                  <span className="text-2xl font-bold text-primary">$ANTIRUG</span>
+                </div>
+                <div>
+                  <span className="text-sm text-muted-foreground block mb-2">Contract Address (CA):</span>
+                  <div className="flex items-center gap-2 bg-muted px-3 py-2 rounded-md">
+                    <code className="font-mono text-sm flex-1 select-all" data-testid="text-about-contract">
+                      {CONTRACT_ADDRESS}
+                    </code>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => copyToClipboard(CONTRACT_ADDRESS)}
+                      aria-label="Copy contract address"
+                      data-testid="button-copy-about"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

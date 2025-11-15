@@ -311,12 +311,16 @@ export default function Home() {
                   </p>
                 </div>
                 
-                {/* Official Contract Address */}
+                {/* Official Token - $ANTIRUG */}
                 <div className="flex flex-col items-center gap-3 pt-6">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-sm font-semibold text-muted-foreground">Official Contract Address</span>
+                    <span className="text-sm font-semibold text-muted-foreground">Official Token</span>
                   </div>
+                  <div className="text-3xl font-bold text-primary mb-2">
+                    $ANTIRUG
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-1">Contract Address (CA)</div>
                   <div className="flex items-center gap-2 bg-muted/50 backdrop-blur-sm px-3 sm:px-4 py-2.5 rounded-lg max-w-full overflow-x-auto border border-border/50">
                     <code className="font-mono text-xs sm:text-sm select-all break-all" data-testid="text-contract-address">
                       {CONTRACT_ADDRESS}
@@ -344,14 +348,20 @@ export default function Home() {
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base">
                     <CheckCircle className="w-4 h-4 text-green-500" />
-                    Official Contract Address
+                    Official Token - $ANTIRUG
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-2 bg-muted/50 px-3 py-2.5 rounded-lg overflow-x-auto border border-border/50">
-                    <code className="font-mono text-xs sm:text-sm flex-1 select-all break-all" data-testid="text-contract-card">
-                      {CONTRACT_ADDRESS}
-                    </code>
+                <CardContent className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Ticker:</span>
+                    <span className="text-xl font-bold text-primary">$ANTIRUG</span>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground block mb-1">Contract Address (CA)</span>
+                    <div className="flex items-center gap-2 bg-muted/50 px-3 py-2.5 rounded-lg overflow-x-auto border border-border/50">
+                      <code className="font-mono text-xs sm:text-sm flex-1 select-all break-all" data-testid="text-contract-card">
+                        {CONTRACT_ADDRESS}
+                      </code>
                     <Button
                       size="sm"
                       variant="ghost"
