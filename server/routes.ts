@@ -84,6 +84,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ providers: stats });
   });
 
+  // Token Analysis Endpoint with Rate Limit Handling
+  app.post("/api/analyze", async (req, res) => {
+    try {
+      const result = analyzeTokenSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          message: "Invalid request format",
+          errors: result.error.issues,
+        });
+      }
+
+      const { tokenAddress } = result.data;
+
+      // Rate limit tracking per IP
+      const clientIP = req.ip || req.connection.remoteAddress;
+      const rateLimitKey = `analyze:${clientIP}`;
+      
+      // Check if client is rate limited (simple in-memory store)
+      const now = Date.now();
+      if (!global.rateLimitStore) {
+        global.rateLimitStore = new Map();
+      }
+      
+      const clientData = global.rateLimitStore.get(rateLimitKey) || { count: 0, resetTime: now + 60000 };
+      
+      if (now > clientData.resetTime) {
+        clientData.count = 0;
+        clientData.resetTime = now + 60000; // Reset every minute
+      }
+      
+      if (clientData.count >= 10) { // 10 requests per minute per IP
+        return res.status(429).json({
+          message: "Rate Limit Reached",
+          error: "Too many analysis requests. Please try again in a few moments.",
+          retryAfter: Math.ceil((clientData.resetTime - now) / 1000)
+        });
+      }
+      
+      clientData.count++;
+      global.rateLimitStore.set(rateLimitKey, clientData);
+
+      console.log(`[API] Analyzing token: ${tokenAddress} for IP: ${clientIP} (${clientData.count}/10)`);
+
+      try {
+        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        
+        res.json({
+          success: true,
+          ...analysis
+        });
+        
+      } catch (error: any) {
+        console.error("Token analysis error:", error);
+        
+        // Handle specific RPC rate limit errors
+        if (error.message?.includes("rate limit") || error.message?.includes("429")) {
+          return res.status(503).json({
+            message: "Rate Limit Reached",
+            error: "Unable to complete token analysis: Solana RPC rate limit reached. Please try again in a few moments.",
+            retryAfter: 30,
+            type: "rpc_rate_limit"
+          });
+        }
+        
+        // Handle other RPC errors
+        if (error.message?.includes("RPC") || error.message?.includes("connection")) {
+          return res.status(503).json({
+            message: "Service Temporarily Unavailable",
+            error: "RPC connection issues. Please try again shortly.",
+            retryAfter: 10,
+            type: "rpc_connection"
+          });
+        }
+        
+        // Generic error handling
+        const statusCode = error.message?.includes("Invalid") ? 400 : 500;
+        res.status(statusCode).json({
+          message: statusCode === 400 ? "Invalid token address" : "Analysis failed",
+          error: error.message || "An unexpected error occurred during token analysis.",
+          tokenAddress
+        });
+      }
+
+    } catch (error: any) {
+      console.error("API error:", error);
+      res.status(500).json({
+        message: "Internal server error",
+        error: "Failed to process analysis request."
+      });
+    }
+  });
+
   // Subscription routes
   app.get('/api/subscription/status', isAuthenticated, async (req: any, res) => {
     try {

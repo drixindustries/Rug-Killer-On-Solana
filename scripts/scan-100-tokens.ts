@@ -182,9 +182,9 @@ async function scanToken(address: string, index: number, total: number): Promise
     };
     
     // Count flags by severity
-    const criticalFlags = analysis.redFlags.filter(f => f.severity === 'critical').length;
-    const highFlags = analysis.redFlags.filter(f => f.severity === 'high').length;
-    const mediumFlags = analysis.redFlags.filter(f => f.severity === 'medium').length;
+    const criticalFlags = analysis.redFlags.filter((f: any) => f.severity === 'critical').length;
+    const highFlags = analysis.redFlags.filter((f: any) => f.severity === 'high').length;
+    const mediumFlags = analysis.redFlags.filter((f: any) => f.severity === 'medium').length;
     
     // Extract metrics
     const pair = analysis.dexscreenerData?.pairs?.[0];

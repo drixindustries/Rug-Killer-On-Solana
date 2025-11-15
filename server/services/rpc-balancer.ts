@@ -12,33 +12,45 @@ interface RpcProvider {
   consecutiveFails: number;
   requiresKey?: boolean;
   hasKey?: () => boolean;
+  requestCount?: number;
+  lastRequestTime?: number;
+  rateLimitResetTime?: number;
+  isRateLimited?: boolean;
 }
 
 const RPC_PROVIDERS = [
-  // High-speed public balancers (prioritized for speed)
+  // High-speed public balancers (prioritized for speed) with rate limits
   { 
     getUrl: () => "https://solana.drpc.org",
     weight: 25, 
     name: "dRPC",
-    tier: "premium"
+    tier: "premium",
+    rateLimit: 100, // requests per minute
+    rateLimitWindow: 60000 // 1 minute
   },
   { 
     getUrl: () => "https://solana.api.pocket.network/",
     weight: 20, 
     name: "Pocket",
-    tier: "premium"
+    tier: "premium",
+    rateLimit: 120,
+    rateLimitWindow: 60000
   },
   { 
     getUrl: () => "https://solana.subquery.network/rpc",
     weight: 20, 
     name: "SubQuery",
-    tier: "premium"
+    tier: "premium",
+    rateLimit: 80,
+    rateLimitWindow: 60000
   },
   { 
     getUrl: () => "https://rpc.ankr.com/solana",
     weight: 15, 
     name: "Ankr",
-    tier: "premium"
+    tier: "premium",
+    rateLimit: 300, // 300 requests per day / spread across minutes
+    rateLimitWindow: 60000
   },
   // API key providers (premium with keys)
   { 
@@ -47,7 +59,9 @@ const RPC_PROVIDERS = [
     name: "Helius",
     tier: "premium",
     requiresKey: true,
-    hasKey: () => !!process.env.HELIUS_KEY
+    hasKey: () => !!process.env.HELIUS_KEY,
+    rateLimit: 1000, // High limit with API key
+    rateLimitWindow: 60000
   },
   { 
     getUrl: () => `https://solana-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY || ""}`,
@@ -55,26 +69,34 @@ const RPC_PROVIDERS = [
     name: "Alchemy",
     tier: "premium",
     requiresKey: true,
-    hasKey: () => !!process.env.ALCHEMY_KEY
+    hasKey: () => !!process.env.ALCHEMY_KEY,
+    rateLimit: 500,
+    rateLimitWindow: 60000
   },
-  // Fallback public endpoints
+  // Fallback public endpoints (more conservative limits)
   { 
     getUrl: () => "https://api.mainnet-beta.solana.com",
     weight: 10, 
     name: "Public",
-    tier: "fallback"
+    tier: "fallback",
+    rateLimit: 40, // Conservative public limit
+    rateLimitWindow: 60000
   },
   { 
     getUrl: () => "https://solana-api.projectserum.com",
     weight: 8, 
     name: "Serum",
-    tier: "fallback"
+    tier: "fallback",
+    rateLimit: 50,
+    rateLimitWindow: 60000
   },
   {
     getUrl: () => "https://ssc-dao.genesysgo.net",
     weight: 5,
     name: "GenesysGo",
-    tier: "fallback"
+    tier: "fallback",
+    rateLimit: 30,
+    rateLimitWindow: 60000
   }
 ];
 
@@ -109,15 +131,42 @@ export class SolanaRpcBalancer {
       fails: 0,
       consecutiveFails: 0,
       avgLatency: 0,
-      lastHealthCheck: 0
+      lastHealthCheck: 0,
+      requestCount: 0,
+      lastRequestTime: 0,
+      rateLimitResetTime: 0,
+      isRateLimited: false
     }));
     this.totalWeight = availableProviders.reduce((s, p) => s + p.weight, 0);
   }
 
   select(): RpcProvider {
-    // Prefer premium tier providers that are healthy
-    const premiumHealthy = this.providers.filter(p => p.tier === 'premium' && p.score > 70 && p.consecutiveFails < 3);
-    const fallbackHealthy = this.providers.filter(p => p.tier === 'fallback' && p.score > 50 && p.consecutiveFails < 5);
+    const now = Date.now();
+    
+    // Reset rate limits for providers whose window has expired
+    this.providers.forEach(p => {
+      if (p.rateLimitResetTime && now > p.rateLimitResetTime) {
+        p.requestCount = 0;
+        p.isRateLimited = false;
+        p.rateLimitResetTime = 0;
+      }
+    });
+    
+    // Filter out rate-limited providers
+    const notRateLimited = this.providers.filter(p => !this.isProviderRateLimited(p));
+    
+    if (notRateLimited.length === 0) {
+      console.log('[RPC Balancer] All providers rate limited, using least limited');
+      // Find provider with the earliest reset time
+      const leastLimited = this.providers.reduce((min, p) => 
+        (p.rateLimitResetTime || 0) < (min.rateLimitResetTime || 0) ? p : min
+      );
+      return leastLimited;
+    }
+    
+    // Prefer premium tier providers that are healthy and not rate limited
+    const premiumHealthy = notRateLimited.filter(p => p.tier === 'premium' && p.score > 70 && p.consecutiveFails < 3);
+    const fallbackHealthy = notRateLimited.filter(p => p.tier === 'fallback' && p.score > 50 && p.consecutiveFails < 5);
     
     let candidates = premiumHealthy.length > 0 ? premiumHealthy : fallbackHealthy;
     
@@ -148,32 +197,91 @@ export class SolanaRpcBalancer {
     }
     
     const selected = weighted[Math.floor(Math.random() * weighted.length)];
-    console.log(`[RPC Balancer] Selected ${selected.name} (${selected.tier}) - score: ${selected.score}, latency: ${selected.avgLatency || 'unknown'}ms`);
+    
+    // Track request for rate limiting
+    this.trackRequest(selected);
+    
+    console.log(`[RPC Balancer] Selected ${selected.name} (${selected.tier}) - score: ${selected.score}, latency: ${selected.avgLatency || 'unknown'}ms, requests: ${selected.requestCount}/${selected.rateLimit || 'unlimited'}`);
     return selected;
   }
 
+  private isProviderRateLimited(provider: RpcProvider): boolean {
+    if (!provider.rateLimit || !provider.rateLimitWindow) return false;
+    
+    const now = Date.now();
+    
+    // Check if we're within rate limit window
+    if (provider.lastRequestTime && (now - provider.lastRequestTime) > provider.rateLimitWindow) {
+      // Reset if window expired
+      provider.requestCount = 0;
+      provider.isRateLimited = false;
+      provider.rateLimitResetTime = 0;
+    }
+    
+    return (provider.requestCount || 0) >= provider.rateLimit;
+  }
+
+  private trackRequest(provider: RpcProvider): void {
+    const now = Date.now();
+    
+    if (!provider.lastRequestTime || (now - provider.lastRequestTime) > (provider.rateLimitWindow || 60000)) {
+      // Reset window
+      provider.requestCount = 1;
+      provider.lastRequestTime = now;
+    } else {
+      provider.requestCount = (provider.requestCount || 0) + 1;
+    }
+    
+    // Check if we hit the rate limit
+    if (provider.rateLimit && provider.requestCount >= provider.rateLimit) {
+      provider.isRateLimited = true;
+      provider.rateLimitResetTime = now + (provider.rateLimitWindow || 60000);
+      console.log(`[RPC Balancer] ${provider.name} rate limited, reset at ${new Date(provider.rateLimitResetTime).toLocaleTimeString()}`);
+    }
+  }
+
   getConnection(): Connection {
-    const provider = this.select();
-    const url = provider.getUrl();
+    let attempts = 0;
+    const maxAttempts = 3;
     
-    // Use connection pooling for frequently used providers
-    const cacheKey = `${provider.name}-${url}`;
-    if (this.connectionPool.has(cacheKey)) {
-      return this.connectionPool.get(cacheKey)!;
+    while (attempts < maxAttempts) {
+      try {
+        const provider = this.select();
+        const url = provider.getUrl();
+        
+        // Use connection pooling for frequently used providers
+        const cacheKey = `${provider.name}-${url}`;
+        if (this.connectionPool.has(cacheKey)) {
+          return this.connectionPool.get(cacheKey)!;
+        }
+        
+        const connection = new Connection(url, { 
+          commitment: "confirmed",
+          wsEndpoint: undefined, // Disable websocket for faster REST calls
+          confirmTransactionInitialTimeout: 8000, // Reduced timeout
+        });
+        
+        // Add to pool if under limit
+        if (this.connectionPool.size < this.poolSize) {
+          this.connectionPool.set(cacheKey, connection);
+        }
+        
+        return connection;
+        
+      } catch (error) {
+        attempts++;
+        console.log(`[RPC Balancer] Connection attempt ${attempts} failed:`, error);
+        
+        if (attempts >= maxAttempts) {
+          // Fallback to most basic public endpoint
+          const fallbackUrl = "https://api.mainnet-beta.solana.com";
+          return new Connection(fallbackUrl, { commitment: "confirmed" });
+        }
+      }
     }
     
-    const connection = new Connection(url, { 
-      commitment: "confirmed",
-      wsEndpoint: undefined, // Disable websocket for faster REST calls
-      confirmTransactionInitialTimeout: 10000,
-    });
-    
-    // Add to pool if under limit
-    if (this.connectionPool.size < this.poolSize) {
-      this.connectionPool.set(cacheKey, connection);
-    }
-    
-    return connection;
+    // Should never reach here, but TypeScript safety
+    throw new Error('Failed to establish RPC connection after all attempts');
   }
 
   // Get multiple connections for concurrent operations
