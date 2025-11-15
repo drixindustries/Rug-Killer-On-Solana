@@ -56,8 +56,8 @@ export function Header({ onNewAnalysis }: HeaderProps) {
           <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <Shield className="h-6 w-6 text-primary" />
-              <span className="font-bold text-lg hidden sm:inline">Solana Rug Killer</span>
-              <span className="font-bold text-lg sm:hidden">SRK</span>
+              <span className="font-bold text-lg hidden sm:inline">Rug Killer Alpha Bot</span>
+              <span className="font-bold text-lg sm:hidden">RKAB</span>
             </Link>
 
             {/* Desktop Navigation Menu */}

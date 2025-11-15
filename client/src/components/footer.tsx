@@ -34,7 +34,7 @@ export function Footer() {
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Shield className="h-5 w-5 text-primary" />
-              <span className="text-sm font-semibold">Solana Rug Killer</span>
+              <span className="text-sm font-semibold">Rug Killer Alpha Bot</span>
             </div>
             <p className="text-sm text-muted-foreground mb-3">
               Protecting Solana investors from rug pulls since 2025
@@ -140,7 +140,7 @@ export function Footer() {
         
         <div className="border-t pt-6">
           <p className="text-xs text-muted-foreground text-center">
-            © 2025 Solana Rug Killer. All rights reserved.
+            © 2025 Rug Killer Alpha Bot. All rights reserved.
           </p>
         </div>
       </div>
