@@ -553,7 +553,7 @@ export default function Home() {
 
                 <TabsContent value="community" className="space-y-6">
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Left Column - Community Features */}
+                    {/* Left Column - Community Verdict and Comments */}
                     <div className="lg:col-span-2 space-y-6">
                       {/* Community Vote Widget */}
                       <Card>
@@ -819,8 +819,11 @@ export default function Home() {
                           )}
                         </CardContent>
                       </Card>
+                    </div>
 
-                      {/* Comments Section */}
+                    {/* Right Column - Share and Report */}
+                    <div className="space-y-6">
+                      {/* Share Analysis */}
                       <Card>
                         <CardHeader>
                           <CardTitle className="flex items-center gap-2">
