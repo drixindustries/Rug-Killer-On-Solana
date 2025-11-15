@@ -150,6 +150,20 @@ export function Header({ onNewAnalysis }: HeaderProps) {
               </>
             )}
 
+            {/* Sign In Button - Only show when not authenticated */}
+            {!user && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => window.location.href = '/api/login'}
+                className="hidden md:inline-flex"
+                data-testid="button-sign-in"
+              >
+                <User className="h-4 w-4 mr-1" />
+                Sign In
+              </Button>
+            )}
+
             {/* Wallet Connect */}
             {walletAddress ? (
               <DropdownMenu>
@@ -263,6 +277,22 @@ export function Header({ onNewAnalysis }: HeaderProps) {
 
                   {/* Mobile Actions */}
                   <div className="space-y-2 pt-4 border-t">
+                    {!user && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="w-full justify-start"
+                        onClick={() => {
+                          window.location.href = '/api/login';
+                          setMobileMenuOpen(false);
+                        }}
+                        data-testid="button-sign-in-mobile"
+                      >
+                        <User className="h-4 w-4 mr-2" />
+                        Sign In
+                      </Button>
+                    )}
+                    
                     {walletAddress ? (
                       <Button 
                         variant="outline"

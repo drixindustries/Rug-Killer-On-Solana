@@ -142,6 +142,19 @@ export function Header({ onNewAnalysis }: HeaderProps) {
             </Button>
           </Link>
           
+          {/* Sign In Button - Only show when not authenticated */}
+          {!user && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => window.location.href = '/api/login'}
+              data-testid="button-sign-in"
+            >
+              <User className="h-4 w-4 mr-1" />
+              Sign In
+            </Button>
+          )}
+          
           {walletAddress ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
