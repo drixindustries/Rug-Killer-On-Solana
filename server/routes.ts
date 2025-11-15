@@ -2034,6 +2034,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // ========================================
+  // WALLET DISCOVERY ROUTES (Admin Only)
+  // ========================================
+
+  // GET /api/admin/wallets/discovery/status - Get wallet discovery status
+  app.get('/api/admin/wallets/discovery/status', isAdmin, async (req, res) => {
+    try {
+      const { getWalletScheduler } = await import('./wallet-scheduler');
+      const { getAlphaAlertService } = await import('./alpha-alerts');
+      
+      const scheduler = getWalletScheduler();
+      const alphaService = getAlphaAlertService();
+      
+      res.json({
+        scheduler: scheduler.getStatus(),
+        alphaAlerts: alphaService.getStatus(),
+      });
+    } catch (error) {
+      console.error("Error getting wallet discovery status:", error);
+      res.status(500).json({ message: "Failed to get status" });
+    }
+  });
+
+  // POST /api/admin/wallets/discovery/run - Manually trigger wallet discovery
+  app.post('/api/admin/wallets/discovery/run', isAdmin, async (req, res) => {
+    try {
+      const { getWalletDiscoveryService } = await import('./services/wallet-discovery');
+      const discoveryService = getWalletDiscoveryService();
+      
+      // This would be async - return immediately
+      res.json({ message: 'Wallet discovery started', status: 'running' });
+      
+      // Run in background
+      const tokenMints = req.body.tokenMints || [];
+      discoveryService.discoverProfitableWallets(tokenMints).catch(err => {
+        console.error('Manual wallet discovery failed:', err);
+      });
+    } catch (error) {
+      console.error("Error starting wallet discovery:", error);
+      res.status(500).json({ message: "Failed to start discovery" });
+    }
+  });
+
+  // POST /api/admin/wallets/add - Manually add a wallet
+  app.post('/api/admin/wallets/add', isAdmin, async (req, res) => {
+    try {
+      const { addManualWallet } = await import('./services/external-wallet-sources');
+      
+      const { walletAddress, displayName, twitterHandle, source } = req.body;
+      
+      if (!walletAddress) {
+        return res.status(400).json({ message: 'walletAddress is required' });
+      }
+
+      await addManualWallet({
+        walletAddress,
+        displayName,
+        twitterHandle,
+        source: source || 'admin-manual',
+      });
+
+      res.json({ message: 'Wallet added successfully', wallet: walletAddress });
+    } catch (error) {
+      console.error("Error adding manual wallet:", error);
+      res.status(500).json({ message: "Failed to add wallet" });
+    }
+  });
+
+  // GET /api/admin/wallets/list - List all tracked wallets
+  app.get('/api/admin/wallets/list', isAdmin, async (req, res) => {
+    try {
+      const { db } = await import('./db');
+      const { kolWallets } = await import('../shared/schema');
+      const { desc } = await import('drizzle-orm');
+      
+      const limit = parseInt(req.query.limit as string) || 100;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      const wallets = await db
+        .select()
+        .from(kolWallets)
+        .orderBy(desc(kolWallets.influenceScore))
+        .limit(limit)
+        .offset(offset);
+
+      const total = await db.select({ count: kolWallets.id }).from(kolWallets);
+
+      res.json({
+        wallets,
+        total: total.length,
+        limit,
+        offset,
+      });
+    } catch (error) {
+      console.error("Error listing wallets:", error);
+      res.status(500).json({ message: "Failed to list wallets" });
+    }
+  });
+
+  // DELETE /api/admin/wallets/:walletAddress - Remove a wallet
+  app.delete('/api/admin/wallets/:walletAddress', isAdmin, async (req, res) => {
+    try {
+      const { db } = await import('./db');
+      const { kolWallets } = await import('../shared/schema');
+      const { eq } = await import('drizzle-orm');
+      
+      const { walletAddress } = req.params;
+      
+      await db
+        .delete(kolWallets)
+        .where(eq(kolWallets.walletAddress, walletAddress));
+
+      res.json({ message: 'Wallet removed successfully' });
+    } catch (error) {
+      console.error("Error removing wallet:", error);
+      res.status(500).json({ message: "Failed to remove wallet" });
+    }
+  });
+
+  // POST /api/admin/wallets/external/sync - Sync from external sources
+  app.post('/api/admin/wallets/external/sync', isAdmin, async (req, res) => {
+    try {
+      const { getExternalWalletService } = await import('./services/external-wallet-sources');
+      const externalService = getExternalWalletService();
+      
+      res.json({ message: 'External wallet sync started', status: 'running' });
+      
+      // Run in background
+      externalService.aggregateAllSources().catch(err => {
+        console.error('External wallet sync failed:', err);
+      });
+    } catch (error) {
+      console.error("Error syncing external wallets:", error);
+      res.status(500).json({ message: "Failed to sync external wallets" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

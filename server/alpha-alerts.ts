@@ -1,5 +1,8 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import WebSocket from 'ws';
+import { db } from './db';
+import { kolWallets } from '../shared/schema';
+import { gte } from 'drizzle-orm';
 
 interface AlphaAlert {
   type: 'new_token' | 'whale_buy' | 'caller_signal';
@@ -13,6 +16,7 @@ interface AlphaCallerConfig {
   wallet: string;
   name: string;
   enabled: boolean;
+  influenceScore?: number;
 }
 
 // Alpha callers can be configured via environment variables or admin interface
@@ -26,10 +30,66 @@ export class AlphaAlertService {
   private alertCallbacks: ((alert: AlphaAlert) => void)[] = [];
   private isRunning = false;
   private alphaCallers: AlphaCallerConfig[];
+  private autoRefreshInterval: NodeJS.Timeout | null = null;
 
   constructor(rpcUrl?: string, customCallers?: AlphaCallerConfig[]) {
     this.connection = new Connection(rpcUrl || 'https://api.mainnet-beta.solana.com', 'confirmed');
     this.alphaCallers = customCallers || DEFAULT_ALPHA_CALLERS;
+  }
+
+  /**
+   * Load profitable wallets from database to monitor
+   * Automatically includes discovered wallets + seeded KOLs
+   */
+  async loadWalletsFromDatabase(minInfluence: number = 60): Promise<void> {
+    try {
+      const topWallets = await db
+        .select()
+        .from(kolWallets)
+        .where(gte(kolWallets.influenceScore, minInfluence))
+        .limit(100); // Monitor top 100 wallets
+
+      const walletsToAdd: AlphaCallerConfig[] = topWallets.map(w => ({
+        wallet: w.walletAddress,
+        name: w.displayName || `Trader ${w.walletAddress.substring(0, 6)}`,
+        enabled: true,
+        influenceScore: w.influenceScore || 50,
+      }));
+
+      // Merge with existing callers (avoid duplicates)
+      for (const newWallet of walletsToAdd) {
+        if (!this.alphaCallers.find(c => c.wallet === newWallet.wallet)) {
+          this.alphaCallers.push(newWallet);
+          
+          // If already running, start monitoring this wallet
+          if (this.isRunning) {
+            this.monitorAlphaCaller(newWallet);
+          }
+        }
+      }
+
+      console.log(`[Alpha Alerts] Loaded ${walletsToAdd.length} wallets from database (min influence: ${minInfluence})`);
+    } catch (error) {
+      console.error('[Alpha Alerts] Error loading wallets from database:', error);
+    }
+  }
+
+  /**
+   * Auto-refresh wallet list every hour to pick up newly discovered wallets
+   */
+  private startAutoRefresh(): void {
+    // Refresh every hour
+    this.autoRefreshInterval = setInterval(async () => {
+      console.log('[Alpha Alerts] Auto-refreshing wallet list...');
+      await this.loadWalletsFromDatabase();
+    }, 60 * 60 * 1000);
+  }
+
+  private stopAutoRefresh(): void {
+    if (this.autoRefreshInterval) {
+      clearInterval(this.autoRefreshInterval);
+      this.autoRefreshInterval = null;
+    }
   }
 
   // Register callback for alerts
@@ -232,11 +292,15 @@ export class AlphaAlertService {
 
     this.isRunning = true;
 
+    // Load wallets from database first
+    await this.loadWalletsFromDatabase();
+
     for (const caller of this.alphaCallers) {
       this.monitorAlphaCaller(caller);
     }
 
     this.startPumpFunMonitor();
+    this.startAutoRefresh();
     
     // Send startup notification directly (not through sendAlert to avoid fake links)
     const startupMessage = '🤖 **ANTIRUGILLER ALPHA ALERTS ONLINE**\n\n' +
@@ -284,6 +348,8 @@ export class AlphaAlertService {
   // Stop all monitoring
   async stop(): Promise<void> {
     this.isRunning = false;
+
+    this.stopAutoRefresh();
 
     // Remove wallet listeners
     for (const [wallet, listenerId] of Array.from(this.listeners.entries())) {

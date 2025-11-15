@@ -88,6 +88,10 @@ app.use((req, res, next) => {
     alphaService.start().catch(err => {
       console.error('Failed to start Alpha Alert service:', err);
     });
+
+    // Start wallet discovery scheduler
+    const { initializeWalletDiscovery } = await import('./wallet-scheduler');
+    initializeWalletDiscovery();
   }
 
   // Start analytics worker (always enabled for dashboard)
