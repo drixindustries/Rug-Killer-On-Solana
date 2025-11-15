@@ -214,7 +214,7 @@ function createTelegramBot(botToken: string): Telegraf {
     { command: 'start', description: 'Show available commands' },
     { command: 'execute', description: 'Full 52-metric scan - /execute <address>' },
     { command: 'first20', description: 'Top 20 holder analysis - /first20 <address>' },
-    { command: 'devtorture', description: 'Dev wallet history - /devtorture <address>' },
+    { command: 'devaudit', description: 'Dev wallet history - /devaudit <address>' },
     { command: 'blacklist', description: 'Check wallet blacklist - /blacklist <wallet>' },
     { command: 'whaletrack', description: 'Smart money in token - /whaletrack <address>' },
     { command: 'kol', description: 'Check if wallet is KOL - /kol <wallet>' },
@@ -234,7 +234,7 @@ function createTelegramBot(botToken: string): Telegraf {
       '**Core Commands:**\n' +
       '/execute <address> - Full 52-metric scan\n' +
       '/first20 <address> - Top 20 holder analysis\n' +
-      '/devtorture <address> - Dev wallet history\n' +
+      '/devaudit <address> - Dev wallet history\n' +
       '/blacklist <wallet> - Check if wallet is flagged\n\n' +
       '**Group Tier Commands:**\n' +
       '/whaletrack <address> - Smart money tracking\n' +
@@ -304,11 +304,11 @@ function createTelegramBot(botToken: string): Telegraf {
     }
   });
   
-  // /devtorture command - Dev wallet history
-  bot.command('devtorture', async (ctx) => {
+  // /devaudit command - Dev wallet history
+  bot.command('devaudit', async (ctx) => {
     const args = ctx.message.text.split(' ');
     if (args.length < 2) {
-      return ctx.reply('❌ Please provide a token address.\n\nExample: `/devtorture EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`', { parse_mode: 'Markdown' });
+      return ctx.reply('❌ Please provide a token address.\n\nExample: `/devaudit EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`', { parse_mode: 'Markdown' });
     }
     
     const tokenAddress = args[1];
@@ -318,7 +318,7 @@ function createTelegramBot(botToken: string): Telegraf {
       
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
       
-      let message = `🔥 **DEV TORTURE REPORT - ${analysis.metadata.symbol}**\n\n`;
+      let message = `🔥 **Dev Audit REPORT - ${analysis.metadata.symbol}**\n\n`;
       message += `Token: \`${tokenAddress}\`\n\n`;
       
       let hasFlags = false;
@@ -369,7 +369,7 @@ function createTelegramBot(botToken: string): Telegraf {
       message += `━━━━━━━━━━━━━━━━\n`;
       if (!hasFlags) {
         message += `🎉 **VERDICT: SAFE**\n`;
-        message += `✅ Token passes dev torture checks!`;
+        message += `✅ Token passes Dev Audit checks!`;
       } else {
         message += `⚠️ **VERDICT: CONCERNING**\n`;
         message += `🚨 Token has dev permissions!`;
@@ -377,7 +377,7 @@ function createTelegramBot(botToken: string): Telegraf {
       
       await ctx.reply(message, { parse_mode: 'Markdown' });
     } catch (error) {
-      console.error('Telegram bot devtorture error:', error);
+      console.error('Telegram bot devaudit error:', error);
       ctx.reply('❌ Error analyzing dev wallet. Please check the address and try again.');
     }
   });

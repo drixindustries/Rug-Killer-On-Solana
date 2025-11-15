@@ -374,7 +374,7 @@ export default function Features() {
                   <span className="text-muted-foreground ml-2">Top 20 holders</span>
                 </div>
                 <div>
-                  <code className="font-semibold">/devtorture</code>
+                  <code className="font-semibold">/devaudit</code>
                   <span className="text-muted-foreground ml-2">Dev wallet history</span>
                 </div>
                 <div>
@@ -439,7 +439,7 @@ export default function Features() {
                   <span className="text-muted-foreground ml-2">Top 20 holders</span>
                 </div>
                 <div>
-                  <code className="font-semibold">/devtorture</code>
+                  <code className="font-semibold">/devaudit</code>
                   <span className="text-muted-foreground ml-2">Dev wallet history</span>
                 </div>
                 <div>

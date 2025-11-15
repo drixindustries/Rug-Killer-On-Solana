@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Header } from "@/components/header-new";
@@ -6,23 +6,6 @@ import { Footer } from "@/components/footer";
 import { TokenInput } from "@/components/token-input";
 import { RiskScoreCard } from "@/components/risk-score-card";
 import { CriticalAlerts } from "@/components/critical-alerts";
-import { MetricsGrid } from "@/components/metrics-grid";
-import { TopHoldersTable } from "@/components/top-holders-table";
-import { HolderDistributionChart } from "@/components/holder-distribution-chart";
-import { TransactionTimeline } from "@/components/transaction-timeline";
-import { TokenMetadataCard } from "@/components/token-metadata-card";
-import { RugcheckCard } from "@/components/rugcheck-card";
-import { GoPlusCard } from "@/components/goplus-card";
-import { MarketDataCard } from "@/components/market-data-card";
-import { BubbleMapsCard } from "@/components/bubblemaps-card";
-import { TokenInfoSidebar } from "@/components/token-info-sidebar";
-import { LiquidityBurnCard } from "@/components/liquidity-burn-card";
-import { HolderFilteringCard } from "@/components/holder-filtering-card";
-import { BundleVisualizationChart } from "@/components/bundle-visualization-chart";
-import { HoneypotDetectionCard } from "@/components/honeypot-detection-card";
-import { BundleDetectionCard } from "@/components/bundle-detection-card";
-import { NetworkAnalysisCard } from "@/components/network-analysis-card";
-import { WhaleDetectionCard } from "@/components/whale-detection-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +23,28 @@ import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import type { TokenAnalysisResponse, TokenComment, CommunityVote, CommunityVoteSummary } from "@shared/schema";
 import { CONTRACT_ADDRESS } from "@/constants";
+
+// Lazy load heavy components for better initial page load
+const MetricsGrid = lazy(() => import("@/components/metrics-grid").then(m => ({ default: m.MetricsGrid })));
+const TopHoldersTable = lazy(() => import("@/components/top-holders-table").then(m => ({ default: m.TopHoldersTable })));
+const HolderDistributionChart = lazy(() => import("@/components/holder-distribution-chart").then(m => ({ default: m.HolderDistributionChart })));
+const TransactionTimeline = lazy(() => import("@/components/transaction-timeline").then(m => ({ default: m.TransactionTimeline })));
+const TokenMetadataCard = lazy(() => import("@/components/token-metadata-card").then(m => ({ default: m.TokenMetadataCard })));
+const RugcheckCard = lazy(() => import("@/components/rugcheck-card").then(m => ({ default: m.RugcheckCard })));
+const GoPlusCard = lazy(() => import("@/components/goplus-card").then(m => ({ default: m.GoPlusCard })));
+const MarketDataCard = lazy(() => import("@/components/market-data-card").then(m => ({ default: m.MarketDataCard })));
+const BubbleMapsCard = lazy(() => import("@/components/bubblemaps-card").then(m => ({ default: m.BubbleMapsCard })));
+const TokenInfoSidebar = lazy(() => import("@/components/token-info-sidebar").then(m => ({ default: m.TokenInfoSidebar })));
+const LiquidityBurnCard = lazy(() => import("@/components/liquidity-burn-card").then(m => ({ default: m.LiquidityBurnCard })));
+const HolderFilteringCard = lazy(() => import("@/components/holder-filtering-card").then(m => ({ default: m.HolderFilteringCard })));
+const BundleVisualizationChart = lazy(() => import("@/components/bundle-visualization-chart").then(m => ({ default: m.BundleVisualizationChart })));
+const HoneypotDetectionCard = lazy(() => import("@/components/honeypot-detection-card").then(m => ({ default: m.HoneypotDetectionCard })));
+const BundleDetectionCard = lazy(() => import("@/components/bundle-detection-card").then(m => ({ default: m.BundleDetectionCard })));
+const NetworkAnalysisCard = lazy(() => import("@/components/network-analysis-card").then(m => ({ default: m.NetworkAnalysisCard })));
+const WhaleDetectionCard = lazy(() => import("@/components/whale-detection-card").then(m => ({ default: m.WhaleDetectionCard })));
+
+// Loading fallback component for lazy-loaded components
+const ComponentLoader = () => <Skeleton className="h-48 w-full" />;
 
 export default function Home() {
   const { toast } = useToast();
@@ -293,8 +298,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* Mascot background */}
-      <div className="mascot-background" />
+      {/* Mascot background - only show on landing page */}
+      {!analysis && <div className="mascot-background" />}
       
       <Header onNewAnalysis={analysis ? handleNewAnalysis : undefined} />
       
@@ -306,8 +311,7 @@ export default function Home() {
                 <div className="space-y-3">
                   <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">Rug Killer Alpha Bot</h1>
                   <p className="text-base sm:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
-                    Advanced Solana token security platform with 99%+ rug detection using AI-powered honeypot simulation, 
-                    bundle timing analysis, and wallet network clustering.
+                    Advanced Solana token security platform with 99%+ rug detection
                   </p>
                 </div>
                 
@@ -342,44 +346,11 @@ export default function Home() {
 
             <TokenInput onAnalyze={handleAnalyze} isAnalyzing={isLoading} />
 
-            {/* Contract Address Card - Always visible */}
-            {!analysis && (
-              <Card data-testid="card-contract-address" className="border-border/50 shadow-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                    Official Token - $ANTIRUG
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">Ticker:</span>
-                    <span className="text-xl font-bold text-primary">$ANTIRUG</span>
-                  </div>
-                  <div>
-                    <span className="text-xs text-muted-foreground block mb-1">Contract Address (CA)</span>
-                    <div className="flex items-center gap-2 bg-muted/50 px-3 py-2.5 rounded-lg overflow-x-auto border border-border/50">
-                      <code className="font-mono text-xs sm:text-sm flex-1 select-all break-all" data-testid="text-contract-card">
-                        {CONTRACT_ADDRESS}
-                      </code>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 shrink-0"
-                      onClick={() => copyToClipboard(CONTRACT_ADDRESS)}
-                      aria-label="Copy contract address"
-                      data-testid="button-copy-contract-card"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {/* BubbleMaps - Positioned directly below token input for better visibility */}
             {analysis && (
-              <BubbleMapsCard tokenAddress={analysis.tokenAddress} />
+              <Suspense fallback={<ComponentLoader />}>
+                <BubbleMapsCard tokenAddress={analysis.tokenAddress} />
+              </Suspense>
             )}
 
             {isLoading && (
@@ -438,113 +409,145 @@ export default function Home() {
                       {/* ADVANCED DETECTION (2025) */}
                       {/* Honeypot Detection */}
                       {analysis.quillcheckData && (
-                        <HoneypotDetectionCard data={analysis.quillcheckData} />
+                        <Suspense fallback={<ComponentLoader />}>
+                          <HoneypotDetectionCard data={analysis.quillcheckData} />
+                        </Suspense>
                       )}
 
                       {/* Bundle Detection */}
                       {analysis.advancedBundleData && (
-                        <BundleDetectionCard data={analysis.advancedBundleData} />
+                        <Suspense fallback={<ComponentLoader />}>
+                          <BundleDetectionCard data={analysis.advancedBundleData} />
+                        </Suspense>
                       )}
 
                       {/* Network Analysis */}
                       {analysis.networkAnalysis && (
-                        <NetworkAnalysisCard data={analysis.networkAnalysis} />
+                        <Suspense fallback={<ComponentLoader />}>
+                          <NetworkAnalysisCard data={analysis.networkAnalysis} />
+                        </Suspense>
                       )}
 
                       {/* Whale Detection */}
                       {analysis.whaleDetection && (
-                        <WhaleDetectionCard 
-                          data={analysis.whaleDetection} 
-                          symbol={analysis.metadata?.symbol || 'TOKEN'} 
-                        />
+                        <Suspense fallback={<ComponentLoader />}>
+                          <WhaleDetectionCard 
+                            data={analysis.whaleDetection} 
+                            symbol={analysis.metadata?.symbol || 'TOKEN'} 
+                          />
+                        </Suspense>
                       )}
 
                       {/* LP Burn Checker - Only show if we have burn data */}
                       {analysis.liquidityPool?.burnPercentage !== undefined && (
-                        <LiquidityBurnCard
-                          burnPercentage={analysis.liquidityPool.burnPercentage}
-                          lpMintAddress={analysis.liquidityPool.lpMintAddress}
-                          lpReserve={analysis.liquidityPool.lpReserve}
-                          actualSupply={analysis.liquidityPool.actualSupply}
-                          isBurned={analysis.liquidityPool.isBurned ?? false}
-                        />
+                        <Suspense fallback={<ComponentLoader />}>
+                          <LiquidityBurnCard
+                            burnPercentage={analysis.liquidityPool.burnPercentage}
+                            lpMintAddress={analysis.liquidityPool.lpMintAddress}
+                            lpReserve={analysis.liquidityPool.lpReserve}
+                            actualSupply={analysis.liquidityPool.actualSupply}
+                            isBurned={analysis.liquidityPool.isBurned ?? false}
+                          />
+                        </Suspense>
                       )}
                       
-                      <MetricsGrid
-                        totalSupply={analysis.metadata?.supply || 0}
-                        holderCount={analysis.holderCount || 0}
-                        topHolderConcentration={analysis.topHolderConcentration || 0}
-                        liquidityStatus={analysis.liquidityPool?.status || "UNKNOWN"}
-                        creationDate={analysis.creationDate}
-                        decimals={analysis.metadata?.decimals || 0}
-                        bundledCount={analysis.holderFiltering?.totals.bundled}
-                        bundleConfidence={analysis.holderFiltering?.bundledDetection?.confidence}
-                        bundleSupplyPct={analysis.holderFiltering?.bundledDetection?.bundleSupplyPct}
-                      />
+                      <Suspense fallback={<ComponentLoader />}>
+                        <MetricsGrid
+                          totalSupply={analysis.metadata?.supply || 0}
+                          holderCount={analysis.holderCount || 0}
+                          topHolderConcentration={analysis.topHolderConcentration || 0}
+                          liquidityStatus={analysis.liquidityPool?.status || "UNKNOWN"}
+                          creationDate={analysis.creationDate}
+                          decimals={analysis.metadata?.decimals || 0}
+                          bundledCount={analysis.holderFiltering?.totals.bundled}
+                          bundleConfidence={analysis.holderFiltering?.bundledDetection?.confidence}
+                          bundleSupplyPct={analysis.holderFiltering?.bundledDetection?.bundleSupplyPct}
+                        />
+                      </Suspense>
 
                       {/* Bundle Visualization Chart */}
                       {analysis.holderFiltering && analysis.holderFiltering.totals.total > 0 && (
-                        <BundleVisualizationChart 
-                          filtering={analysis.holderFiltering}
-                          totalHolders={analysis.holderCount || 0}
-                        />
+                        <Suspense fallback={<ComponentLoader />}>
+                          <BundleVisualizationChart 
+                            filtering={analysis.holderFiltering}
+                            totalHolders={analysis.holderCount || 0}
+                          />
+                        </Suspense>
                       )}
 
                       {/* Holder Filtering Details */}
                       {analysis.holderFiltering && analysis.holderFiltering.totals.total > 0 && (
-                        <HolderFilteringCard filtering={analysis.holderFiltering} />
+                        <Suspense fallback={<ComponentLoader />}>
+                          <HolderFilteringCard filtering={analysis.holderFiltering} />
+                        </Suspense>
                       )}
                     </div>
                     
                     {/* Right Column - Sidebar */}
                     <div className="space-y-6">
                       {/* Token Info Sidebar with copy-able addresses */}
-                      <TokenInfoSidebar
-                        tokenAddress={analysis.tokenAddress}
-                        mintAuthority={analysis.mintAuthority.hasAuthority ? analysis.mintAuthority.authorityAddress : null}
-                        freezeAuthority={analysis.freezeAuthority.hasAuthority ? analysis.freezeAuthority.authorityAddress : null}
-                        lpAddresses={analysis.liquidityPool?.lpAddresses || []}
-                      />
+                      <Suspense fallback={<ComponentLoader />}>
+                        <TokenInfoSidebar
+                          tokenAddress={analysis.tokenAddress}
+                          mintAuthority={analysis.mintAuthority.hasAuthority ? analysis.mintAuthority.authorityAddress : null}
+                          freezeAuthority={analysis.freezeAuthority.hasAuthority ? analysis.freezeAuthority.authorityAddress : null}
+                          lpAddresses={analysis.liquidityPool?.lpAddresses || []}
+                        />
+                      </Suspense>
 
-                      <TokenMetadataCard 
-                        metadata={analysis.metadata}
-                        tokenAddress={analysis.tokenAddress}
-                      />
-                      
-                      {analysis.rugcheckData && (
-                        <RugcheckCard 
-                          data={analysis.rugcheckData}
+                      <Suspense fallback={<ComponentLoader />}>
+                        <TokenMetadataCard 
+                          metadata={analysis.metadata}
                           tokenAddress={analysis.tokenAddress}
                         />
+                      </Suspense>
+                      
+                      {analysis.rugcheckData && (
+                        <Suspense fallback={<ComponentLoader />}>
+                          <RugcheckCard 
+                            data={analysis.rugcheckData}
+                            tokenAddress={analysis.tokenAddress}
+                          />
+                        </Suspense>
                       )}
                       
                       {analysis.goplusData && (
-                        <GoPlusCard 
-                          data={analysis.goplusData}
-                          tokenAddress={analysis.tokenAddress}
-                        />
+                        <Suspense fallback={<ComponentLoader />}>
+                          <GoPlusCard 
+                            data={analysis.goplusData}
+                            tokenAddress={analysis.tokenAddress}
+                          />
+                        </Suspense>
                       )}
                       
                       {analysis.dexscreenerData && (
-                        <MarketDataCard 
-                          data={analysis.dexscreenerData}
-                          tokenAddress={analysis.tokenAddress}
-                        />
+                        <Suspense fallback={<ComponentLoader />}>
+                          <MarketDataCard 
+                            data={analysis.dexscreenerData}
+                            tokenAddress={analysis.tokenAddress}
+                          />
+                        </Suspense>
                       )}
                       
-                      <TransactionTimeline transactions={analysis.recentTransactions || []} />
+                      <Suspense fallback={<ComponentLoader />}>
+                        <TransactionTimeline transactions={analysis.recentTransactions || []} />
+                      </Suspense>
                       
                       {analysis.topHolders && analysis.topHolders.length > 0 && (
                         <>
-                          <TopHoldersTable 
-                            holders={analysis.topHolders}
-                            decimals={analysis.metadata?.decimals || 0}
-                          />
+                          <Suspense fallback={<ComponentLoader />}>
+                            <TopHoldersTable 
+                              holders={analysis.topHolders}
+                              decimals={analysis.metadata?.decimals || 0}
+                            />
+                          </Suspense>
 
-                          <HolderDistributionChart
-                            holders={analysis.topHolders}
-                            totalConcentration={analysis.topHolderConcentration || 0}
-                          />
+                          <Suspense fallback={<ComponentLoader />}>
+                            <HolderDistributionChart
+                              holders={analysis.topHolders}
+                              totalConcentration={analysis.topHolderConcentration || 0}
+                            />
+                          </Suspense>
                         </>
                       )}
                     </div>

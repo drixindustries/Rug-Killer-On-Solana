@@ -117,7 +117,7 @@ const DocumentationPDF = () => (
         <View style={pdfStyles.list}>
           <Text style={pdfStyles.text}>• /execute [token] - Full comprehensive risk analysis</Text>
           <Text style={pdfStyles.text}>• /first20 [token] - Detailed top 20 holder breakdown</Text>
-          <Text style={pdfStyles.text}>• /devtorture [wallet] - Complete dev wallet transaction history</Text>
+          <Text style={pdfStyles.text}>• /devaudit [wallet] - Complete dev wallet transaction history</Text>
           <Text style={pdfStyles.text}>• /blacklist [wallet] - Check if wallet is flagged in AI blacklist</Text>
         </View>
         <Text style={pdfStyles.text}>
@@ -367,7 +367,7 @@ const DocumentationPDF = () => (
         <Text style={pdfStyles.text}>
           Once subscribed, visit header/footer bot icons to get Telegram and Discord 
           invite links. Add bots to your channels and use /execute, /first20, 
-          /devtorture, and /blacklist commands for instant analysis.
+          /devaudit, and /blacklist commands for instant analysis.
         </Text>
       </View>
 
@@ -586,7 +586,7 @@ export default function Documentation() {
                       <li className="flex items-start gap-2">
                         <Code className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                         <div>
-                          <code className="text-xs bg-muted px-1 py-0.5 rounded">/devtorture [wallet]</code>
+                          <code className="text-xs bg-muted px-1 py-0.5 rounded">/devaudit [wallet]</code>
                           <p className="text-muted-foreground text-xs">Complete dev wallet transaction history and patterns</p>
                         </div>
                       </li>
@@ -665,7 +665,7 @@ export default function Documentation() {
                           </div>
                           <div>
                             <p className="font-medium mb-1">Check Wallet History:</p>
-                            <code className="bg-background px-2 py-1 rounded block">/devtorture HgK4jnXmQoNZWVJE3NSJF3JfhGNp4gAJF7ZqvDBCqxXE</code>
+                            <code className="bg-background px-2 py-1 rounded block">/devaudit HgK4jnXmQoNZWVJE3NSJF3JfhGNp4gAJF7ZqvDBCqxXE</code>
                           </div>
                           <div>
                             <p className="font-medium mb-1">Check Blacklist:</p>
@@ -807,7 +807,7 @@ export default function Documentation() {
                           </div>
                           <div>
                             <p className="font-medium mb-1">Check Wallet:</p>
-                            <code className="bg-background px-2 py-1 rounded block">/devtorture wallet_address:HgK4jnXmQoNZWVJE3NSJF3JfhGNp4gAJF7ZqvDBCqxXE</code>
+                            <code className="bg-background px-2 py-1 rounded block">/devaudit wallet_address:HgK4jnXmQoNZWVJE3NSJF3JfhGNp4gAJF7ZqvDBCqxXE</code>
                           </div>
                         </div>
                       </div>
@@ -1179,7 +1179,7 @@ export default function Documentation() {
                     Once subscribed, visit header/footer bot icons to get Telegram and Discord invite links. 
                     Add bots to your channels and use <code className="text-xs bg-muted px-1 py-0.5 rounded">/execute</code>, 
                     <code className="text-xs bg-muted px-1 py-0.5 rounded ml-1">/first20</code>, 
-                    <code className="text-xs bg-muted px-1 py-0.5 rounded ml-1">/devtorture</code>, and 
+                    <code className="text-xs bg-muted px-1 py-0.5 rounded ml-1">/devaudit</code>, and 
                     <code className="text-xs bg-muted px-1 py-0.5 rounded ml-1">/blacklist</code> commands for instant analysis.
                   </p>
                 </div>

@@ -278,11 +278,11 @@ export default function BotGuide() {
                 </CardContent>
               </Card>
 
-              {/* /devtorture Command */}
-              <Card data-testid="card-telegram-devtorture">
+              {/* /devaudit Command */}
+              <Card data-testid="card-telegram-devaudit">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="font-mono text-lg">/devtorture [token_address]</CardTitle>
+                    <CardTitle className="font-mono text-lg">/devaudit [token_address]</CardTitle>
                     <Badge variant="destructive">Security Audit</Badge>
                   </div>
                   <CardDescription>Deep dive into developer wallet security and token age</CardDescription>
@@ -299,7 +299,7 @@ export default function BotGuide() {
                   <div>
                     <h4 className="font-semibold mb-2">Usage</h4>
                     <code className="block bg-muted px-4 py-3 rounded font-mono text-sm">
-                      /devtorture EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+                      /devaudit EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
                     </code>
                   </div>
                   <div>
@@ -331,7 +331,7 @@ export default function BotGuide() {
                   <div>
                     <h4 className="font-semibold mb-2">Example Response</h4>
                     <div className="bg-muted px-4 py-3 rounded text-sm space-y-1 font-mono">
-                      <p>🔥 <strong>DEV TORTURE REPORT - SCAMCOIN</strong></p>
+                      <p>🔥 <strong>Dev Audit REPORT - SCAMCOIN</strong></p>
                       <p></p>
                       <p>Contract: `AbCd...5678`</p>
                       <p></p>
@@ -812,7 +812,7 @@ export default function BotGuide() {
                   <div>
                     <h4 className="font-semibold mb-2">What it does</h4>
                     <p className="text-sm text-muted-foreground">
-                      Same as Telegram's /devtorture, but in Discord embed format. Aggressive security 
+                      Same as Telegram's /devaudit, but in Discord embed format. Aggressive security 
                       audit checking mint/freeze authorities and token age.
                     </p>
                   </div>
@@ -946,7 +946,7 @@ export default function BotGuide() {
                     </li>
                     <li className="flex items-start gap-2">
                       <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                      <span>Run /devtorture on new tokens (&lt;7 days old)</span>
+                      <span>Run /devaudit on new tokens (&lt;7 days old)</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />

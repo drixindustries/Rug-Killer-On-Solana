@@ -49,7 +49,7 @@ Once the bot is running, you can test it in your Discord server:
 2. You should see the RugKillerAlphaBot commands:
    - `/execute` - Full 52-metric rug detection scan
    - `/first20` - Top 20 holder concentration analysis
-   - `/devtorture` - Developer wallet history tracking
+   - `/devaudit` - Developer wallet history tracking
    - `/blacklist` - Check if wallet is flagged
 
 ## Available Commands
@@ -85,7 +85,7 @@ Shows detailed breakdown of top 20 holders:
 /first20 2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt
 ```
 
-### `/devtorture <token_address>`
+### `/devaudit <token_address>`
 **Developer Wallet History**
 
 Tracks developer wallet activity:
@@ -97,7 +97,7 @@ Tracks developer wallet activity:
 
 **Example:**
 ```
-/devtorture 2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt
+/devaudit 2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt
 ```
 
 ### `/blacklist <wallet_address>`

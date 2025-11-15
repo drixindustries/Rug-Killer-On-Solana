@@ -166,7 +166,7 @@ export default function About() {
                     <div>
                       <h3 className="font-semibold text-sm">Telegram & Discord Bots</h3>
                       <p className="text-sm text-muted-foreground">
-                        /execute, /first20, /devtorture + auto-link detection
+                        /execute, /first20, /devaudit + auto-link detection
                       </p>
                     </div>
                   </div>

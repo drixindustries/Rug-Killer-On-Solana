@@ -43,7 +43,7 @@ export default function BotSetup() {
               <ul className="space-y-1 text-sm text-muted-foreground">
                 <li>• /execute - Full 52-metric rug scan</li>
                 <li>• /first20 - Top 20 holder analysis</li>
-                <li>• /devtorture - Dev wallet history</li>
+                <li>• /devaudit - Dev wallet history</li>
                 <li>• /blacklist - Scam wallet check</li>
               </ul>
             </div>

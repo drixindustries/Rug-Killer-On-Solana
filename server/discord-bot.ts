@@ -229,7 +229,7 @@ const commands = [
         .setRequired(true)
     ),
   new SlashCommandBuilder()
-    .setName('devtorture')
+    .setName('devaudit')
     .setDescription('Track dev wallet history')
     .addStringOption(option =>
       option.setName('address')
@@ -346,7 +346,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           .addFields(
             {
               name: '📋 Core Commands',
-              value: '`/execute <address>` - Full 52-metric scan\n`/first20 <address>` - Top 20 holder analysis\n`/devtorture <address>` - Dev wallet history\n`/blacklist <wallet>` - Check if wallet is flagged\n`/help` - Show this help message'
+              value: '`/execute <address>` - Full 52-metric scan\n`/first20 <address>` - Top 20 holder analysis\n`/devaudit <address>` - Dev wallet history\n`/blacklist <wallet>` - Check if wallet is flagged\n`/help` - Show this help message'
             },
             {
               name: '👥 Group Tier Commands',
@@ -416,7 +416,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         
         await interaction.editReply({ embeds: [embed] });
         
-      } else if (interaction.commandName === 'devtorture') {
+      } else if (interaction.commandName === 'devaudit') {
         const tokenAddress = interaction.options.getString('address', true);
         
         await interaction.deferReply();
@@ -427,7 +427,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           let hasFlags = false;
           
           const embed = new EmbedBuilder()
-            .setTitle(`🔥 Dev Torture Report - ${analysis.metadata.symbol}`)
+            .setTitle(`🔥 Dev Audit Report - ${analysis.metadata.symbol}`)
             .setDescription(`Contract: \`${tokenAddress}\``)
             .setTimestamp();
           
@@ -491,14 +491,14 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           embed.addFields({
             name: '━━━━━━━━━━━━━━━━',
             value: !hasFlags 
-              ? '🎉 **VERDICT: SAFE**\n✅ Token passes dev torture checks!' 
+              ? '🎉 **VERDICT: SAFE**\n✅ Token passes Dev Audit checks!' 
               : '⚠️ **VERDICT: CONCERNING**\n🚨 Token has concerning dev permissions!',
             inline: false
           });
           
           await interaction.editReply({ embeds: [embed] });
         } catch (error: any) {
-          console.error('DevTorture command error:', error);
+          console.error('devaudit command error:', error);
           await interaction.editReply({ 
             content: `❌ Error analyzing token: ${error.message}\n\nMake sure the address is a valid Solana token contract.` 
           });

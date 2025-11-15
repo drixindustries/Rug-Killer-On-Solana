@@ -49,7 +49,7 @@ export function BotShowcase() {
                 <div className="flex items-start gap-2">
                   <TrendingUp className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="font-medium">/devtorture [wallet]</p>
+                    <p className="font-medium">/devaudit [wallet]</p>
                     <p className="text-sm text-muted-foreground">Developer wallet history and pattern detection</p>
                   </div>
                 </div>

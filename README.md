@@ -131,7 +131,7 @@ Rug Killer Alpha Bot is the most advanced Solana token security platform, combin
 #### **Available Commands** (11 Total):
 - `/execute [token]` - Full 52-metric scan + advanced detection (honeypot, bundle, network, whale)
 - `/first20 [token]` - Top 20 holder concentration analysis
-- `/devtorture [token]` - Developer wallet history tracking
+- `/devaudit [token]` - Developer wallet history tracking
 - `/blacklist [wallet]` - Check if wallet is flagged for scams
 - `/whaletrack [token]` - Track smart money wallets in a token
 - `/kol [wallet]` - Check if a wallet is a known KOL

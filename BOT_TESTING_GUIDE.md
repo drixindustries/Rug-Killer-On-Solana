@@ -57,7 +57,7 @@ Detailed top 20 holder analysis with:
 /first20 2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt
 ```
 
-### `/devtorture <token_address>`
+### `/devaudit <token_address>`
 Developer wallet history tracking:
 - Previous launches
 - Success/failure rate
@@ -65,7 +65,7 @@ Developer wallet history tracking:
 
 **Test:**
 ```
-/devtorture 2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt
+/devaudit 2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt
 ```
 
 ### `/blacklist <wallet_address>`
@@ -113,12 +113,12 @@ Holder analysis with Discord formatting
 /first20 token_address:2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt
 ```
 
-### `/devtorture token_address:<address>`
+### `/devaudit token_address:<address>`
 Developer history with Discord rich embeds
 
 **Test:**
 ```
-/devtorture token_address:2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt
+/devaudit token_address:2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt
 ```
 
 ### `/blacklist wallet_address:<address>`
@@ -162,7 +162,7 @@ If token doesn't exist or has no data:
 - [ ] `/help` command shows all commands
 - [ ] `/execute` with $ANTIRUG address returns analysis
 - [ ] `/first20` shows top holders
-- [ ] `/devtorture` shows developer history
+- [ ] `/devaudit` shows developer history
 - [ ] `/blacklist` checks wallet flags
 - [ ] Pasting raw address triggers auto-analysis
 - [ ] Invalid address shows error message
@@ -174,7 +174,7 @@ If token doesn't exist or has no data:
 - [ ] Slash commands appear in command menu
 - [ ] `/execute` returns color-coded embed
 - [ ] `/first20` shows holder breakdown
-- [ ] `/devtorture` displays dev history
+- [ ] `/devaudit` displays dev history
 - [ ] `/blacklist` shows flags with severity
 - [ ] Embeds have proper colors based on risk
 - [ ] Timestamps appear on all responses

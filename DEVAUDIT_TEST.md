@@ -1,7 +1,7 @@
-# Dev Torture Command Test Report
+# Dev Audit Command Test Report
 
 ## Overview
-The `/devtorture` command provides aggressive security auditing focused on developer control and token safety.
+The `/devaudit` command provides aggressive security auditing focused on developer control and token safety.
 
 ## Test Status: ✅ PASSED
 
@@ -77,7 +77,7 @@ embed.setColor(hasFlags ? 0xff0000 : 0x00ff00);
 embed.addFields({
   name: '━━━━━━━━━━━━━━━━',
   value: !hasFlags 
-    ? '🎉 **VERDICT: SAFE**\n✅ Token passes dev torture checks!' 
+    ? '🎉 **VERDICT: SAFE**\n✅ Token passes Dev Audit checks!' 
     : '⚠️ **VERDICT: CONCERNING**\n🚨 Token has concerning dev permissions!',
   inline: false
 });
@@ -92,7 +92,7 @@ embed.addFields({
 
 ### Scenario 1: Safe Token (USDC)
 ```
-🔥 Dev Torture Report - USDC
+🔥 Dev Audit Report - USDC
 Contract: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
 
 🪙 Mint Authority
@@ -109,12 +109,12 @@ Dev cannot freeze accounts
 
 ━━━━━━━━━━━━━━━━
 🎉 VERDICT: SAFE
-✅ Token passes dev torture checks!
+✅ Token passes Dev Audit checks!
 ```
 
 ### Scenario 2: Dangerous Token (New Scam)
 ```
-🔥 Dev Torture Report - SCAMCOIN
+🔥 Dev Audit Report - SCAMCOIN
 Contract: AbCd1234EfGh5678...
 
 🪙 Mint Authority
@@ -167,12 +167,12 @@ embed.setColor(hasFlags ? 0xff0000 : 0x00ff00); // ✅ Now works correctly
 ## Platform Support
 
 ### ✅ Discord Bot
-- Command: `/devtorture <token_address>`
+- Command: `/devaudit <token_address>`
 - Format: Rich Discord embeds with color coding
 - Status: **WORKING**
 
 ### ✅ Telegram Bot  
-- Command: `/devtorture <token_address>`
+- Command: `/devaudit <token_address>`
 - Format: Markdown formatted messages
 - Status: **WORKING**
 
@@ -212,9 +212,9 @@ embed.setColor(hasFlags ? 0xff0000 : 0x00ff00); // ✅ Now works correctly
 
 ## Conclusion
 
-✅ **Dev Torture Command: FULLY FUNCTIONAL**
+✅ **Dev Audit Command: FULLY FUNCTIONAL**
 
-The `/devtorture` command successfully:
+The `/devaudit` command successfully:
 - Detects dangerous dev permissions
 - Analyzes token age risk
 - Provides clear, actionable verdicts
@@ -226,12 +226,12 @@ The `/devtorture` command successfully:
 
 ### Discord
 ```
-/devtorture EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+/devaudit EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
 ```
 
 ### Telegram
 ```
-/devtorture EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+/devaudit EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
 ```
 
 ---
