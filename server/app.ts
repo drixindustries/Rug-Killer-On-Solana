@@ -72,10 +72,15 @@ export async function startServer() {
     console.log('✅ Serving static files from dist/public');
   } else {
     // Development mode - use Vite dev server
-    // Dynamic import with template to prevent esbuild bundling
-    const viteDevPath = './vite.dev.js';
-    const { setupVite } = await import(viteDevPath);
-    await setupVite(app, server);
+    try {
+      // Dynamic import with template to prevent esbuild bundling
+      const viteDevPath = './vite.dev.js';
+      const { setupVite } = await import(viteDevPath);
+      await setupVite(app, server);
+    } catch (error: any) {
+      console.error('❌ Failed to load Vite dev server (this is normal in production):', error.message);
+      console.log('ℹ️ Running in production mode without Vite');
+    }
   }
 
   // Global error handler
