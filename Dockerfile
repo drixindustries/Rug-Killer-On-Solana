@@ -1,13 +1,17 @@
 FROM node:20-alpine AS build
 WORKDIR /app
+
+# Install dependencies
 COPY package*.json ./
 RUN npm ci
+
+# Copy source code
 COPY . .
 
-# Build the project (expects a root-level build script creating dist/)
-# Cache bust: 2025-11-15-vite-fix-v2
-RUN rm -rf dist && npm run build
+# Build client (outputs to dist/public) and server (outputs to dist/)
+RUN npm run build
 
+# Production stage
 FROM node:20-alpine AS runtime
 WORKDIR /app
 
@@ -15,13 +19,13 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copy built output and any runtime assets required by the server
+# Copy built output
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/client/public ./client/public
 COPY --from=build /app/shared ./shared
 
+# Environment
 ENV NODE_ENV=production
 EXPOSE 5000
 
-# Start the compiled server entry
+# Start server
 CMD ["node", "dist/index.js"]

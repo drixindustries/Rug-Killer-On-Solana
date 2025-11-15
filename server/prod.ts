@@ -1,6 +1,6 @@
 /**
- * Server entry point
- * Production-ready, no Vite dependencies
+ * Production server entry point
+ * NO development dependencies
  */
 import { startServer } from "./app.js";
 
