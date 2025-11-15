@@ -345,6 +345,89 @@ export interface AgedWalletData {
   risks: string[];
 }
 
+// Pump & Dump Detection (NEW)
+export interface PumpDumpPattern {
+  type: 'rapid_pump' | 'instant_dump' | 'coordinated_selloff' | 'volume_manipulation';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  confidence: number; // 0-100
+  description: string;
+  evidence: {
+    priceChange?: number;
+    timeWindow?: string;
+    volumeAnomaly?: number;
+    sellPressure?: number;
+  };
+}
+
+export interface PumpDumpData {
+  isRugPull: boolean;
+  rugConfidence: number; // 0-100
+  patterns: PumpDumpPattern[];
+  timeline: {
+    pumpDetected: boolean;
+    pumpPercentage?: number;
+    dumpDetected: boolean;
+    dumpPercentage?: number;
+    timeToRug?: number; // Minutes from launch to dump
+  };
+  risks: string[];
+}
+
+// Liquidity Monitoring (NEW)
+export interface LiquidityChange {
+  type: 'sudden_drop' | 'gradual_drain' | 'lp_removal' | 'healthy';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  confidence: number;
+  description: string;
+  evidence: {
+    currentLiquidity: number;
+    percentageChange?: number;
+    timeWindow?: string;
+  };
+}
+
+export interface LiquidityMonitorData {
+  isHealthy: boolean;
+  riskScore: number; // 0-100
+  changes: LiquidityChange[];
+  currentLiquidity: number;
+  liquidityTrend: 'stable' | 'increasing' | 'decreasing' | 'critical_drop';
+  liquidityToMcapRatio?: {
+    ratio: number;
+    health: 'excellent' | 'good' | 'fair' | 'poor' | 'critical';
+    description: string;
+  };
+  risks: string[];
+}
+
+// Top Holder Tracking (NEW)
+export interface HolderActivity {
+  wallet: string;
+  rank: number;
+  supplyPercent: number;
+  activityType: 'selling' | 'buying' | 'holding' | 'unknown';
+  recentTransactions: number;
+  sellVolume?: number;
+  buyVolume?: number;
+}
+
+export interface CoordinatedSelloff {
+  detected: boolean;
+  sellersCount: number;
+  combinedSupplyPercent: number;
+  timeWindow: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  confidence: number;
+  description: string;
+}
+
+export interface HolderTrackingData {
+  coordinatedSelloff: CoordinatedSelloff | null;
+  suspiciousActivities: HolderActivity[];
+  topHolderStability: 'stable' | 'volatile' | 'mass_exodus';
+  risks: string[];
+}
+
 export interface TokenAnalysisResponse {
   tokenAddress: string;
   riskScore: number;
@@ -398,6 +481,9 @@ export interface TokenAnalysisResponse {
   whaleDetection?: WhaleDetectionData;
   gmgnData?: GMGNData; // GMGN.AI bundle & insider detection
   agedWalletData?: AgedWalletData; // Aged wallet fake volume detection
+  pumpDumpData?: PumpDumpData; // Pump & dump pattern detection
+  liquidityMonitor?: LiquidityMonitorData; // Real-time liquidity tracking
+  holderTracking?: HolderTrackingData; // Top holder sell-off detection
 }
 
 // Storage schema (not used for in-memory but kept for consistency)

@@ -25,6 +25,9 @@ import { QuillCheckService } from "./services/quillcheck-service";
 import { WhaleDetectorService } from "./services/whale-detector";
 import { GMGNService } from "./services/gmgn-service";
 import { AgedWalletDetector } from "./services/aged-wallet-detector";
+import { PumpDumpDetectorService } from "./services/pump-dump-detector";
+import { LiquidityMonitorService } from "./services/liquidity-monitor";
+import { HolderTrackingService } from "./services/holder-tracking";
 
 export class SolanaTokenAnalyzer {
   private rugcheckService: RugcheckService;
@@ -37,6 +40,9 @@ export class SolanaTokenAnalyzer {
   private whaleDetector: WhaleDetectorService;
   private gmgnService: GMGNService;
   private agedWalletDetector: AgedWalletDetector;
+  private pumpDumpDetector: PumpDumpDetectorService;
+  private liquidityMonitor: LiquidityMonitorService;
+  private holderTracker: HolderTrackingService;
 
   constructor() {
     this.rugcheckService = new RugcheckService();
@@ -49,6 +55,9 @@ export class SolanaTokenAnalyzer {
     this.whaleDetector = new WhaleDetectorService();
     this.gmgnService = new GMGNService();
     this.agedWalletDetector = new AgedWalletDetector();
+    this.pumpDumpDetector = new PumpDumpDetectorService();
+    this.liquidityMonitor = new LiquidityMonitorService();
+    this.holderTracker = new HolderTrackingService();
   }
 
   private getConnection(): Connection {
@@ -329,6 +338,47 @@ export class SolanaTokenAnalyzer {
       } catch (error) {
         console.error('[Aged Wallets] Detection failed:', error);
       }
+
+      // Pump & Dump pattern detection
+      let pumpDumpData = null;
+      try {
+        const dexService = new DexScreenerService();
+        const primaryPair = dexscreenerData ? dexService.getMostLiquidPair(dexscreenerData) : null;
+        pumpDumpData = this.pumpDumpDetector.analyzePriceAction(primaryPair, { topHolders: holders });
+        console.log(`[Pump & Dump] Rug Confidence: ${pumpDumpData.rugConfidence}%, Patterns: ${pumpDumpData.patterns.length}`);
+      } catch (error) {
+        console.error('[Pump & Dump] Detection failed:', error);
+      }
+
+      // Liquidity monitoring (real-time)
+      let liquidityMonitorData = null;
+      try {
+        const dexService = new DexScreenerService();
+        const primaryPair = dexscreenerData ? dexService.getMostLiquidPair(dexscreenerData) : null;
+        liquidityMonitorData = this.liquidityMonitor.monitorLiquidity(primaryPair);
+        
+        // Calculate liquidity/mcap ratio if we have both
+        if (primaryPair && marketData?.marketCap) {
+          const ratio = this.liquidityMonitor.calculateLiquidityRatio(
+            primaryPair.liquidity?.usd || 0,
+            marketData.marketCap
+          );
+          liquidityMonitorData.liquidityToMcapRatio = ratio;
+        }
+        
+        console.log(`[Liquidity Monitor] Health: ${liquidityMonitorData.isHealthy}, Trend: ${liquidityMonitorData.liquidityTrend}, Risk: ${liquidityMonitorData.riskScore}`);
+      } catch (error) {
+        console.error('[Liquidity Monitor] Check failed:', error);
+      }
+
+      // Top holder tracking (coordinated sell-offs)
+      let holderTrackingData = null;
+      try {
+        holderTrackingData = await this.holderTracker.trackTopHolders(tokenAddress, holders);
+        console.log(`[Holder Tracking] Stability: ${holderTrackingData.topHolderStability}, Sellers: ${holderTrackingData.suspiciousActivities.length}`);
+      } catch (error) {
+        console.error('[Holder Tracking] Analysis failed:', error);
+      }
       
       // Build metadata - prioritize DexScreener data over on-chain defaults
       const supply = Number(mintInfo.supply);
@@ -361,7 +411,10 @@ export class SolanaTokenAnalyzer {
         networkAnalysis,
         quillcheckData,
         gmgnData,
-        agedWalletData
+        agedWalletData,
+        pumpDumpData,
+        liquidityMonitorData,
+        holderTrackingData
       );
       
       // Calculate overall risk score with safety check
@@ -411,6 +464,9 @@ export class SolanaTokenAnalyzer {
         networkAnalysis: networkAnalysis || undefined,
         gmgnData: gmgnData || undefined,
         agedWalletData: agedWalletData || undefined,
+        pumpDumpData: pumpDumpData || undefined,
+        liquidityMonitor: liquidityMonitorData || undefined,
+        holderTracking: holderTrackingData || undefined,
       };
     } catch (error) {
       console.error("Token analysis error:", error);
@@ -840,7 +896,10 @@ export class SolanaTokenAnalyzer {
     networkAnalysis?: any,
     quillcheckData?: any,
     gmgnData?: any,
-    agedWalletData?: any
+    agedWalletData?: any,
+    pumpDumpData?: any,
+    liquidityMonitorData?: any,
+    holderTrackingData?: any
   ): RiskFlag[] {
     const flags: RiskFlag[] = [];
 
@@ -996,6 +1055,96 @@ export class SolanaTokenAnalyzer {
         severity: "high",
         title: "Coordinated Aged Wallet Buys",
         description: "Aged wallets bought within 1 minute of each other - automated fake volume generation.",
+      });
+    }
+
+    // ============================================================================
+    // PUMP & DUMP DETECTION (NEW)
+    // ============================================================================
+    
+    if (pumpDumpData?.isRugPull) {
+      flags.push({
+        type: "suspicious_transactions",
+        severity: "critical",
+        title: `RUG PULL DETECTED: ${pumpDumpData.rugConfidence}% Confidence`,
+        description: `Token exhibits classic pump & dump pattern. ${pumpDumpData.risks.join(' ')}`,
+      });
+    }
+
+    // Critical pump & dump patterns
+    pumpDumpData?.patterns.forEach((pattern: any) => {
+      if (pattern.severity === 'critical') {
+        flags.push({
+          type: "suspicious_transactions",
+          severity: "critical",
+          title: pattern.description,
+          description: `${pattern.type.replace(/_/g, ' ').toUpperCase()}: Evidence shows ${JSON.stringify(pattern.evidence)}`,
+        });
+      }
+    });
+
+    // Instant dump detection
+    if (pumpDumpData?.timeline.dumpDetected && pumpDumpData.timeline.dumpPercentage && pumpDumpData.timeline.dumpPercentage > 60) {
+      flags.push({
+        type: "suspicious_transactions",
+        severity: "critical",
+        title: `Catastrophic Dump: -${pumpDumpData.timeline.dumpPercentage.toFixed(0)}%`,
+        description: "Token price has crashed. Holders are likely rugged.",
+      });
+    }
+
+    // ============================================================================
+    // LIQUIDITY MONITORING (NEW)
+    // ============================================================================
+    
+    if (liquidityMonitorData?.liquidityTrend === 'critical_drop') {
+      flags.push({
+        type: "low_liquidity",
+        severity: "critical",
+        title: "LIQUIDITY BEING DRAINED",
+        description: `Liquidity has dropped critically. ${liquidityMonitorData.risks.join(' ')}`,
+      });
+    }
+
+    if (liquidityMonitorData && !liquidityMonitorData.isHealthy) {
+      flags.push({
+        type: "low_liquidity",
+        severity: liquidityMonitorData.riskScore >= 70 ? "critical" : "high",
+        title: `Unhealthy Liquidity: $${liquidityMonitorData.currentLiquidity.toFixed(0)}`,
+        description: liquidityMonitorData.risks[0] || "Liquidity below safe thresholds",
+      });
+    }
+
+    // Liquidity/Market Cap ratio warnings
+    if (liquidityMonitorData?.liquidityToMcapRatio?.health === 'critical') {
+      flags.push({
+        type: "low_liquidity",
+        severity: "high",
+        title: "Critical Liquidity/MCap Ratio",
+        description: liquidityMonitorData.liquidityToMcapRatio.description,
+      });
+    }
+
+    // ============================================================================
+    // TOP HOLDER TRACKING (NEW)
+    // ============================================================================
+    
+    if (holderTrackingData?.coordinatedSelloff?.detected) {
+      const selloff = holderTrackingData.coordinatedSelloff;
+      flags.push({
+        type: "suspicious_transactions",
+        severity: selloff.severity as any,
+        title: "COORDINATED WHALE SELL-OFF",
+        description: selloff.description,
+      });
+    }
+
+    if (holderTrackingData?.topHolderStability === 'mass_exodus') {
+      flags.push({
+        type: "suspicious_transactions",
+        severity: "critical",
+        title: "Mass Exodus: Top Holders Dumping",
+        description: "Multiple top holders are actively selling. Price collapse imminent.",
       });
     }
         // Mint authority not revoked
