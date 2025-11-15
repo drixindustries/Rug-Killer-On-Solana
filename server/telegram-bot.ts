@@ -421,6 +421,409 @@ function createTelegramBot(botToken: string): Telegraf {
       ctx.reply('❌ Error checking KOL database.');
     }
   });
+
+  // /price command - Quick price lookup (popular feature)
+  bot.command('price', async (ctx) => {
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) {
+      return ctx.reply('❌ Please provide a token address.\n\nExample: `/price EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`', { parse_mode: 'Markdown' });
+    }
+    
+    const tokenAddress = args[1];
+    
+    try {
+      await ctx.reply('💰 Fetching price...');
+      
+      const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      const pair = analysis.dexscreenerData?.pairs?.[0];
+      
+      let message = `💰 **PRICE CHECK - ${analysis.metadata.symbol}**\n\n`;
+      
+      if (pair) {
+        const price = parseFloat(pair.priceUsd);
+        message += `📊 **Current Price**: $${price.toFixed(price < 0.01 ? 8 : 4)}\n\n`;
+        
+        // 24h change with trend indicator
+        const change24h = pair.priceChange.h24;
+        const changeEmoji = change24h >= 0 ? '📈' : '📉';
+        const changeColor = change24h >= 0 ? '🟢' : '🔴';
+        message += `${changeEmoji} **24h Change**: ${changeColor} ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}%\n`;
+        
+        // Volume
+        message += `📦 **24h Volume**: $${formatNumber(pair.volume.h24)}\n`;
+        message += `💧 **Liquidity**: $${formatNumber(pair.liquidity?.usd || 0)}\n`;
+        
+        // Market cap
+        if (pair.marketCap) {
+          message += `💎 **Market Cap**: $${formatNumber(pair.marketCap)}\n`;
+        }
+        
+        // FDV
+        if (pair.fdv) {
+          message += `🌐 **FDV**: $${formatNumber(pair.fdv)}\n`;
+        }
+        
+        message += `\n🔗 [View on DEXScreener](${pair.url})`;
+      } else {
+        message += `⚠️ Price data not available\n\nToken may not have active trading pairs yet.`;
+      }
+      
+      await ctx.reply(message, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } });
+    } catch (error) {
+      console.error('Telegram bot price error:', error);
+      ctx.reply('❌ Error fetching price data. Please check the address and try again.');
+    }
+  });
+
+  // /rugcheck command - Instant rug detection (inspired by rugcheck.xyz)
+  bot.command('rugcheck', async (ctx) => {
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) {
+      return ctx.reply('❌ Please provide a token address.\n\nExample: `/rugcheck EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`', { parse_mode: 'Markdown' });
+    }
+    
+    const tokenAddress = args[1];
+    
+    try {
+      await ctx.reply('🔍 Running rug detection...');
+      
+      const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      
+      let message = `🔒 **RUG CHECK - ${analysis.metadata.symbol}**\n\n`;
+      
+      // Overall risk level
+      const riskEmoji = getRiskEmoji(analysis.riskLevel);
+      message += `${riskEmoji} **RISK LEVEL: ${analysis.riskLevel}**\n`;
+      message += `Risk Score: ${analysis.riskScore}/100\n\n`;
+      
+      // Critical flags
+      let dangerFlags = 0;
+      let warningFlags = 0;
+      
+      message += `🔐 **SECURITY CHECKS:**\n`;
+      
+      if (analysis.mintAuthority.hasAuthority && !analysis.mintAuthority.isRevoked) {
+        message += `❌ Mint Authority Active\n`;
+        dangerFlags++;
+      } else {
+        message += `✅ Mint Authority Revoked\n`;
+      }
+      
+      if (analysis.freezeAuthority.hasAuthority && !analysis.freezeAuthority.isRevoked) {
+        message += `❌ Freeze Authority Active\n`;
+        dangerFlags++;
+      } else {
+        message += `✅ Freeze Authority Revoked\n`;
+      }
+      
+      // LP burn check
+      if (analysis.liquidityPool.burnPercentage !== undefined) {
+        const burnPct = analysis.liquidityPool.burnPercentage;
+        if (burnPct >= 99.99) {
+          message += `✅ LP Fully Burned (${burnPct.toFixed(1)}%)\n`;
+        } else if (burnPct >= 80) {
+          message += `⚠️ LP Mostly Burned (${burnPct.toFixed(1)}%)\n`;
+          warningFlags++;
+        } else if (burnPct >= 50) {
+          message += `⚠️ LP Partially Burned (${burnPct.toFixed(1)}%)\n`;
+          warningFlags++;
+        } else {
+          message += `❌ LP Not Burned (${burnPct.toFixed(1)}%)\n`;
+          dangerFlags++;
+        }
+      }
+      
+      message += `\n📊 **HOLDER ANALYSIS:**\n`;
+      
+      // Holder concentration
+      if (analysis.topHolderConcentration > 80) {
+        message += `❌ Extreme Concentration (${analysis.topHolderConcentration.toFixed(1)}%)\n`;
+        dangerFlags++;
+      } else if (analysis.topHolderConcentration > 50) {
+        message += `⚠️ High Concentration (${analysis.topHolderConcentration.toFixed(1)}%)\n`;
+        warningFlags++;
+      } else {
+        message += `✅ Good Distribution (${analysis.topHolderConcentration.toFixed(1)}%)\n`;
+      }
+      
+      message += `• Total Holders: ${analysis.holderCount}\n`;
+      
+      // AI verdict if available
+      if (analysis.aiVerdict) {
+        message += `\n🤖 **AI ANALYSIS:**\n`;
+        message += `${analysis.aiVerdict.rating} - ${analysis.aiVerdict.verdict}\n`;
+      }
+      
+      message += `\n━━━━━━━━━━━━━━━━\n`;
+      
+      // Final verdict
+      if (dangerFlags >= 3) {
+        message += `🚨 **HIGH RUG RISK** - Multiple red flags detected!\n`;
+        message += `Consider avoiding this token.`;
+      } else if (dangerFlags >= 1 || warningFlags >= 3) {
+        message += `⚠️ **MODERATE RISK** - Some concerns detected.\n`;
+        message += `Do your own research before investing.`;
+      } else if (warningFlags >= 1) {
+        message += `✅ **LOW RISK** - Minor concerns only.\n`;
+        message += `Token appears relatively safe.`;
+      } else {
+        message += `✅ **VERY LOW RISK** - All checks passed!\n`;
+        message += `Token has strong security measures.`;
+      }
+      
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (error) {
+      console.error('Telegram bot rugcheck error:', error);
+      ctx.reply('❌ Error running rug check. Please check the address and try again.');
+    }
+  });
+
+  // /liquidity command - Detailed LP analysis
+  bot.command('liquidity', async (ctx) => {
+    const args = ctx.message.text.split(' ');
+    if (args.length < 2) {
+      return ctx.reply('❌ Please provide a token address.\n\nExample: `/liquidity EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`', { parse_mode: 'Markdown' });
+    }
+    
+    const tokenAddress = args[1];
+    
+    try {
+      await ctx.reply('💧 Analyzing liquidity...');
+      
+      const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      const pair = analysis.dexscreenerData?.pairs?.[0];
+      
+      let message = `💧 **LIQUIDITY ANALYSIS - ${analysis.metadata.symbol}**\n\n`;
+      
+      if (pair) {
+        // Liquidity USD
+        const liquidityUsd = pair.liquidity?.usd || 0;
+        message += `💰 **Total Liquidity**: $${formatNumber(liquidityUsd)}\n`;
+        
+        // Liquidity quality check
+        if (liquidityUsd < 1000) {
+          message += `🚨 **VERY LOW** - High slippage risk!\n`;
+        } else if (liquidityUsd < 5000) {
+          message += `⚠️ **LOW** - Expect slippage on medium trades\n`;
+        } else if (liquidityUsd < 50000) {
+          message += `✅ **MODERATE** - Decent for small-medium trades\n`;
+        } else {
+          message += `✅ **HIGH** - Good for large trades\n`;
+        }
+        
+        message += `\n📊 **LIQUIDITY BREAKDOWN:**\n`;
+        
+        // Base/Quote amounts
+        if (pair.liquidity?.base !== undefined) {
+          message += `• Token: ${formatNumber(pair.liquidity.base)} ${analysis.metadata.symbol}\n`;
+        }
+        if (pair.liquidity?.quote !== undefined) {
+          message += `• ${pair.quoteToken?.symbol || 'SOL'}: ${formatNumber(pair.liquidity.quote)}\n`;
+        }
+        
+        message += `\n🔥 **LP TOKEN STATUS:**\n`;
+        
+        // LP burn percentage
+        if (analysis.liquidityPool.burnPercentage !== undefined) {
+          const burnPct = analysis.liquidityPool.burnPercentage;
+          message += `• Burned: ${burnPct.toFixed(2)}%\n`;
+          
+          if (burnPct >= 99.99) {
+            message += `✅ LP is locked forever - Cannot be pulled!\n`;
+          } else if (burnPct >= 80) {
+            message += `⚠️ Most LP burned, but ${(100 - burnPct).toFixed(2)}% could be pulled\n`;
+          } else {
+            message += `❌ ${(100 - burnPct).toFixed(2)}% LP can be pulled - RUG RISK!\n`;
+          }
+        }
+        
+        // Volume to liquidity ratio
+        message += `\n📈 **TRADING METRICS:**\n`;
+        const volumeToLiqRatio = liquidityUsd > 0 ? (pair.volume.h24 / liquidityUsd) : 0;
+        message += `• 24h Volume: $${formatNumber(pair.volume.h24)}\n`;
+        message += `• Vol/Liq Ratio: ${volumeToLiqRatio.toFixed(2)}x\n`;
+        
+        if (volumeToLiqRatio > 3) {
+          message += `🔥 **VERY HIGH** activity - Popular token!\n`;
+        } else if (volumeToLiqRatio > 1) {
+          message += `✅ **GOOD** activity - Healthy trading\n`;
+        } else if (volumeToLiqRatio > 0.1) {
+          message += `⚠️ **LOW** activity - Limited trading\n`;
+        } else {
+          message += `🚨 **VERY LOW** activity - Dead pool?\n`;
+        }
+        
+      } else {
+        message += `⚠️ No liquidity pool found\n\n`;
+        message += `This token may not have active trading pairs yet.`;
+      }
+      
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (error) {
+      console.error('Telegram bot liquidity error:', error);
+      ctx.reply('❌ Error analyzing liquidity. Please check the address and try again.');
+    }
+  });
+
+  // /compare command - Compare two tokens side by side
+  bot.command('compare', async (ctx) => {
+    const args = ctx.message.text.split(' ');
+    if (args.length < 3) {
+      return ctx.reply('❌ Please provide two token addresses.\n\nExample: `/compare ABC123... XYZ789...`', { parse_mode: 'Markdown' });
+    }
+    
+    const token1 = args[1];
+    const token2 = args[2];
+    
+    try {
+      await ctx.reply('⚖️ Comparing tokens...');
+      
+      const [analysis1, analysis2] = await Promise.all([
+        tokenAnalyzer.analyzeToken(token1),
+        tokenAnalyzer.analyzeToken(token2)
+      ]);
+      
+      let message = `⚖️ **TOKEN COMPARISON**\n\n`;
+      
+      // Names
+      message += `**Token A**: ${analysis1.metadata.symbol}\n`;
+      message += `**Token B**: ${analysis2.metadata.symbol}\n\n`;
+      
+      // Risk scores
+      message += `🛡️ **RISK SCORE**\n`;
+      message += `A: ${analysis1.riskScore}/100 (${analysis1.riskLevel}) ${getRiskEmoji(analysis1.riskLevel)}\n`;
+      message += `B: ${analysis2.riskScore}/100 (${analysis2.riskLevel)} ${getRiskEmoji(analysis2.riskLevel)}\n`;
+      
+      const betterRisk = analysis1.riskScore > analysis2.riskScore ? 'A' : 'B';
+      message += `👑 Winner: Token ${betterRisk}\n\n`;
+      
+      // Market data
+      const pair1 = analysis1.dexscreenerData?.pairs?.[0];
+      const pair2 = analysis2.dexscreenerData?.pairs?.[0];
+      
+      if (pair1 && pair2) {
+        message += `💰 **PRICE & VOLUME**\n`;
+        message += `A: $${parseFloat(pair1.priceUsd).toFixed(8)} | Vol: $${formatNumber(pair1.volume.h24)}\n`;
+        message += `B: $${parseFloat(pair2.priceUsd).toFixed(8)} | Vol: $${formatNumber(pair2.volume.h24)}\n`;
+        
+        const betterVol = pair1.volume.h24 > pair2.volume.h24 ? 'A' : 'B';
+        message += `👑 Higher Volume: Token ${betterVol}\n\n`;
+        
+        message += `📊 **MARKET CAP**\n`;
+        message += `A: $${formatNumber(pair1.marketCap || 0)}\n`;
+        message += `B: $${formatNumber(pair2.marketCap || 0)}\n`;
+        
+        if (pair1.marketCap && pair2.marketCap) {
+          const betterMcap = pair1.marketCap > pair2.marketCap ? 'A' : 'B';
+          message += `👑 Larger: Token ${betterMcap}\n\n`;
+        } else {
+          message += `\n`;
+        }
+        
+        message += `💧 **LIQUIDITY**\n`;
+        message += `A: $${formatNumber(pair1.liquidity?.usd || 0)}\n`;
+        message += `B: $${formatNumber(pair2.liquidity?.usd || 0)}\n`;
+        
+        const betterLiq = (pair1.liquidity?.usd || 0) > (pair2.liquidity?.usd || 0) ? 'A' : 'B';
+        message += `👑 Better: Token ${betterLiq}\n\n`;
+      }
+      
+      // Holder concentration
+      message += `👥 **HOLDER DISTRIBUTION**\n`;
+      message += `A: ${analysis1.topHolderConcentration.toFixed(1)}% (${analysis1.holderCount} holders)\n`;
+      message += `B: ${analysis2.topHolderConcentration.toFixed(1)}% (${analysis2.holderCount} holders)\n`;
+      
+      const betterDist = analysis1.topHolderConcentration < analysis2.topHolderConcentration ? 'A' : 'B';
+      message += `👑 Better Distribution: Token ${betterDist}\n\n`;
+      
+      // Security
+      message += `🔐 **SECURITY**\n`;
+      const a_mint = analysis1.mintAuthority.hasAuthority ? '❌' : '✅';
+      const b_mint = analysis2.mintAuthority.hasAuthority ? '❌' : '✅';
+      message += `Mint Revoked: A ${a_mint} | B ${b_mint}\n`;
+      
+      const a_freeze = analysis1.freezeAuthority.hasAuthority ? '❌' : '✅';
+      const b_freeze = analysis2.freezeAuthority.hasAuthority ? '❌' : '✅';
+      message += `Freeze Revoked: A ${a_freeze} | B ${b_freeze}\n\n`;
+      
+      // Overall recommendation
+      message += `━━━━━━━━━━━━━━━━\n`;
+      
+      let aScore = 0;
+      let bScore = 0;
+      
+      if (analysis1.riskScore > analysis2.riskScore) aScore++; else bScore++;
+      if ((pair1?.volume.h24 || 0) > (pair2?.volume.h24 || 0)) aScore++; else bScore++;
+      if ((pair1?.liquidity?.usd || 0) > (pair2?.liquidity?.usd || 0)) aScore++; else bScore++;
+      if (analysis1.topHolderConcentration < analysis2.topHolderConcentration) aScore++; else bScore++;
+      
+      if (aScore > bScore) {
+        message += `🏆 **OVERALL**: Token A appears safer (${aScore}-${bScore})`;
+      } else if (bScore > aScore) {
+        message += `🏆 **OVERALL**: Token B appears safer (${bScore}-${aScore})`;
+      } else {
+        message += `⚖️ **OVERALL**: Both tokens are similar (${aScore}-${bScore})`;
+      }
+      
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (error) {
+      console.error('Telegram bot compare error:', error);
+      ctx.reply('❌ Error comparing tokens. Please check both addresses and try again.');
+    }
+  });
+
+  // /trending command - Show trending/top volume tokens
+  bot.command('trending', async (ctx) => {
+    try {
+      await ctx.reply('🔥 Fetching trending tokens...');
+      
+      // Fetch from DexScreener trending endpoint
+      const response = await fetch('https://api.dexscreener.com/latest/dex/tokens/solana');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch trending data');
+      }
+      
+      const data = await response.json();
+      const pairs = data.pairs || [];
+      
+      // Sort by 24h volume and take top 10
+      const trending = pairs
+        .filter((p: any) => p.chainId === 'solana')
+        .sort((a: any, b: any) => (b.volume?.h24 || 0) - (a.volume?.h24 || 0))
+        .slice(0, 10);
+      
+      if (trending.length === 0) {
+        return ctx.reply('⚠️ No trending tokens found at the moment.');
+      }
+      
+      let message = `🔥 **TRENDING SOLANA TOKENS**\n`;
+      message += `_Top 10 by 24h Volume_\n\n`;
+      
+      trending.forEach((pair: any, index: number) => {
+        const symbol = pair.baseToken?.symbol || 'Unknown';
+        const price = parseFloat(pair.priceUsd || 0);
+        const change24h = pair.priceChange?.h24 || 0;
+        const volume = pair.volume?.h24 || 0;
+        const liquidity = pair.liquidity?.usd || 0;
+        
+        const trendEmoji = change24h >= 0 ? '📈' : '📉';
+        
+        message += `${index + 1}. **${symbol}** ${trendEmoji}\n`;
+        message += `   Price: $${price < 0.01 ? price.toFixed(8) : price.toFixed(4)} (${change24h >= 0 ? '+' : ''}${change24h.toFixed(1)}%)\n`;
+        message += `   Vol: $${formatNumber(volume)} | Liq: $${formatNumber(liquidity)}\n`;
+        message += `   \`${pair.baseToken?.address}\`\n\n`;
+      });
+      
+      message += `━━━━━━━━━━━━━━━━\n`;
+      message += `💡 Use /execute <address> for full analysis`;
+      
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (error) {
+      console.error('Telegram bot trending error:', error);
+      ctx.reply('❌ Error fetching trending tokens. Please try again later.');
+    }
+  });
   
   // Handle direct messages with token addresses
   bot.on(message('text'), async (ctx) => {

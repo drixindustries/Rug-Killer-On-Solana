@@ -225,6 +225,46 @@ const commands = [
         .setDescription('Wallet address to check')
         .setRequired(true)
     ),
+  new SlashCommandBuilder()
+    .setName('price')
+    .setDescription('Quick price lookup for a token')
+    .addStringOption(option =>
+      option.setName('address')
+        .setDescription('Token contract address')
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName('rugcheck')
+    .setDescription('Instant rug detection scan')
+    .addStringOption(option =>
+      option.setName('address')
+        .setDescription('Token contract address')
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName('liquidity')
+    .setDescription('Detailed liquidity pool analysis')
+    .addStringOption(option =>
+      option.setName('address')
+        .setDescription('Token contract address')
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName('compare')
+    .setDescription('Compare two tokens side by side')
+    .addStringOption(option =>
+      option.setName('token1')
+        .setDescription('First token address')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option.setName('token2')
+        .setDescription('Second token address')
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName('trending')
+    .setDescription('Show trending Solana tokens by volume'),
 ].map(command => command.toJSON());
 
 // ============================================================================
@@ -276,6 +316,10 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             {
               name: '🐋 Whale Tier Commands',
               value: '`/whaletrack <address>` - Smart money tracking\n`/kol <wallet>` - Check if wallet is KOL'
+            },
+            {
+              name: '🔥 NEW Popular Commands',
+              value: '`/price <address>` - Quick price lookup\n`/rugcheck <address>` - Instant rug detection\n`/liquidity <address>` - LP analysis\n`/compare <token1> <token2>` - Side-by-side comparison\n`/trending` - Top 10 tokens by volume'
             },
             {
               name: '💡 Quick Tip',
@@ -532,6 +576,384 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         embed.addFields({
           name: 'Tier',
           value: tierText
+        });
+        
+        await interaction.editReply({ embeds: [embed] });
+      
+      } else if (interaction.commandName === 'price') {
+        const tokenAddress = interaction.options.getString('address', true);
+        
+        await interaction.deferReply();
+        
+        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        const pair = analysis.dexscreenerData?.pairs?.[0];
+        
+        const embed = new EmbedBuilder()
+          .setTitle(`💰 Price Check - ${analysis.metadata.symbol}`)
+          .setTimestamp();
+        
+        if (pair) {
+          const price = parseFloat(pair.priceUsd);
+          const change24h = pair.priceChange.h24;
+          
+          embed.setColor(change24h >= 0 ? 0x00ff00 : 0xff0000);
+          
+          let priceInfo = `**Current Price**: $${price.toFixed(price < 0.01 ? 8 : 4)}\n\n`;
+          
+          const changeEmoji = change24h >= 0 ? '📈' : '📉';
+          const changeColor = change24h >= 0 ? '🟢' : '🔴';
+          priceInfo += `${changeEmoji} **24h Change**: ${changeColor} ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}%`;
+          
+          embed.setDescription(priceInfo);
+          
+          embed.addFields(
+            { name: '📦 24h Volume', value: `$${formatNumber(pair.volume.h24)}`, inline: true },
+            { name: '💧 Liquidity', value: `$${formatNumber(pair.liquidity?.usd || 0)}`, inline: true }
+          );
+          
+          if (pair.marketCap) {
+            embed.addFields({ name: '💎 Market Cap', value: `$${formatNumber(pair.marketCap)}`, inline: true });
+          }
+          
+          if (pair.fdv) {
+            embed.addFields({ name: '🌐 FDV', value: `$${formatNumber(pair.fdv)}`, inline: true });
+          }
+          
+          if (pair.url) {
+            embed.setURL(pair.url);
+          }
+        } else {
+          embed.setColor(0x808080);
+          embed.setDescription('⚠️ Price data not available\n\nToken may not have active trading pairs yet.');
+        }
+        
+        await interaction.editReply({ embeds: [embed] });
+      
+      } else if (interaction.commandName === 'rugcheck') {
+        const tokenAddress = interaction.options.getString('address', true);
+        
+        await interaction.deferReply();
+        
+        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        
+        const riskEmoji = getRiskEmoji(analysis.riskLevel);
+        const color = getRiskColor(analysis.riskLevel);
+        
+        const embed = new EmbedBuilder()
+          .setColor(color)
+          .setTitle(`🔒 Rug Check - ${analysis.metadata.symbol}`)
+          .setDescription(`${riskEmoji} **RISK LEVEL: ${analysis.riskLevel}**\nRisk Score: ${analysis.riskScore}/100`)
+          .setTimestamp();
+        
+        let dangerFlags = 0;
+        let warningFlags = 0;
+        
+        let securityChecks = '';
+        
+        if (analysis.mintAuthority.hasAuthority && !analysis.mintAuthority.isRevoked) {
+          securityChecks += '❌ Mint Authority Active\n';
+          dangerFlags++;
+        } else {
+          securityChecks += '✅ Mint Authority Revoked\n';
+        }
+        
+        if (analysis.freezeAuthority.hasAuthority && !analysis.freezeAuthority.isRevoked) {
+          securityChecks += '❌ Freeze Authority Active\n';
+          dangerFlags++;
+        } else {
+          securityChecks += '✅ Freeze Authority Revoked\n';
+        }
+        
+        if (analysis.liquidityPool.burnPercentage !== undefined) {
+          const burnPct = analysis.liquidityPool.burnPercentage;
+          if (burnPct >= 99.99) {
+            securityChecks += `✅ LP Fully Burned (${burnPct.toFixed(1)}%)\n`;
+          } else if (burnPct >= 80) {
+            securityChecks += `⚠️ LP Mostly Burned (${burnPct.toFixed(1)}%)\n`;
+            warningFlags++;
+          } else if (burnPct >= 50) {
+            securityChecks += `⚠️ LP Partially Burned (${burnPct.toFixed(1)}%)\n`;
+            warningFlags++;
+          } else {
+            securityChecks += `❌ LP Not Burned (${burnPct.toFixed(1)}%)\n`;
+            dangerFlags++;
+          }
+        }
+        
+        embed.addFields({ name: '🔐 Security Checks', value: securityChecks });
+        
+        let holderAnalysis = '';
+        if (analysis.topHolderConcentration > 80) {
+          holderAnalysis += `❌ Extreme Concentration (${analysis.topHolderConcentration.toFixed(1)}%)\n`;
+          dangerFlags++;
+        } else if (analysis.topHolderConcentration > 50) {
+          holderAnalysis += `⚠️ High Concentration (${analysis.topHolderConcentration.toFixed(1)}%)\n`;
+          warningFlags++;
+        } else {
+          holderAnalysis += `✅ Good Distribution (${analysis.topHolderConcentration.toFixed(1)}%)\n`;
+        }
+        holderAnalysis += `• Total Holders: ${analysis.holderCount}`;
+        
+        embed.addFields({ name: '📊 Holder Analysis', value: holderAnalysis });
+        
+        if (analysis.aiVerdict) {
+          embed.addFields({
+            name: '🤖 AI Analysis',
+            value: `${analysis.aiVerdict.rating} - ${analysis.aiVerdict.verdict}`
+          });
+        }
+        
+        let verdict = '';
+        if (dangerFlags >= 3) {
+          verdict = '🚨 **HIGH RUG RISK** - Multiple red flags detected!\nConsider avoiding this token.';
+        } else if (dangerFlags >= 1 || warningFlags >= 3) {
+          verdict = '⚠️ **MODERATE RISK** - Some concerns detected.\nDo your own research before investing.';
+        } else if (warningFlags >= 1) {
+          verdict = '✅ **LOW RISK** - Minor concerns only.\nToken appears relatively safe.';
+        } else {
+          verdict = '✅ **VERY LOW RISK** - All checks passed!\nToken has strong security measures.';
+        }
+        
+        embed.addFields({ name: '━━━━━━━━━━━━━━━━', value: verdict });
+        
+        await interaction.editReply({ embeds: [embed] });
+      
+      } else if (interaction.commandName === 'liquidity') {
+        const tokenAddress = interaction.options.getString('address', true);
+        
+        await interaction.deferReply();
+        
+        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        const pair = analysis.dexscreenerData?.pairs?.[0];
+        
+        const embed = new EmbedBuilder()
+          .setTitle(`💧 Liquidity Analysis - ${analysis.metadata.symbol}`)
+          .setTimestamp();
+        
+        if (pair) {
+          const liquidityUsd = pair.liquidity?.usd || 0;
+          
+          let qualityEmoji = '';
+          let qualityText = '';
+          if (liquidityUsd < 1000) {
+            qualityEmoji = '🚨';
+            qualityText = 'VERY LOW - High slippage risk!';
+            embed.setColor(0xff0000);
+          } else if (liquidityUsd < 5000) {
+            qualityEmoji = '⚠️';
+            qualityText = 'LOW - Expect slippage on medium trades';
+            embed.setColor(0xffaa00);
+          } else if (liquidityUsd < 50000) {
+            qualityEmoji = '✅';
+            qualityText = 'MODERATE - Decent for small-medium trades';
+            embed.setColor(0xffff00);
+          } else {
+            qualityEmoji = '✅';
+            qualityText = 'HIGH - Good for large trades';
+            embed.setColor(0x00ff00);
+          }
+          
+          embed.setDescription(`💰 **Total Liquidity**: $${formatNumber(liquidityUsd)}\n${qualityEmoji} **${qualityText}**`);
+          
+          let breakdown = '';
+          if (pair.liquidity?.base !== undefined) {
+            breakdown += `• Token: ${formatNumber(pair.liquidity.base)} ${analysis.metadata.symbol}\n`;
+          }
+          if (pair.liquidity?.quote !== undefined) {
+            breakdown += `• ${pair.quoteToken?.symbol || 'SOL'}: ${formatNumber(pair.liquidity.quote)}`;
+          }
+          
+          if (breakdown) {
+            embed.addFields({ name: '📊 Liquidity Breakdown', value: breakdown });
+          }
+          
+          let lpStatus = '';
+          if (analysis.liquidityPool.burnPercentage !== undefined) {
+            const burnPct = analysis.liquidityPool.burnPercentage;
+            lpStatus += `• Burned: ${burnPct.toFixed(2)}%\n\n`;
+            
+            if (burnPct >= 99.99) {
+              lpStatus += '✅ LP is locked forever - Cannot be pulled!';
+            } else if (burnPct >= 80) {
+              lpStatus += `⚠️ Most LP burned, but ${(100 - burnPct).toFixed(2)}% could be pulled`;
+            } else {
+              lpStatus += `❌ ${(100 - burnPct).toFixed(2)}% LP can be pulled - RUG RISK!`;
+            }
+          }
+          
+          if (lpStatus) {
+            embed.addFields({ name: '🔥 LP Token Status', value: lpStatus });
+          }
+          
+          const volumeToLiqRatio = liquidityUsd > 0 ? (pair.volume.h24 / liquidityUsd) : 0;
+          let tradingMetrics = `• 24h Volume: $${formatNumber(pair.volume.h24)}\n`;
+          tradingMetrics += `• Vol/Liq Ratio: ${volumeToLiqRatio.toFixed(2)}x\n\n`;
+          
+          if (volumeToLiqRatio > 3) {
+            tradingMetrics += '🔥 **VERY HIGH** activity - Popular token!';
+          } else if (volumeToLiqRatio > 1) {
+            tradingMetrics += '✅ **GOOD** activity - Healthy trading';
+          } else if (volumeToLiqRatio > 0.1) {
+            tradingMetrics += '⚠️ **LOW** activity - Limited trading';
+          } else {
+            tradingMetrics += '🚨 **VERY LOW** activity - Dead pool?';
+          }
+          
+          embed.addFields({ name: '📈 Trading Metrics', value: tradingMetrics });
+        } else {
+          embed.setColor(0x808080);
+          embed.setDescription('⚠️ No liquidity pool found\n\nThis token may not have active trading pairs yet.');
+        }
+        
+        await interaction.editReply({ embeds: [embed] });
+      
+      } else if (interaction.commandName === 'compare') {
+        const token1 = interaction.options.getString('token1', true);
+        const token2 = interaction.options.getString('token2', true);
+        
+        await interaction.deferReply();
+        
+        const [analysis1, analysis2] = await Promise.all([
+          tokenAnalyzer.analyzeToken(token1),
+          tokenAnalyzer.analyzeToken(token2)
+        ]);
+        
+        const pair1 = analysis1.dexscreenerData?.pairs?.[0];
+        const pair2 = analysis2.dexscreenerData?.pairs?.[0];
+        
+        const embed = new EmbedBuilder()
+          .setColor(0x5865f2)
+          .setTitle('⚖️ Token Comparison')
+          .setDescription(`**Token A**: ${analysis1.metadata.symbol}\n**Token B**: ${analysis2.metadata.symbol}`)
+          .setTimestamp();
+        
+        const betterRisk = analysis1.riskScore > analysis2.riskScore ? 'A' : 'B';
+        let riskComparison = `A: ${analysis1.riskScore}/100 (${analysis1.riskLevel}) ${getRiskEmoji(analysis1.riskLevel)}\n`;
+        riskComparison += `B: ${analysis2.riskScore}/100 (${analysis2.riskLevel}) ${getRiskEmoji(analysis2.riskLevel)}\n`;
+        riskComparison += `👑 Winner: Token ${betterRisk}`;
+        
+        embed.addFields({ name: '🛡️ Risk Score', value: riskComparison });
+        
+        if (pair1 && pair2) {
+          const betterVol = pair1.volume.h24 > pair2.volume.h24 ? 'A' : 'B';
+          let priceVol = `A: $${parseFloat(pair1.priceUsd).toFixed(8)} | Vol: $${formatNumber(pair1.volume.h24)}\n`;
+          priceVol += `B: $${parseFloat(pair2.priceUsd).toFixed(8)} | Vol: $${formatNumber(pair2.volume.h24)}\n`;
+          priceVol += `👑 Higher Volume: Token ${betterVol}`;
+          
+          embed.addFields({ name: '💰 Price & Volume', value: priceVol });
+          
+          if (pair1.marketCap && pair2.marketCap) {
+            const betterMcap = pair1.marketCap > pair2.marketCap ? 'A' : 'B';
+            let mcapComparison = `A: $${formatNumber(pair1.marketCap)}\n`;
+            mcapComparison += `B: $${formatNumber(pair2.marketCap)}\n`;
+            mcapComparison += `👑 Larger: Token ${betterMcap}`;
+            
+            embed.addFields({ name: '📊 Market Cap', value: mcapComparison });
+          }
+          
+          const betterLiq = (pair1.liquidity?.usd || 0) > (pair2.liquidity?.usd || 0) ? 'A' : 'B';
+          let liqComparison = `A: $${formatNumber(pair1.liquidity?.usd || 0)}\n`;
+          liqComparison += `B: $${formatNumber(pair2.liquidity?.usd || 0)}\n`;
+          liqComparison += `👑 Better: Token ${betterLiq}`;
+          
+          embed.addFields({ name: '💧 Liquidity', value: liqComparison });
+        }
+        
+        const betterDist = analysis1.topHolderConcentration < analysis2.topHolderConcentration ? 'A' : 'B';
+        let holderComparison = `A: ${analysis1.topHolderConcentration.toFixed(1)}% (${analysis1.holderCount} holders)\n`;
+        holderComparison += `B: ${analysis2.topHolderConcentration.toFixed(1)}% (${analysis2.holderCount} holders)\n`;
+        holderComparison += `👑 Better Distribution: Token ${betterDist}`;
+        
+        embed.addFields({ name: '👥 Holder Distribution', value: holderComparison });
+        
+        const a_mint = analysis1.mintAuthority.hasAuthority ? '❌' : '✅';
+        const b_mint = analysis2.mintAuthority.hasAuthority ? '❌' : '✅';
+        const a_freeze = analysis1.freezeAuthority.hasAuthority ? '❌' : '✅';
+        const b_freeze = analysis2.freezeAuthority.hasAuthority ? '❌' : '✅';
+        
+        let security = `Mint Revoked: A ${a_mint} | B ${b_mint}\n`;
+        security += `Freeze Revoked: A ${a_freeze} | B ${b_freeze}`;
+        
+        embed.addFields({ name: '🔐 Security', value: security });
+        
+        let aScore = 0;
+        let bScore = 0;
+        
+        if (analysis1.riskScore > analysis2.riskScore) aScore++; else bScore++;
+        if ((pair1?.volume.h24 || 0) > (pair2?.volume.h24 || 0)) aScore++; else bScore++;
+        if ((pair1?.liquidity?.usd || 0) > (pair2?.liquidity?.usd || 0)) aScore++; else bScore++;
+        if (analysis1.topHolderConcentration < analysis2.topHolderConcentration) aScore++; else bScore++;
+        
+        let verdict = '';
+        if (aScore > bScore) {
+          verdict = `🏆 **OVERALL**: Token A appears safer (${aScore}-${bScore})`;
+        } else if (bScore > aScore) {
+          verdict = `🏆 **OVERALL**: Token B appears safer (${bScore}-${aScore})`;
+        } else {
+          verdict = `⚖️ **OVERALL**: Both tokens are similar (${aScore}-${bScore})`;
+        }
+        
+        embed.addFields({ name: '━━━━━━━━━━━━━━━━', value: verdict });
+        
+        await interaction.editReply({ embeds: [embed] });
+      
+      } else if (interaction.commandName === 'trending') {
+        await interaction.deferReply();
+        
+        const response = await fetch('https://api.dexscreener.com/latest/dex/tokens/solana');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch trending data');
+        }
+        
+        const data = await response.json();
+        const pairs = data.pairs || [];
+        
+        const trending = pairs
+          .filter((p: any) => p.chainId === 'solana')
+          .sort((a: any, b: any) => (b.volume?.h24 || 0) - (a.volume?.h24 || 0))
+          .slice(0, 10);
+        
+        if (trending.length === 0) {
+          const embed = new EmbedBuilder()
+            .setColor(0x808080)
+            .setTitle('🔥 Trending Tokens')
+            .setDescription('⚠️ No trending tokens found at the moment.')
+            .setTimestamp();
+          
+          await interaction.editReply({ embeds: [embed] });
+          return;
+        }
+        
+        const embed = new EmbedBuilder()
+          .setColor(0xff6600)
+          .setTitle('🔥 Trending Solana Tokens')
+          .setDescription('_Top 10 by 24h Volume_')
+          .setTimestamp();
+        
+        trending.forEach((pair: any, index: number) => {
+          const symbol = pair.baseToken?.symbol || 'Unknown';
+          const price = parseFloat(pair.priceUsd || 0);
+          const change24h = pair.priceChange?.h24 || 0;
+          const volume = pair.volume?.h24 || 0;
+          const liquidity = pair.liquidity?.usd || 0;
+          
+          const trendEmoji = change24h >= 0 ? '📈' : '📉';
+          
+          let fieldValue = `Price: $${price < 0.01 ? price.toFixed(8) : price.toFixed(4)} (${change24h >= 0 ? '+' : ''}${change24h.toFixed(1)}%)\n`;
+          fieldValue += `Vol: $${formatNumber(volume)} | Liq: $${formatNumber(liquidity)}\n`;
+          fieldValue += `\`${pair.baseToken?.address}\``;
+          
+          embed.addFields({
+            name: `${index + 1}. ${symbol} ${trendEmoji}`,
+            value: fieldValue,
+            inline: false
+          });
+        });
+        
+        embed.addFields({
+          name: '━━━━━━━━━━━━━━━━',
+          value: '💡 Use /execute <address> for full analysis'
         });
         
         await interaction.editReply({ embeds: [embed] });
