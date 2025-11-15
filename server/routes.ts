@@ -2350,6 +2350,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // LIVE SCAN HISTORY & PUMP.FUN WEBHOOK ROUTES
   // ============================================================================
 
+  // GET /api/bot/invite-links - Get bot invite links for footer
+  app.get('/api/bot/invite-links', (req, res) => {
+    const telegramBotUsername = process.env.TELEGRAM_BOT_USERNAME || 'rugkilleralphabot';
+    const discordClientId = process.env.DISCORD_CLIENT_ID;
+    
+    const links: {
+      telegram?: string;
+      discord?: string;
+      message?: string;
+    } = {
+      telegram: `https://t.me/${telegramBotUsername}`,
+    };
+
+    if (discordClientId) {
+      links.discord = `https://discord.com/api/oauth2/authorize?client_id=${discordClientId}&permissions=2147486720&scope=bot%20applications.commands`;
+    }
+
+    res.json(links);
+  });
+
   // GET /api/scan-history - Get recent scan history
   app.get('/api/scan-history', async (req, res) => {
     try {
