@@ -17,12 +17,16 @@ const RPC_PROVIDERS = [
   { 
     getUrl: () => `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_KEY || ""}`,
     weight: 30, 
-    name: "Helius" 
+    name: "Helius",
+    requiresKey: true,
+    hasKey: () => !!process.env.HELIUS_KEY
   },
   { 
     getUrl: () => `https://solana-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY || ""}`,
     weight: 20, 
-    name: "Alchemy" 
+    name: "Alchemy",
+    requiresKey: true,
+    hasKey: () => !!process.env.ALCHEMY_KEY
   },
   { 
     getUrl: () => "https://solana-api.projectserum.com",
@@ -36,12 +40,26 @@ export class SolanaRpcBalancer {
   private totalWeight: number;
 
   constructor(providers: typeof RPC_PROVIDERS) {
-    this.providers = providers.map(p => ({
+    // Filter out providers that require API keys but don't have them
+    const availableProviders = providers.filter(p => {
+      if ('requiresKey' in p && p.requiresKey && 'hasKey' in p) {
+        const hasKey = p.hasKey();
+        if (!hasKey) {
+          console.log(`[RPC Balancer] Skipping ${p.name} - no API key configured`);
+        }
+        return hasKey;
+      }
+      return true;
+    });
+    
+    console.log(`[RPC Balancer] Available providers: ${availableProviders.map(p => p.name).join(', ')}`);
+    
+    this.providers = availableProviders.map(p => ({
       ...p,
       score: 100,
       fails: 0,
     }));
-    this.totalWeight = providers.reduce((s, p) => s + p.weight, 0);
+    this.totalWeight = availableProviders.reduce((s, p) => s + p.weight, 0);
   }
 
   select(): RpcProvider {

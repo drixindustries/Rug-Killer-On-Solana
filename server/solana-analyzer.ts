@@ -54,9 +54,19 @@ export class SolanaTokenAnalyzer {
       let mintInfo;
       try {
         mintInfo = await getMint(connection, mintPubkey, undefined, TOKEN_2022_PROGRAM_ID);
-      } catch (error) {
+        console.log(`✅ Token uses Token-2022 program: ${tokenAddress}`);
+      } catch (token2022Error) {
         // Not a Token-2022, try standard SPL token
-        mintInfo = await getMint(connection, mintPubkey, undefined, TOKEN_PROGRAM_ID);
+        try {
+          mintInfo = await getMint(connection, mintPubkey, undefined, TOKEN_PROGRAM_ID);
+          console.log(`✅ Token uses standard SPL Token program: ${tokenAddress}`);
+        } catch (splTokenError) {
+          console.error('Failed to fetch mint info with both token programs:', {
+            token2022Error: token2022Error instanceof Error ? token2022Error.message : token2022Error,
+            splTokenError: splTokenError instanceof Error ? splTokenError.message : splTokenError
+          });
+          throw new Error(`Invalid token address or unsupported token program: ${tokenAddress}`);
+        }
       }
       
       // Analyze authorities
