@@ -9,7 +9,7 @@ The Solana Rug Killer now includes an **automated wallet discovery system** that
 3. **External Sources** - Integrates with Birdeye API and community submissions
 4. **Alpha Alert Integration** - Automatically monitors discovered wallets for alpha calls
 
-This gives you access to **100+ smart money wallets** that services like ATM.day, Gemnl, and Alpha Gardeners charge for.
+This gives you access to **100+ smart money wallets** for free, completely automated and open source.
 
 ---
 
@@ -45,7 +45,7 @@ Each wallet is scored on:
 Aggregates wallets from:
 - **Birdeye API**: Top traders and trending wallets (requires paid API)
 - **Community Submissions**: Manually added by admins
-- **Alpha Services**: Publicly shared wallets from ATM.day/Gemnl/etc (when available)
+- **Public Sources**: Publicly shared wallets from various platforms
 
 ### 🚨 Alpha Alert Integration
 
@@ -250,22 +250,30 @@ POST /api/admin/wallets/external/sync
 
 ---
 
-## How It Compares to Paid Services
+## Why Use This System?
 
-### ATM.day
-- **They offer**: 20,000+ smart wallets, 72 calls/day, 82% win rate, $190 avg ATH ROI
-- **We offer**: Automated discovery of high-performing wallets from successful tokens
-- **Advantage**: Open source, free, customizable filters
+### Open Source & Free
+- No monthly subscriptions or hidden fees
+- Full transparency - audit all code yourself
+- Self-hosted - you control your data
 
-### Gemnl
-- **They offer**: Premium/Degen alerts, smart wallet holdings per token
-- **We offer**: Real-time monitoring of discovered wallets + quality filters
-- **Advantage**: No subscription fees, full control over alert criteria
+### Customizable
+- Adjust win rate thresholds (default 60%)
+- Set minimum profit requirements (default 5 SOL)
+- Configure influence scoring algorithm
+- Add your own data sources
 
-### Alpha Gardeners
-- **They offer**: SOL/ETH alerts, whale tracking, first 50 buyer analysis
-- **We offer**: Same first 50 buyer analysis + automatic win rate calculation
-- **Advantage**: Integrated with your own platform, extensible
+### Automated
+- Discovers new profitable wallets every 6 hours
+- Auto-updates performance metrics
+- Removes inactive/low-performing wallets
+- Seamlessly integrates with alpha alerts
+
+### Community-Driven
+- Contribute wallet sources
+- Share improvements
+- No vendor lock-in
+- Built by traders, for traders
 
 ---
 
