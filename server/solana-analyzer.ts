@@ -50,23 +50,38 @@ export class SolanaTokenAnalyzer {
       // Fetch mint account info
       const connection = this.getConnection();
       
-      // Try Token-2022 first (newer standard), fallback to SPL Token
+      // First, check if the account exists and get its owner to determine the correct program
       let mintInfo;
+      let accountInfo;
+      
       try {
-        mintInfo = await getMint(connection, mintPubkey, undefined, TOKEN_2022_PROGRAM_ID);
-        console.log(`✅ Token uses Token-2022 program: ${tokenAddress}`);
-      } catch (token2022Error) {
-        // Not a Token-2022, try standard SPL token
-        try {
-          mintInfo = await getMint(connection, mintPubkey, undefined, TOKEN_PROGRAM_ID);
-          console.log(`✅ Token uses standard SPL Token program: ${tokenAddress}`);
-        } catch (splTokenError) {
-          console.error('Failed to fetch mint info with both token programs:', {
-            token2022Error: token2022Error instanceof Error ? token2022Error.message : token2022Error,
-            splTokenError: splTokenError instanceof Error ? splTokenError.message : splTokenError
-          });
-          throw new Error(`Invalid token address or unsupported token program: ${tokenAddress}`);
+        accountInfo = await connection.getAccountInfo(mintPubkey);
+        
+        if (!accountInfo) {
+          throw new Error(`Token mint account not found: ${tokenAddress}`);
         }
+        
+        // Check which token program owns this account
+        const isToken2022 = accountInfo.owner.equals(TOKEN_2022_PROGRAM_ID);
+        const isSPLToken = accountInfo.owner.equals(TOKEN_PROGRAM_ID);
+        
+        if (!isToken2022 && !isSPLToken) {
+          console.error(`Account owner is not a token program: ${accountInfo.owner.toBase58()}`);
+          throw new Error(`Invalid token: account is owned by ${accountInfo.owner.toBase58()}, not a token program`);
+        }
+        
+        // Fetch mint info using the correct program ID
+        if (isToken2022) {
+          mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID);
+          console.log(`✅ Token uses Token-2022 program: ${tokenAddress}`);
+        } else {
+          mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID);
+          console.log(`✅ Token uses standard SPL Token program: ${tokenAddress}`);
+        }
+      } catch (error) {
+        console.error('Failed to fetch mint info:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to fetch token data: ${errorMessage}`);
       }
       
       // Analyze authorities
@@ -312,16 +327,32 @@ export class SolanaTokenAnalyzer {
                                errorMessage.toLowerCase().includes('rate limit') ||
                                errorMessage.toLowerCase().includes('too many requests');
       const isInvalidAddress = errorMessage.toLowerCase().includes('invalid') ||
-                               errorMessage.toLowerCase().includes('not found');
+                               errorMessage.toLowerCase().includes('not found') ||
+                               errorMessage.toLowerCase().includes('account not found');
+      const isNetworkError = errorMessage.toLowerCase().includes('network') ||
+                            errorMessage.toLowerCase().includes('timeout') ||
+                            errorMessage.toLowerCase().includes('econnrefused');
+      const isTokenProgramError = errorMessage.toLowerCase().includes('token program') ||
+                                  errorMessage.toLowerCase().includes('owner');
       
       // Build appropriate error description
       let errorDescription = "Unable to complete token analysis: ";
+      let errorTitle = "Analysis Failed";
+      
       if (isRateLimitError) {
+        errorTitle = "Rate Limit Reached";
         errorDescription += "Solana RPC rate limit reached. Please try again in a few moments.";
       } else if (isInvalidAddress) {
-        errorDescription += "Invalid token address or token does not exist on-chain.";
+        errorTitle = "Invalid Token";
+        errorDescription += "This token address does not exist on Solana or is not a valid SPL token.";
+      } else if (isNetworkError) {
+        errorTitle = "Network Error";
+        errorDescription += "Unable to connect to Solana network. Please check your connection and try again.";
+      } else if (isTokenProgramError) {
+        errorTitle = "Unsupported Token";
+        errorDescription += "This account is not a valid SPL token or Token-2022. It may be a different type of Solana account.";
       } else {
-        errorDescription += `${errorMessage}. This may be due to network issues or an invalid token address.`;
+        errorDescription += errorMessage;
       }
       
       // Return a safe default response when analysis fails
@@ -359,7 +390,7 @@ export class SolanaTokenAnalyzer {
         redFlags: [{
           type: "mint_authority",
           severity: "critical",
-          title: isRateLimitError ? "Rate Limit Reached" : "Analysis Failed",
+          title: errorTitle,
           description: errorDescription,
         }],
         creationDate: undefined,
