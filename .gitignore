@@ -1,4 +1,4 @@
-# Dependencies
+﻿# Dependencies
 node_modules
 npm-debug.log*
 yarn-debug.log*
@@ -11,12 +11,53 @@ build
 .cache
 server/public
 
-# Environment variables
+# Environment variables - ALL VARIANTS
 .env
-.env.local
-.env.development
-.env.test
-.env.production
+.env.*
+!.env.example
+*.env
+.envrc
+
+# Secrets and credentials
+secrets/
+*.secret
+*.secrets
+credentials.json
+service-account*.json
+
+# SSL/TLS certificates and keys
+ssl/
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+*.csr
+
+# Private keys and tokens
+*_rsa
+*_rsa.pub
+*.private
+id_rsa*
+id_dsa*
+id_ecdsa*
+id_ed25519*
+
+# API keys and tokens (various formats)
+*token*
+*secret*
+*apikey*
+*api_key*
+!*token*.ts
+!*token*.tsx
+!*token*.js
+!*secret*.md
+# But exclude code files about tokens
+!client/src/components/token*.tsx
+!client/src/pages/*token*.tsx
+!tests/**/token*.ts
+!tests/**/*token*.spec.ts
 
 # IDE & Editor
 .vscode/
@@ -30,6 +71,7 @@ server/public
 *.db
 *.sqlite
 postgres-data/
+*.sql.gz
 
 # Logs
 logs
@@ -53,7 +95,7 @@ vite.config.ts.*
 Thumbs.db
 .DS_Store
 
-# Replit-specific (keep these if working on Replit, remove for pure GitHub)
+# Replit-specific
 .replit
 .upm
 .config/
@@ -71,8 +113,19 @@ analysis_fullpage.png
 generated-icon.png
 delete.sh
 
-# Internal/dangerous files (NOT for public GitHub)
+# Internal/dangerous files
 replit.md
 design_guidelines.md
 server/sniper-bot.ts
 server/token-deployer.ts
+
+# Backup files
+*.backup
+*.bak
+*.old
+
+# Compiled binaries
+*.exe
+*.dll
+*.so
+*.dylib
