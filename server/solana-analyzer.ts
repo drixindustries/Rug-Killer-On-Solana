@@ -1,5 +1,5 @@
 import { Connection, PublicKey, ParsedAccountData } from "@solana/web3.js";
-import { getMint, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { getMint, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import type {
   TokenAnalysisResponse,
   AuthorityStatus,
@@ -49,7 +49,15 @@ export class SolanaTokenAnalyzer {
       
       // Fetch mint account info
       const connection = this.getConnection();
-      const mintInfo = await getMint(connection, mintPubkey);
+      
+      // Try Token-2022 first (newer standard), fallback to SPL Token
+      let mintInfo;
+      try {
+        mintInfo = await getMint(connection, mintPubkey, undefined, TOKEN_2022_PROGRAM_ID);
+      } catch (error) {
+        // Not a Token-2022, try standard SPL token
+        mintInfo = await getMint(connection, mintPubkey, undefined, TOKEN_PROGRAM_ID);
+      }
       
       // Analyze authorities
       const mintAuthority = this.analyzeMintAuthority(mintInfo.mintAuthority);
