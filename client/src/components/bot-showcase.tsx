@@ -54,15 +54,24 @@ export function BotShowcase() {
                   </div>
                 </div>
               </div>
-              <Button 
-                className="w-full" 
-                variant="default"
-                onClick={() => window.location.href = '/pricing'}
-                data-testid="button-telegram-cta"
-              >
-                <SiTelegram className="h-4 w-4 mr-2" />
-                View Plans
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  className="flex-1" 
+                  variant="default"
+                  onClick={() => window.open('https://t.me/RugKillerAlphaBot', '_blank')}
+                  data-testid="button-telegram-join"
+                >
+                  <SiTelegram className="h-4 w-4 mr-2" />
+                  Join Bot
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => window.location.href = '/bot-guide'}
+                  data-testid="button-telegram-guide"
+                >
+                  Guide
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -102,15 +111,24 @@ export function BotShowcase() {
                   </div>
                 </div>
               </div>
-              <Button 
-                className="w-full" 
-                variant="default"
-                onClick={() => window.location.href = '/pricing'}
-                data-testid="button-discord-cta"
-              >
-                <SiDiscord className="h-4 w-4 mr-2" />
-                View Plans
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  className="flex-1" 
+                  variant="default"
+                  onClick={() => window.open('https://discord.gg/rugkiller', '_blank')}
+                  data-testid="button-discord-join"
+                >
+                  <SiDiscord className="h-4 w-4 mr-2" />
+                  Join Bot
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => window.location.href = '/bot-guide'}
+                  data-testid="button-discord-guide"
+                >
+                  Guide
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -13,12 +13,22 @@ export default function Landing() {
             <Shield className="w-6 h-6 text-primary" />
             <span className="font-semibold text-xl">Solana Rug Killer</span>
           </div>
-          <Button 
-            onClick={() => window.location.href = '/'}
-            data-testid="button-get-started-header"
-          >
-            Analyze Tokens
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.href = '/bot-guide'}
+            >
+              <Bot className="w-4 h-4 mr-2" />
+              Join Bots
+            </Button>
+            <Button 
+              onClick={() => window.location.href = '/'}
+              data-testid="button-get-started-header"
+            >
+              Analyze Tokens
+            </Button>
+          </div>
         </div>
       </header>
 
