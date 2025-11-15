@@ -11,7 +11,7 @@ export default function Landing() {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Shield className="w-6 h-6 text-primary" />
-            <span className="font-semibold text-xl">Solana Rug Killer</span>
+            <span className="font-semibold text-xl">Rug Killer Alpha Bot</span>
           </div>
           <div className="flex items-center gap-3">
             <Button 
@@ -315,7 +315,7 @@ export default function Landing() {
 
       <footer className="border-t py-6">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>Solana Rug Killer - Protect your investments</p>
+          <p>Rug Killer Alpha Bot - Protect your investments</p>
         </div>
       </footer>
     </div>
