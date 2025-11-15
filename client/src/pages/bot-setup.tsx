@@ -266,26 +266,18 @@ export default function BotSetup() {
               <p className="text-sm">
                 Click the button below to invite the bot to your Discord server. You'll need "Manage Server" permissions.
               </p>
-              <Button
-                variant="default"
-                size="lg"
-                asChild
-                className="w-full sm:w-auto"
-                data-testid="button-invite-discord-bot"
-              >
-                <a 
-                  href="https://discord.com/oauth2/authorize?client_id=1437952073319714879&scope=bot&permissions=3072" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                >
-                  <SiDiscord className="h-5 w-5 mr-2" />
-                  Invite Discord Bot
-                  <ExternalLink className="h-4 w-4 ml-2" />
-                </a>
-              </Button>
+              <div className="bg-muted p-4 rounded-lg space-y-3">
+                <p className="text-sm font-semibold">Discord Bot Invite URL Template:</p>
+                <code className="block bg-background p-3 rounded text-xs break-all">
+                  https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot&permissions=3072
+                </code>
+                <p className="text-xs text-muted-foreground">
+                  Replace <code className="bg-background px-1 py-0.5 rounded">YOUR_CLIENT_ID</code> with your Discord Application ID from Part 2, Step 2
+                </p>
+              </div>
               <div className="text-xs text-muted-foreground space-y-1">
-                <p>• Bot permissions: Read Messages, Send Messages, Embed Links</p>
-                <p>• After inviting, use <code className="bg-muted px-1 py-0.5 rounded">/execute</code> to analyze tokens</p>
+                <p>• Bot permissions: Read Messages (2048), Send Messages (2048), Embed Links (16384) = 3072 total</p>
+                <p>• After inviting, use <code className="bg-muted px-1 py-0.5 rounded">/execute [token]</code> to analyze tokens</p>
               </div>
             </CardContent>
           </Card>

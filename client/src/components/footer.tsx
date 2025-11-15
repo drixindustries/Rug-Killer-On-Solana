@@ -126,7 +126,7 @@ export function Footer() {
                 data-testid="footer-button-invite-discord"
               >
                 <a 
-                  href="https://discord.com/oauth2/authorize?client_id=1437952073319714879&scope=bot&permissions=3072" 
+                  href="https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot&permissions=3072" 
                   target="_blank" 
                   rel="noopener noreferrer"
                 >
