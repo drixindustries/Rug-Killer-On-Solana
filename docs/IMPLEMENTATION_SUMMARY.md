@@ -199,7 +199,7 @@ Final Score: 0-100
 ## 🗂️ Project Structure
 
 ```
-Rug-Killer-on-Solana/
+Rug-Killer-On-Solana/
 ├── client/                      # React frontend
 │   ├── src/
 │   │   ├── hooks/

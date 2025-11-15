@@ -363,7 +363,7 @@ ws.onmessage = (e) => console.log(JSON.parse(e.data));
 ## Support
 
 For issues or questions:
-- GitHub Issues: https://github.com/drixindustries/Rug-Killer-on-Solana
+- GitHub Issues: https://github.com/drixindustries/Rug-Killer-On-Solana/issues
 - Discord: [Your Discord Link]
 - Telegram: [Your Telegram Link]
 

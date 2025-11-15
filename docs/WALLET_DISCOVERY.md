@@ -497,7 +497,7 @@ MIT License - See LICENSE file for details
 ## Support
 
 - **Documentation**: [docs/](../docs/)
-- **GitHub Issues**: [Report bugs](https://github.com/your-repo/issues)
+- **GitHub Issues**: [Report bugs](https://github.com/drixindustries/Rug-Killer-On-Solana/issues)
 - **Discord**: Join our community (link in README)
 - **Twitter**: [@RugKillerBot](https://twitter.com/rugkillerbot)
 
