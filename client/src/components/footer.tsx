@@ -129,6 +129,23 @@ export function Footer() {
               
               {/* Bot Invite Buttons */}
               <div className="space-y-2">
+                {/* Main Website Link */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  asChild
+                  className="w-full text-xs"
+                  data-testid="footer-button-main-website"
+                >
+                  <a 
+                    href="/"
+                    rel="noopener noreferrer"
+                  >
+                    <Shield className="h-3.5 w-3.5 mr-2" />
+                    Main Website
+                  </a>
+                </Button>
+                
                 {botLinks?.telegram && (
                   <Button
                     variant="default"
