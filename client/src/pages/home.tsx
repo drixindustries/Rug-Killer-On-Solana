@@ -499,8 +499,8 @@ export default function Home() {
                       )}
                     </div>
                     
-                    {/* Right Column - Sidebar */}
-                    <div className="space-y-6">
+                    {/* Right Column - STICKY Sidebar */}
+                    <div className="sticky top-4 self-start space-y-6 max-h-screen overflow-y-auto">
                       {/* Token Info Sidebar with copy-able addresses */}
                       <Suspense fallback={<ComponentLoader />}>
                         <TokenInfoSidebar
