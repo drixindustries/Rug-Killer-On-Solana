@@ -326,6 +326,25 @@ export interface GMGNData {
   smartMoneyActive: boolean; // True if smart traders are involved
 }
 
+// Aged Wallet Detection (Fake Volume)
+export interface AgedWalletData {
+  agedWalletCount: number;
+  totalFakeVolumePercent: number;
+  riskScore: number; // 0-100
+  patterns: {
+    sameFundingSource: boolean;
+    similarAges: boolean;
+    coordinatedBuys: boolean;
+    noSells: boolean;
+  };
+  suspiciousWallets: Array<{
+    wallet: string;
+    walletAge: number; // Days
+    hasOnlyBuys: boolean;
+  }>;
+  risks: string[];
+}
+
 export interface TokenAnalysisResponse {
   tokenAddress: string;
   riskScore: number;
@@ -378,6 +397,7 @@ export interface TokenAnalysisResponse {
   networkAnalysis?: NetworkAnalysisData;
   whaleDetection?: WhaleDetectionData;
   gmgnData?: GMGNData; // GMGN.AI bundle & insider detection
+  agedWalletData?: AgedWalletData; // Aged wallet fake volume detection
 }
 
 // Storage schema (not used for in-memory but kept for consistency)

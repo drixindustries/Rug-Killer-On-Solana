@@ -42,6 +42,7 @@ const HoneypotDetectionCard = lazy(() => import("@/components/honeypot-detection
 const BundleDetectionCard = lazy(() => import("@/components/bundle-detection-card").then(m => ({ default: m.BundleDetectionCard })));
 const NetworkAnalysisCard = lazy(() => import("@/components/network-analysis-card").then(m => ({ default: m.NetworkAnalysisCard })));
 const WhaleDetectionCard = lazy(() => import("@/components/whale-detection-card").then(m => ({ default: m.WhaleDetectionCard })));
+const AgedWalletDetectionCard = lazy(() => import("@/components/aged-wallet-detection-card").then(m => ({ default: m.AgedWalletDetectionCard })));
 
 // Loading fallback component for lazy-loaded components
 const ComponentLoader = () => <Skeleton className="h-48 w-full" />;
@@ -435,6 +436,13 @@ export default function Home() {
                             data={analysis.whaleDetection} 
                             symbol={analysis.metadata?.symbol || 'TOKEN'} 
                           />
+                        </Suspense>
+                      )}
+
+                      {/* Aged Wallet Detection (Fake Volume) */}
+                      {analysis.agedWalletData && analysis.agedWalletData.agedWalletCount > 0 && (
+                        <Suspense fallback={<ComponentLoader />}>
+                          <AgedWalletDetectionCard data={analysis.agedWalletData} />
                         </Suspense>
                       )}
 

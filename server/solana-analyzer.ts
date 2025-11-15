@@ -24,6 +24,7 @@ import { BubblemapsService } from "./services/bubblemaps-service";
 import { QuillCheckService } from "./services/quillcheck-service";
 import { WhaleDetectorService } from "./services/whale-detector";
 import { GMGNService } from "./services/gmgn-service";
+import { AgedWalletDetector } from "./services/aged-wallet-detector";
 
 export class SolanaTokenAnalyzer {
   private rugcheckService: RugcheckService;
@@ -35,6 +36,7 @@ export class SolanaTokenAnalyzer {
   private quillcheckService: QuillCheckService;
   private whaleDetector: WhaleDetectorService;
   private gmgnService: GMGNService;
+  private agedWalletDetector: AgedWalletDetector;
 
   constructor() {
     this.rugcheckService = new RugcheckService();
@@ -46,6 +48,7 @@ export class SolanaTokenAnalyzer {
     this.quillcheckService = new QuillCheckService();
     this.whaleDetector = new WhaleDetectorService();
     this.gmgnService = new GMGNService();
+    this.agedWalletDetector = new AgedWalletDetector();
   }
 
   private getConnection(): Connection {
@@ -313,6 +316,19 @@ export class SolanaTokenAnalyzer {
       } catch (error) {
         console.error('[GMGN] Data processing failed:', error);
       }
+
+      // Aged wallet detection (fake volume)
+      let agedWalletData = null;
+      try {
+        agedWalletData = await this.agedWalletDetector.detectAgedWallets(
+          tokenAddress,
+          holders,
+          recentTransactions
+        );
+        console.log(`[Aged Wallets] Count: ${agedWalletData.agedWalletCount}, Fake Volume: ${agedWalletData.totalFakeVolumePercent.toFixed(1)}%, Risk: ${agedWalletData.riskScore}`);
+      } catch (error) {
+        console.error('[Aged Wallets] Detection failed:', error);
+      }
       
       // Build metadata - prioritize DexScreener data over on-chain defaults
       const supply = Number(mintInfo.supply);
@@ -344,7 +360,8 @@ export class SolanaTokenAnalyzer {
         advancedBundleData,
         networkAnalysis,
         quillcheckData,
-        gmgnData
+        gmgnData,
+        agedWalletData
       );
       
       // Calculate overall risk score with safety check
@@ -393,6 +410,7 @@ export class SolanaTokenAnalyzer {
         advancedBundleData: advancedBundleData as any || undefined,
         networkAnalysis: networkAnalysis || undefined,
         gmgnData: gmgnData || undefined,
+        agedWalletData: agedWalletData || undefined,
       };
     } catch (error) {
       console.error("Token analysis error:", error);
@@ -821,7 +839,8 @@ export class SolanaTokenAnalyzer {
     advancedBundleData?: any,
     networkAnalysis?: any,
     quillcheckData?: any,
-    gmgnData?: any
+    gmgnData?: any,
+    agedWalletData?: any
   ): RiskFlag[] {
     const flags: RiskFlag[] = [];
 
@@ -944,7 +963,42 @@ export class SolanaTokenAnalyzer {
       }
     }
 
-    // Mint authority not revoked
+    // Aged wallet fake volume detection
+    if (agedWalletData && agedWalletData.riskScore >= 70) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "critical",
+        title: `Fake Volume: ${agedWalletData.agedWalletCount} Aged Wallets Detected`,
+        description: `${agedWalletData.agedWalletCount} old wallets (30+ days) controlling ${agedWalletData.totalFakeVolumePercent.toFixed(1)}% of supply. ${agedWalletData.risks.join(' ')}`,
+      });
+    } else if (agedWalletData && agedWalletData.riskScore >= 40) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "high",
+        title: `Suspected Fake Volume: ${agedWalletData.agedWalletCount} Aged Wallets`,
+        description: `${agedWalletData.agedWalletCount} aged wallets detected creating potential fake volume. ${agedWalletData.risks[0] || ''}`,
+      });
+    }
+
+    // Specific aged wallet patterns
+    if (agedWalletData?.patterns.sameFundingSource && agedWalletData.agedWalletCount >= 5) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "high",
+        title: "Aged Wallets Share Funding Source",
+        description: "Multiple aged wallets were funded from the same source before buying - coordinated fake volume.",
+      });
+    }
+
+    if (agedWalletData?.patterns.coordinatedBuys && agedWalletData.agedWalletCount >= 5) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "high",
+        title: "Coordinated Aged Wallet Buys",
+        description: "Aged wallets bought within 1 minute of each other - automated fake volume generation.",
+      });
+    }
+        // Mint authority not revoked
     if (mintAuthority.hasAuthority) {
       flags.push({
         type: "mint_authority",
