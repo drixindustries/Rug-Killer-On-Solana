@@ -970,7 +970,19 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     }
   });
   
-  // Handle direct messages with token addresses (like Telegram bot)
+  // Fun personality responses when mentioned
+  const personalityQuotes = [
+    "🎭 Hiya puddin'! Need me to sniff out some rugs? Just drop that contract address and watch me work!",
+    "💣 BOOM! Someone called? Drop a token address and I'll tell ya if it's a keeper or a rug-pullin' disaster!",
+    "🔨 Harley's Rug Detector at your service! Toss me a contract and I'll smash through the BS faster than you can say 'diamond hands'!",
+    "🎪 Oh oh oh! You rang? I LOVE exposing scammers! Give me a token address and I'll tear it apart... in the fun way!",
+    "💥 Well well well, what do we have here? Another ape lookin' for alpha? Drop that CA and let's see if it's legit or just another honeypot!",
+    "🃏 Miss me? Course ya did! I'm the only bot crazy enough to actually ENJOY hunting rugs. Try me with a token address!",
+    "🎯 YOOHOO! Ready to blow up some scammer's plans? Hand over that contract address and watch the fireworks!",
+    "🦇 Batsy wouldn't approve of my methods but WHO CARES! Drop a token and I'll go full detective mode on those devs!",
+  ];
+
+  // Handle direct messages and mentions
   client.on('messageCreate', async message => {
     // Ignore bot messages
     if (message.author.bot) return;
@@ -980,11 +992,23 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     
     const text = message.content.trim();
     
+    // Check if bot is mentioned
+    if (message.mentions.has(client.user!.id) || message.reference?.messageId) {
+      const randomQuote = personalityQuotes[Math.floor(Math.random() * personalityQuotes.length)];
+      await message.reply(randomQuote);
+      return;
+    }
+    
     // Check if it's a Solana address (base58, 32-44 chars, no spaces)
     if (text.length >= 32 && text.length <= 44 && !/\s/.test(text)) {
       try {
-        // Send "analyzing" message
-        const processingMsg = await message.reply('🔍 Quick analysis...');
+        const quickReplies = [
+          '🔍 Ooh, a shiny new token! Let me check if it\'s a gem or a trap...',
+          '💣 ANALYZING! If this is a rug I\'m gonna be SO disappointed...',
+          '🎪 Time for the Harley Rug Test! Let\'s see what we got here...',
+          '🔨 Hold tight puddin\', running diagnostics on this bad boy...',
+        ];
+        const processingMsg = await message.reply(quickReplies[Math.floor(Math.random() * quickReplies.length)]);
         
         // Analyze the token
         const analysis = await tokenAnalyzer.analyzeToken(text);
