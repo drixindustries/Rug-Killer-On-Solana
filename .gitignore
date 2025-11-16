@@ -62,6 +62,12 @@ coverage/
 *.lcov
 test-results/
 playwright-report/
+test-*.ts
+test-*.js
+test-*.ps1
+*test*.OLD.*
+*.OLD.ts
+*.OLD.js
 
 # Misc
 .nixpacksdir
