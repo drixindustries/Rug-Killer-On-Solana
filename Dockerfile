@@ -8,10 +8,11 @@ RUN npm install
 
 # Copy necessary files for build
 COPY client/ ./client/
+COPY shared/ ./shared/
 COPY vite.config.ts ./
 COPY tsconfig*.json ./
 
-# Build frontend
+# Build frontend (outputs to /app/dist/public)
 RUN npm run build
 
 # Production stage
@@ -27,8 +28,8 @@ RUN npm install --production
 COPY shared/ ./shared/
 COPY server/ ./
 
-# Copy frontend build from builder stage
-COPY --from=frontend-builder /app/client/dist/public/ ./dist/public/
+# Copy frontend build from builder stage (correct path: /app/dist/public)
+COPY --from=frontend-builder /app/dist/public/ ./dist/public/
 
 # Environment
 ENV NODE_ENV=production
