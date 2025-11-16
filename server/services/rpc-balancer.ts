@@ -37,19 +37,23 @@ const RPC_PROVIDERS = [
     rateLimitWindow: 60000
   },
   { 
-    getUrl: () => "https://solana.subquery.network/rpc",
+    getUrl: () => `https://rpc.ankr.com/solana/${process.env.ANKR_KEY || ""}`,
     weight: 20, 
-    name: "SubQuery",
+    name: "Ankr",
     tier: "premium",
-    rateLimit: 80,
+    requiresKey: true,
+    hasKey: () => !!process.env.ANKR_KEY,
+    rateLimit: 500, // 500M requests/month on free tier
     rateLimitWindow: 60000
   },
   { 
-    getUrl: () => "https://rpc.ankr.com/solana",
-    weight: 15, 
-    name: "Ankr",
+    getUrl: () => `https://solana-mainnet.rpc.grove.city/v1/${process.env.GROVE_KEY || ""}`,
+    weight: 20, 
+    name: "Grove",
     tier: "premium",
-    rateLimit: 300, // 300 requests per day / spread across minutes
+    requiresKey: true,
+    hasKey: () => !!process.env.GROVE_KEY,
+    rateLimit: 250,
     rateLimitWindow: 60000
   },
   // API key providers (premium with keys)
@@ -83,19 +87,13 @@ const RPC_PROVIDERS = [
     rateLimitWindow: 60000
   },
   { 
-    getUrl: () => "https://solana-api.projectserum.com",
-    weight: 8, 
-    name: "Serum",
+    getUrl: () => `https://rpc.shyft.to/?api_key=${process.env.SHYFT_KEY || ""}`,
+    weight: 15, 
+    name: "Shyft",
     tier: "fallback",
-    rateLimit: 50,
-    rateLimitWindow: 60000
-  },
-  {
-    getUrl: () => "https://ssc-dao.genesysgo.net",
-    weight: 5,
-    name: "GenesysGo",
-    tier: "fallback",
-    rateLimit: 30,
+    requiresKey: true,
+    hasKey: () => !!process.env.SHYFT_KEY,
+    rateLimit: 100,
     rateLimitWindow: 60000
   }
 ];
