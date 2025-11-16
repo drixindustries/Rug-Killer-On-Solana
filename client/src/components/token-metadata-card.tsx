@@ -1,14 +1,70 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Coins, Globe, FileText, AlertCircle, CheckCircle } from "lucide-react";
+import { Coins, Globe, FileText, AlertCircle, CheckCircle, Calendar, Clock } from "lucide-react";
 import type { TokenMetadata } from "@shared/schema";
 
 interface TokenMetadataCardProps {
   metadata?: TokenMetadata;
   tokenAddress: string;
+  creationDate?: number;
 }
 
-export function TokenMetadataCard({ metadata, tokenAddress }: TokenMetadataCardProps) {
+export function TokenMetadataCard({ metadata, tokenAddress, creationDate }: TokenMetadataCardProps) {
+  const getTokenAge = (timestamp?: number) => {
+    if (!timestamp) return "Established (>30 days)";
+    
+    const now = Date.now();
+    const diff = now - timestamp;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    
+    if (days === 0) {
+      if (hours === 0) return "Just created";
+      return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
+    }
+    if (days === 1) return "Yesterday";
+    if (days < 7) return `${days} days ago`;
+    if (days < 30) return `${days} days ago`;
+    if (days < 365) return `${Math.floor(days / 30)} months ago`;
+    return `${Math.floor(days / 365)} years ago`;
+  };
+
+  const getAgeRiskBadge = (timestamp?: number) => {
+    if (!timestamp) {
+      return <Badge variant="outline" className="gap-1 text-green-600 border-green-600">
+        <CheckCircle className="h-3 w-3" />
+        Established
+      </Badge>;
+    }
+    
+    const now = Date.now();
+    const diff = now - timestamp;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    if (days < 1) {
+      return <Badge variant="destructive" className="gap-1">
+        <AlertCircle className="h-3 w-3" />
+        Very New - High Risk
+      </Badge>;
+    }
+    if (days < 7) {
+      return <Badge className="gap-1 bg-orange-500">
+        <Clock className="h-3 w-3" />
+        New Token
+      </Badge>;
+    }
+    if (days < 30) {
+      return <Badge variant="secondary" className="gap-1">
+        <Calendar className="h-3 w-3" />
+        Recent
+      </Badge>;
+    }
+    return <Badge variant="outline" className="gap-1 text-green-600 border-green-600">
+      <CheckCircle className="h-3 w-3" />
+      Established
+    </Badge>;
+  };
+
   if (!metadata) {
     return (
       <Card className="p-6" data-testid="card-token-metadata">
@@ -62,6 +118,8 @@ export function TokenMetadataCard({ metadata, tokenAddress }: TokenMetadataCardP
                   Mutable
                 </Badge>
               )}
+              
+              {getAgeRiskBadge(creationDate)}
             </div>
           </div>
         </div>
@@ -87,6 +145,13 @@ export function TokenMetadataCard({ metadata, tokenAddress }: TokenMetadataCardP
               {metadata?.supply && metadata?.decimals 
                 ? (metadata.supply / Math.pow(10, metadata.decimals)).toLocaleString()
                 : "Unknown"}
+            </span>
+          </div>
+          
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Token Age</span>
+            <span className="text-sm font-semibold" data-testid="text-token-age">
+              {getTokenAge(creationDate)}
             </span>
           </div>
         </div>

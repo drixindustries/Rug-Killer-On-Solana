@@ -124,7 +124,7 @@ export class SolanaTokenAnalyzer {
       const freezeAuthority = this.analyzeFreezeAuthority(mintInfo.freezeAuthority);
       
       // Fetch token accounts (holders) from on-chain and external APIs in parallel
-      const [onChainHolders, totalHolderCount, recentTransactions, rugcheckData, goplusData, dexscreenerData, jupiterPriceData, birdeyeData, pumpFunData, quillcheckData, gmgnRawData] = await Promise.all([
+      const [onChainHolders, totalHolderCount, recentTransactions, rugcheckData, goplusData, dexscreenerData, jupiterPriceData, birdeyeData, pumpFunData, quillcheckData, gmgnRawData, tokenCreationDate] = await Promise.all([
         this.fetchTopHolders(mintPubkey, mintInfo.decimals, mintInfo.supply),
         this.getTotalHolderCount(mintPubkey).catch(() => null),
         this.fetchRecentTransactions(mintPubkey),
@@ -136,6 +136,7 @@ export class SolanaTokenAnalyzer {
         checkPumpFun(tokenAddress).catch(() => ({ isPumpFun: false, devBought: 0, bondingCurve: 0 })),
         this.quillcheckService.checkToken(tokenAddress).catch(() => null),
         this.gmgnService.getTokenAnalysis(tokenAddress).catch(() => null),
+        this.getTokenCreationDate(mintPubkey).catch(() => undefined),
       ]);
       
       // Enrich holders with Rugcheck data if on-chain fetch failed
@@ -469,7 +470,7 @@ export class SolanaTokenAnalyzer {
         recentTransactions,
         suspiciousActivityDetected: recentTransactions.some(tx => tx.suspicious),
         redFlags,
-        creationDate: undefined,
+        creationDate: tokenCreationDate,
         aiVerdict,
         pumpFunData: pumpFunData || undefined,
         birdeyeData: birdeyeData || undefined,
@@ -902,6 +903,72 @@ export class SolanaTokenAnalyzer {
     } catch (error) {
       console.error("Error fetching transactions:", error);
       return [];
+    }
+  }
+
+  private async getTokenCreationDate(mintPubkey: PublicKey): Promise<number | undefined> {
+    try {
+      const connection = this.getConnection();
+      
+      // Only fetch enough signatures to cover ~30 days for new tokens
+      // For older tokens (>30 days), we don't need exact creation date
+      const maxSignatures = 2000; // Should cover most tokens up to 30 days old
+      const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      
+      let allSignatures: any[] = [];
+      let before: string | undefined;
+      const batchSize = 1000;
+      
+      // Fetch signatures in batches, but stop if we go back more than 30 days
+      for (let batch = 0; batch < 2; batch++) { // Max 2 batches (2000 signatures)
+        const signatures = await connection.getSignaturesForAddress(
+          mintPubkey, 
+          { limit: batchSize, before }, 
+          'confirmed'
+        );
+        
+        if (signatures.length === 0) break;
+        
+        // Check if we've gone back more than 30 days
+        const oldestInBatch = signatures[signatures.length - 1];
+        const oldestTime = (oldestInBatch.blockTime || 0) * 1000;
+        
+        allSignatures.push(...signatures);
+        
+        // If oldest transaction in this batch is older than 30 days, 
+        // mark as established token and return undefined (no need for exact age)
+        if (oldestTime < thirtyDaysAgo) {
+          // Token is older than 30 days - considered established
+          return undefined; // Frontend will show "Established" for undefined dates
+        }
+        
+        // If we got fewer than the batch size, we've reached the end
+        if (signatures.length < batchSize) break;
+        
+        // Set 'before' to the last signature for pagination
+        before = signatures[signatures.length - 1].signature;
+        
+        // Add small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      if (allSignatures.length === 0) {
+        return undefined;
+      }
+      
+      // The oldest signature is at the end of the array (most recent first)
+      const oldestSignature = allSignatures[allSignatures.length - 1];
+      const creationTime = oldestSignature.blockTime;
+      
+      if (!creationTime) {
+        return undefined;
+      }
+      
+      // Convert to milliseconds
+      return creationTime * 1000;
+    } catch (error) {
+      console.error("Error fetching token creation date:", error);
+      return undefined;
     }
   }
 

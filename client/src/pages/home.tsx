@@ -502,6 +502,7 @@ export default function Home() {
                         <TokenMetadataCard 
                           metadata={analysis.metadata}
                           tokenAddress={analysis.tokenAddress}
+                          creationDate={analysis.creationDate}
                         />
                       </Suspense>
                       

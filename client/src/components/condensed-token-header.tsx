@@ -212,7 +212,8 @@ export function CondensedTokenHeader({ analysis }: CondensedTokenHeaderProps) {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => copyToClipboard(analysis.liquidityPool.lpAddresses[0], "LP address")}
+                onClick={() => copyToClipboard(analysis.liquidityPool?.lpAddresses?.[0] || "", "LP address")}
+                disabled={!analysis.liquidityPool?.lpAddresses?.[0]}
               >
                 <Copy className="h-4 w-4" />
               </Button>
@@ -220,9 +221,10 @@ export function CondensedTokenHeader({ analysis }: CondensedTokenHeaderProps) {
                 size="sm"
                 variant="ghost"
                 asChild
+                disabled={!analysis.liquidityPool?.lpAddresses?.[0]}
               >
                 <a 
-                  href={`https://solscan.io/account/${analysis.liquidityPool.lpAddresses[0]}`}
+                  href={`https://solscan.io/account/${analysis.liquidityPool?.lpAddresses?.[0] || ""}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
