@@ -323,26 +323,23 @@ export const rpcBalancer = new SolanaRpcBalancer(RPC_PROVIDERS);
 const performHealthChecks = async () => {
   const healthChecks = rpcBalancer.providers.map(async (p) => {
     const startTime = Date.now();
+    const url = p.getUrl();
+    const conn = new Connection(url, { commitment: "confirmed", wsEndpoint: undefined });
+
+    // Helper to race a promise with timeout
+    const withTimeout = async <T>(promise: Promise<T>, ms = 5000): Promise<T> => {
+      const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms));
+      return Promise.race([promise, timeoutPromise]) as Promise<T>;
+    };
+
     try {
-      const url = p.getUrl();
-      const conn = new Connection(url, { commitment: "confirmed" });
-      
-      // Test with timeout
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 5000)
-      );
-      
-      await Promise.race([
-        conn.getSlot(),
-        timeoutPromise
-      ]);
-      
+      // Primary: getSlot
+      await withTimeout(conn.getSlot());
       const latency = Date.now() - startTime;
       p.avgLatency = p.avgLatency ? (p.avgLatency + latency) / 2 : latency;
       p.score = Math.min(100, p.score + 8);
       p.consecutiveFails = 0;
       p.lastHealthCheck = Date.now();
-      
       if (latency < 500) {
         console.log(`✅ ${p.name}: ${latency}ms (excellent)`);
       } else if (latency < 1000) {
@@ -351,19 +348,34 @@ const performHealthChecks = async () => {
         console.log(`🟠 ${p.name}: ${latency}ms (slow)`);
         p.score = Math.max(60, p.score - 5);
       }
-      
-    } catch (error) {
-      const latency = Date.now() - startTime;
-      p.consecutiveFails++;
-      p.fails++;
-      p.score = Math.max(0, p.score - 15);
-      p.lastHealthCheck = Date.now();
-      console.log(`❌ ${p.name}: Failed (${error.message}) - consecutive fails: ${p.consecutiveFails}`);
+      return;
+    } catch (error: any) {
+      // Fallback: some providers mis-shape getSlot; try getEpochInfo
+      const primaryErr = error?.message || String(error);
+      try {
+        const t1 = Date.now();
+        await withTimeout(conn.getEpochInfo());
+        const latency = Date.now() - t1;
+        p.avgLatency = p.avgLatency ? (p.avgLatency + latency) / 2 : latency;
+        p.score = Math.min(95, p.score + 6);
+        p.consecutiveFails = 0;
+        p.lastHealthCheck = Date.now();
+        console.log(`✅ ${p.name}: ${latency}ms via getEpochInfo`);
+        return;
+      } catch (fallbackErr: any) {
+        const latency = Date.now() - startTime;
+        p.consecutiveFails++;
+        p.fails++;
+        p.score = Math.max(0, p.score - 15);
+        p.lastHealthCheck = Date.now();
+        const msg = fallbackErr?.message || primaryErr;
+        console.log(`❌ ${p.name}: Failed (${msg}) - consecutive fails: ${p.consecutiveFails}`);
+      }
     }
   });
-  
+
   await Promise.allSettled(healthChecks);
-  
+
   const healthyCount = rpcBalancer.providers.filter(p => p.score > 70).length;
   console.log(`[RPC Health] ${healthyCount}/${rpcBalancer.providers.length} providers healthy`);
 };

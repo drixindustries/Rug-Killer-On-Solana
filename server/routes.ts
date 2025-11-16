@@ -125,17 +125,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { host } = new URL(url);
         const { Connection } = await import('@solana/web3.js');
 
-        const results: Array<{ latencyMs: number; slot?: number; error?: string }> = [];
+        const results: Array<{ latencyMs: number; slot?: number; method: string; error?: string }> = [];
         for (let i = 0; i < count; i++) {
           const t0 = Date.now();
           try {
             const conn = new Connection(url, { commitment: 'confirmed', wsEndpoint: undefined });
             const timeoutMs = 5000;
             const timeout = new Promise((_resolve, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs));
-            const slot = await Promise.race([conn.getSlot(), timeout]) as number;
-            results.push({ latencyMs: Date.now() - t0, slot });
+            try {
+              const slot = await Promise.race([conn.getSlot(), timeout]) as number;
+              results.push({ latencyMs: Date.now() - t0, slot, method: 'getSlot' });
+            } catch (primaryErr: any) {
+              // Fallback to getEpochInfo for providers that don't like getSlot
+              const timeout2 = new Promise((_resolve, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs));
+              const info = await Promise.race([conn.getEpochInfo(), timeout2]);
+              results.push({ latencyMs: Date.now() - t0, slot: undefined, method: 'getEpochInfo' });
+            }
           } catch (e: any) {
-            results.push({ latencyMs: Date.now() - t0, error: e?.message || String(e) });
+            results.push({ latencyMs: Date.now() - t0, method: 'error', error: e?.message || String(e) });
           }
         }
 
