@@ -32,12 +32,19 @@ function getAnkrUrl(): string | undefined {
   let raw = getEnv('ANKR_RPC_URL')?.trim();
   const apiKey = getEnv('ANKR_API_KEY')?.trim();
 
+  console.log('[Ankr Config] ANKR_RPC_URL present:', !!raw);
+  console.log('[Ankr Config] ANKR_API_KEY present:', !!apiKey);
+
   // If only API key is provided or URL missing, construct the URL
   if ((!raw || raw.length === 0) && apiKey) {
     raw = `https://rpc.ankr.com/solana/${apiKey.replace(/^\"|\"$/g, '')}`;
+    console.log('[Ankr Config] Constructed URL from API key');
   }
 
-  if (!raw) return undefined;
+  if (!raw) {
+    console.log('[Ankr Config] No Ankr credentials found');
+    return undefined;
+  }
 
   // Strip accidental quotes and whitespace
   const cleaned = raw.replace(/^\"|\"$/g, '').trim();
@@ -68,8 +75,11 @@ function getAnkrUrl(): string | undefined {
         return undefined;
       }
     }
-    return u.toString();
-  } catch {
+    const finalUrl = u.toString();
+    console.log('[Ankr Config] Final Ankr URL configured:', finalUrl.substring(0, 40) + '...');
+    return finalUrl;
+  } catch (err) {
+    console.error('[Ankr Config] Error parsing Ankr URL:', err);
     return undefined;
   }
 }
@@ -265,9 +275,9 @@ export class SolanaRpcBalancer {
         
         return connection;
         
-      } catch (error) {
+      } catch (error: any) {
         attempts++;
-        console.log(`[RPC Balancer] Connection attempt ${attempts} failed:`, error);
+        console.error(`[RPC Balancer] Connection attempt ${attempts} failed:`, error?.message || error);
         
         if (attempts >= maxAttempts) {
           // Fallback to most basic public endpoint
