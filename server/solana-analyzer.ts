@@ -185,24 +185,7 @@ export class SolanaTokenAnalyzer {
   private generateRiskFlags(dex: any, onChain: any): RiskFlag[] {
     const flags: RiskFlag[] = [];
 
-    // QuillCheck flags
-    if (quill?.isHoneypot) {
-      flags.push({
-        type: "honeypot",
-        severity: "critical",
-        title: "Honeypot Detected",
-        description: "This token appears to be a honeypot. You may not be able to sell.",
-      });
-    }
-
-    if (quill?.buyTax && quill.buyTax > 10) {
-      flags.push({
-        type: "tax",
-        severity: "high",
-        title: `High Buy Tax: ${quill.buyTax}%`,
-        description: `Buying this token incurs a ${quill.buyTax}% tax.`,
-      });
-    }
+    // Basic checks from on-chain + DexScreener only
 
     // Authority flags
     if (onChain?.authorities?.mintAuthority) {
