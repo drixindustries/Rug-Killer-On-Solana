@@ -16,11 +16,15 @@ try {
   console.log('ℹ️  No dotenv (Railway mode)');
 }
 
-// Log startup environment AND all environment variables to debug Railway
+// Log startup environment. Avoid dumping env keys in production to prevent accidental leakage
 console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
 console.log('💾 Database Mode:', process.env.FORCE_IN_MEMORY_DB === 'true' ? 'IN-MEMORY' : 'PostgreSQL');
 console.log('🔌 Port:', process.env.PORT || '5000');
-console.log('📋 All ENV vars:', Object.keys(process.env).filter(k => !k.includes('SECRET') && !k.includes('KEY')).join(', '));
+if (process.env.NODE_ENV !== 'production') {
+  console.log('📋 All ENV vars:', Object.keys(process.env).join(', '));
+} else {
+  console.log('📋 Env var count:', Object.keys(process.env).length);
+}
 
 // Prevent process from exiting on unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
