@@ -129,3 +129,8 @@ server/token-deployer.ts
 *.dll
 *.so
 *.dylib
+coverage/
+scan-results/
+*.zip
+test-*.mjs
+test-*.js

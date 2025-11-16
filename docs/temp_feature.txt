@@ -1,6 +1,0 @@
-﻿###  Auto-Link Feature (NEW - November 2025)
-- **Smart Address Detection** - Automatically detects Solana addresses in chat
-- **Quick Links** - Instant links to GMGN, Padre, Axiom.trade, and Solscan
-- **Telegram & Discord** - Both bots provide explorer links automatically
-- **No Commands Needed** - Just paste an address, get instant links
-- **Clean UI** - Formatted embeds (Discord) and markdown (Telegram)
