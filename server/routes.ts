@@ -55,104 +55,107 @@ const isAdmin = async (req: any, res: any, next: any) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Debug: RPC health snapshot (no secrets exposed)
-  app.get('/api/debug/rpc', (_req, res) => {
-    try {
-      const providers = rpcBalancer.providers.map((p) => {
-        const rawUrl = p.getUrl();
-        let host = 'unknown';
-        let suffix = '';
-        try {
-          const u = new URL(rawUrl);
-          host = u.host;
-          suffix = (u.pathname || '').slice(-6);
-        } catch {}
+  const enableDebug = process.env.ENABLE_DEBUG_ENDPOINTS === 'true';
+  if (enableDebug) {
+    // Debug: RPC health snapshot (no secrets exposed)
+    app.get('/api/debug/rpc', (_req, res) => {
+      try {
+        const providers = rpcBalancer.providers.map((p) => {
+          const rawUrl = p.getUrl();
+          let host = 'unknown';
+          let suffix = '';
+          try {
+            const u = new URL(rawUrl);
+            host = u.host;
+            suffix = (u.pathname || '').slice(-6);
+          } catch {}
 
-        return {
-          name: p.name,
-          tier: p.tier,
-          host,
-          idSuffix: suffix, // last 6 chars of path, avoids exposing full keys
-          score: p.score,
-          avgLatency: p.avgLatency ?? null,
-          consecutiveFails: p.consecutiveFails,
-          requestCount: p.requestCount ?? 0,
-          rateLimited: !!p.isRateLimited,
-          rateLimitResetTime: p.rateLimitResetTime ? new Date(p.rateLimitResetTime).toISOString() : null,
-          lastHealthCheck: p.lastHealthCheck ? new Date(p.lastHealthCheck).toISOString() : null,
-          hasKey: 'hasKey' in p ? !!p.hasKey?.() : true,
-        };
-      });
+          return {
+            name: p.name,
+            tier: p.tier,
+            host,
+            idSuffix: suffix, // last 6 chars of path, avoids exposing full keys
+            score: p.score,
+            avgLatency: p.avgLatency ?? null,
+            consecutiveFails: p.consecutiveFails,
+            requestCount: p.requestCount ?? 0,
+            rateLimited: !!p.isRateLimited,
+            rateLimitResetTime: p.rateLimitResetTime ? new Date(p.rateLimitResetTime).toISOString() : null,
+            lastHealthCheck: p.lastHealthCheck ? new Date(p.lastHealthCheck).toISOString() : null,
+            hasKey: 'hasKey' in p ? !!p.hasKey?.() : true,
+          };
+        });
 
-      const healthyCount = rpcBalancer.providers.filter(p => p.score > 70).length;
-      res.json({
-        time: new Date().toISOString(),
-        healthyCount,
-        total: rpcBalancer.providers.length,
-        providers,
-      });
-    } catch (err: any) {
-      res.status(500).json({ error: err?.message || 'RPC debug error' });
-    }
-  });
-
-  // Debug: actively ping the currently selected RPC and report latency
-  app.get('/api/debug/ping-rpc', async (req, res) => {
-    const started = Date.now();
-    try {
-      // How many pings?
-      const rawCount = parseInt(String((req.query.count ?? '1')));
-      const count = Number.isFinite(rawCount) ? Math.max(1, Math.min(10, rawCount)) : 1;
-
-      // Select once; measure the same provider to keep results comparable
-      const provider = rpcBalancer.providers[0] ? rpcBalancer.select() : null;
-      if (!provider) {
-        return res.status(503).json({ error: 'No RPC providers configured' });
+        const healthyCount = rpcBalancer.providers.filter(p => p.score > 70).length;
+        res.json({
+          time: new Date().toISOString(),
+          healthyCount,
+          total: rpcBalancer.providers.length,
+          providers,
+        });
+      } catch (err: any) {
+        res.status(500).json({ error: err?.message || 'RPC debug error' });
       }
+    });
 
-      const url = provider.getUrl();
-      const { host } = new URL(url);
-      const { Connection } = await import('@solana/web3.js');
+    // Debug: actively ping the currently selected RPC and report latency
+    app.get('/api/debug/ping-rpc', async (req, res) => {
+      const started = Date.now();
+      try {
+        const rawCount = parseInt(String((req.query.count ?? '1')));
+        const count = Number.isFinite(rawCount) ? Math.max(1, Math.min(10, rawCount)) : 1;
 
-      const results: Array<{ latencyMs: number; slot?: number; error?: string }> = [];
-      for (let i = 0; i < count; i++) {
-        const t0 = Date.now();
-        try {
-          const conn = new Connection(url, { commitment: 'confirmed', wsEndpoint: undefined });
-          const timeoutMs = 5000;
-          const timeout = new Promise((_resolve, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs));
-          const slot = await Promise.race([conn.getSlot(), timeout]) as number;
-          results.push({ latencyMs: Date.now() - t0, slot });
-        } catch (e: any) {
-          results.push({ latencyMs: Date.now() - t0, error: e?.message || String(e) });
+        const provider = rpcBalancer.providers[0] ? rpcBalancer.select() : null;
+        if (!provider) {
+          return res.status(503).json({ error: 'No RPC providers configured' });
         }
+
+        const url = provider.getUrl();
+        const { host } = new URL(url);
+        const { Connection } = await import('@solana/web3.js');
+
+        const results: Array<{ latencyMs: number; slot?: number; error?: string }> = [];
+        for (let i = 0; i < count; i++) {
+          const t0 = Date.now();
+          try {
+            const conn = new Connection(url, { commitment: 'confirmed', wsEndpoint: undefined });
+            const timeoutMs = 5000;
+            const timeout = new Promise((_resolve, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs));
+            const slot = await Promise.race([conn.getSlot(), timeout]) as number;
+            results.push({ latencyMs: Date.now() - t0, slot });
+          } catch (e: any) {
+            results.push({ latencyMs: Date.now() - t0, error: e?.message || String(e) });
+          }
+        }
+
+        const latencies = results.map(r => r.latencyMs);
+        const avg = Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length);
+        const min = Math.min(...latencies);
+        const max = Math.max(...latencies);
+
+        return res.json({
+          provider: provider.name,
+          tier: provider.tier,
+          host,
+          count,
+          avgLatencyMs: avg,
+          minLatencyMs: min,
+          maxLatencyMs: max,
+          tries: results,
+          totalTimeMs: Date.now() - started,
+          time: new Date().toISOString(),
+        });
+      } catch (err: any) {
+        return res.status(500).json({
+          error: err?.message || String(err),
+          latencyMs: Date.now() - started,
+          time: new Date().toISOString(),
+        });
       }
-
-      const latencies = results.map(r => r.latencyMs);
-      const avg = Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length);
-      const min = Math.min(...latencies);
-      const max = Math.max(...latencies);
-
-      return res.json({
-        provider: provider.name,
-        tier: provider.tier,
-        host,
-        count,
-        avgLatencyMs: avg,
-        minLatencyMs: min,
-        maxLatencyMs: max,
-        tries: results,
-        totalTimeMs: Date.now() - started,
-        time: new Date().toISOString(),
-      });
-    } catch (err: any) {
-      return res.status(500).json({
-        error: err?.message || String(err),
-        latencyMs: Date.now() - started,
-        time: new Date().toISOString(),
-      });
-    }
-  });
+    });
+  } else {
+    console.log('ℹ️ Debug endpoints disabled (set ENABLE_DEBUG_ENDPOINTS=true to enable)');
+  }
   // Wallet logout endpoint
   app.post('/api/logout', (req: any, res) => {
     req.session.destroy((err: any) => {
