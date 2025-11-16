@@ -21,24 +21,27 @@ class RedisCache {
   private maxErrors: number = 3;
 
   constructor() {
-    // Only enable Redis if explicitly configured
-    const redisUrl = process.env.REDIS_URL || process.env.REDISCLOUD_URL;
+    // Use Railway Redis if available, fallback to localhost for dev
+    const redisUrl = process.env.REDIS_URL || process.env.REDISCLOUD_URL || 'redis://localhost:6379';
     
-    if (!redisUrl) {
-      console.log('[Redis] Not configured - caching disabled (set REDIS_URL to enable)');
-      this.isEnabled = false;
-      return;
-    }
-
     this.isEnabled = true;
     this.redis = new Redis(redisUrl, {
-      maxRetriesPerRequest: 2,
+      maxRetriesPerRequest: 1,
       retryDelayOnFailover: 100,
       lazyConnect: true,
       keepAlive: 30000,
-      connectTimeout: 5000,
-      commandTimeout: 3000,
+      connectTimeout: 3000,
+      commandTimeout: 2000,
       enableOfflineQueue: false,
+      // Don't retry failed connections indefinitely
+      retryStrategy: (times) => {
+        if (times > 3) {
+          console.log('[Redis] Max retry attempts reached - caching disabled');
+          this.isEnabled = false;
+          return null; // Stop retrying
+        }
+        return Math.min(times * 100, 2000);
+      },
     });
 
     this.setupEventHandlers();
@@ -48,27 +51,32 @@ class RedisCache {
     if (!this.redis) return;
 
     this.redis.on('connect', () => {
-      console.log('[Redis] Connected successfully');
+      console.log('[Redis] ✅ Connected successfully');
       this.isConnected = true;
       this.errorCount = 0;
     });
 
     this.redis.on('error', (error) => {
-      this.errorCount++;
-      if (this.errorCount <= this.maxErrors) {
-        console.error('[Redis] Connection error:', error.message);
+      // Only log first few errors to avoid spam
+      if (this.errorCount < 3) {
+        console.error('[Redis] ⚠️ Connection error:', error.message);
+        this.errorCount++;
       }
-      if (this.errorCount === this.maxErrors) {
-        console.log('[Redis] Max errors reached - silencing further Redis errors');
+      if (this.errorCount === 3) {
+        console.log('[Redis] Muting further errors - caching will fallback gracefully');
       }
-      this.isConnected = false;
     });
 
     this.redis.on('close', () => {
       if (this.isConnected) {
         console.log('[Redis] Connection closed');
+        this.isConnected = false;
       }
-      this.isConnected = false;
+    });
+
+    this.redis.on('ready', () => {
+      console.log('[Redis] Ready to accept commands');
+      this.isConnected = true;
     });
   }
 
@@ -80,15 +88,23 @@ class RedisCache {
     fetchFn: () => Promise<T>, 
     expiresInSeconds: number = 300
   ): Promise<T> {
-    // Skip cache if disabled or too many errors
-    if (!this.isEnabled || !this.redis || this.errorCount >= this.maxErrors) {
+    // Skip cache if disabled due to connection failures
+    if (!this.isEnabled || !this.redis) {
       return await fetchFn();
     }
 
     try {
+      // Try to connect if not connected yet
       if (!this.isConnected && !this.connectionAttempted) {
         this.connectionAttempted = true;
-        await this.redis.connect();
+        await this.redis.connect().catch(() => {
+          this.isEnabled = false; // Disable on connection failure
+        });
+      }
+
+      // If still not connected, just fetch directly
+      if (!this.isConnected) {
+        return await fetchFn();
       }
 
       // Try to get cached value
@@ -100,12 +116,14 @@ class RedisCache {
       // Fetch fresh data
       const value = await fetchFn();
       
-      // Cache the result (don't await to avoid blocking)
-      this.redis.setex(key, expiresInSeconds, JSON.stringify(value)).catch(() => {});
+      // Cache the result (non-blocking)
+      this.redis.setex(key, expiresInSeconds, JSON.stringify(value)).catch(() => {
+        // Silent fail on cache write errors
+      });
       
       return value;
     } catch (error) {
-      // Silently fallback to direct fetch
+      // Graceful fallback - always return data
       return await fetchFn();
     }
   }
