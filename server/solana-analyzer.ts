@@ -44,18 +44,20 @@ export class SolanaTokenAnalyzer {
         throw new Error("Invalid token address format");
       }
 
-      // Fetch data in parallel - DexScreener, QuillCheck, and Birdeye
-      const [dexData, quillData, birdeyeData, onChainData] = await Promise.allSettled([
+      // Fetch data in parallel - DexScreener, QuillCheck, Birdeye, and token age
+      const [dexData, quillData, birdeyeData, onChainData, creationDateData] = await Promise.allSettled([
         options.skipExternal ? null : this.dexScreener.getTokenData(tokenMintAddress),
         options.skipExternal ? null : this.quillCheck.checkToken(tokenMintAddress),
         options.skipExternal ? null : getBirdeyeOverview(tokenMintAddress),
         options.skipOnChain ? null : this.getOnChainData(tokenAddress),
+        options.skipOnChain ? null : this.getTokenCreationDate(tokenAddress),
       ]);
 
       const dex = dexData.status === 'fulfilled' ? dexData.value : null;
       const quill = quillData.status === 'fulfilled' ? quillData.value : null;
       const birdeye = birdeyeData.status === 'fulfilled' ? birdeyeData.value : null;
       const onChain = onChainData.status === 'fulfilled' ? onChainData.value : null;
+      const creationDate = creationDateData.status === 'fulfilled' ? creationDateData.value : undefined;
 
       console.log(`✅ [Analyzer] Data fetched in ${Date.now() - startTime}ms`);
 
@@ -93,6 +95,9 @@ export class SolanaTokenAnalyzer {
         riskScore: this.calculateRiskScore(quill, dex, birdeye),
         riskLevel: this.determineRiskLevel(quill, dex, birdeye),
         riskFlags: this.generateRiskFlags(quill, dex, birdeye, onChain),
+        
+        // Token age
+        creationDate: creationDate,
         
         // Holder data (basic from on-chain)
         holderCount: onChain?.holderCount || null,
@@ -307,6 +312,66 @@ export class SolanaTokenAnalyzer {
       pooledToken: pair.quoteToken?.symbol || "Unknown",
       url: pair.url || "",
     }));
+  }
+
+  private async getTokenCreationDate(mintPubkey: PublicKey): Promise<number | undefined> {
+    try {
+      const connection = this.getConnection();
+      
+      // Only fetch enough signatures to cover ~30 days for new tokens
+      // For older tokens (>30 days), we don't need exact creation date
+      const maxSignatures = 2000;
+      const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      
+      let allSignatures: any[] = [];
+      let before: string | undefined;
+      const batchSize = 1000;
+      
+      // Fetch signatures in batches, but stop if we go back more than 30 days
+      for (let batch = 0; batch < 2; batch++) { // Max 2 batches (2000 signatures)
+        const signatures = await connection.getSignaturesForAddress(
+          mintPubkey, 
+          { limit: batchSize, before }, 
+          'confirmed'
+        );
+        
+        if (signatures.length === 0) break;
+        
+        // Check if we've gone back more than 30 days
+        const oldestInBatch = signatures[signatures.length - 1];
+        const oldestTime = (oldestInBatch.blockTime || 0) * 1000;
+        
+        allSignatures.push(...signatures);
+        
+        // If oldest transaction in this batch is older than 30 days, 
+        // return undefined (token is established)
+        if (oldestTime < thirtyDaysAgo) {
+          return undefined; // Frontend will show "Established" for undefined dates
+        }
+        
+        // If we got fewer than the batch size, we've reached the end
+        if (signatures.length < batchSize) break;
+        
+        // Set 'before' to the last signature for pagination
+        before = signatures[signatures.length - 1].signature;
+        
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      if (allSignatures.length === 0) {
+        return undefined;
+      }
+      
+      // The oldest signature is at the end of the array (most recent first)
+      const oldestSignature = allSignatures[allSignatures.length - 1];
+      const creationTime = oldestSignature.blockTime;
+      
+      return creationTime ? creationTime * 1000 : undefined;
+    } catch (error: any) {
+      console.warn(`⚠️ [Analyzer] Failed to fetch token creation date:`, error.message);
+      return undefined;
+    }
   }
 }
 
