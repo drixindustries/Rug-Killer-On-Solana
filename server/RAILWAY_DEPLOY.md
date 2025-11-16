@@ -5,12 +5,48 @@
 Set these in your Railway dashboard under **Variables**:
 
 ```
+# Core Settings
+NODE_ENV=production
+SESSION_SECRET=your-random-secret-here-change-me-minimum-32-characters
+
+# Database (optional - uses in-memory if not set)
 FORCE_IN_MEMORY_DB=true
 DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/placeholder
-SESSION_SECRET=your-random-secret-here-change-me
+
+# RPC Provider (at least one required)
+QUICKNODE_RPC_URL=https://your-quicknode-url.quiknode.pro/your-api-key/
+
+# API Keys (optional but recommended for best results)
+BIRDEYE_API_KEY=c0ecda95a02f4b69ba76c48bd5f830b5
+
+# Demo Mode (optional)
 PHANTOM_WALLET_ADDRESS=Demo
-NODE_ENV=production
 ```
+
+## Critical API Keys
+
+### Birdeye API Key
+**Purpose**: Enhanced market data, social links (Twitter/Telegram/Website), LP burn status
+
+**How to Set**:
+1. Go to Railway Dashboard → Your Service → **Variables** tab
+2. Click **"New Variable"**
+3. Set **Name**: `BIRDEYE_API_KEY`
+4. Set **Value**: `c0ecda95a02f4b69ba76c48bd5f830b5` (or your key)
+5. Click **"Add"**
+
+**Note**: Birdeye is optional - analyzer will work without it but won't have social links or enhanced market data.
+
+### QuickNode RPC URL
+**Purpose**: Primary Solana RPC provider for on-chain data
+
+**How to Set**:
+1. Sign up at https://quicknode.com
+2. Create a Solana Mainnet endpoint
+3. Copy the HTTP URL
+4. Add to Railway Variables as `QUICKNODE_RPC_URL`
+
+**Note**: System falls back to public RPCs if not set, but QuickNode is much faster.
 
 ## How to Deploy
 

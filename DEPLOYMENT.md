@@ -44,8 +44,12 @@ NODE_ENV=production
 SESSION_SECRET=your-super-secret-session-key-change-this
 
 # RPC Providers (at least one recommended)
+QUICKNODE_RPC_URL=https://your-quicknode-url.quiknode.pro/your-api-key/
 HELIUS_API_KEY=your-helius-key
 ALCHEMY_API_KEY=your-alchemy-key
+
+# API Keys (optional but recommended)
+BIRDEYE_API_KEY=your-birdeye-api-key-here
 
 # Discord Bot (optional)
 DISCORD_BOT_TOKEN=your-discord-bot-token
