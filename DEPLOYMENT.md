@@ -43,12 +43,10 @@ In Railway dashboard → Your Service → **Variables** tab, add:
 NODE_ENV=production
 SESSION_SECRET=your-super-secret-session-key-change-this
 
-# RPC Providers (at least one recommended)
-QUICKNODE_RPC_URL=https://your-quicknode-url.quiknode.pro/your-api-key/
-HELIUS_API_KEY=your-helius-key
-ALCHEMY_API_KEY=your-alchemy-key
+# RPC Provider (recommended)
+ANKR_RPC_URL=https://rpc.ankr.com/solana/YOUR_ANKR_API_KEY
 
-# API Keys (optional but recommended)
+# API Keys (optional)
 BIRDEYE_API_KEY=your-birdeye-api-key-here
 
 # Discord Bot (optional)

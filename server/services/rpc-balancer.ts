@@ -18,15 +18,24 @@ interface RpcProvider {
   isRateLimited?: boolean;
 }
 
+// Helper to safely read env vars even if a key was added with stray whitespace
+function getEnv(key: string): string | undefined {
+  if (process.env[key]) return process.env[key];
+  for (const [k, v] of Object.entries(process.env)) {
+    if (k.trim() === key) return v as string;
+  }
+  return undefined;
+}
+
 const RPC_PROVIDERS = [
   // Ankr Premium RPC (primary if available)
   { 
-    getUrl: () => `${process.env.ANKR_RPC_URL || ""}`,
+    getUrl: () => `${getEnv('ANKR_RPC_URL') || ""}`,
     weight: 50, 
     name: "Ankr-Premium",
     tier: "premium" as const,
     requiresKey: true,
-    hasKey: () => !!process.env.ANKR_RPC_URL,
+    hasKey: () => !!getEnv('ANKR_RPC_URL'),
     rateLimit: 500,
     rateLimitWindow: 60000
   },
