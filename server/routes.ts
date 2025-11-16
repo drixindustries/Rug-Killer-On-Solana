@@ -95,6 +95,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: err?.message || 'RPC debug error' });
     }
   });
+
+  // Debug: actively ping the currently selected RPC and report latency
+  app.get('/api/debug/ping-rpc', async (_req, res) => {
+    const started = Date.now();
+    try {
+      // Select provider and build a transient connection (selection metrics are logged by balancer)
+      const provider = rpcBalancer.providers[0] ? rpcBalancer.select() : null;
+      if (!provider) {
+        return res.status(503).json({ error: 'No RPC providers configured' });
+      }
+
+      const url = provider.getUrl();
+      const { host } = new URL(url);
+
+      // Use a short-lived connection for the ping to avoid interfering with pooled connections
+      const { Connection } = await import('@solana/web3.js');
+      const conn = new Connection(url, { commitment: 'confirmed', wsEndpoint: undefined });
+
+      // Add a timeout guard
+      const timeoutMs = 5000;
+      const timeout = new Promise((_resolve, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs));
+      const slot = await Promise.race([conn.getSlot(), timeout]) as number;
+
+      const latency = Date.now() - started;
+      return res.json({
+        provider: provider.name,
+        tier: provider.tier,
+        host,
+        latencyMs: latency,
+        slot,
+        time: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      return res.status(500).json({
+        error: err?.message || String(err),
+        latencyMs: Date.now() - started,
+        time: new Date().toISOString(),
+      });
+    }
+  });
   // Wallet logout endpoint
   app.post('/api/logout', (req: any, res) => {
     req.session.destroy((err: any) => {
