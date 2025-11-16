@@ -1,0 +1,1433 @@
+import { Connection, PublicKey } from "@solana/web3.js";
+import { getMint, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import type {
+  TokenAnalysisResponse,
+  AuthorityStatus,
+  HolderInfo,
+  LiquidityPoolStatus,
+  TokenMetadata,
+  RiskFlag,
+  RiskLevel,
+  TransactionInfo,
+  DexScreenerData,
+} from "../shared/schema";
+// LIGHTNING FAST: Only Birdeye API + fast cached RPC
+import { isKnownAddress, getKnownAddressInfo, detectBundledWallets, getPumpFunBondingCurveAddress, getPumpFunAssociatedBondingCurveAddress } from "./known-addresses.ts";
+import { getBirdeyeOverview } from "./services/birdeye-api.ts";
+import { checkPumpFun } from "./services/pumpfun-api.ts";
+import { fastRPC } from "./services/fast-rpc.ts";
+import { LPChecker } from "./services/lp-checker.ts";
+import { BundleDetectorService } from "./services/bundle-detector.ts";
+import { BubblemapsService } from "./services/bubblemaps-service.ts";
+import { WhaleDetectorService } from "./services/whale-detector.ts";
+import { AgedWalletDetector } from "./services/aged-wallet-detector.ts";
+import { PumpDumpDetectorService } from "./services/pump-dump-detector.ts";
+import { LiquidityMonitorService } from "./services/liquidity-monitor.ts";
+import { HolderTrackingService } from "./services/holder-tracking.ts";
+import { FundingSourceAnalyzer } from "./services/funding-source-analyzer.ts";
+import { walletIntelligenceService } from "./services/wallet-intelligence.ts";
+import { DexScreenerService } from "./dexscreener-service.ts";
+
+export class SolanaTokenAnalyzer {
+  // Core detection services - streamlined to focus on Birdeye data
+  private bundleDetector: BundleDetectorService;
+  private bubblemapsService: BubblemapsService;
+  private whaleDetector: WhaleDetectorService;
+  private agedWalletDetector: AgedWalletDetector;
+  private pumpDumpDetector: PumpDumpDetectorService;
+  private liquidityMonitor: LiquidityMonitorService;
+  private holderTracker: HolderTrackingService;
+  private fundingAnalyzer: FundingSourceAnalyzer;
+
+  constructor() {
+    // Streamlined to core detection services + Birdeye
+    this.bundleDetector = new BundleDetectorService();
+    this.bubblemapsService = new BubblemapsService();
+    this.whaleDetector = new WhaleDetectorService();
+    this.agedWalletDetector = new AgedWalletDetector();
+    this.pumpDumpDetector = new PumpDumpDetectorService();
+    this.liquidityMonitor = new LiquidityMonitorService();
+    this.holderTracker = new HolderTrackingService();
+    this.fundingAnalyzer = new FundingSourceAnalyzer();
+  }
+
+  private getConnection(): Connection {
+    return fastRPC.getConnection();
+  }
+
+  // Get multiple connections for concurrent operations
+  private getMultipleConnections(count: number = 3): Connection[] {
+    return fastRPC.getMultipleConnections(count);
+  }
+
+  async analyzeToken(tokenAddress: string): Promise<TokenAnalysisResponse> {
+    try {
+      // Validate address format before proceeding
+      let mintPubkey: PublicKey;
+      try {
+        mintPubkey = new PublicKey(tokenAddress);
+      } catch (error) {
+        throw new Error(`Invalid Solana address format: ${tokenAddress}`);
+      }
+      
+      // Fetch mint account info using cached FastRPC
+      
+      // First, check if the account exists and get its owner to determine the correct program
+      let mintInfo;
+      let accountInfo;
+      
+      try {
+        accountInfo = await fastRPC.getAccountInfo(mintPubkey.toBase58());
+        
+        if (!accountInfo) {
+          // Try using cached mint info directly as fallback
+          console.warn(`Account info not found, trying direct mint fetch: ${tokenAddress}`);
+          mintInfo = await fastRPC.getMintInfo(tokenAddress);
+          
+          if (!mintInfo) {
+            throw new Error(
+              `This token address does not exist on Solana or is not a valid SPL token. ` +
+              `Please verify the address is correct. If this is a very new pump.fun token, ` +
+              `please wait a few minutes for it to be indexed by RPC nodes.`
+            );
+          }
+          
+          // Successfully got mint info from fallback
+          console.log(`✅ Got mint info from fallback for: ${tokenAddress}`);
+        } else {
+          // Check which token program owns this account
+          const isToken2022 = accountInfo.owner.equals(TOKEN_2022_PROGRAM_ID);
+          const isSPLToken = accountInfo.owner.equals(TOKEN_PROGRAM_ID);
+          
+          if (!isToken2022 && !isSPLToken) {
+            console.error(`Account owner is not a token program: ${accountInfo.owner.toBase58()}`);
+            throw new Error(`Invalid token: account is owned by ${accountInfo.owner.toBase58()}, not a token program`);
+          }
+          
+          // Fetch mint info using the correct program ID (using connection for SPL token parsing)
+          const connection = this.getConnection();
+          try {
+            if (isToken2022) {
+              mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID);
+              console.log(`✅ Token uses Token-2022 program: ${tokenAddress}`);
+            } else {
+              mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID);
+              console.log(`✅ Token uses standard SPL Token program: ${tokenAddress}`);
+            }
+          } catch (mintError) {
+            // Fallback: try the other program if first fails (some tokens might be misdetected)
+            console.warn(`Failed to parse with detected program, trying fallback...`);
+            try {
+              if (isToken2022) {
+                mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID);
+                console.log(`✅ Token actually uses standard SPL Token program (fallback): ${tokenAddress}`);
+              } else {
+                mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID);
+                console.log(`✅ Token actually uses Token-2022 program (fallback): ${tokenAddress}`);
+              }
+            } catch (fallbackError) {
+              throw new Error(`Failed to parse token mint with both programs: ${mintError.message}`);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch mint info:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to fetch token data: ${errorMessage}`);
+      }
+      
+      // Analyze authorities
+      const mintAuthority = this.analyzeMintAuthority(mintInfo.mintAuthority);
+      const freezeAuthority = this.analyzeFreezeAuthority(mintInfo.freezeAuthority);
+      
+      // Fetch token accounts (holders) from on-chain and streamlined APIs (Birdeye)
+      const [onChainHolders, totalHolderCount, recentTransactions, birdeyeData, pumpFunData, tokenCreationDate] = await Promise.all([
+        this.fetchTopHolders(mintPubkey, mintInfo.decimals, mintInfo.supply),
+        this.getTotalHolderCount(mintPubkey).catch(() => null),
+        this.fetchRecentTransactions(mintPubkey),
+        getBirdeyeOverview(tokenAddress).catch(() => null),
+        checkPumpFun(tokenAddress).catch(() => ({ isPumpFun: false, devBought: 0, bondingCurve: 0 })),
+        this.getTokenCreationDate(mintPubkey).catch(() => undefined),
+      ]);
+      
+      // Process holders data - prioritize Birdeye over on-chain for performance
+      const holders = onChainHolders.length > 0 
+        ? onChainHolders 
+        : []; // Fallback to empty array if on-chain fetch fails
+      
+      // Get actual total holder count (not just top 20)
+      // Use getProgramAccounts result if available, otherwise fallback to top holders length
+      const holderCount = totalHolderCount || holders.length;
+      
+      // First, get liquidity pool addresses from external sources
+      const liquidityPool = this.analyzeLiquidity(0); // Pass 0 initially, will recalculate
+
+      // Enrich liquidity data with market information from Birdeye
+      const enrichedLiquidity = await this.enrichLiquidityWithMarketData(
+        liquidityPool,
+        birdeyeData,
+        tokenAddress
+      );
+      
+      // Filter out LP/exchange addresses from holder concentration calculation
+      const lpAddresses = enrichedLiquidity.lpAddresses || [];
+      
+      // Detect bundled wallets (same-block purchases, suspicious patterns)
+      const bundledWallets = detectBundledWallets(holders);
+      
+      // For pump.fun tokens, also exclude the bonding curve addresses
+      // Detect pump.fun from API
+      const isPumpFunToken = pumpFunData?.isPumpFun || false;
+      
+      const pumpFunExclusions: string[] = [];
+      if (isPumpFunToken) {
+        try {
+          const bondingCurve = getPumpFunBondingCurveAddress(tokenAddress);
+          const associatedBondingCurve = getPumpFunAssociatedBondingCurveAddress(tokenAddress);
+          
+          if (bondingCurve) {
+            pumpFunExclusions.push(bondingCurve);
+            console.log(`[Pump.fun] Excluding bonding curve: ${bondingCurve}`);
+          }
+          if (associatedBondingCurve) {
+            pumpFunExclusions.push(associatedBondingCurve);
+            console.log(`[Pump.fun] Excluding associated bonding curve: ${associatedBondingCurve}`);
+          }
+        } catch (error) {
+          console.error('[Pump.fun] Failed to calculate bonding curve addresses:', error);
+          // Continue without exclusions rather than failing entirely
+        }
+      }
+      
+      // Filter out LP addresses, known exchanges, bundled wallets, and pump.fun bonding curve
+      const addressesToExclude = new Set([
+        ...lpAddresses,
+        ...bundledWallets,
+        ...pumpFunExclusions,
+      ]);
+      
+      // Also filter out known exchange/protocol addresses
+      const filteredHolders = holders.filter(h => {
+        // Exclude LP addresses
+        if (addressesToExclude.has(h.address)) return false;
+        
+        // Exclude known exchanges/protocols
+        if (isKnownAddress(h.address)) return false;
+        
+        return true;
+      });
+      
+      // Calculate holder concentration excluding filtered addresses
+      const topHolderConcentration = Math.min(100, Math.max(0, 
+        filteredHolders.slice(0, 10).reduce((sum, h) => sum + (h.percentage || 0), 0)
+      ));
+
+      // Advanced wallet intelligence analysis with age classifications
+      let walletIntelligence = null;
+      if (filteredHolders.length > 0) {
+        try {
+          console.log(`[WalletIntel] Starting analysis of ${filteredHolders.length} wallets...`);
+          const walletIntelResults = await walletIntelligenceService.analyzeWallets(
+            filteredHolders,
+            Number(mintInfo.supply)
+          );
+          
+          walletIntelligence = walletIntelResults.summary;
+          console.log(`[WalletIntel] Analysis complete:`, {
+            avgAge: walletIntelligence.avgWalletAge.toFixed(1),
+            degens: walletIntelligence.totals.degens,
+            bots: walletIntelligence.totals.bots,
+            smartMoney: walletIntelligence.totals.smartMoney,
+            snipers: walletIntelligence.totals.snipers
+          });
+        } catch (error) {
+          console.error('[WalletIntel] Analysis failed:', error);
+        }
+      }
+      
+      // Build holder filtering metadata
+      const excludedAddresses: Array<{address: string; type: 'lp' | 'exchange' | 'protocol' | 'bundled'; label?: string; reason: string;}> = [];
+      
+      // Add LP addresses
+      lpAddresses.forEach(addr => {
+        excludedAddresses.push({
+          address: addr,
+          type: 'lp',
+          reason: 'Liquidity pool or token account'
+        });
+      });
+      
+      // Add known exchanges/protocols
+      holders.forEach(h => {
+        if (isKnownAddress(h.address)) {
+          const info = getKnownAddressInfo(h.address);
+          excludedAddresses.push({
+            address: h.address,
+            type: info?.type === 'exchange' ? 'exchange' : 'protocol',
+            label: info?.label,
+            reason: info?.label || 'Known exchange/protocol'
+          });
+        }
+      });
+      
+      // Add bundled wallets
+      bundledWallets.forEach(addr => {
+        excludedAddresses.push({
+          address: addr,
+          type: 'bundled',
+          reason: 'Suspected bundled wallet (same purchase pattern)'
+        });
+      });
+      
+      // Add pump.fun bonding curve addresses
+      pumpFunExclusions.forEach(addr => {
+        excludedAddresses.push({
+          address: addr,
+          type: 'protocol',
+          label: 'Pump.fun Bonding Curve',
+          reason: 'Pump.fun bonding curve contract (not a real holder)'
+        });
+      });
+      
+      // Calculate bundle supply percentage (DevsNightmarePro-style)
+      const bundledHolders = holders.filter(h => bundledWallets.includes(h.address));
+      
+      // Calculate percentage from holder data (safe for both on-chain and Rugcheck fallback)
+      const bundleSupplyPct = bundledHolders.reduce((sum, h) => sum + (h.percentage || 0), 0);
+      
+      // Calculate amount - only meaningful for on-chain data (Rugcheck sets balance=percentage)
+      const bundledSupplyAmount = onChainHolders.length > 0 
+        ? bundledHolders.reduce((sum, h) => sum + (h.balance || 0), 0)
+        : undefined; // Suppress when using Rugcheck fallback to avoid misleading figures
+      
+      // Determine confidence level based on bundle size and percentage
+      let bundleConfidence: 'low' | 'medium' | 'high' = 'low';
+      if (bundledWallets.length >= 5 || bundleSupplyPct >= 15) {
+        bundleConfidence = 'high';
+      } else if (bundledWallets.length >= 3 || bundleSupplyPct >= 5) {
+        bundleConfidence = 'medium';
+      }
+      
+      const holderFiltering = {
+        totals: {
+          lp: lpAddresses.length,
+          exchanges: excludedAddresses.filter(a => a.type === 'exchange').length,
+          protocols: excludedAddresses.filter(a => a.type === 'protocol').length,
+          bundled: bundledWallets.length,
+          total: excludedAddresses.length,
+          // Wallet intelligence totals
+          degens: walletIntelligence?.totals.degens || 0,
+          bots: walletIntelligence?.totals.bots || 0,
+          smartMoney: walletIntelligence?.totals.smartMoney || 0,
+          snipers: walletIntelligence?.totals.snipers || 0,
+          aged: walletIntelligence?.totals.aged || 0,
+          newWallets: walletIntelligence?.totals.newWallets || 0
+        },
+        excluded: excludedAddresses,
+        walletIntelligence: walletIntelligence || undefined,
+        bundledDetection: bundledWallets.length > 0 ? {
+          strategy: 'percentageMatch' as const,
+          confidence: bundleConfidence,
+          details: `Detected ${bundledWallets.length} wallets with suspicious patterns`,
+          bundleSupplyPct: Math.min(100, Math.max(0, bundleSupplyPct)),
+          bundledSupplyAmount
+        } : undefined
+      };
+
+      // Advanced bundle detection using Jito timing analysis
+      let advancedBundleData = null;
+      try {
+        advancedBundleData = await this.bundleDetector.detectBundles(tokenAddress, holders);
+        console.log(`[Bundle Detector] Score: ${advancedBundleData?.bundleScore || 0}, Bundled Supply: ${advancedBundleData?.bundledSupplyPercent || 0}%`);
+      } catch (error) {
+        console.error('[Bundle Detector] Analysis failed:', error);
+      }
+
+      // Wallet network analysis with Bubblemaps
+      let networkAnalysis = null;
+      try {
+        networkAnalysis = await this.bubblemapsService.analyzeNetwork(tokenAddress);
+        console.log(`[Bubblemaps] Network Risk: ${networkAnalysis?.networkRiskScore || 0}, Clustered Wallets: ${networkAnalysis?.clusteredWallets || 0}`);
+      } catch (error) {
+        console.error('[Bubblemaps] Analysis failed:', error);
+      }
+
+      // Aged wallet detection (fake volume)
+      let agedWalletData = null;
+      try {
+        agedWalletData = await this.agedWalletDetector.detectAgedWallets(
+          tokenAddress,
+          holders,
+          recentTransactions
+        );
+        console.log(`[Aged Wallets] Count: ${agedWalletData.agedWalletCount}, Fake Volume: ${agedWalletData.totalFakeVolumePercent.toFixed(1)}%, Risk: ${agedWalletData.riskScore}`);
+      } catch (error) {
+        console.error('[Aged Wallets] Detection failed:', error);
+      }
+
+      // Pump & Dump pattern detection
+      let pumpDumpData = null;
+      try {
+        // Note: DexScreener integration removed, using Birdeye data instead
+        pumpDumpData = this.pumpDumpDetector.analyzePriceAction(null, { topHolders: holders });
+        console.log(`[Pump & Dump] Rug Confidence: ${pumpDumpData.rugConfidence}%, Patterns: ${pumpDumpData.patterns.length}`);
+      } catch (error) {
+        console.error('[Pump & Dump] Detection failed:', error);
+      }
+
+      // Liquidity monitoring (real-time)
+      let liquidityMonitorData = null;
+      try {
+        // Use Birdeye liquidity data instead of DexScreener
+        liquidityMonitorData = this.liquidityMonitor.monitorLiquidity({
+          liquidity: { usd: birdeyeData?.liquidity || 0 },
+          priceUsd: birdeyeData?.price || 0
+        });
+        
+        // Calculate liquidity/mcap ratio if we have both
+        if (birdeyeData?.mc && birdeyeData?.liquidity) {
+          const ratio = this.liquidityMonitor.calculateLiquidityRatio(
+            birdeyeData.liquidity,
+            birdeyeData.mc
+          );
+          liquidityMonitorData.liquidityToMcapRatio = ratio;
+        }
+        
+        console.log(`[Liquidity Monitor] Health: ${liquidityMonitorData.isHealthy}, Trend: ${liquidityMonitorData.liquidityTrend}, Risk: ${liquidityMonitorData.riskScore}`);
+      } catch (error) {
+        console.error('[Liquidity Monitor] Check failed:', error);
+      }
+
+      // Top holder tracking (coordinated sell-offs)
+      let holderTrackingData = null;
+      try {
+        holderTrackingData = await this.holderTracker.trackTopHolders(tokenAddress, holders);
+        console.log(`[Holder Tracking] Stability: ${holderTrackingData.topHolderStability}, Sellers: ${holderTrackingData.suspiciousActivities.length}`);
+      } catch (error) {
+        console.error('[Holder Tracking] Analysis failed:', error);
+      }
+
+      // Funding source analysis (Nova-style detection)
+      let fundingAnalysisData = null;
+      try {
+        fundingAnalysisData = await this.fundingAnalyzer.analyzeFundingSources(tokenAddress, holders);
+        console.log(`[Funding Analysis] Suspicious: ${fundingAnalysisData.suspiciousFunding}, Sources: ${Object.keys(fundingAnalysisData.fundingSourceBreakdown).length}`);
+      } catch (error) {
+        console.error('[Funding Analysis] Failed:', error);
+      }
+      
+      // Fetch DexScreener data (optional)
+      let dexscreenerData: DexScreenerData | null = null;
+      let primaryDexPair: any = null;
+      try {
+        const dexService = new DexScreenerService();
+        dexscreenerData = await dexService.getTokenData(tokenAddress);
+        if (dexscreenerData) {
+          primaryDexPair = dexService.getSOLPair(dexscreenerData) || dexService.getMostLiquidPair(dexscreenerData);
+        }
+      } catch (error) {
+        console.error('[DexScreener] Failed to fetch data:', error);
+      }
+
+      // Build metadata - prefer DexScreener base token info, fallback to Birdeye
+      const supply = Number(mintInfo.supply);
+      const safeSupply = isNaN(supply) || !isFinite(supply) ? 0 : supply;
+      
+      const metadata: TokenMetadata = {
+        name: primaryDexPair?.baseToken?.name || birdeyeData?.twitter || "Unknown Token",
+        symbol: primaryDexPair?.baseToken?.symbol || tokenAddress.slice(0, 6),
+        decimals: mintInfo.decimals || 0,
+        supply: safeSupply,
+        hasMetadata: !!birdeyeData,
+        isMutable: mintAuthority.hasAuthority,
+      };
+      
+      // Build market data using DexScreener if available else Birdeye
+      const marketData = primaryDexPair
+        ? this.buildMarketData(primaryDexPair, null)
+        : this.buildMarketDataFromBirdeye(birdeyeData);
+      
+      // GMGN and QuillCheck removed - APIs no longer available
+      const gmgnData = null;
+      const quillcheckData = null;
+      
+      // Calculate risk flags (use enriched liquidity for accurate risk assessment)
+      const redFlags = this.calculateRiskFlags(
+        mintAuthority,
+        freezeAuthority,
+        enrichedLiquidity,
+        topHolderConcentration,
+        holderCount,
+        advancedBundleData,
+        networkAnalysis,
+        gmgnData,
+        agedWalletData,
+        pumpDumpData,
+        liquidityMonitorData,
+        holderTrackingData,
+        fundingAnalysisData,
+        quillcheckData
+      );
+      
+      // Calculate overall risk score with safety check
+      const riskScore = this.calculateRiskScore(redFlags);
+      const safeRiskScore = isNaN(riskScore) || !isFinite(riskScore) ? 100 : Math.min(100, Math.max(0, riskScore));
+      const riskLevel = this.getRiskLevel(safeRiskScore);
+      
+      const now = Date.now();
+      const safeAnalyzedAt = isNaN(now) || !isFinite(now) ? Date.now() : now;
+
+      // Calculate AI verdict
+      const aiVerdict = this.calculateAIVerdict({
+        riskScore: safeRiskScore,
+        mintAuthority,
+        freezeAuthority,
+        liquidityPool: enrichedLiquidity,
+        marketData,
+        holderCount,
+        topHolderConcentration,
+        creationDate,
+        agedWalletData,
+      });
+
+      return {
+        tokenAddress,
+        riskScore: safeRiskScore,
+        riskLevel,
+        analyzedAt: safeAnalyzedAt,
+        mintAuthority,
+        freezeAuthority,
+        metadata,
+        holderCount: holderCount,
+        topHolders: filteredHolders, // Return filtered holders (excluding LP, exchanges, bundles)
+        topHolderConcentration: isNaN(topHolderConcentration) ? 0 : topHolderConcentration,
+        holderFiltering,
+        liquidityPool: enrichedLiquidity,
+        marketData,
+        recentTransactions,
+        suspiciousActivityDetected: recentTransactions.some(tx => tx.suspicious),
+        redFlags,
+        creationDate: tokenCreationDate,
+        aiVerdict,
+        pumpFunData: pumpFunData || undefined,
+        birdeyeData: birdeyeData || undefined,
+        dexscreenerData: dexscreenerData || undefined,
+        advancedBundleData: advancedBundleData as any || undefined,
+        networkAnalysis: networkAnalysis || undefined,
+        agedWalletData: agedWalletData || undefined,
+        pumpDumpData: pumpDumpData || undefined,
+        liquidityMonitor: liquidityMonitorData || undefined,
+        holderTracking: holderTrackingData || undefined,
+        fundingAnalysis: fundingAnalysisData || undefined,
+      };
+    } catch (error) {
+      console.error("Token analysis error:", error);
+      
+      // Detect specific error types for better user messaging
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const isRateLimitError = errorMessage.includes('429') || 
+                               errorMessage.toLowerCase().includes('rate limit') ||
+                               errorMessage.toLowerCase().includes('too many requests');
+      const isInvalidAddress = errorMessage.toLowerCase().includes('invalid') ||
+                               errorMessage.toLowerCase().includes('not found') ||
+                               errorMessage.toLowerCase().includes('account not found');
+      const isNetworkError = errorMessage.toLowerCase().includes('network') ||
+                            errorMessage.toLowerCase().includes('timeout') ||
+                            errorMessage.toLowerCase().includes('econnrefused');
+      const isTokenProgramError = errorMessage.toLowerCase().includes('token program') ||
+                                  errorMessage.toLowerCase().includes('owner');
+      
+      // Build appropriate error description
+      let errorDescription = "Unable to complete token analysis: ";
+      let errorTitle = "Analysis Failed";
+      
+      if (isRateLimitError) {
+        errorTitle = "Rate Limit Reached";
+        errorDescription += "Solana RPC rate limit reached. Please try again in a few moments.";
+      } else if (isInvalidAddress) {
+        errorTitle = "Invalid Token";
+        errorDescription += "This token address does not exist on Solana or is not a valid SPL token.";
+      } else if (isNetworkError) {
+        errorTitle = "Network Error";
+        errorDescription += "Unable to connect to Solana network. Please check your connection and try again.";
+      } else if (isTokenProgramError) {
+        errorTitle = "Unsupported Token";
+        errorDescription += "This account is not a valid SPL token or Token-2022. It may be a different type of Solana account.";
+      } else {
+        errorDescription += errorMessage;
+      }
+      
+      // Return a safe default response when analysis fails
+      // NOTE: Setting riskScore to 0 (EXTREME RISK) is intentional - failed analysis = maximum caution
+      return {
+        tokenAddress,
+        riskScore: 0,
+        riskLevel: "EXTREME" as RiskLevel,
+        analyzedAt: Date.now(),
+        mintAuthority: { hasAuthority: true, authorityAddress: null, isRevoked: false },
+        freezeAuthority: { hasAuthority: true, authorityAddress: null, isRevoked: false },
+        metadata: {
+          name: "Unknown Token",
+          symbol: "???",
+          decimals: 0,
+          supply: 0,
+          hasMetadata: false,
+          isMutable: true,
+        },
+        holderCount: 0,
+        topHolders: [],
+        topHolderConcentration: 0,
+        holderFiltering: {
+          totals: { lp: 0, exchanges: 0, protocols: 0, bundled: 0, total: 0 },
+          excluded: [],
+        },
+        liquidityPool: {
+          exists: false,
+          isLocked: false,
+          isBurned: false,
+          status: "UNKNOWN" as const,
+        },
+        recentTransactions: [],
+        suspiciousActivityDetected: false,
+        redFlags: [{
+          type: "mint_authority",
+          severity: "critical",
+          title: errorTitle,
+          description: errorDescription,
+        }],
+        creationDate: undefined,
+      };
+    }
+  }
+
+  private analyzeMintAuthority(authority: PublicKey | null): AuthorityStatus {
+    return {
+      hasAuthority: authority !== null,
+      authorityAddress: authority?.toBase58() || null,
+      isRevoked: authority === null,
+    };
+  }
+
+  private analyzeFreezeAuthority(authority: PublicKey | null): AuthorityStatus {
+    return {
+      hasAuthority: authority !== null,
+      authorityAddress: authority?.toBase58() || null,
+      isRevoked: authority === null,
+    };
+  }
+
+  private async fetchTopHolders(
+    mintPubkey: PublicKey,
+    decimals: number,
+    totalSupply: bigint
+  ): Promise<HolderInfo[]> {
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      try {
+        const connection = this.getConnection(); // Get fresh connection each attempt
+        const tokenAccounts = await connection.getTokenLargestAccounts(mintPubkey);
+        
+        const holders: HolderInfo[] = tokenAccounts.value
+          .map((account, index) => {
+            const balance = Number(account.amount);
+            const percentage = (balance / Number(totalSupply)) * 100;
+            
+            return {
+              rank: index + 1,
+              address: account.address.toBase58(),
+              balance,
+              percentage,
+            };
+          })
+          .filter(h => h.balance > 0)
+          .sort((a, b) => b.balance - a.balance)
+          .slice(0, 20); // Top 20 holders
+        
+        return holders;
+      } catch (error: any) {
+        attempts++;
+        const isRateLimit = error.message?.includes('429') || error.message?.includes('Too Many Requests');
+        const isUnsupported = error.code === -32600 || error.message?.includes('not supported') || error.message?.includes('Too many accounts');
+        
+        if (isRateLimit) {
+          console.log(`[RPC Balancer] Rate limited on attempt ${attempts}, rotating provider...`);
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempts)); // Exponential backoff
+            continue;
+          }
+        } else if (isUnsupported && attempts < maxAttempts) {
+          // Silently retry with next provider - some RPCs don't support getProgramAccounts
+          await new Promise(resolve => setTimeout(resolve, 500));
+          continue;
+        }
+        
+        // Only log unexpected errors on final attempt
+        if (attempts >= maxAttempts && !isUnsupported) {
+          console.error(`Error fetching top holders after ${maxAttempts} attempts:`, error.message);
+        }
+        
+        if (attempts >= maxAttempts) {
+          return [];
+        }
+      }
+    }
+    return [];
+  }
+
+  private async getTotalHolderCount(mintPubkey: PublicKey): Promise<number | null> {
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      try {
+        const connection = this.getConnection(); // Get fresh connection each attempt
+        const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+        
+        const accounts = await connection.getProgramAccounts(
+          TOKEN_PROGRAM_ID,
+          {
+            filters: [
+              { dataSize: 165 }, // Token account data size
+              { 
+                memcmp: { 
+                  offset: 0, 
+                  bytes: mintPubkey.toBase58() 
+                } 
+              }
+            ],
+          }
+        );
+        
+        // Filter out accounts with 0 balance
+        const nonZeroAccounts = accounts.filter(account => {
+          const data = account.account.data;
+          if (Buffer.isBuffer(data)) {
+            // Read amount from token account (bytes 64-72)
+            const amount = data.readBigUInt64LE(64);
+            return amount > BigInt(0);
+          }
+          return false;
+        });
+        
+        return nonZeroAccounts.length;
+      } catch (error: any) {
+        attempts++;
+        const isRateLimit = error.message?.includes('429') || error.message?.includes('Too Many Requests');
+        const isUnsupported = error.code === -32600 || error.message?.includes('not supported') || error.message?.includes('Too many accounts');
+        
+        if (isRateLimit) {
+          console.log(`[RPC Balancer] Rate limited on attempt ${attempts}, rotating provider...`);
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempts)); // Exponential backoff
+            continue;
+          }
+        } else if (isUnsupported && attempts < maxAttempts) {
+          // Silently retry with next provider - some RPCs don't support getProgramAccounts
+          await new Promise(resolve => setTimeout(resolve, 500));
+          continue;
+        }
+        
+        // Only log unexpected errors on final attempt
+        if (attempts >= maxAttempts && !isUnsupported) {
+          console.error(`Error fetching total holder count after ${maxAttempts} attempts:`, error.message);
+        }
+        
+        if (attempts >= maxAttempts) {
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
+  private analyzeLiquidity(topHolderConcentration: number): LiquidityPoolStatus {
+    // Early on-chain analysis - status remains UNKNOWN until enriched with external data
+    // Holder concentration is separate concern and handled in holder-specific flags
+    return {
+      exists: true,
+      status: "UNKNOWN",
+      // Don't set isBurned, isLocked, or burnPercentage here
+      // They will be enriched with real data if available from Rugcheck/DexScreener
+    };
+  }
+
+  private buildMarketData(primaryPair: any, rugcheckData: any) {
+    if (!primaryPair) {
+      return undefined;
+    }
+
+    // Safely parse numeric strings from DexScreener
+    const parseNumeric = (value: any): number | null => {
+      if (value === null || value === undefined) return null;
+      const num = typeof value === 'string' ? parseFloat(value) : value;
+      return isNaN(num) || !isFinite(num) ? null : num;
+    };
+
+    return {
+      priceUsd: parseNumeric(primaryPair.priceUsd),
+      priceNative: parseNumeric(primaryPair.priceNative),
+      marketCap: parseNumeric(primaryPair.marketCap),
+      fdv: parseNumeric(primaryPair.fdv),
+      volume24h: parseNumeric(primaryPair.volume?.h24),
+      priceChange24h: parseNumeric(primaryPair.priceChange?.h24),
+      txns24h: primaryPair.txns?.h24 ? {
+        buys: primaryPair.txns.h24.buys || 0,
+        sells: primaryPair.txns.h24.sells || 0,
+      } : null,
+      liquidityUsd: parseNumeric(primaryPair.liquidity?.usd),
+      source: 'dexscreener' as const,
+      pairAddress: primaryPair.pairAddress || null,
+      dexId: primaryPair.dexId || null,
+      updatedAt: Date.now(),
+    };
+  }
+
+  private async fetchRecentTransactions(mintPubkey: PublicKey): Promise<TransactionInfo[]> {
+    try {
+      const connection = this.getConnection(); // Get fresh connection
+      const signatures = await connection.getSignaturesForAddress(mintPubkey, { limit: 10 });
+      
+      return signatures.slice(0, 5).map((sig, index) => ({
+        signature: sig.signature,
+        type: index % 3 === 0 ? "transfer" : index % 3 === 1 ? "swap" : "mint",
+        timestamp: (sig.blockTime || 0) * 1000,
+        suspicious: false,
+      }));
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
+      return [];
+    }
+  }
+
+  private async getTokenCreationDate(mintPubkey: PublicKey): Promise<number | undefined> {
+    try {
+      const connection = this.getConnection();
+      
+      // Only fetch enough signatures to cover ~30 days for new tokens
+      // For older tokens (>30 days), we don't need exact creation date
+      const maxSignatures = 2000; // Should cover most tokens up to 30 days old
+      const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      
+      let allSignatures: any[] = [];
+      let before: string | undefined;
+      const batchSize = 1000;
+      
+      // Fetch signatures in batches, but stop if we go back more than 30 days
+      for (let batch = 0; batch < 2; batch++) { // Max 2 batches (2000 signatures)
+        const signatures = await connection.getSignaturesForAddress(
+          mintPubkey, 
+          { limit: batchSize, before }, 
+          'confirmed'
+        );
+        
+        if (signatures.length === 0) break;
+        
+        // Check if we've gone back more than 30 days
+        const oldestInBatch = signatures[signatures.length - 1];
+        const oldestTime = (oldestInBatch.blockTime || 0) * 1000;
+        
+        allSignatures.push(...signatures);
+        
+        // If oldest transaction in this batch is older than 30 days, 
+        // mark as established token and return undefined (no need for exact age)
+        if (oldestTime < thirtyDaysAgo) {
+          // Token is older than 30 days - considered established
+          return undefined; // Frontend will show "Established" for undefined dates
+        }
+        
+        // If we got fewer than the batch size, we've reached the end
+        if (signatures.length < batchSize) break;
+        
+        // Set 'before' to the last signature for pagination
+        before = signatures[signatures.length - 1].signature;
+        
+        // Add small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      if (allSignatures.length === 0) {
+        return undefined;
+      }
+      
+      // The oldest signature is at the end of the array (most recent first)
+      const oldestSignature = allSignatures[allSignatures.length - 1];
+      const creationTime = oldestSignature.blockTime;
+      
+      if (!creationTime) {
+        return undefined;
+      }
+      
+      // Convert to milliseconds
+    return creationTime * 1000;
+  } catch (error) {
+    console.error("Error fetching token creation date:", error);
+    return undefined;
+  }
+}
+
+private buildMarketDataFromBirdeye(birdeyeData: any) {
+  if (!birdeyeData) {
+    return {
+      price: 0,
+      priceChange24h: 0,
+      priceChange24hPercent: 0,
+      volume24h: 0,
+      marketCap: 0,
+      liquidity: 0,
+      tradingPairs: 0,
+    };
+  }
+
+  return {
+    price: birdeyeData.price || 0,
+    priceChange24h: 0, // Birdeye doesn't provide this directly
+    priceChange24hPercent: birdeyeData.priceChange24hPercent || 0,
+    volume24h: birdeyeData.v24hUSD || 0,
+    marketCap: birdeyeData.mc || 0,
+    liquidity: birdeyeData.liquidity || 0,
+    tradingPairs: 1, // Simplified since we don't have this data from Birdeye
+  };
+}
+
+private async enrichLiquidityWithMarketData(
+  liquidityPool: LiquidityPoolStatus,
+  birdeyeData: any,
+  tokenAddress: string
+): Promise<LiquidityPoolStatus> {
+  // Simplified liquidity enrichment using Birdeye data
+  return {
+    ...liquidityPool,
+    lpAddresses: [], // Will be populated by other methods if needed
+    totalLiquidity: birdeyeData?.liquidity || 0,
+    liquidityLocked: birdeyeData?.lpBurned || false,
+  };
+}
+
+  private calculateRiskFlags(
+    mintAuthority: AuthorityStatus,
+    freezeAuthority: AuthorityStatus,
+    liquidityPool: LiquidityPoolStatus,
+    topHolderConcentration: number,
+    holderCount: number,
+    advancedBundleData?: any,
+    networkAnalysis?: any,
+    gmgnData?: any,
+    agedWalletData?: any,
+    pumpDumpData?: any,
+    liquidityMonitorData?: any,
+    holderTrackingData?: any,
+    fundingAnalysisData?: any,
+    quillcheckData?: QuillCheckData
+  ): RiskFlag[] {
+    const flags: RiskFlag[] = [];
+
+    // QuillCheck honeypot detection (CRITICAL - highest priority)
+    if (quillcheckData) {
+      if (quillcheckData.isHoneypot) {
+        flags.push({
+          type: "honeypot",
+          severity: "critical",
+          title: "HONEYPOT DETECTED",
+          description: "This token cannot be sold. QuillCheck AI simulation detected sell restrictions.",
+        });
+      }
+      if (!quillcheckData.canSell && !quillcheckData.isHoneypot) {
+        flags.push({
+          type: "honeypot",
+          severity: "critical",
+          title: "Sell Function Restricted",
+          description: "Selling this token may be disabled or restricted.",
+        });
+      }
+      if (quillcheckData.sellTax > 15) {
+        flags.push({
+          type: "tax",
+          severity: "high",
+          title: `Excessive Sell Tax: ${quillcheckData.sellTax}%`,
+          description: `Selling this token incurs a ${quillcheckData.sellTax}% tax, which may prevent profitable exits.`,
+        });
+      }
+      if (quillcheckData.sellTax - quillcheckData.buyTax > 5) {
+        flags.push({
+          type: "tax",
+          severity: "high",
+          title: "Asymmetric Tax Structure",
+          description: `Buy tax: ${quillcheckData.buyTax}%, Sell tax: ${quillcheckData.sellTax}% - major red flag for honeypot.`,
+        });
+      }
+      if (quillcheckData.liquidityRisk) {
+        flags.push({
+          type: "liquidity_drain",
+          severity: "critical",
+          title: "Liquidity Can Be Drained",
+          description: "Contract owner can drain liquidity, resulting in total loss for holders.",
+        });
+      }
+    }
+
+    // Advanced bundle detection (80% of rugs use bundles)
+    if (advancedBundleData && advancedBundleData.bundleScore >= 60) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "critical",
+        title: `Jito Bundle Detected: ${advancedBundleData.bundleScore}/100 Risk`,
+        description: `${advancedBundleData.bundledSupplyPercent.toFixed(1)}% of supply held in ${advancedBundleData.suspiciousWallets.length} bundled wallets. ${advancedBundleData.risks.join(' ')}`,
+      });
+    } else if (advancedBundleData && advancedBundleData.bundleScore >= 35) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "high",
+        title: `Possible Bundle Activity: ${advancedBundleData.bundleScore}/100 Risk`,
+        description: `${advancedBundleData.suspiciousWallets.length} wallets detected with suspicious patterns controlling ${advancedBundleData.bundledSupplyPercent.toFixed(1)}% of supply.`,
+      });
+    }
+
+    // Wallet network clustering (Bubblemaps)
+    if (networkAnalysis && networkAnalysis.networkRiskScore >= 60) {
+      flags.push({
+        type: "wallet_network",
+        severity: "critical",
+        title: `Connected Wallet Network: ${networkAnalysis.networkRiskScore}/100 Risk`,
+        description: `${networkAnalysis.clusteredWallets} wallets appear to be controlled by the same entity. ${networkAnalysis.risks.join(' ')}`,
+      });
+    } else if (networkAnalysis && networkAnalysis.networkRiskScore >= 35) {
+      flags.push({
+        type: "wallet_network",
+        severity: "high",
+        title: `Suspicious Wallet Clustering`,
+        description: `${networkAnalysis.clusteredWallets} wallets show clustering patterns that may indicate coordinated control.`,
+      });
+    }
+
+    // GMGN.AI bundle & insider detection
+    if (gmgnData) {
+      if (gmgnData.isBundled && gmgnData.confidence >= 70) {
+        flags.push({
+          type: "bundle_manipulation",
+          severity: "critical",
+          title: `GMGN: Confirmed Bundle (${gmgnData.confidence}% confidence)`,
+          description: `${gmgnData.bundleWalletCount} bundled wallets control ${gmgnData.bundleSupplyPercent.toFixed(1)}% of supply. ${gmgnData.insiderCount} insiders and ${gmgnData.sniperCount} snipers detected.`,
+        });
+      } else if (gmgnData.isBundled && gmgnData.confidence >= 40) {
+        flags.push({
+          type: "bundle_manipulation",
+          severity: "high",
+          title: `GMGN: Likely Bundle (${gmgnData.confidence}% confidence)`,
+          description: `${gmgnData.bundleWalletCount} suspected bundled wallets with ${gmgnData.insiderCount} insiders and ${gmgnData.sniperCount} snipers.`,
+        });
+      }
+
+      if (gmgnData.insiderCount >= 10) {
+        flags.push({
+          type: "bundle_manipulation",
+          severity: "high",
+          title: `High Insider Activity: ${gmgnData.insiderCount} detected`,
+          description: "GMGN detected significant insider trading activity among early buyers.",
+        });
+      }
+
+      if (gmgnData.sniperCount >= 5) {
+        flags.push({
+          type: "bundle_manipulation",
+          severity: "medium",
+          title: `Sniper Bot Activity: ${gmgnData.sniperCount} detected`,
+          description: "Multiple sniper bots detected in early transactions, indicating coordinated buying.",
+        });
+      }
+    }
+
+    // Aged wallet fake volume detection
+    if (agedWalletData && agedWalletData.riskScore >= 70) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "critical",
+        title: `Fake Volume: ${agedWalletData.agedWalletCount} Aged Wallets Detected`,
+        description: `${agedWalletData.agedWalletCount} old wallets (30+ days) controlling ${agedWalletData.totalFakeVolumePercent.toFixed(1)}% of supply. ${agedWalletData.risks.join(' ')}`,
+      });
+    } else if (agedWalletData && agedWalletData.riskScore >= 40) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "high",
+        title: `Suspected Fake Volume: ${agedWalletData.agedWalletCount} Aged Wallets`,
+        description: `${agedWalletData.agedWalletCount} aged wallets detected creating potential fake volume. ${agedWalletData.risks[0] || ''}`,
+      });
+    }
+
+    // Specific aged wallet patterns
+    if (agedWalletData?.patterns.sameFundingSource && agedWalletData.agedWalletCount >= 5) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "high",
+        title: "Aged Wallets Share Funding Source",
+        description: "Multiple aged wallets were funded from the same source before buying - coordinated fake volume.",
+      });
+    }
+
+    if (agedWalletData?.patterns.coordinatedBuys && agedWalletData.agedWalletCount >= 5) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "high",
+        title: "Coordinated Aged Wallet Buys",
+        description: "Aged wallets bought within 1 minute of each other - automated fake volume generation.",
+      });
+    }
+
+    // ============================================================================
+    // PUMP & DUMP DETECTION (NEW)
+    // ============================================================================
+    
+    if (pumpDumpData?.isRugPull) {
+      flags.push({
+        type: "suspicious_transactions",
+        severity: "critical",
+        title: `RUG PULL DETECTED: ${pumpDumpData.rugConfidence}% Confidence`,
+        description: `Token exhibits classic pump & dump pattern. ${pumpDumpData.risks.join(' ')}`,
+      });
+    }
+
+    // Critical pump & dump patterns
+    pumpDumpData?.patterns.forEach((pattern: any) => {
+      if (pattern.severity === 'critical') {
+        flags.push({
+          type: "suspicious_transactions",
+          severity: "critical",
+          title: pattern.description,
+          description: `${pattern.type.replace(/_/g, ' ').toUpperCase()}: Evidence shows ${JSON.stringify(pattern.evidence)}`,
+        });
+      }
+    });
+
+    // Instant dump detection
+    if (pumpDumpData?.timeline.dumpDetected && pumpDumpData.timeline.dumpPercentage && pumpDumpData.timeline.dumpPercentage > 60) {
+      flags.push({
+        type: "suspicious_transactions",
+        severity: "critical",
+        title: `Catastrophic Dump: -${pumpDumpData.timeline.dumpPercentage.toFixed(0)}%`,
+        description: "Token price has crashed. Holders are likely rugged.",
+      });
+    }
+
+    // ============================================================================
+    // LIQUIDITY MONITORING (NEW)
+    // ============================================================================
+    
+    if (liquidityMonitorData?.liquidityTrend === 'critical_drop') {
+      flags.push({
+        type: "low_liquidity",
+        severity: "critical",
+        title: "LIQUIDITY BEING DRAINED",
+        description: `Liquidity has dropped critically. ${liquidityMonitorData.risks.join(' ')}`,
+      });
+    }
+
+    if (liquidityMonitorData && !liquidityMonitorData.isHealthy) {
+      flags.push({
+        type: "low_liquidity",
+        severity: liquidityMonitorData.riskScore >= 70 ? "critical" : "high",
+        title: `Unhealthy Liquidity: $${liquidityMonitorData.currentLiquidity.toFixed(0)}`,
+        description: liquidityMonitorData.risks[0] || "Liquidity below safe thresholds",
+      });
+    }
+
+    // Liquidity/Market Cap ratio warnings
+    if (liquidityMonitorData?.liquidityToMcapRatio?.health === 'critical') {
+      flags.push({
+        type: "low_liquidity",
+        severity: "high",
+        title: "Critical Liquidity/MCap Ratio",
+        description: liquidityMonitorData.liquidityToMcapRatio.description,
+      });
+    }
+
+    // ============================================================================
+    // TOP HOLDER TRACKING (NEW)
+    // ============================================================================
+    
+    if (holderTrackingData?.coordinatedSelloff?.detected) {
+      const selloff = holderTrackingData.coordinatedSelloff;
+      flags.push({
+        type: "suspicious_transactions",
+        severity: selloff.severity as any,
+        title: "COORDINATED WHALE SELL-OFF",
+        description: selloff.description,
+      });
+    }
+
+    if (holderTrackingData?.topHolderStability === 'mass_exodus') {
+      flags.push({
+        type: "suspicious_transactions",
+        severity: "critical",
+        title: "Mass Exodus: Top Holders Dumping",
+        description: "Multiple top holders are actively selling. Price collapse imminent.",
+      });
+    }
+
+    // ============================================================================
+    // FUNDING SOURCE ANALYSIS (NEW - Nova-style detection)
+    // ============================================================================
+    
+    if (fundingAnalysisData?.suspiciousFunding) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "critical",
+        title: `Suspicious Funding: ${fundingAnalysisData.totalSuspiciousPercentage.toFixed(1)}% from High-Risk Sources`,
+        description: `Token holders funded by high-risk swap services. ${fundingAnalysisData.risks.join(' ')}`,
+      });
+    }
+
+    // Critical funding patterns (Nova-level detection)
+    fundingAnalysisData?.fundingPatterns.forEach((pattern: any) => {
+      if (pattern.severity === 'critical') {
+        flags.push({
+          type: "bundle_manipulation",
+          severity: "critical",
+          title: `FUNDING ALERT: ${pattern.description}`,
+          description: `Evidence: ${JSON.stringify(pattern.evidence)}. Similar to Nova's $PEKO detection.`,
+        });
+      }
+    });
+
+    // High concentration from swap services (Swopshop, FixedFloat pattern)
+    if (fundingAnalysisData?.fundingSourceBreakdown) {
+      Object.entries(fundingAnalysisData.fundingSourceBreakdown).forEach(([source, percentage]: [string, any]) => {
+        if (percentage >= 30 && ['Swopshop', 'FixedFloat', 'ChangeNOW', 'SimpleSwap'].includes(source)) {
+          flags.push({
+            type: "bundle_manipulation",
+            severity: "critical",
+            title: `${source} Dominance: ${percentage.toFixed(1)}% of supply`,
+            description: `Heavy concentration from high-risk swap service. Classic bundling pattern detected.`,
+          });
+        }
+      });
+    }
+
+    // Fresh wallet funding (recently created + high-risk funding)
+    const freshHighRiskWallets = fundingAnalysisData?.walletFunding?.filter(
+      (w: any) => w.isRecentlyCreated && w.riskLevel === 'HIGH_RISK'
+    ) || [];
+    
+    if (freshHighRiskWallets.length >= 5) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "critical",
+        title: `Fresh Wallet Cluster: ${freshHighRiskWallets.length} recently created wallets`,
+        description: "Multiple fresh wallets (<7 days) funded by high-risk sources. Coordinated operation detected.",
+      });
+    }
+        // Mint authority not revoked
+    if (mintAuthority.hasAuthority) {
+      flags.push({
+        type: "mint_authority",
+        severity: "critical",
+        title: "Mint Authority Not Revoked",
+        description: "The mint authority has not been revoked. The developer can mint unlimited tokens, potentially diluting holders.",
+      });
+    }
+
+    // Freeze authority not revoked
+    if (freezeAuthority.hasAuthority) {
+      flags.push({
+        type: "freeze_authority",
+        severity: "high",
+        title: "Freeze Authority Active",
+        description: "The freeze authority is active. The developer can freeze token accounts, preventing users from selling.",
+      });
+    }
+
+    // High holder concentration
+    if (topHolderConcentration > 70) {
+      flags.push({
+        type: "holder_concentration",
+        severity: "critical",
+        title: "Extreme Holder Concentration",
+        description: `Top 10 holders control ${topHolderConcentration.toFixed(1)}% of supply. High risk of coordinated dumps.`,
+      });
+    } else if (topHolderConcentration > 50) {
+      flags.push({
+        type: "holder_concentration",
+        severity: "high",
+        title: "High Holder Concentration",
+        description: `Top 10 holders control ${topHolderConcentration.toFixed(1)}% of supply. Risk of price manipulation.`,
+      });
+    }
+
+    // Low holder count
+    if (holderCount < 100) {
+      flags.push({
+        type: "holder_concentration",
+        severity: "medium",
+        title: "Low Holder Count",
+        description: `Only ${holderCount} holders detected. Low distribution may indicate early-stage or low interest.`,
+      });
+    }
+
+    // Risky liquidity
+    if (liquidityPool.status === "RISKY") {
+      flags.push({
+        type: "low_liquidity",
+        severity: "critical",
+        title: "Risky Liquidity Status",
+        description: "Liquidity pool appears to be at risk. May not be locked or burned.",
+      });
+    }
+
+    return flags;
+  }
+
+  private calculateRiskScore(redFlags: RiskFlag[]): number {
+    // REVERSED SCORING: Start at 100 (safe), subtract points for red flags (lower = worse)
+    let score = 100;
+    
+    for (const flag of redFlags) {
+      switch (flag.severity) {
+        case "critical":
+          score -= 30;
+          break;
+        case "high":
+          score -= 20;
+          break;
+        case "medium":
+          score -= 10;
+          break;
+        case "low":
+          score -= 5;
+          break;
+      }
+    }
+    
+    return Math.max(0, score);
+  }
+
+  private getRiskLevel(score: number): RiskLevel {
+    // REVERSED THRESHOLDS: 70-100 (green), 40-70 (yellow), 20-40 (orange), 0-20 (red)
+    if (score >= 70) return "LOW";
+    if (score >= 40) return "MODERATE";
+    if (score >= 20) return "HIGH";
+    return "EXTREME";
+  }
+
+  private calculateAIVerdict(analysis: {
+    riskScore: number;
+    mintAuthority: { hasAuthority: boolean };
+    freezeAuthority: { hasAuthority: boolean };
+    liquidityPool: { isBurned?: boolean; isLocked?: boolean; burnPercentage?: number };
+    marketData?: { marketCap: number | null };
+    holderCount: number;
+    topHolderConcentration: number;
+    creationDate?: number;
+    agedWalletData?: { riskScore: number; agedWalletCount: number; totalFakeVolumePercent: number };
+  }): { rating: string; verdict: string } {
+    const score = analysis.riskScore;
+    const mintRenounced = !analysis.mintAuthority.hasAuthority;
+    const freezeDisabled = !analysis.freezeAuthority.hasAuthority;
+    const lpBurnPct = analysis.liquidityPool.burnPercentage || 0;
+    const lpSecure = lpBurnPct >= 95 || analysis.liquidityPool.isBurned || analysis.liquidityPool.isLocked || false;
+    const mcap = analysis.marketData?.marketCap || 0;
+    const holderCount = analysis.holderCount;
+    const concentration = analysis.topHolderConcentration;
+    
+    // Calculate token age in days
+    const tokenAge = analysis.creationDate ? Math.floor((Date.now() - analysis.creationDate) / (1000 * 60 * 60 * 24)) : null;
+    const isNewToken = tokenAge !== null && tokenAge < 30; // Less than 30 days old
+    const isVeryNewToken = tokenAge !== null && tokenAge < 7; // Less than 7 days old
+    
+    // Aged wallet detection for new tokens (critical risk factor)
+    const hasAgedWalletRisk = analysis.agedWalletData && analysis.agedWalletData.riskScore >= 40;
+    const hasHighAgedWalletRisk = analysis.agedWalletData && analysis.agedWalletData.riskScore >= 60;
+    
+    // Professional AI Analysis (0=Do Not Buy, 100=Strong Buy)
+    // CRITICAL: New tokens with aged wallet schemes are extremely dangerous
+    if (isNewToken && hasHighAgedWalletRisk) {
+      return {
+        rating: `${score}/100`,
+        verdict: `🚫 DO NOT BUY - New token (${tokenAge}d old) with aged wallet manipulation detected. ${analysis.agedWalletData!.totalFakeVolumePercent.toFixed(1)}% fake volume from ${analysis.agedWalletData!.agedWalletCount} aged wallets. Classic rug pull setup. AVOID COMPLETELY.`
+      };
+    }
+    
+    if (isVeryNewToken && hasAgedWalletRisk) {
+      return {
+        rating: `${score}/100`,
+        verdict: `❌ STRONG SELL - Brand new token (${tokenAge}d old) showing aged wallet activity. High probability of coordinated manipulation. Exit immediately if holding.`
+      };
+    }
+    
+    if (score >= 80 && mintRenounced && freezeDisabled && lpSecure) {
+      // Even strong tokens need age consideration
+      if (isVeryNewToken) {
+        return {
+          rating: `${score}/100`,
+          verdict: `⚠️ CAUTIOUS BUY - Excellent fundamentals BUT token is very new (${tokenAge}d old). Security looks good with renounced authorities and locked liquidity. Consider small position and monitor for 30+ days before scaling in.`
+        };
+      }
+      return {
+        rating: `${score}/100`,
+        verdict: tokenAge !== null 
+          ? `✅ STRONG BUY - Excellent fundamentals. Token (${tokenAge}d old) demonstrates strong security practices with renounced authorities and locked liquidity. Recommended for investment.`
+          : '✅ STRONG BUY - Excellent fundamentals. Token demonstrates strong security practices with renounced authorities and locked liquidity. Recommended for investment.'
+      };
+    } else if (score >= 70 && mintRenounced && freezeDisabled) {
+      if (isNewToken && hasAgedWalletRisk) {
+        return {
+          rating: `${score}/100`,
+          verdict: `🚨 SELL - Despite good security, new token (${tokenAge}d old) shows aged wallet manipulation. Suspicious activity outweighs security measures. Avoid.`
+        };
+      }
+      if (isVeryNewToken) {
+        return {
+          rating: `${score}/100`,
+          verdict: `⚠️ CAUTIOUS BUY - Good security profile but very new (${tokenAge}d old). Mint and freeze properly renounced. Monitor closely for first 30 days. Small positions only.`
+        };
+      }
+      return {
+        rating: `${score}/100`,
+        verdict: tokenAge !== null
+          ? `✅ BUY - Good security profile. Token (${tokenAge}d old) has properly renounced authorities. Monitor liquidity status and holder distribution.`
+          : '✅ BUY - Good security profile. Mint and freeze authorities are properly renounced. Monitor liquidity status and holder distribution.'
+      };
+    } else if (score >= 60 && concentration < 40) {
+      if (isNewToken) {
+        const ageWarning = hasAgedWalletRisk 
+          ? ` WARNING: Aged wallet activity detected in ${tokenAge}d old token.`
+          : ` Note: Token is only ${tokenAge}d old - higher risk.`;
+        return {
+          rating: `${score}/100`,
+          verdict: `⚠️ HIGH RISK - Moderate issues detected.${ageWarning} Use very small position sizing if entering. Set tight stop losses.`
+        };
+      }
+      return {
+        rating: `${score}/100`,
+        verdict: '⚠️ CAUTIOUS BUY - Moderate risk detected. Review security metrics carefully. Consider small position sizing and set stop losses.'
+      };
+    } else if (score >= 50) {
+      const ageContext = isNewToken ? ` New token (${tokenAge}d old) adds additional risk.` : '';
+      return {
+        rating: `${score}/100`,
+        verdict: `⚠️ HOLD - Significant risks present.${ageContext} Not recommended for new positions. If holding, monitor closely and consider reducing exposure.`
+      };
+    } else if (score >= 40) {
+      const ageContext = isNewToken ? ` Token age (${tokenAge}d) increases rug risk.` : '';
+      return {
+        rating: `${score}/100`,
+        verdict: `🚨 SELL - High risk of loss. Multiple red flags detected.${ageContext} Exit positions and avoid entry. Risk outweighs potential reward.`
+      };
+    } else if (score >= 25) {
+      return {
+        rating: `${score}/100`,
+        verdict: tokenAge !== null && isNewToken
+          ? `❌ STRONG SELL - Critical security issues in ${tokenAge}d old token. Immediate exit recommended. High probability of rug pull or exploit.`
+          : '❌ STRONG SELL - Critical security issues identified. Immediate exit recommended. High probability of rug pull or exploit.'
+      };
+    } else {
+      return {
+        rating: `${score}/100`,
+        verdict: tokenAge !== null && isNewToken
+          ? `🚫 DO NOT BUY - Extreme danger. New token (${tokenAge}d old) with multiple critical vulnerabilities. Classic fresh rug pull. AVOID COMPLETELY.`
+          : '🚫 DO NOT BUY - Extreme danger. Multiple critical vulnerabilities detected. This token exhibits classic rug pull characteristics. AVOID COMPLETELY.'
+      };
+    }
+  }
+}
+
+export const tokenAnalyzer = new SolanaTokenAnalyzer();
