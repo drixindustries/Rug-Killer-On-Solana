@@ -26,7 +26,6 @@ import { LiquidityMonitorService } from "./services/liquidity-monitor";
 import { HolderTrackingService } from "./services/holder-tracking";
 import { FundingSourceAnalyzer } from "./services/funding-source-analyzer";
 import { walletIntelligenceService } from "./services/wallet-intelligence";
-import { walletIntelligenceService } from "./services/wallet-intelligence";
 
 export class SolanaTokenAnalyzer {
   // Core detection services - streamlined to focus on Birdeye and GMGN data
@@ -96,12 +95,28 @@ export class SolanaTokenAnalyzer {
         
         // Fetch mint info using the correct program ID (using connection for SPL token parsing)
         const connection = this.getConnection();
-        if (isToken2022) {
-          mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID);
-          console.log(`✅ Token uses Token-2022 program: ${tokenAddress}`);
-        } else {
-          mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID);
-          console.log(`✅ Token uses standard SPL Token program: ${tokenAddress}`);
+        try {
+          if (isToken2022) {
+            mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID);
+            console.log(`✅ Token uses Token-2022 program: ${tokenAddress}`);
+          } else {
+            mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID);
+            console.log(`✅ Token uses standard SPL Token program: ${tokenAddress}`);
+          }
+        } catch (mintError) {
+          // Fallback: try the other program if first fails (some tokens might be misdetected)
+          console.warn(`Failed to parse with detected program, trying fallback...`);
+          try {
+            if (isToken2022) {
+              mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID);
+              console.log(`✅ Token actually uses standard SPL Token program (fallback): ${tokenAddress}`);
+            } else {
+              mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID);
+              console.log(`✅ Token actually uses Token-2022 program (fallback): ${tokenAddress}`);
+            }
+          } catch (fallbackError) {
+            throw new Error(`Failed to parse token mint with both programs: ${mintError.message}`);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch mint info:', error);
@@ -136,7 +151,7 @@ export class SolanaTokenAnalyzer {
       // First, get liquidity pool addresses from external sources
       const liquidityPool = this.analyzeLiquidity(0); // Pass 0 initially, will recalculate
 
-      // Enrich liquidity data with market information from Birdeye and GMGN
+      // Enrich liquidity data with market information from Birdeye
       const enrichedLiquidity = await this.enrichLiquidityWithMarketData(
         liquidityPool,
         birdeyeData,
@@ -357,9 +372,8 @@ export class SolanaTokenAnalyzer {
       // Pump & Dump pattern detection
       let pumpDumpData = null;
       try {
-        const dexService = new DexScreenerService();
-        const primaryPair = dexscreenerData ? dexService.getMostLiquidPair(dexscreenerData) : null;
-        pumpDumpData = this.pumpDumpDetector.analyzePriceAction(primaryPair, { topHolders: holders });
+        // Note: DexScreener integration removed, using Birdeye data instead
+        pumpDumpData = this.pumpDumpDetector.analyzePriceAction(null, { topHolders: holders });
         console.log(`[Pump & Dump] Rug Confidence: ${pumpDumpData.rugConfidence}%, Patterns: ${pumpDumpData.patterns.length}`);
       } catch (error) {
         console.error('[Pump & Dump] Detection failed:', error);
@@ -368,15 +382,17 @@ export class SolanaTokenAnalyzer {
       // Liquidity monitoring (real-time)
       let liquidityMonitorData = null;
       try {
-        const dexService = new DexScreenerService();
-        const primaryPair = dexscreenerData ? dexService.getMostLiquidPair(dexscreenerData) : null;
-        liquidityMonitorData = this.liquidityMonitor.monitorLiquidity(primaryPair);
+        // Use Birdeye liquidity data instead of DexScreener
+        liquidityMonitorData = this.liquidityMonitor.monitorLiquidity({
+          liquidity: { usd: birdeyeData?.liquidity || 0 },
+          priceUsd: birdeyeData?.price || 0
+        });
         
         // Calculate liquidity/mcap ratio if we have both
-        if (primaryPair && marketData?.marketCap) {
+        if (birdeyeData?.mc && birdeyeData?.liquidity) {
           const ratio = this.liquidityMonitor.calculateLiquidityRatio(
-            primaryPair.liquidity?.usd || 0,
-            marketData.marketCap
+            birdeyeData.liquidity,
+            birdeyeData.mc
           );
           liquidityMonitorData.liquidityToMcapRatio = ratio;
         }
@@ -404,13 +420,9 @@ export class SolanaTokenAnalyzer {
         console.error('[Funding Analysis] Failed:', error);
       }
       
-      // Build metadata - prioritize DexScreener data over on-chain defaults
+      // Build metadata - use Birdeye data
       const supply = Number(mintInfo.supply);
       const safeSupply = isNaN(supply) || !isFinite(supply) ? 0 : supply;
-      
-      // Get most liquid pair from DexScreener for metadata and market data
-      const dexService = new DexScreenerService();
-      const primaryPair = dexscreenerData ? dexService.getMostLiquidPair(dexscreenerData) : null;
       
       const metadata: TokenMetadata = {
         name: birdeyeData?.twitter || "Unknown Token",
@@ -752,143 +764,6 @@ export class SolanaTokenAnalyzer {
     };
   }
 
-  private async enrichLiquidityWithMarketData(
-    liquidityPool: LiquidityPoolStatus,
-    rugcheckData: any,
-    dexscreenerData: any,
-    tokenAddress: string
-  ): Promise<LiquidityPoolStatus> {
-    // Extract LP addresses from DexScreener pairs
-    const lpAddresses: string[] = [];
-    if (dexscreenerData?.pairs) {
-      dexscreenerData.pairs.forEach((pair: any) => {
-        if (pair.pairAddress) {
-          lpAddresses.push(pair.pairAddress);
-        }
-      });
-    }
-
-    // Add Rugcheck liquidity token accounts to exclude from holder concentration
-    // For Pump.fun, this includes the token account owned by the bonding curve
-    if (rugcheckData?.markets) {
-      rugcheckData.markets.forEach((market: any) => {
-        if (market.pubkey) lpAddresses.push(market.pubkey); // Pair/program address
-        if (market.liquidityA) lpAddresses.push(market.liquidityA); // Token account A
-        if (market.liquidityB) lpAddresses.push(market.liquidityB); // Token account B (SOL)
-      });
-    }
-
-    // Deduplicate LP addresses using Set
-    const uniqueLpAddresses = Array.from(new Set(lpAddresses));
-
-    // Get most liquid pair from DexScreener for primary liquidity data
-    const dexService = new DexScreenerService();
-    const primaryPair = dexscreenerData ? dexService.getMostLiquidPair(dexscreenerData) : null;
-    
-    // Use DexScreener liquidity as primary source, fallback to Rugcheck
-    let totalLiquidity = primaryPair?.liquidity?.usd;
-    
-    // ON-CHAIN LP BURN CHECKING (Grok's Method)
-    // Instead of relying on Rugcheck percentages, check actual on-chain state
-    const connection = this.getConnection();
-    const lpChecker = new LPChecker(connection);
-    
-    let isBurned = false;
-    let isLocked = false;
-    let burnPercentage = 0;
-
-    if (rugcheckData?.markets && rugcheckData.markets.length > 0) {
-      // Find the market with highest liquidity
-      const primaryMarket = rugcheckData.markets.reduce((prev: any, current: any) => {
-        return (current.liquidity || 0) > (prev.liquidity || 0) ? current : prev;
-      });
-
-      // Use Rugcheck liquidity if DexScreener didn't have it
-      if (!totalLiquidity) {
-        totalLiquidity = primaryMarket.liquidity;
-      }
-
-      // Check if this is a Pump.fun token (bonding curve model)
-      const isPumpFun = primaryMarket.marketType?.startsWith('pump_fun') || false;
-      
-      // For Pump.fun tokens, use lpLockedPct (they're locked in bonding curve, not burned)
-      // For regular tokens, check actual on-chain LP burn status
-      if (isPumpFun && primaryMarket.lp) {
-        burnPercentage = primaryMarket.lp.lpLockedPct || 0;
-        isLocked = burnPercentage >= 90;
-        isBurned = false; // Pump.fun tokens use locking, not burning
-        
-        console.log(`[Pump.fun] Detected bonding curve liquidity: ${burnPercentage}% locked`);
-        
-        // Use locked USD liquidity for Pump.fun
-        if (!totalLiquidity && primaryMarket.lp.lpLockedUSD) {
-          totalLiquidity = primaryMarket.lp.lpLockedUSD;
-        }
-        
-        // Fallback: If lpLockedPct is missing but we detected pump.fun, treat as risky
-        if (burnPercentage === 0 && !primaryMarket.lp.lpLockedPct) {
-          console.warn(`[Pump.fun] Missing lpLockedPct data for ${tokenAddress}`);
-          isLocked = false; // Unknown lock status = risky
-        }
-      } else if (primaryPair?.pairAddress) {
-        // Regular AMM token - check on-chain if LP is actually burned
-        try {
-          isBurned = await lpChecker.isLPBurned(primaryPair.pairAddress);
-          burnPercentage = isBurned ? 100 : 0;
-          isLocked = false;
-        } catch (error) {
-          console.error('[LP Check] Failed to check LP burn status:', error);
-          // Fallback: LP exists but we can't verify burn status = RISKY
-          isBurned = false;
-          isLocked = false;
-          burnPercentage = 0;
-        }
-      }
-
-      // Cross-validate: if liquidity exists but not burned/locked, it's risky
-      const hasLiquidity = (totalLiquidity && totalLiquidity > 1000) || false;
-
-      let status: "SAFE" | "RISKY" | "UNKNOWN" = liquidityPool.status;
-      // For pump.fun tokens, locked >= 90% is safe. For regular tokens, burned is safe.
-      if ((isBurned || isLocked) && hasLiquidity) {
-        status = "SAFE";
-      } else if (hasLiquidity && !isBurned && !isLocked) {
-        status = "RISKY";
-      }
-
-      return {
-        ...liquidityPool,
-        isBurned,
-        isLocked,
-        burnPercentage,
-        totalLiquidity,
-        lpAddresses: uniqueLpAddresses,
-        status,
-      };
-    }
-
-    // No Rugcheck data - use DexScreener liquidity only
-    if (primaryPair?.liquidity?.usd) {
-      return {
-        ...liquidityPool,
-        totalLiquidity: primaryPair.liquidity.usd,
-        lpAddresses: uniqueLpAddresses,
-        status: totalLiquidity && totalLiquidity > 1000 ? "RISKY" : "UNKNOWN",
-      };
-    }
-
-    // No liquidity data at all - add LP addresses if available
-    if (uniqueLpAddresses.length > 0) {
-      return {
-        ...liquidityPool,
-        lpAddresses: uniqueLpAddresses,
-      };
-    }
-    
-    // No data available at all
-    return liquidityPool;
-  }
-
   private async fetchRecentTransactions(mintPubkey: PublicKey): Promise<TransactionInfo[]> {
     try {
       const connection = this.getConnection(); // Get fresh connection
@@ -997,10 +872,10 @@ private buildMarketDataFromBirdeye(birdeyeData: any) {
 }
 
 private async enrichLiquidityWithMarketData(
-  liquidityPool: any,
+  liquidityPool: LiquidityPoolStatus,
   birdeyeData: any,
   tokenAddress: string
-) {
+): Promise<LiquidityPoolStatus> {
   // Simplified liquidity enrichment using Birdeye data
   return {
     ...liquidityPool,
@@ -1008,7 +883,9 @@ private async enrichLiquidityWithMarketData(
     totalLiquidity: birdeyeData?.liquidity || 0,
     liquidityLocked: birdeyeData?.lpBurned || false,
   };
-}  private calculateRiskFlags(
+}
+
+private calculateRiskFlags(
     mintAuthority: AuthorityStatus,
     freezeAuthority: AuthorityStatus,
     liquidityPool: LiquidityPoolStatus,
@@ -1016,7 +893,6 @@ private async enrichLiquidityWithMarketData(
     holderCount: number,
     advancedBundleData?: any,
     networkAnalysis?: any,
-    quillcheckData?: any,
     gmgnData?: any,
     agedWalletData?: any,
     pumpDumpData?: any,
@@ -1449,176 +1325,6 @@ private async enrichLiquidityWithMarketData(
         rating: '3/10',
         verdict: '🔴 DANGEROUS - High probability of rug pull'
       };
-    }
-  }
-
-  // ============================================================================
-  // CACHED RPC METHODS FOR LIGHTNING FAST PERFORMANCE
-  // ============================================================================
-
-  /**
-   * Fetch top token holders using cached RPC calls
-   */
-  private async fetchTopHolders(
-    mintPubkey: PublicKey, 
-    decimals: number, 
-    totalSupply: bigint
-  ): Promise<HolderInfo[]> {
-    try {
-      const accounts = await fastRPC.getProgramAccounts(
-        TOKEN_PROGRAM_ID.toBase58(),
-        {
-          encoding: 'jsonParsed',
-          filters: [
-            {
-              dataSize: 165
-            },
-            {
-              memcmp: {
-                offset: 0,
-                bytes: mintPubkey.toBase58()
-              }
-            }
-          ]
-        }
-      );
-
-      const holders: HolderInfo[] = [];
-      
-      for (const account of accounts) {
-        try {
-          const data = account.account.data as ParsedAccountData;
-          const parsed = data.parsed?.info;
-          
-          if (parsed && parsed.tokenAmount) {
-            const balance = Number(parsed.tokenAmount.amount) / Math.pow(10, decimals);
-            const percentage = (Number(parsed.tokenAmount.amount) / Number(totalSupply)) * 100;
-            
-            if (balance > 0) {
-              holders.push({
-                rank: 0, // Will be set after sorting
-                address: parsed.owner,
-                balance,
-                percentage
-              });
-            }
-          }
-        } catch (error) {
-          console.warn('Error parsing token account:', error);
-          continue;
-        }
-      }
-
-      // Sort by balance and assign ranks
-      const sortedHolders = holders
-        .sort((a, b) => b.balance - a.balance)
-        .slice(0, 100) // Top 100 holders
-        .map((holder, index) => ({
-          ...holder,
-          rank: index + 1
-        }));
-
-      console.log(`✅ Found ${sortedHolders.length} token holders via cached RPC`);
-      return sortedHolders;
-    } catch (error) {
-      console.error('Error fetching top holders:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get total holder count using cached RPC calls
-   */
-  private async getTotalHolderCount(mintPubkey: PublicKey): Promise<number | null> {
-    try {
-      const accounts = await fastRPC.getProgramAccounts(
-        TOKEN_PROGRAM_ID.toBase58(),
-        {
-          encoding: 'base64',
-          filters: [
-            {
-              dataSize: 165
-            },
-            {
-              memcmp: {
-                offset: 0,
-                bytes: mintPubkey.toBase58()
-              }
-            }
-          ]
-        }
-      );
-
-      // Count accounts with non-zero balances
-      let count = 0;
-      for (const account of accounts) {
-        try {
-          // Basic check for non-zero balance (accounts with 0 balance are often closed)
-          const data = account.account.data;
-          if (data && data.length > 64) { // Valid token account
-            count++;
-          }
-        } catch (error) {
-          continue;
-        }
-      }
-
-      return count;
-    } catch (error) {
-      console.error('Error getting holder count:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Fetch recent transactions using cached RPC calls
-   */
-  private async fetchRecentTransactions(mintPubkey: PublicKey): Promise<TransactionInfo[]> {
-    try {
-      const signatures = await fastRPC.getSignaturesForAddress(mintPubkey.toBase58(), {
-        limit: 20
-      });
-
-      const transactions: TransactionInfo[] = [];
-
-      for (const sig of signatures.slice(0, 10)) { // Only process first 10 for performance
-        try {
-          transactions.push({
-            signature: sig.signature,
-            timestamp: sig.blockTime ? sig.blockTime * 1000 : Date.now(),
-            type: "unknown",
-            amount: 0,
-            suspicious: false // Basic implementation - can be enhanced with pattern detection
-          });
-        } catch (error) {
-          continue;
-        }
-      }
-
-      return transactions;
-    } catch (error) {
-      console.error('Error fetching recent transactions:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get token creation date using cached RPC calls
-   */
-  private async getTokenCreationDate(mintPubkey: PublicKey): Promise<number | undefined> {
-    try {
-      const signatures = await fastRPC.getSignaturesForAddress(mintPubkey.toBase58(), {
-        limit: 1000 // Get more signatures to find the earliest one
-      });
-
-      if (signatures.length === 0) return undefined;
-
-      // Find the earliest signature (creation)
-      const earliestSig = signatures[signatures.length - 1];
-      return earliestSig.blockTime ? earliestSig.blockTime * 1000 : undefined;
-    } catch (error) {
-      console.error('Error getting token creation date:', error);
-      return undefined;
     }
   }
 }

@@ -948,7 +948,7 @@ export default function Home() {
             </span>
           </a>
           <a
-            href="https://discord.gg/rugkiller"
+            href="https://discord.gg/8xvBYhE9mK"
             target="_blank"
             rel="noopener noreferrer"
             className="bg-purple-500 hover:bg-purple-600 text-white p-3 rounded-full shadow-lg transition-all hover:scale-105 group"

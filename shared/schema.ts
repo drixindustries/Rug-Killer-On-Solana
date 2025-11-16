@@ -276,6 +276,11 @@ export interface PumpFunData {
   isPumpFun: boolean;
   devBought: number;
   bondingCurve: number;
+  mayhemMode?: boolean; // When bonding curve is complete and king-of-hill mechanics active
+  king?: {
+    address: string;
+    percentage: number;
+  };
 }
 
 // AI Verdict
