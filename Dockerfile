@@ -33,7 +33,12 @@ COPY server/package.json server/package-lock.json ./server/
 # Install dependencies at ROOT level (so shared/ can resolve modules)
 RUN npm ci --omit=dev
 
+# Also install server dependencies
+WORKDIR /app/server
+RUN npm ci --omit=dev
+
 # Copy shared directory and server source
+WORKDIR /app
 COPY shared/ ./shared/
 COPY server/ ./server/
 
@@ -48,6 +53,6 @@ ENV NODE_ENV=production
 ENV PORT=8080
 EXPOSE 8080
 
-# Run from ROOT directory so module resolution works for shared/
-WORKDIR /app
-CMD ["node_modules/.bin/tsx", "server/index.ts"]
+# Run from server directory using local tsx
+WORKDIR /app/server
+CMD ["./node_modules/.bin/tsx", "index.ts"]
