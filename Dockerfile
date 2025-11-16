@@ -26,20 +26,15 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy shared directory first (needed by both root and server)
-COPY shared/ ./shared/
-
-# Copy root package files and install ALL dependencies (shared needs them)
+# Copy ALL package files first
 COPY package*.json ./
-RUN npm ci --omit=dev
-
-# Copy server package files and install production dependencies
 COPY server/package.json server/package-lock.json ./server/
-WORKDIR /app/server
+
+# Install dependencies at ROOT level (so shared/ can resolve modules)
 RUN npm ci --omit=dev
 
-WORKDIR /app
-# Copy server source
+# Copy shared directory and server source
+COPY shared/ ./shared/
 COPY server/ ./server/
 
 # Copy frontend build from builder stage
@@ -53,6 +48,6 @@ ENV NODE_ENV=production
 ENV PORT=8080
 EXPOSE 8080
 
-# Run tsx from server directory
-WORKDIR /app/server
-CMD ["sh", "-c", "cd /app/server && node_modules/.bin/tsx index.ts"]
+# Run from ROOT directory so module resolution works for shared/
+WORKDIR /app
+CMD ["node_modules/.bin/tsx", "server/index.ts"]
