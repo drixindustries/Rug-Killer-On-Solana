@@ -68,7 +68,7 @@ class FastRPCService {
   }
 
   /**
-   * Cached account info lookup (1 min cache)
+   * Cached account info lookup (1 min cache) with retry logic
    */
   async getAccountInfo(address: string) {
     const cacheKey = `rpc:account:${address}`;
@@ -76,14 +76,37 @@ class FastRPCService {
     return await redisCache.cacheFetch(
       cacheKey,
       async () => {
-        try {
-          const connection = this.getConnection();
-          const pubkey = new PublicKey(address);
-          return await connection.getAccountInfo(pubkey);
-        } catch (error) {
-          console.error(`[FastRPC] Account info error for ${address}:`, error);
-          return null;
+        // Try multiple connections with retries
+        const maxRetries = 3;
+        let lastError;
+        
+        for (let i = 0; i < maxRetries; i++) {
+          try {
+            const connection = this.getConnection();
+            const pubkey = new PublicKey(address);
+            const accountInfo = await connection.getAccountInfo(pubkey, 'confirmed');
+            
+            if (accountInfo) {
+              return accountInfo;
+            }
+            
+            // Account doesn't exist - try next endpoint
+            console.warn(`[FastRPC] Account not found on endpoint ${i + 1}: ${address}`);
+            lastError = new Error('Account not found');
+          } catch (error) {
+            console.error(`[FastRPC] Account info error on attempt ${i + 1} for ${address}:`, error);
+            lastError = error;
+            
+            // Wait a bit before retry
+            if (i < maxRetries - 1) {
+              await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
+            }
+          }
         }
+        
+        // All attempts failed
+        console.error(`[FastRPC] Failed to fetch account info after ${maxRetries} attempts: ${address}`);
+        return null;
       },
       60 // 1 minute
     );
@@ -170,7 +193,7 @@ class FastRPCService {
   }
 
   /**
-   * Cached mint info (5 min cache)
+   * Cached mint info (5 min cache) with retry and multi-program support
    */
   async getMintInfo(mintAddress: string) {
     const cacheKey = `rpc:mint:${mintAddress}`;
@@ -178,15 +201,41 @@ class FastRPCService {
     return await redisCache.cacheFetch(
       cacheKey,
       async () => {
-        try {
-          const { getMint } = await import('@solana/spl-token');
-          const connection = this.getConnection();
-          const mintPubkey = new PublicKey(mintAddress);
-          return await getMint(connection, mintPubkey);
-        } catch (error) {
-          console.error(`[FastRPC] Mint info error for ${mintAddress}:`, error);
-          return null;
+        const { getMint, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } = await import('@solana/spl-token');
+        const maxRetries = 3;
+        let lastError;
+        
+        for (let i = 0; i < maxRetries; i++) {
+          try {
+            const connection = this.getConnection();
+            const mintPubkey = new PublicKey(mintAddress);
+            
+            // Try standard SPL Token program first
+            try {
+              const mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID);
+              return mintInfo;
+            } catch (splError) {
+              // Try Token-2022 program
+              try {
+                const mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID);
+                return mintInfo;
+              } catch (token2022Error) {
+                throw splError; // Throw original error if both fail
+              }
+            }
+          } catch (error) {
+            console.error(`[FastRPC] Mint info error on attempt ${i + 1} for ${mintAddress}:`, error);
+            lastError = error;
+            
+            // Wait before retry
+            if (i < maxRetries - 1) {
+              await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
+            }
+          }
         }
+        
+        console.error(`[FastRPC] Failed to fetch mint info after ${maxRetries} attempts: ${mintAddress}`);
+        return null;
       },
       300 // 5 minutes
     );

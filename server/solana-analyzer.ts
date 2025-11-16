@@ -87,41 +87,54 @@ export class SolanaTokenAnalyzer {
         accountInfo = await fastRPC.getAccountInfo(mintPubkey.toBase58());
         
         if (!accountInfo) {
-          throw new Error(`Token mint account not found: ${tokenAddress}`);
-        }
-        
-        // Check which token program owns this account
-        const isToken2022 = accountInfo.owner.equals(TOKEN_2022_PROGRAM_ID);
-        const isSPLToken = accountInfo.owner.equals(TOKEN_PROGRAM_ID);
-        
-        if (!isToken2022 && !isSPLToken) {
-          console.error(`Account owner is not a token program: ${accountInfo.owner.toBase58()}`);
-          throw new Error(`Invalid token: account is owned by ${accountInfo.owner.toBase58()}, not a token program`);
-        }
-        
-        // Fetch mint info using the correct program ID (using connection for SPL token parsing)
-        const connection = this.getConnection();
-        try {
-          if (isToken2022) {
-            mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID);
-            console.log(`✅ Token uses Token-2022 program: ${tokenAddress}`);
-          } else {
-            mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID);
-            console.log(`✅ Token uses standard SPL Token program: ${tokenAddress}`);
+          // Try using cached mint info directly as fallback
+          console.warn(`Account info not found, trying direct mint fetch: ${tokenAddress}`);
+          mintInfo = await fastRPC.getMintInfo(tokenAddress);
+          
+          if (!mintInfo) {
+            throw new Error(
+              `This token address does not exist on Solana or is not a valid SPL token. ` +
+              `Please verify the address is correct. If this is a very new pump.fun token, ` +
+              `please wait a few minutes for it to be indexed by RPC nodes.`
+            );
           }
-        } catch (mintError) {
-          // Fallback: try the other program if first fails (some tokens might be misdetected)
-          console.warn(`Failed to parse with detected program, trying fallback...`);
+          
+          // Successfully got mint info from fallback
+          console.log(`✅ Got mint info from fallback for: ${tokenAddress}`);
+        } else {
+          // Check which token program owns this account
+          const isToken2022 = accountInfo.owner.equals(TOKEN_2022_PROGRAM_ID);
+          const isSPLToken = accountInfo.owner.equals(TOKEN_PROGRAM_ID);
+          
+          if (!isToken2022 && !isSPLToken) {
+            console.error(`Account owner is not a token program: ${accountInfo.owner.toBase58()}`);
+            throw new Error(`Invalid token: account is owned by ${accountInfo.owner.toBase58()}, not a token program`);
+          }
+          
+          // Fetch mint info using the correct program ID (using connection for SPL token parsing)
+          const connection = this.getConnection();
           try {
             if (isToken2022) {
-              mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID);
-              console.log(`✅ Token actually uses standard SPL Token program (fallback): ${tokenAddress}`);
-            } else {
               mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID);
-              console.log(`✅ Token actually uses Token-2022 program (fallback): ${tokenAddress}`);
+              console.log(`✅ Token uses Token-2022 program: ${tokenAddress}`);
+            } else {
+              mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID);
+              console.log(`✅ Token uses standard SPL Token program: ${tokenAddress}`);
             }
-          } catch (fallbackError) {
-            throw new Error(`Failed to parse token mint with both programs: ${mintError.message}`);
+          } catch (mintError) {
+            // Fallback: try the other program if first fails (some tokens might be misdetected)
+            console.warn(`Failed to parse with detected program, trying fallback...`);
+            try {
+              if (isToken2022) {
+                mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID);
+                console.log(`✅ Token actually uses standard SPL Token program (fallback): ${tokenAddress}`);
+              } else {
+                mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID);
+                console.log(`✅ Token actually uses Token-2022 program (fallback): ${tokenAddress}`);
+              }
+            } catch (fallbackError) {
+              throw new Error(`Failed to parse token mint with both programs: ${mintError.message}`);
+            }
           }
         }
       } catch (error) {
