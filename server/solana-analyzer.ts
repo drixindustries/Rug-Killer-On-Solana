@@ -25,6 +25,8 @@ import { PumpDumpDetectorService } from "./services/pump-dump-detector";
 import { LiquidityMonitorService } from "./services/liquidity-monitor";
 import { HolderTrackingService } from "./services/holder-tracking";
 import { FundingSourceAnalyzer } from "./services/funding-source-analyzer";
+import { walletIntelligenceService } from "./services/wallet-intelligence";
+import { walletIntelligenceService } from "./services/wallet-intelligence";
 
 export class SolanaTokenAnalyzer {
   // Core detection services - streamlined to focus on Birdeye and GMGN data
@@ -193,6 +195,29 @@ export class SolanaTokenAnalyzer {
       const topHolderConcentration = Math.min(100, Math.max(0, 
         filteredHolders.slice(0, 10).reduce((sum, h) => sum + (h.percentage || 0), 0)
       ));
+
+      // Advanced wallet intelligence analysis with age and GMGN-style classifications
+      let walletIntelligence = null;
+      if (filteredHolders.length > 0) {
+        try {
+          console.log(`[WalletIntel] Starting analysis of ${filteredHolders.length} wallets...`);
+          const walletIntelResults = await walletIntelligenceService.analyzeWallets(
+            filteredHolders,
+            Number(mintInfo.supply)
+          );
+          
+          walletIntelligence = walletIntelResults.summary;
+          console.log(`[WalletIntel] Analysis complete:`, {
+            avgAge: walletIntelligence.avgWalletAge.toFixed(1),
+            degens: walletIntelligence.totals.degens,
+            bots: walletIntelligence.totals.bots,
+            smartMoney: walletIntelligence.totals.smartMoney,
+            snipers: walletIntelligence.totals.snipers
+          });
+        } catch (error) {
+          console.error('[WalletIntel] Analysis failed:', error);
+        }
+      }
       
       // Build holder filtering metadata
       const excludedAddresses: Array<{address: string; type: 'lp' | 'exchange' | 'protocol' | 'bundled'; label?: string; reason: string;}> = [];
@@ -263,9 +288,17 @@ export class SolanaTokenAnalyzer {
           exchanges: excludedAddresses.filter(a => a.type === 'exchange').length,
           protocols: excludedAddresses.filter(a => a.type === 'protocol').length,
           bundled: bundledWallets.length,
-          total: excludedAddresses.length
+          total: excludedAddresses.length,
+          // GMGN-style wallet intelligence totals
+          degens: walletIntelligence?.totals.degens || 0,
+          bots: walletIntelligence?.totals.bots || 0,
+          smartMoney: walletIntelligence?.totals.smartMoney || 0,
+          snipers: walletIntelligence?.totals.snipers || 0,
+          aged: walletIntelligence?.totals.aged || 0,
+          newWallets: walletIntelligence?.totals.newWallets || 0
         },
         excluded: excludedAddresses,
+        walletIntelligence: walletIntelligence || undefined,
         bundledDetection: bundledWallets.length > 0 ? {
           strategy: 'percentageMatch' as const,
           confidence: bundleConfidence,

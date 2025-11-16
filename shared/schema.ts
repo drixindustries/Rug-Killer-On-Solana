@@ -206,8 +206,33 @@ export interface HolderFilteringMetadata {
     protocols: number;
     bundled: number;
     total: number;
+    // GMGN-style wallet classifications
+    degens: number;
+    bots: number;
+    smartMoney: number;
+    snipers: number;
+    aged: number; // Wallets older than 6 months
+    newWallets: number; // Wallets created in last 30 days
   };
   excluded: FilteredAddress[];
+  walletIntelligence?: {
+    avgWalletAge: number; // Average age in days
+    oldestWallet: number; // Age of oldest wallet in days
+    newestWallet: number; // Age of newest wallet in days
+    ageDistribution: {
+      veryNew: number; // < 7 days
+      new: number; // 7-30 days
+      recent: number; // 30-90 days
+      established: number; // 90-365 days
+      aged: number; // > 365 days
+    };
+    classifications: {
+      degens: { count: number; supplyPercent: number; addresses: string[] };
+      bots: { count: number; supplyPercent: number; addresses: string[] };
+      smartMoney: { count: number; supplyPercent: number; addresses: string[] };
+      snipers: { count: number; supplyPercent: number; addresses: string[] };
+    };
+  };
   bundledDetection?: {
     strategy: 'percentageMatch' | 'sameBlock' | 'fundingSource';
     confidence: 'low' | 'medium' | 'high';
