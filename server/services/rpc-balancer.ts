@@ -53,6 +53,21 @@ function getAnkrUrl(): string | undefined {
     if (u.protocol !== 'https:') {
       u.protocol = 'https:';
     }
+
+    // If user pasted a multichain URL, rewrite to Solana-specific path
+    // Example: https://rpc.ankr.com/multichain/<KEY> -> https://rpc.ankr.com/solana/<KEY>
+    if (u.hostname.endsWith('rpc.ankr.com') && u.pathname.startsWith('/multichain/')) {
+      const parts = u.pathname.split('/').filter(Boolean);
+      const last = parts[parts.length - 1];
+      if (last && last.length > 16) {
+        u.pathname = `/solana/${last}`;
+      } else if (apiKey) {
+        u.pathname = `/solana/${apiKey.replace(/^\"|\"$/g, '')}`;
+      } else {
+        // If we cannot confidently extract a key, fail to undefined
+        return undefined;
+      }
+    }
     return u.toString();
   } catch {
     return undefined;
