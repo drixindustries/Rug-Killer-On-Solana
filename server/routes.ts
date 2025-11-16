@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { analyzeTokenSchema, insertWatchlistSchema } from "./shared/schema.ts";
+import { analyzeTokenSchema, insertWatchlistSchema } from "../shared/schema.ts";
 import { tokenAnalyzer } from "./solana-analyzer.ts";
 // import { setupAuth, isAuthenticated } from "./replitAuth"; // Disabled for non-Replit deployments
 import { storage } from "./storage.ts";
