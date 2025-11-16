@@ -50,8 +50,8 @@ function createTelegramBot(botToken: string): Telegraf {
     { command: 'liquidity', description: 'LP analysis - /liquidity <address>' },
     { command: 'compare', description: 'Compare 2 tokens - /compare <addr1> <addr2>' },
     { command: 'trending', description: 'Show trending tokens by volume' }
-  ]).catch(err => {
-    console.error('Failed to set Telegram bot commands:', err);
+  ]).catch((err) => {
+    console.warn('⚠️ Failed to set Telegram bot commands (silenced):', (err as any)?.message || String(err));
   });
   
   // /start command

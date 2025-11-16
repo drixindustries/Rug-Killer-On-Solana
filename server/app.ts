@@ -152,29 +152,40 @@ export async function startServer() {
 }
 
 async function startServices() {
-  // Telegram bot
-  if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_TOKEN !== 'PLACEHOLDER_TOKEN') {
+  // Telegram bot (optional)
+  if (
+    process.env.TELEGRAM_ENABLED === 'true' &&
+    process.env.TELEGRAM_BOT_TOKEN &&
+    process.env.TELEGRAM_BOT_TOKEN !== 'PLACEHOLDER_TOKEN'
+  ) {
     try {
       const { startTelegramBot } = await import('./telegram-bot.ts');
-      startTelegramBot().catch(err => {
-        console.error('❌ Telegram bot failed:', err);
+      startTelegramBot().catch((err: any) => {
+        console.warn('⚠️ Telegram bot unavailable (silenced):', err?.message || String(err));
       });
-    } catch (err) {
-      console.error('❌ Failed to load Telegram bot:', err);
+    } catch (err: any) {
+      console.warn('⚠️ Telegram bot not loaded (silenced):', err?.message || String(err));
     }
+  } else {
+    console.log('ℹ️ Telegram bot disabled (set TELEGRAM_ENABLED=true to enable)');
   }
 
-  // Discord bot
-  if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_BOT_TOKEN !== 'PLACEHOLDER_TOKEN' &&
-      process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_ID !== 'PLACEHOLDER_ID') {
+  // Discord bot (optional)
+  if (
+    process.env.DISCORD_ENABLED === 'true' &&
+    process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_BOT_TOKEN !== 'PLACEHOLDER_TOKEN' &&
+    process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_ID !== 'PLACEHOLDER_ID'
+  ) {
     try {
       const { startDiscordBot } = await import('./discord-bot.ts');
-      startDiscordBot().catch(err => {
-        console.error('❌ Discord bot failed:', err);
+      startDiscordBot().catch((err: any) => {
+        console.warn('⚠️ Discord bot unavailable (silenced):', err?.message || String(err));
       });
-    } catch (err) {
-      console.error('❌ Failed to load Discord bot:', err);
+    } catch (err: any) {
+      console.warn('⚠️ Discord bot not loaded (silenced):', err?.message || String(err));
     }
+  } else {
+    console.log('ℹ️ Discord bot disabled (set DISCORD_ENABLED=true to enable)');
   }
 
   // Alpha alerts

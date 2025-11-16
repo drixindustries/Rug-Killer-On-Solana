@@ -2506,26 +2506,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
   
-  // Initialize WebSocket for live scans
-  (async () => {
-    try {
-      const { liveScanWS } = await import('./live-scan-websocket.ts');
-      const { pumpFunWebhook } = await import('./services/pumpfun-webhook.ts');
-      
-      // Initialize WebSocket server
-      liveScanWS.initialize(httpServer);
-      
-      // Connect to Pump.fun webhook (only if enabled)
-      if (process.env.ENABLE_PUMPFUN_WEBHOOK === 'true') {
-        await pumpFunWebhook.connect();
-        console.log('✅ Pump.fun webhook enabled and connected');
-      } else {
-        console.log('ℹ️  Pump.fun webhook disabled (set ENABLE_PUMPFUN_WEBHOOK=true to enable)');
+  // Initialize WebSocket for live scans (optional)
+  if (process.env.ENABLE_LIVE_SCAN === 'true') {
+    (async () => {
+      try {
+        const { liveScanWS } = await import('./live-scan-websocket.ts');
+        const { pumpFunWebhook } = await import('./services/pumpfun-webhook.ts');
+        
+        // Initialize WebSocket server
+        liveScanWS.initialize(httpServer);
+        
+        // Connect to Pump.fun webhook (only if enabled)
+        if (process.env.ENABLE_PUMPFUN_WEBHOOK === 'true') {
+          await pumpFunWebhook.connect();
+          console.log('✅ Pump.fun webhook enabled and connected');
+        } else {
+          console.log('ℹ️  Pump.fun webhook disabled (set ENABLE_PUMPFUN_WEBHOOK=true to enable)');
+        }
+      } catch (error: any) {
+        console.warn('⚠️ Live scan WebSocket unavailable (silenced):', error?.message || String(error));
       }
-    } catch (error) {
-      console.error('❌ Error initializing live scan WebSocket:', error);
-    }
-  })();
+    })();
+  } else {
+    console.log('ℹ️ Live scan WebSocket disabled (set ENABLE_LIVE_SCAN=true to enable)');
+  }
   
   return httpServer;
 }
