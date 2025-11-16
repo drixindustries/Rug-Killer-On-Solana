@@ -19,97 +19,32 @@ interface RpcProvider {
 }
 
 const RPC_PROVIDERS = [
-  // High-speed public balancers (prioritized for speed) with rate limits
-  { 
-    getUrl: () => "https://solana.drpc.org",
-    weight: 25, 
-    name: "dRPC",
-    tier: "premium",
-    rateLimit: 100, // requests per minute
-    rateLimitWindow: 60000 // 1 minute
-  },
-  { 
-    getUrl: () => "https://solana.api.pocket.network/",
-    weight: 20, 
-    name: "Pocket",
-    tier: "premium",
-    rateLimit: 120,
-    rateLimitWindow: 60000
-  },
-  { 
-    getUrl: () => `https://rpc.ankr.com/solana/${process.env.ANKR_KEY || ""}`,
-    weight: 20, 
-    name: "Ankr",
-    tier: "premium",
-    requiresKey: true,
-    hasKey: () => !!process.env.ANKR_KEY,
-    rateLimit: 500, // 500M requests/month on free tier
-    rateLimitWindow: 60000
-  },
-  { 
-    getUrl: () => `https://solana-mainnet.rpc.grove.city/v1/${process.env.GROVE_KEY || ""}`,
-    weight: 20, 
-    name: "Grove",
-    tier: "premium",
-    requiresKey: true,
-    hasKey: () => !!process.env.GROVE_KEY,
-    rateLimit: 250,
-    rateLimitWindow: 60000
-  },
-  // API key providers (premium with keys)
-  { 
-    getUrl: () => `https://solana-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY || ""}`,
-    weight: 25, 
-    name: "Alchemy",
-    tier: "premium",
-    requiresKey: true,
-    hasKey: () => !!process.env.ALCHEMY_KEY,
-    rateLimit: 500,
-    rateLimitWindow: 60000
-  },
+  // Primary: QuickNode (if available)
   { 
     getUrl: () => `${process.env.QUICKNODE_RPC_URL || ""}`,
-    weight: 40, 
+    weight: 50, 
     name: "QuickNode",
-    tier: "premium",
+    tier: "premium" as const,
     requiresKey: true,
     hasKey: () => !!process.env.QUICKNODE_RPC_URL,
     rateLimit: 500,
     rateLimitWindow: 60000
   },
-  // Fallback public endpoints (more conservative limits)
+  // Reliable public endpoints
   { 
     getUrl: () => "https://api.mainnet-beta.solana.com",
-    weight: 10, 
-    name: "Public",
-    tier: "fallback",
-    rateLimit: 40, // Conservative public limit
-    rateLimitWindow: 60000
-  },
-  { 
-    getUrl: () => "https://solana-api.projectserum.com",
-    weight: 12, 
-    name: "Serum",
-    tier: "fallback",
-    rateLimit: 50,
+    weight: 30, 
+    name: "Solana-Public",
+    tier: "fallback" as const,
+    rateLimit: 40,
     rateLimitWindow: 60000
   },
   { 
     getUrl: () => "https://rpc.ankr.com/solana",
-    weight: 15, 
+    weight: 20, 
     name: "Ankr-Public",
-    tier: "fallback",
+    tier: "fallback" as const,
     rateLimit: 60,
-    rateLimitWindow: 60000
-  },
-  { 
-    getUrl: () => `https://rpc.shyft.to/?api_key=${process.env.SHYFT_KEY || ""}`,
-    weight: 15, 
-    name: "Shyft",
-    tier: "fallback",
-    requiresKey: true,
-    hasKey: () => !!process.env.SHYFT_KEY,
-    rateLimit: 100,
     rateLimitWindow: 60000
   }
 ];
