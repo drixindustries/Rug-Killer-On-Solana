@@ -97,10 +97,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Debug: actively ping the currently selected RPC and report latency
-  app.get('/api/debug/ping-rpc', async (_req, res) => {
+  app.get('/api/debug/ping-rpc', async (req, res) => {
     const started = Date.now();
     try {
-      // Select provider and build a transient connection (selection metrics are logged by balancer)
+      // How many pings?
+      const rawCount = parseInt(String((req.query.count ?? '1')));
+      const count = Number.isFinite(rawCount) ? Math.max(1, Math.min(10, rawCount)) : 1;
+
+      // Select once; measure the same provider to keep results comparable
       const provider = rpcBalancer.providers[0] ? rpcBalancer.select() : null;
       if (!provider) {
         return res.status(503).json({ error: 'No RPC providers configured' });
@@ -108,23 +112,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const url = provider.getUrl();
       const { host } = new URL(url);
-
-      // Use a short-lived connection for the ping to avoid interfering with pooled connections
       const { Connection } = await import('@solana/web3.js');
-      const conn = new Connection(url, { commitment: 'confirmed', wsEndpoint: undefined });
 
-      // Add a timeout guard
-      const timeoutMs = 5000;
-      const timeout = new Promise((_resolve, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs));
-      const slot = await Promise.race([conn.getSlot(), timeout]) as number;
+      const results: Array<{ latencyMs: number; slot?: number; error?: string }> = [];
+      for (let i = 0; i < count; i++) {
+        const t0 = Date.now();
+        try {
+          const conn = new Connection(url, { commitment: 'confirmed', wsEndpoint: undefined });
+          const timeoutMs = 5000;
+          const timeout = new Promise((_resolve, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs));
+          const slot = await Promise.race([conn.getSlot(), timeout]) as number;
+          results.push({ latencyMs: Date.now() - t0, slot });
+        } catch (e: any) {
+          results.push({ latencyMs: Date.now() - t0, error: e?.message || String(e) });
+        }
+      }
 
-      const latency = Date.now() - started;
+      const latencies = results.map(r => r.latencyMs);
+      const avg = Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length);
+      const min = Math.min(...latencies);
+      const max = Math.max(...latencies);
+
       return res.json({
         provider: provider.name,
         tier: provider.tier,
         host,
-        latencyMs: latency,
-        slot,
+        count,
+        avgLatencyMs: avg,
+        minLatencyMs: min,
+        maxLatencyMs: max,
+        tries: results,
+        totalTimeMs: Date.now() - started,
         time: new Date().toISOString(),
       });
     } catch (err: any) {
