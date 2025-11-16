@@ -11,7 +11,7 @@ import * as schema from "../shared/schema.ts";
 
 // Railway provides DATABASE_URL automatically when PostgreSQL is attached
 const DATABASE_URL = process.env.DATABASE_URL;
-const FORCE_IN_MEMORY = process.env.FORCE_IN_MEMORY_DB === 'true';
+const FORCE_IN_MEMORY = ((process.env.FORCE_IN_MEMORY_DB || '').trim().toLowerCase()) === 'true';
 
 console.log('🔧 DB Config - DATABASE_URL present:', !!DATABASE_URL);
 console.log('🔧 DB Config - FORCE_IN_MEMORY_DB:', process.env.FORCE_IN_MEMORY_DB);
