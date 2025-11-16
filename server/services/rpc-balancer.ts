@@ -27,15 +27,47 @@ function getEnv(key: string): string | undefined {
   return undefined;
 }
 
+// Build a valid Ankr Solana RPC URL from either a full URL or an API key
+function getAnkrUrl(): string | undefined {
+  let raw = getEnv('ANKR_RPC_URL')?.trim();
+  const apiKey = getEnv('ANKR_API_KEY')?.trim();
+
+  // If only API key is provided or URL missing, construct the URL
+  if ((!raw || raw.length === 0) && apiKey) {
+    raw = `https://rpc.ankr.com/solana/${apiKey.replace(/^\"|\"$/g, '')}`;
+  }
+
+  if (!raw) return undefined;
+
+  // Strip accidental quotes and whitespace
+  const cleaned = raw.replace(/^\"|\"$/g, '').trim();
+
+  // If it looks like just a key, construct URL
+  if (!cleaned.startsWith('http')) {
+    return `https://rpc.ankr.com/solana/${cleaned}`;
+  }
+
+  // Validate URL format and ensure https scheme
+  try {
+    const u = new URL(cleaned);
+    if (u.protocol !== 'https:') {
+      u.protocol = 'https:';
+    }
+    return u.toString();
+  } catch {
+    return undefined;
+  }
+}
+
 const RPC_PROVIDERS = [
   // Ankr Premium RPC (primary if available)
   { 
-    getUrl: () => `${getEnv('ANKR_RPC_URL') || ""}`,
+    getUrl: () => `${getAnkrUrl() || ""}`,
     weight: 50, 
     name: "Ankr-Premium",
     tier: "premium" as const,
     requiresKey: true,
-    hasKey: () => !!getEnv('ANKR_RPC_URL'),
+    hasKey: () => !!getAnkrUrl(),
     rateLimit: 500,
     rateLimitWindow: 60000
   },
