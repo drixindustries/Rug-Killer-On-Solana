@@ -1,24 +1,29 @@
 FROM node:20-alpine
 
-# Set up monorepo structure
+# Create workspace structure
 WORKDIR /workspace
 
-# Copy server package files and install dependencies
-COPY server/package*.json ./server/
-WORKDIR /workspace/server
-RUN npm install --production
-
-# Copy all source code
-WORKDIR /workspace
-COPY server/ ./server/
+# Copy shared first
 COPY shared/ ./shared/
 
-# Set working directory to server
+# Copy server package files
+COPY server/package*.json ./server/
+WORKDIR /workspace/server
+
+# Install dependencies
+RUN npm install --production
+
+# Copy server source
+WORKDIR /workspace
+COPY server/ ./server/
+
+# Set final working directory
 WORKDIR /workspace/server
 
 # Environment
 ENV NODE_ENV=production
+ENV TSX_TSCONFIG_PATH=/workspace/server/tsconfig.json
 EXPOSE 5000
 
-# Run tsx directly
-CMD ["node_modules/.bin/tsx", "index.ts"]
+# Run tsx with proper node options
+CMD ["node", "--import", "tsx", "index.ts"]
