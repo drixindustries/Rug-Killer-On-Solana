@@ -26,14 +26,20 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy server package files and install production dependencies only
+# Copy shared directory first (needed by both root and server)
+COPY shared/ ./shared/
+
+# Copy root package files and install ALL dependencies (shared needs them)
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+# Copy server package files and install production dependencies
 COPY server/package.json server/package-lock.json ./server/
 WORKDIR /app/server
 RUN npm ci --omit=dev
 
 WORKDIR /app
-# Copy shared directory and server source
-COPY shared/ ./shared/
+# Copy server source
 COPY server/ ./server/
 
 # Copy frontend build from builder stage
