@@ -19,10 +19,21 @@ interface RpcProvider {
 }
 
 const RPC_PROVIDERS = [
-  // Only using Solana public RPC - reliable and always available
+  // Ankr Premium RPC (primary if available)
+  { 
+    getUrl: () => `${process.env.ANKR_RPC_URL || ""}`,
+    weight: 50, 
+    name: "Ankr-Premium",
+    tier: "premium" as const,
+    requiresKey: true,
+    hasKey: () => !!process.env.ANKR_RPC_URL,
+    rateLimit: 500,
+    rateLimitWindow: 60000
+  },
+  // Fallback to public Solana RPC
   { 
     getUrl: () => "https://api.mainnet-beta.solana.com",
-    weight: 100, 
+    weight: 50, 
     name: "Solana-Public",
     tier: "fallback" as const,
     rateLimit: 40,
