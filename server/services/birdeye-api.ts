@@ -2,7 +2,7 @@ import axios from 'axios';
 import { redisCache } from './redis-cache.ts';
 
 const BIRDEYE_API = 'https://public-api.birdeye.so';
-const API_KEY = process.env.BIRDEYE_API_KEY || '';
+const API_KEY = process.env.BIRDEYE_API_KEY || 'c0ecda95a02f4b69ba76c48bd5f830b5';
 
 interface BirdeyeOverview {
   price: number;
