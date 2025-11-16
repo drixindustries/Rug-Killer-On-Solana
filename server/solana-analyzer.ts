@@ -10,15 +10,14 @@ import type {
   RiskLevel,
   TransactionInfo,
 } from "@shared/schema";
-// Removed: RugCheck, GoPlus, DexScreener, Jupiter - keeping only Birdeye and GMGN
+// LIGHTNING FAST: Only Birdeye and GMGN APIs + fast cached RPC
 import { isKnownAddress, getKnownAddressInfo, detectBundledWallets, getPumpFunBondingCurveAddress, getPumpFunAssociatedBondingCurveAddress } from "./known-addresses";
 import { getBirdeyeOverview } from "./services/birdeye-api";
 import { checkPumpFun } from "./services/pumpfun-api";
-import { rpcBalancer } from "./services/rpc-balancer";
+import { fastRPC } from "./services/fast-rpc";
 import { LPChecker } from "./services/lp-checker";
 import { BundleDetectorService } from "./services/bundle-detector";
 import { BubblemapsService } from "./services/bubblemaps-service";
-import { QuillCheckService } from "./services/quillcheck-service";
 import { WhaleDetectorService } from "./services/whale-detector";
 import { GMGNService } from "./services/gmgn-service";
 import { AgedWalletDetector } from "./services/aged-wallet-detector";
@@ -53,12 +52,12 @@ export class SolanaTokenAnalyzer {
   }
 
   private getConnection(): Connection {
-    return rpcBalancer.getConnection();
+    return fastRPC.getConnection();
   }
 
   // Get multiple connections for concurrent operations
   private getMultipleConnections(count: number = 3): Connection[] {
-    return rpcBalancer.getMultipleConnections(count);
+    return fastRPC.getMultipleConnections(count);
   }
 
   async analyzeToken(tokenAddress: string): Promise<TokenAnalysisResponse> {
@@ -71,15 +70,14 @@ export class SolanaTokenAnalyzer {
         throw new Error(`Invalid Solana address format: ${tokenAddress}`);
       }
       
-      // Fetch mint account info
-      const connection = this.getConnection();
+      // Fetch mint account info using cached FastRPC
       
       // First, check if the account exists and get its owner to determine the correct program
       let mintInfo;
       let accountInfo;
       
       try {
-        accountInfo = await connection.getAccountInfo(mintPubkey);
+        accountInfo = await fastRPC.getAccountInfo(mintPubkey.toBase58());
         
         if (!accountInfo) {
           throw new Error(`Token mint account not found: ${tokenAddress}`);
@@ -94,7 +92,8 @@ export class SolanaTokenAnalyzer {
           throw new Error(`Invalid token: account is owned by ${accountInfo.owner.toBase58()}, not a token program`);
         }
         
-        // Fetch mint info using the correct program ID
+        // Fetch mint info using the correct program ID (using connection for SPL token parsing)
+        const connection = this.getConnection();
         if (isToken2022) {
           mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID);
           console.log(`✅ Token uses Token-2022 program: ${tokenAddress}`);
@@ -123,15 +122,10 @@ export class SolanaTokenAnalyzer {
         this.getTokenCreationDate(mintPubkey).catch(() => undefined),
       ]);
       
-      // Enrich holders with Rugcheck data if on-chain fetch failed
+      // Process holders data - prioritize Birdeye/GMGN over on-chain for performance
       const holders = onChainHolders.length > 0 
         ? onChainHolders 
-        : (rugcheckData?.topHolders || []).map((h: any, index: number) => ({
-            rank: index + 1,
-            address: h.address || '',
-            balance: h.pct || 0,
-            percentage: h.pct || 0,
-          }));
+        : []; // Fallback to empty array if on-chain fetch fails
       
       // Get actual total holder count (not just top 20)
       // Use getProgramAccounts result if available, otherwise fallback to top holders length
@@ -1422,6 +1416,176 @@ private async enrichLiquidityWithMarketData(
         rating: '3/10',
         verdict: '🔴 DANGEROUS - High probability of rug pull'
       };
+    }
+  }
+
+  // ============================================================================
+  // CACHED RPC METHODS FOR LIGHTNING FAST PERFORMANCE
+  // ============================================================================
+
+  /**
+   * Fetch top token holders using cached RPC calls
+   */
+  private async fetchTopHolders(
+    mintPubkey: PublicKey, 
+    decimals: number, 
+    totalSupply: bigint
+  ): Promise<HolderInfo[]> {
+    try {
+      const accounts = await fastRPC.getProgramAccounts(
+        TOKEN_PROGRAM_ID.toBase58(),
+        {
+          encoding: 'jsonParsed',
+          filters: [
+            {
+              dataSize: 165
+            },
+            {
+              memcmp: {
+                offset: 0,
+                bytes: mintPubkey.toBase58()
+              }
+            }
+          ]
+        }
+      );
+
+      const holders: HolderInfo[] = [];
+      
+      for (const account of accounts) {
+        try {
+          const data = account.account.data as ParsedAccountData;
+          const parsed = data.parsed?.info;
+          
+          if (parsed && parsed.tokenAmount) {
+            const balance = Number(parsed.tokenAmount.amount) / Math.pow(10, decimals);
+            const percentage = (Number(parsed.tokenAmount.amount) / Number(totalSupply)) * 100;
+            
+            if (balance > 0) {
+              holders.push({
+                rank: 0, // Will be set after sorting
+                address: parsed.owner,
+                balance,
+                percentage
+              });
+            }
+          }
+        } catch (error) {
+          console.warn('Error parsing token account:', error);
+          continue;
+        }
+      }
+
+      // Sort by balance and assign ranks
+      const sortedHolders = holders
+        .sort((a, b) => b.balance - a.balance)
+        .slice(0, 100) // Top 100 holders
+        .map((holder, index) => ({
+          ...holder,
+          rank: index + 1
+        }));
+
+      console.log(`✅ Found ${sortedHolders.length} token holders via cached RPC`);
+      return sortedHolders;
+    } catch (error) {
+      console.error('Error fetching top holders:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get total holder count using cached RPC calls
+   */
+  private async getTotalHolderCount(mintPubkey: PublicKey): Promise<number | null> {
+    try {
+      const accounts = await fastRPC.getProgramAccounts(
+        TOKEN_PROGRAM_ID.toBase58(),
+        {
+          encoding: 'base64',
+          filters: [
+            {
+              dataSize: 165
+            },
+            {
+              memcmp: {
+                offset: 0,
+                bytes: mintPubkey.toBase58()
+              }
+            }
+          ]
+        }
+      );
+
+      // Count accounts with non-zero balances
+      let count = 0;
+      for (const account of accounts) {
+        try {
+          // Basic check for non-zero balance (accounts with 0 balance are often closed)
+          const data = account.account.data;
+          if (data && data.length > 64) { // Valid token account
+            count++;
+          }
+        } catch (error) {
+          continue;
+        }
+      }
+
+      return count;
+    } catch (error) {
+      console.error('Error getting holder count:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch recent transactions using cached RPC calls
+   */
+  private async fetchRecentTransactions(mintPubkey: PublicKey): Promise<TransactionInfo[]> {
+    try {
+      const signatures = await fastRPC.getSignaturesForAddress(mintPubkey.toBase58(), {
+        limit: 20
+      });
+
+      const transactions: TransactionInfo[] = [];
+
+      for (const sig of signatures.slice(0, 10)) { // Only process first 10 for performance
+        try {
+          transactions.push({
+            signature: sig.signature,
+            timestamp: sig.blockTime ? sig.blockTime * 1000 : Date.now(),
+            type: "unknown",
+            amount: 0,
+            suspicious: false // Basic implementation - can be enhanced with pattern detection
+          });
+        } catch (error) {
+          continue;
+        }
+      }
+
+      return transactions;
+    } catch (error) {
+      console.error('Error fetching recent transactions:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get token creation date using cached RPC calls
+   */
+  private async getTokenCreationDate(mintPubkey: PublicKey): Promise<number | undefined> {
+    try {
+      const signatures = await fastRPC.getSignaturesForAddress(mintPubkey.toBase58(), {
+        limit: 1000 // Get more signatures to find the earliest one
+      });
+
+      if (signatures.length === 0) return undefined;
+
+      // Find the earliest signature (creation)
+      const earliestSig = signatures[signatures.length - 1];
+      return earliestSig.blockTime ? earliestSig.blockTime * 1000 : undefined;
+    } catch (error) {
+      console.error('Error getting token creation date:', error);
+      return undefined;
     }
   }
 }

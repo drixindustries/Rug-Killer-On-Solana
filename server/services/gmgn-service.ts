@@ -1,5 +1,5 @@
 /**
- * GMGN.AI API Integration
+ * GMGN.AI API Integration with Redis Caching
  * 
  * Provides advanced bundle detection and insider trading analysis
  * GMGN monitors first 70 buyers, snipers, and insider traders
@@ -9,8 +9,16 @@
  * - Smart money tracking
  * - Bundle detection
  * 
+ * Cache Strategy:
+ * - Token analysis: 60 seconds
+ * - Bundle info: 60 seconds  
+ * - Smart money: 60 seconds
+ * 
  * Created: Nov 15, 2025
+ * Updated: Lightning Fast Redis Integration
  */
+
+import { redisCache } from './redis-cache';
 
 interface GMGNTokenResponse {
   code: number;
@@ -58,48 +66,60 @@ export class GMGNService {
   private readonly TIMEOUT_MS = 10000;
 
   /**
-   * Fetch comprehensive token analysis from GMGN
+   * Cached GMGN token analysis (60 seconds cache)
    */
   async getTokenAnalysis(tokenAddress: string): Promise<GMGNTokenResponse | null> {
-    try {
-      const url = `${this.BASE_URL}/tokens/sol/${tokenAddress}`;
-      
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), this.TIMEOUT_MS);
+    const cacheKey = `gmgn:analysis:${tokenAddress}`;
+    
+    return await redisCache.cacheFetch(
+      cacheKey,
+      async () => {
+        try {
+          const url = `${this.BASE_URL}/tokens/sol/${tokenAddress}`;
+          
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), this.TIMEOUT_MS);
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'application/json',
-          'Referer': 'https://gmgn.ai/'
-        },
-        signal: controller.signal
-      });
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Accept': 'application/json',
+              'Referer': 'https://gmgn.ai/'
+            },
+            signal: controller.signal
+          });
 
-      clearTimeout(timeout);
+          clearTimeout(timeout);
 
-      if (!response.ok) {
-        console.error(`GMGN API returned ${response.status}`);
-        return null;
-      }
+          if (!response.ok) {
+            if (response.status === 429) {
+              console.warn('[GMGN] Rate limited');
+            } else {
+              console.error(`[GMGN] API returned ${response.status}`);
+            }
+            return null;
+          }
 
-      const data: GMGNTokenResponse = await response.json();
-      
-      if (data.code !== 0) {
-        console.error(`GMGN API error: ${data.msg}`);
-        return null;
-      }
+          const data: GMGNTokenResponse = await response.json();
+          
+          if (data.code !== 0) {
+            console.error(`[GMGN] API error: ${data.msg}`);
+            return null;
+          }
 
-      return data;
-    } catch (error) {
-      if ((error as Error).name === 'AbortError') {
-        console.error('GMGN API timeout');
-      } else {
-        console.error('GMGN API error:', error);
-      }
-      return null;
-    }
+          return data;
+        } catch (error) {
+          if ((error as Error).name === 'AbortError') {
+            console.error('[GMGN] API timeout');
+          } else {
+            console.error('[GMGN] API error:', error);
+          }
+          return null;
+        }
+      },
+      60 // 60 seconds cache
+    );
   }
 
   /**
