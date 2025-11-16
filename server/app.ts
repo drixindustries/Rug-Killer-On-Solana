@@ -154,37 +154,57 @@ export async function startServer() {
 async function startServices() {
   // Telegram bot
   if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_TOKEN !== 'PLACEHOLDER_TOKEN') {
-    const { startTelegramBot } = await import('./telegram-bot.ts');
-    startTelegramBot().catch(err => {
-      console.error('❌ Telegram bot failed:', err);
-    });
+    try {
+      const { startTelegramBot } = await import('./telegram-bot.ts');
+      startTelegramBot().catch(err => {
+        console.error('❌ Telegram bot failed:', err);
+      });
+    } catch (err) {
+      console.error('❌ Failed to load Telegram bot:', err);
+    }
   }
 
   // Discord bot
   if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_BOT_TOKEN !== 'PLACEHOLDER_TOKEN' &&
       process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_ID !== 'PLACEHOLDER_ID') {
-    const { startDiscordBot } = await import('./discord-bot.ts');
-    startDiscordBot().catch(err => {
-      console.error('❌ Discord bot failed:', err);
-    });
+    try {
+      const { startDiscordBot } = await import('./discord-bot.ts');
+      startDiscordBot().catch(err => {
+        console.error('❌ Discord bot failed:', err);
+      });
+    } catch (err) {
+      console.error('❌ Failed to load Discord bot:', err);
+    }
   }
 
   // Alpha alerts
   if (process.env.ALPHA_ALERTS_ENABLED === 'true') {
-    const { getAlphaAlertService } = await import('./alpha-alerts.ts');
-    const alphaService = getAlphaAlertService();
-    alphaService.start().catch(err => {
-      console.error('❌ Alpha alerts failed:', err);
-    });
+    try {
+      const { getAlphaAlertService } = await import('./alpha-alerts.ts');
+      const alphaService = getAlphaAlertService();
+      alphaService.start().catch(err => {
+        console.error('❌ Alpha alerts failed:', err);
+      });
 
-    const { initializeWalletDiscovery } = await import('./wallet-scheduler.ts');
-    initializeWalletDiscovery();
+      const { initializeWalletDiscovery } = await import('./wallet-scheduler.ts');
+      initializeWalletDiscovery();
+    } catch (err) {
+      console.error('❌ Failed to load Alpha alerts:', err);
+    }
   }
 
-  // Workers
-  const { analyticsWorker } = await import('./workers/analytics-worker.ts');
-  analyticsWorker.start();
+  // Workers - optional, gracefully handle failures
+  try {
+    const { analyticsWorker } = await import('./workers/analytics-worker.ts');
+    analyticsWorker.start();
+  } catch (err: any) {
+    console.warn('⚠️ Analytics worker not available:', err.message);
+  }
 
-  const { socialWorker } = await import('./workers/social-worker.ts');
-  socialWorker.start();
+  try {
+    const { socialWorker } = await import('./workers/social-worker.ts');
+    socialWorker.start();
+  } catch (err: any) {
+    console.warn('⚠️ Social worker not available:', err.message);
+  }
 }
