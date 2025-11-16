@@ -1,4 +1,68 @@
-# Changelog - Advanced Detection Implementation
+# Changelog - Production Updates & Advanced Detection
+
+## January 2025 – Production Deployment & Performance Optimization
+
+### Infrastructure & Deployment
+- **Railway Production Deployment**: Successfully deployed complete application to Railway with Docker
+- **Frontend Build Integration**: Fixed Docker configuration to include React frontend build in production container
+- **SPA Routing Correction**: Fixed fallback route handler preventing API routes from being caught by frontend router
+- **Module Import Standardization**: Corrected all import paths to use `./shared` for proper monorepo module resolution
+- **RPC Provider Upgrade**: Replaced deprecated providers (SubQuery, Serum, GenesysGo) with Grove and Shyft for enhanced reliability
+
+### Performance Improvements
+- **Website Load Time Optimization**: 
+  - Removed JetBrains Mono font (50KB+ savings)
+  - Implemented DNS prefetch for Google Fonts
+  - Added font-display: swap to prevent Flash of Invisible Text
+  - Optimized Inter font to load only essential weights (400, 500, 600, 700)
+  - Added performance-focused meta tags
+- **Redis Caching Layer**: Implemented comprehensive Redis caching for faster API responses
+- **Lazy Component Loading**: Added lazy loading for heavy components to improve initial page load
+- **RPC Balancer Enhancement**: Integrated high-speed RPC endpoints for 30-50% speed improvement
+- **Link Centralization**: Created constants.ts for all external links to improve maintainability and consistency
+
+### Features Added
+- **GitBook Documentation**: Integrated official GitBook with direct access from documentation page
+- **Token Age Display**: Optimized display focusing on 0-30 day tokens with clear visual indicators
+- **Aged Wallet Detection**: Implemented 400-day threshold for detecting fake volume manipulation patterns
+- **Nova-Style Funding Analysis**: Added comprehensive funding source analysis
+- **GMGN.AI Integration**: Advanced bundle detection and insider trading analysis capabilities
+- **MobyScreener Integration**: Added to trusted data sources for enhanced token verification
+- **Condensed Layout**: Implemented DeepNets-inspired layout for improved readability and information density
+
+### Bot Platform Improvements
+- **Bot Link Accessibility**: Fixed footer and header bot invitation links for both Telegram and Discord
+- **Command Display Fix**: Resolved devtorture command display issues across both platforms
+- **Discord Embed Redesign**: Improved embed layout for better readability
+- **Token 2022 Support**: Added full support for Token-2022 program and pump.fun integration
+- **Link Standardization**: Fixed inconsistent Discord and Telegram links across entire platform
+
+### API & Data Sources
+- **Streamlined Data Sources**: Focused on Birdeye and GMGN for most reliable and accurate data
+- **Rate Limiting Implementation**: Comprehensive rate limiting and error handling for RPC stability
+- **Real-time Rug Detection**: Multi-layered detection systems for honeypots, high tax schemes, and authority risks
+- **DexScreener Caching**: Implemented 30-second TTL cache for DexScreener to reduce redundant API calls
+- **QuillCheck Restoration**: Restored live honeypot and tax detection via QuillCheck service
+
+### UI/UX Enhancements
+- **Status Indicator Fix**: Resolved overlapping status indicators in token analysis cards
+- **Sticky Token Addresses**: Made token address sidebar static and sticky for easier reference
+- **Community Tab Layout**: Fixed grid structure preventing content layering and overlapping issues
+- **Phantom Wallet Connection**: Improved cookie configuration and authentication logging
+
+### Security & Code Quality
+- **Bundle Detection Algorithm**: Enhanced accuracy with stricter thresholds to reduce false positives
+- **Process Error Handlers**: Added comprehensive error handling to prevent silent server failures
+- **ESM Module Resolution**: Fixed all imports with proper .ts extensions for TypeScript ESM compatibility
+- **Link Consistency**: Standardized all Discord and Telegram links using centralized constants
+
+### Documentation
+- **README Modernization**: Professional formatting with comprehensive deployment instructions
+- **Railway Deployment Guide**: Detailed documentation for Railway-specific configuration
+- **Bot Setup Documentation**: Complete setup guide for Telegram and Discord bot configuration
+- **API Endpoint Reference**: Comprehensive endpoint documentation with request/response examples
+
+---
 
 ## November 2025 – Scanner Fix & DexScreener Reintroduction
 ### Summary
