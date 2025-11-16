@@ -203,6 +203,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ providers: stats });
   });
 
+  // Get server's public IP (for Railway IP whitelisting)
+  app.get("/api/server-ip", async (req, res) => {
+    try {
+      const response = await fetch("https://api.ipify.org?format=json");
+      const data = await response.json() as { ip: string };
+      res.json({ 
+        publicIP: data.ip,
+        note: "Add this IP to your Ankr whitelist"
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch IP" });
+    }
+  });
+
   // Token Analysis Endpoint with Rate Limit Handling
   app.post("/api/analyze", async (req, res) => {
     try {
