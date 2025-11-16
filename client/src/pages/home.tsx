@@ -9,6 +9,7 @@ import { CriticalAlerts } from "@/components/critical-alerts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TELEGRAM_BOT_LINK, DISCORD_SERVER_LINK } from "@/constants";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
@@ -936,7 +937,7 @@ export default function Home() {
       <div className="fixed bottom-6 right-6 z-50">
         <div className="flex flex-col gap-3">
           <a
-            href="https://t.me/rugkilleralphabot"
+            href={TELEGRAM_BOT_LINK}
             target="_blank"
             rel="noopener noreferrer"
             className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition-all hover:scale-105 group"
@@ -948,7 +949,7 @@ export default function Home() {
             </span>
           </a>
           <a
-            href="https://discord.gg/8xvBYhE9mK"
+            href={DISCORD_SERVER_LINK}
             target="_blank"
             rel="noopener noreferrer"
             className="bg-purple-500 hover:bg-purple-600 text-white p-3 rounded-full shadow-lg transition-all hover:scale-105 group"

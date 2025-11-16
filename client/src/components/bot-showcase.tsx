@@ -2,7 +2,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SiTelegram, SiDiscord } from "react-icons/si";
-import { Zap, Shield, TrendingUp } from "lucide-react";
+import { Shield, Zap, TrendingUp } from "lucide-react";
+import { TELEGRAM_BOT_LINK, DISCORD_SERVER_LINK } from "@/constants";
 
 export function BotShowcase() {
   return (
@@ -58,7 +59,7 @@ export function BotShowcase() {
                 <Button 
                   className="flex-1" 
                   variant="default"
-                  onClick={() => window.open('https://t.me/RugKillerAlphaBot', '_blank')}
+                  onClick={() => window.open(TELEGRAM_BOT_LINK, '_blank')}
                   data-testid="button-telegram-join"
                 >
                   <SiTelegram className="h-4 w-4 mr-2" />
@@ -115,7 +116,7 @@ export function BotShowcase() {
                 <Button 
                   className="flex-1" 
                   variant="default"
-                  onClick={() => window.open('https://discord.gg/rugkiller', '_blank')}
+                  onClick={() => window.open(DISCORD_SERVER_LINK, '_blank')}
                   data-testid="button-discord-join"
                 >
                   <SiDiscord className="h-4 w-4 mr-2" />

@@ -1,1 +1,9 @@
 export const CONTRACT_ADDRESS = "2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt";
+
+// Official Links
+export const TELEGRAM_BOT_LINK = "https://t.me/rugkilleralphabot";
+export const DISCORD_SERVER_LINK = "https://discord.gg/8xvBYhE9mK";
+export const DISCORD_BOT_INVITE = "https://discord.com/oauth2/authorize?client_id=1437952073319714879&scope=bot&permissions=3072";
+export const GITHUB_REPO = "https://github.com/drixindustries/Rug-Killer-On-Solana";
+export const GITBOOK_DOCS = "https://drix.gitbook.io/rug-killer-on-solana";
+export const WEBSITE_URL = "https://rugkilleralphabot.fun";
