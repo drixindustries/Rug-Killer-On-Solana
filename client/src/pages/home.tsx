@@ -405,14 +405,13 @@ export default function Home() {
                     <CondensedAlerts redFlags={analysis.redFlags || []} />
                   </Suspense>
 
-                  {/* Main Content Grid - More Compact */}
-                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    {/* Left Column - Detection Results (3/4 width) */}
-                    <div className="lg:col-span-3 space-y-4">
+                  {/* Main Content Grid - Fixed Column Layout to Prevent Overlap */}
+                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-0">
+                    {/* Left Column - Detection Results (3/4 width) - Fixed positioning */}
+                    <div className="lg:col-span-3 space-y-4 min-w-0">
                       
-                      {/* Advanced Detection Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Honeypot Detection */}
+                      {/* Advanced Detection Grid - Fixed 2-column layout */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-max">{/* Honeypot Detection */}
                         {analysis.quillcheckData && (
                           <Suspense fallback={<ComponentLoader />}>
                             <HoneypotDetectionCard data={analysis.quillcheckData} />
@@ -486,8 +485,9 @@ export default function Home() {
                       )}
                     </div>
                     
-                    {/* Right Column - STICKY Sidebar (1/4 width) */}
-                    <div className="sticky top-4 self-start space-y-4 max-h-screen overflow-y-auto">
+                    {/* Right Column - FIXED STICKY Sidebar (1/4 width) - NO OVERLAP */}
+                    <div className="sticky top-4 self-start min-w-0 max-w-full">
+                      <div className="space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto pr-1">
                       {/* Token Info Sidebar with copy-able addresses */}
                       <Suspense fallback={<ComponentLoader />}>
                         <TokenInfoSidebar
@@ -527,6 +527,7 @@ export default function Home() {
                           </Suspense>
                         </>
                       )}
+                      </div>
                     </div>
                   </div>
                 </TabsContent>

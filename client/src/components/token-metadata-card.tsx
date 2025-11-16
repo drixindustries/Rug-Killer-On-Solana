@@ -99,27 +99,35 @@ export function TokenMetadataCard({ metadata, tokenAddress, creationDate }: Toke
             <p className="text-sm text-muted-foreground font-mono" data-testid="text-token-symbol">
               ${metadata?.symbol || "???"}
             </p>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {metadata?.hasMetadata ? (
-                <Badge variant="secondary" className="gap-1">
-                  <CheckCircle className="h-3 w-3" />
-                  Has Metadata
-                </Badge>
-              ) : (
-                <Badge variant="destructive" className="gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  No Metadata
-                </Badge>
-              )}
+            <div className="space-y-2 mt-2">
+              <div className="flex items-center justify-start min-w-0">
+                {metadata?.hasMetadata ? (
+                  <Badge variant="secondary" className="gap-1 shrink-0">
+                    <CheckCircle className="h-3 w-3" />
+                    Has Metadata
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive" className="gap-1 shrink-0">
+                    <AlertCircle className="h-3 w-3" />
+                    No Metadata
+                  </Badge>
+                )}
+              </div>
               
               {metadata?.isMutable && (
-                <Badge variant="outline" className="gap-1 text-yellow-600 border-yellow-600">
-                  <AlertCircle className="h-3 w-3" />
-                  Mutable
-                </Badge>
+                <div className="flex items-center justify-start min-w-0">
+                  <Badge variant="outline" className="gap-1 text-yellow-600 border-yellow-600 shrink-0">
+                    <AlertCircle className="h-3 w-3" />
+                    Mutable
+                  </Badge>
+                </div>
               )}
               
-              {getAgeRiskBadge(creationDate)}
+              <div className="flex items-center justify-start min-w-0">
+                <div className="shrink-0">
+                  {getAgeRiskBadge(creationDate)}
+                </div>
+              </div>
             </div>
           </div>
         </div>

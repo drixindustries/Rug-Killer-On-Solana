@@ -144,26 +144,28 @@ export function CondensedTokenHeader({ analysis }: CondensedTokenHeaderProps) {
         </div>
       </div>
 
-      {/* Authority Status Row */}
-      <div className="flex flex-wrap gap-4 mb-6">
+      {/* Authority Status Row - Fixed Grid Layout */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Mint Authority:</span>
-          <Badge variant={analysis.mintAuthority.hasAuthority ? "destructive" : "secondary"}>
+          <Badge variant={analysis.mintAuthority.hasAuthority ? "destructive" : "secondary"} className="shrink-0">
             {analysis.mintAuthority.hasAuthority ? "Enabled" : "Disabled"}
           </Badge>
         </div>
         
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Freeze Authority:</span>
-          <Badge variant={analysis.freezeAuthority.hasAuthority ? "destructive" : "secondary"}>
+          <Badge variant={analysis.freezeAuthority.hasAuthority ? "destructive" : "secondary"} className="shrink-0">
             {analysis.freezeAuthority.hasAuthority ? "Enabled" : "Disabled"}
           </Badge>
         </div>
         
         {analysis.liquidityPool?.isBurned && (
-          <Badge variant="secondary" className="text-green-600 bg-green-50 border-green-200">
-            LP Burned
-          </Badge>
+          <div className="flex items-center">
+            <Badge variant="secondary" className="text-green-600 bg-green-50 border-green-200 shrink-0">
+              LP Burned
+            </Badge>
+          </div>
         )}
       </div>
 
