@@ -1,4 +1,10 @@
-import 'dotenv/config';
+// Try to load .env if it exists (local dev), but don't fail if it doesn't (Railway)
+try {
+  await import('dotenv/config');
+} catch {
+  // Railway injects env vars directly - no dotenv needed
+}
+
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "../shared/schema.ts";
@@ -6,6 +12,9 @@ import * as schema from "../shared/schema.ts";
 // Railway provides DATABASE_URL automatically when PostgreSQL is attached
 const DATABASE_URL = process.env.DATABASE_URL;
 const FORCE_IN_MEMORY = process.env.FORCE_IN_MEMORY_DB === 'true';
+
+console.log('🔧 DB Config - DATABASE_URL present:', !!DATABASE_URL);
+console.log('🔧 DB Config - FORCE_IN_MEMORY_DB:', process.env.FORCE_IN_MEMORY_DB);
 
 let db: any;
 let pool: any = null;

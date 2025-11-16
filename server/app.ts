@@ -11,8 +11,11 @@ import fs from "fs";
 export const app = express();
 
 // Session middleware for wallet authentication
+const SESSION_SECRET = process.env.SESSION_SECRET || 'railway-fallback-secret-' + Date.now();
+console.log('🔑 Using session secret:', SESSION_SECRET.substring(0, 10) + '...');
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'default-secret-change-in-production',
+  secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -65,25 +68,36 @@ export async function startServer() {
   // Register API routes
   const server = await registerRoutes(app);
 
-  // Serve static files in production
+  // Serve static files in production (if available)
   if (process.env.NODE_ENV === 'production') {
     const distPath = path.join(process.cwd(), 'dist', 'public');
     
-    if (!fs.existsSync(distPath)) {
-      console.error(`❌ Build directory not found: ${distPath}`);
-      console.error('Run "npm run build" first!');
-      process.exit(1);
+    if (fs.existsSync(distPath)) {
+      // Serve static assets
+      app.use(express.static(distPath));
+
+      // SPA fallback - serve index.html for all non-API routes
+      app.use('*', (_req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+      
+      console.log('✅ Serving static files from dist/public');
+    } else {
+      console.log('ℹ️ No frontend build found - running API-only mode');
+      console.log('ℹ️ This is normal for Railway backend deployment');
+      
+      // Simple root endpoint for API-only mode
+      app.get('/', (_req, res) => {
+        res.json({
+          message: 'Rug Killer API Server',
+          status: 'online',
+          endpoints: {
+            health: '/api/health',
+            docs: 'https://github.com/drixindustries/Rug-Killer-On-Solana'
+          }
+        });
+      });
     }
-
-    // Serve static assets
-    app.use(express.static(distPath));
-
-    // SPA fallback - serve index.html for all non-API routes
-    app.use('*', (_req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-    
-    console.log('✅ Serving static files from dist/public');
   } else {
     // Development mode - use Vite dev server
     try {
@@ -92,8 +106,21 @@ export async function startServer() {
       const { setupVite } = await import(viteDevPath);
       await setupVite(app, server);
     } catch (error: any) {
-      console.error('❌ Failed to load Vite dev server (this is normal in production):', error.message);
-      console.log('ℹ️ Running in production mode without Vite');
+      console.warn('⚠️  Failed to load Vite dev server:', error.message);
+      console.log('ℹ️ Running in API-only mode');
+      
+      // Simple root endpoint for API-only mode
+      app.get('/', (_req, res) => {
+        res.json({
+          message: 'Rug Killer API Server',
+          status: 'online',
+          mode: 'development',
+          endpoints: {
+            health: '/api/health',
+            docs: 'https://github.com/drixindustries/Rug-Killer-On-Solana'
+          }
+        });
+      });
     }
   }
 

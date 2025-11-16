@@ -1,0 +1,11 @@
+# Railway deployment configuration
+# This file is in server/ directory
+
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]  
+cmds = ["npm install --production"]
+
+[start]
+cmd = "npm start"

@@ -1,31 +1,18 @@
-FROM node:20-alpine AS build
+﻿FROM node:20-alpine
+
 WORKDIR /app
 
-# Install dependencies
-COPY package*.json ./
-RUN npm ci
+# Copy server package files and install dependencies
+COPY server/package*.json ./
+RUN npm install --production
 
 # Copy source code
-COPY . .
-
-# Build client (outputs to dist/public) and server (outputs to dist/)
-RUN npm run build
-
-# Production stage
-FROM node:20-alpine AS runtime
-WORKDIR /app
-
-# Install only production dependencies
-COPY package*.json ./
-RUN npm ci --omit=dev
-
-# Copy built output
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/shared ./shared
+COPY server/ ./
+COPY shared/ ./shared/
 
 # Environment
 ENV NODE_ENV=production
 EXPOSE 5000
 
-# Start server
-CMD ["node", "dist/prod.js"]
+# Run tsx directly - bypass npm
+CMD ["node_modules/.bin/tsx", "index.ts"]
