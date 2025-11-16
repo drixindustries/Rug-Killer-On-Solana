@@ -1,4 +1,4 @@
-﻿FROM node:20-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -8,7 +8,7 @@ RUN npm install --production
 
 # Copy source code
 COPY server/ ./
-COPY shared/ ./shared/
+COPY shared/ ../shared/
 
 # Environment
 ENV NODE_ENV=production
