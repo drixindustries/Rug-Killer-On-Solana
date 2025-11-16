@@ -1,29 +1,22 @@
 FROM node:20-alpine
 
-# Create workspace structure
-WORKDIR /workspace
+WORKDIR /app
 
-# Copy shared first
-COPY shared/ ./shared/
-
-# Copy server package files
-COPY server/package*.json ./server/
-WORKDIR /workspace/server
-
-# Install dependencies
+# Copy server package files and install dependencies
+COPY server/package*.json ./
 RUN npm install --production
 
-# Copy server source
-WORKDIR /workspace
-COPY server/ ./server/
+# Copy server source code
+COPY server/ ./
 
-# Set final working directory
-WORKDIR /workspace/server
+# Copy shared INTO parent directory so ../shared works
+# This creates /shared (parent of /app)
+RUN mkdir -p ../shared
+COPY shared/ ../shared/
 
 # Environment
 ENV NODE_ENV=production
-ENV TSX_TSCONFIG_PATH=/workspace/server/tsconfig.json
 EXPOSE 5000
 
-# Run tsx with proper node options
-CMD ["node", "--import", "tsx", "index.ts"]
+# Run tsx
+CMD ["node_modules/.bin/tsx", "index.ts"]
