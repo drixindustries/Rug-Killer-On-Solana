@@ -10,6 +10,9 @@ RUN npm install --production
 COPY shared/ ./shared/
 COPY server/ ./
 
+# Copy frontend build
+COPY client/dist/public/ ./dist/public/
+
 # Environment
 ENV NODE_ENV=production
 EXPOSE 5000
