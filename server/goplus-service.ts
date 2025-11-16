@@ -1,4 +1,4 @@
-import type { GoPlusSecurityData } from "./shared/schema";
+import type { GoPlusSecurityData } from "../shared/schema";
 
 const GOPLUS_API_URL = "https://api.gopluslabs.io/api/v1";
 

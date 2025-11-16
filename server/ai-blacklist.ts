@@ -1,6 +1,6 @@
 import { db } from "./db.ts";
-import { badActorLabels, analysisRuns } from "./shared/schema.ts";
-import type { TokenAnalysisResponse } from "./shared/schema.ts";
+import { badActorLabels, analysisRuns } from "../shared/schema.ts";
+import type { TokenAnalysisResponse } from "../shared/schema.ts";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { storage } from "./storage.ts";
 

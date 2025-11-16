@@ -1,5 +1,5 @@
 import { db } from "./db.ts";
-import { kolWallets } from "./shared/schema.ts";
+import { kolWallets } from "../shared/schema.ts";
 import { eq } from "drizzle-orm";
 
 // KOL wallet data from kolscan.io (as of Nov 11, 2025)

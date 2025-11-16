@@ -11,7 +11,7 @@ import type {
   TransactionInfo,
   QuillCheckData,
   DexScreenerData,
-} from "./shared/schema";
+} from "../shared/schema";
 // LIGHTNING FAST: Only Birdeye and GMGN APIs + fast cached RPC
 import { isKnownAddress, getKnownAddressInfo, detectBundledWallets, getPumpFunBondingCurveAddress, getPumpFunAssociatedBondingCurveAddress } from "./known-addresses.ts";
 import { getBirdeyeOverview } from "./services/birdeye-api.ts";

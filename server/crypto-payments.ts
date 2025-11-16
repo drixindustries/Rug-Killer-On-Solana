@@ -1,6 +1,6 @@
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { db } from "./db.ts";
-import { cryptoAddresses, payments, paymentAudit, subscriptions } from "./shared/schema.ts";
+import { cryptoAddresses, payments, paymentAudit, subscriptions } from "../shared/schema.ts";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
 

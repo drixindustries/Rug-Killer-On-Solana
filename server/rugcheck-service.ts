@@ -1,4 +1,4 @@
-import type { RugcheckData } from "./shared/schema";
+import type { RugcheckData } from "../shared/schema";
 
 const RUGCHECK_API_URL = "https://api.rugcheck.xyz/v1";
 const RUGCHECK_API_KEY = process.env.RUGCHECK_API_KEY;
