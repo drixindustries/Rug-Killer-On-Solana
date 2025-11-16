@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Copy, CheckCircle, ThumbsUp, ThumbsDown, Flag, Share2, MessageSquare, AlertTriangle, Star, Trash2, Twitter, Send, Loader2 } from "lucide-react";
+import { Copy, CheckCircle, ThumbsUp, ThumbsDown, Flag, Share2, MessageSquare, MessageCircle, AlertTriangle, Star, Trash2, Twitter, Send, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
@@ -931,6 +931,36 @@ export default function Home() {
           </div>
         </div>
       </main>
+
+      {/* TELEGRAM & DISCORD BOT LINKS - BOTTOM CORNER AS REQUESTED MULTIPLE TIMES! */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <div className="flex flex-col gap-3">
+          <a
+            href="https://t.me/rugkilleralphabot"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition-all hover:scale-105 group"
+            title="Rug Killer Telegram Bot"
+          >
+            <Send className="h-6 w-6" />
+            <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-2 py-1 rounded text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+              Telegram Bot
+            </span>
+          </a>
+          <a
+            href="https://discord.gg/rugkiller"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-purple-500 hover:bg-purple-600 text-white p-3 rounded-full shadow-lg transition-all hover:scale-105 group"
+            title="Rug Killer Discord Bot"
+          >
+            <MessageCircle className="h-6 w-6" />
+            <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-2 py-1 rounded text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+              Discord Bot
+            </span>
+          </a>
+        </div>
+      </div>
 
       <Footer />
     </div>
