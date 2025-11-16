@@ -433,17 +433,31 @@ export default function Documentation() {
               Everything you need to know about Solana Rug Killer - comprehensive guide with PDF download
             </p>
             
-            <PDFDownloadLink
-              document={<DocumentationPDF />}
-              fileName="solana-rug-killer-documentation.pdf"
-            >
-              {({ loading }) => (
-                <Button size="lg" disabled={loading} data-testid="button-download-pdf">
-                  <Download className="h-4 w-4 mr-2" />
-                  {loading ? 'Preparing PDF...' : 'Download Complete PDF Guide'}
-                </Button>
-              )}
-            </PDFDownloadLink>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+              <Button size="lg" asChild>
+                <a 
+                  href="https://drix.gitbook.io/rug-killer-on-solana" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center"
+                >
+                  <Code className="h-4 w-4 mr-2" />
+                  View GitBook Docs
+                </a>
+              </Button>
+              
+              <PDFDownloadLink
+                document={<DocumentationPDF />}
+                fileName="solana-rug-killer-documentation.pdf"
+              >
+                {({ loading }) => (
+                  <Button size="lg" variant="outline" disabled={loading} data-testid="button-download-pdf">
+                    <Download className="h-4 w-4 mr-2" />
+                    {loading ? 'Preparing PDF...' : 'Download PDF Guide'}
+                  </Button>
+                )}
+              </PDFDownloadLink>
+            </div>
           </div>
 
           {/* Overview Section */}
