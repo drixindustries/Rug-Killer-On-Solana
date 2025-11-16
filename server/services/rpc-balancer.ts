@@ -77,6 +77,16 @@ const RPC_PROVIDERS = [
     rateLimit: 500,
     rateLimitWindow: 60000
   },
+  { 
+    getUrl: () => `${process.env.QUICKNODE_RPC_URL || ""}`,
+    weight: 40, 
+    name: "QuickNode",
+    tier: "premium",
+    requiresKey: true,
+    hasKey: () => !!process.env.QUICKNODE_RPC_URL,
+    rateLimit: 500,
+    rateLimitWindow: 60000
+  },
   // Fallback public endpoints (more conservative limits)
   { 
     getUrl: () => "https://api.mainnet-beta.solana.com",

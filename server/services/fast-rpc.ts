@@ -16,6 +16,8 @@ import { redisCache } from './redis-cache.ts';
 class FastRPCService {
   private connections: Connection[];
   private currentIndex: number = 0;
+  private endpoints: string[];
+  private cooldowns: Map<number, number> = new Map();
 
   constructor() {
     // Use multiple high-performance RPC endpoints
@@ -28,8 +30,9 @@ class FastRPCService {
       'https://solana.drpc.org',
       'https://solana.api.pocket.network/',
     ].filter(Boolean);
+    this.endpoints = endpoints as string[];
 
-    this.connections = endpoints.map(url => new Connection(url, {
+    this.connections = this.endpoints.map(url => new Connection(url, {
       commitment: 'confirmed',
       confirmTransactionInitialTimeout: 30000,
       wsEndpoint: undefined, // Disable WebSocket for better performance
@@ -41,10 +44,38 @@ class FastRPCService {
   /**
    * Get next connection in round-robin fashion
    */
-  private getConnection(): Connection {
-    const connection = this.connections[this.currentIndex];
-    this.currentIndex = (this.currentIndex + 1) % this.connections.length;
-    return connection;
+  private getConnection(): { connection: Connection; index: number; url: string } {
+    const now = Date.now();
+    const len = this.connections.length;
+
+    // Try up to len times to find a non-cooled endpoint
+    for (let attempts = 0; attempts < len; attempts++) {
+      const idx = this.currentIndex;
+      const cooldownUntil = this.cooldowns.get(idx) || 0;
+      const url = this.endpoints[idx];
+      const connection = this.connections[idx];
+
+      this.currentIndex = (this.currentIndex + 1) % len;
+
+      if (cooldownUntil > now) {
+        continue;
+      }
+      return { connection, index: idx, url };
+    }
+
+    // If all are cooled, pick the one with the soonest expiry
+    let bestIdx = 0;
+    let bestExpiry = Infinity;
+    for (let i = 0; i < len; i++) {
+      const exp = this.cooldowns.get(i) || 0;
+      if (exp < bestExpiry) {
+        bestExpiry = exp;
+        bestIdx = i;
+      }
+    }
+    const url = this.endpoints[bestIdx];
+    const connection = this.connections[bestIdx];
+    return { connection, index: bestIdx, url };
   }
 
   /**
@@ -57,7 +88,7 @@ class FastRPCService {
       cacheKey,
       async () => {
         try {
-          const connection = this.getConnection();
+          const { connection } = this.getConnection();
           const mintPubkey = new PublicKey(mintAddress);
           const mintInfo = await connection.getTokenSupply(mintPubkey);
           return BigInt(mintInfo.value.amount);
@@ -84,8 +115,12 @@ class FastRPCService {
         let lastError;
         
         for (let i = 0; i < maxRetries; i++) {
+          let attemptIdx = -1;
+          let attemptUrl = '';
           try {
-            const connection = this.getConnection();
+            const { connection, index, url } = this.getConnection();
+            attemptIdx = index;
+            attemptUrl = url;
             const pubkey = new PublicKey(address);
             const accountInfo = await connection.getAccountInfo(pubkey, 'confirmed');
             
@@ -94,10 +129,21 @@ class FastRPCService {
             }
             
             // Account doesn't exist - try next endpoint
-            console.warn(`[FastRPC] Account not found on endpoint ${i + 1}: ${address}`);
+            console.warn(`[FastRPC] Account not found on endpoint ${i + 1} (${url}): ${address}`);
             lastError = new Error('Account not found');
           } catch (error) {
-            console.error(`[FastRPC] Account info error on attempt ${i + 1} for ${address}:`, error);
+            const err = error as any;
+            console.error(`[FastRPC] Account info error on attempt ${i + 1} for ${address} via ${attemptUrl}:`, err);
+            // Quarantine endpoints that return auth errors
+            const msg = String(err?.message || '');
+            if (msg.includes('401') || msg.includes('403') || msg.toLowerCase().includes('unauthorized')) {
+              const cooldownMs = 5 * 60 * 1000;
+              const until = Date.now() + cooldownMs;
+              if (attemptIdx >= 0) {
+                this.cooldowns.set(attemptIdx, until);
+              }
+              console.warn(`[FastRPC] Quarantining endpoint ${attemptUrl} for 5m due to auth error`);
+            }
             lastError = error;
             
             // Wait a bit before retry
@@ -125,7 +171,7 @@ class FastRPCService {
       cacheKey,
       async () => {
         try {
-          const connection = this.getConnection();
+          const { connection } = this.getConnection();
           const mintPubkey = new PublicKey(mintAddress);
           const result = await connection.getTokenLargestAccounts(mintPubkey);
           return result.value;
@@ -148,7 +194,7 @@ class FastRPCService {
       cacheKey,
       async () => {
         try {
-          const connection = this.getConnection();
+          const { connection } = this.getConnection();
           const pubkey = new PublicKey(address);
           const signatures = await connection.getSignaturesForAddress(
             pubkey,
@@ -179,7 +225,7 @@ class FastRPCService {
       cacheKey,
       async () => {
         try {
-          const connection = this.getConnection();
+          const { connection } = this.getConnection();
           const programPubkey = new PublicKey(programId);
           const accounts = await connection.getProgramAccounts(
             programPubkey,
@@ -210,7 +256,7 @@ class FastRPCService {
         
         for (let i = 0; i < maxRetries; i++) {
           try {
-            const connection = this.getConnection();
+            const { connection } = this.getConnection();
             const mintPubkey = new PublicKey(mintAddress);
             
             // Try standard SPL Token program first
@@ -248,7 +294,8 @@ class FastRPCService {
    * Get fresh connection for non-cacheable operations
    */
   getDirectConnection(): Connection {
-    return this.getConnection();
+    const { connection } = this.getConnection();
+    return connection;
   }
 
   /**
