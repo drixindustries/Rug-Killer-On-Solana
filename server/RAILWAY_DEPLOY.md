@@ -14,7 +14,10 @@ FORCE_IN_MEMORY_DB=true
 DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/placeholder
 
 # RPC Provider (primary)
+# Option 1: Full URL
 ANKR_RPC_URL=https://rpc.ankr.com/solana/YOUR_ANKR_API_KEY
+# Option 2: Just the key (server will build the URL)
+# ANKR_API_KEY=YOUR_ANKR_API_KEY
 
 # API Keys (optional but recommended for best results)
 BIRDEYE_API_KEY=c0ecda95a02f4b69ba76c48bd5f830b5
@@ -37,16 +40,27 @@ PHANTOM_WALLET_ADDRESS=Demo
 
 **Note**: Birdeye is optional - analyzer will work without it but won't have social links or enhanced market data.
 
-### Ankr RPC URL
+### Ankr RPC (URL or Key)
 **Purpose**: Primary Solana RPC provider for on-chain data
 
-**How to Set**:
+You can set either:
+- `ANKR_RPC_URL` as the full HTTPS endpoint, or
+- `ANKR_API_KEY` as the raw key (the server constructs `https://rpc.ankr.com/solana/<KEY>`)
+
+Setup steps:
 1. Sign in at https://www.ankr.com
 2. Create a Web3 API project → add Solana
-3. Copy the HTTPS endpoint
-4. Add to Railway Variables as `ANKR_RPC_URL`
+3. Copy either the endpoint (for `ANKR_RPC_URL`) or just the key (for `ANKR_API_KEY`)
+4. Add to Railway Variables
 
-**Note**: If not set, the app falls back to the public Solana RPC.
+Notes:
+- Do not include quotes or trailing spaces in variable values
+- If both are set, `ANKR_RPC_URL` takes precedence
+- If none is set, the app falls back to the public Solana RPC
+
+Verify after deploy:
+- GET `/api/debug/rpc` → should list `Ankr-Premium` with `host: rpc.ankr.com`
+- GET `/api/debug/ping-rpc?count=3` → shows latency and slots
 
 ## How to Deploy
 

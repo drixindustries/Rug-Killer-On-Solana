@@ -46,6 +46,13 @@ SESSION_SECRET=your-super-secret-session-key-change-this
 # RPC Provider (recommended)
 ANKR_RPC_URL=https://rpc.ankr.com/solana/YOUR_ANKR_API_KEY
 
+# Alternatively, set only the key (the server constructs the URL):
+# ANKR_API_KEY=YOUR_ANKR_API_KEY
+# Notes:
+# - Do not include quotes or spaces in the value
+# - Either `ANKR_RPC_URL` or `ANKR_API_KEY` works; URL takes precedence if both are set
+# - Verify after deploy: GET `/api/debug/rpc` and `/api/debug/ping-rpc?count=3`
+
 # API Keys (optional)
 BIRDEYE_API_KEY=your-birdeye-api-key-here
 
