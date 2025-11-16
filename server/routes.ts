@@ -55,6 +55,46 @@ const isAdmin = async (req: any, res: any, next: any) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Debug: RPC health snapshot (no secrets exposed)
+  app.get('/api/debug/rpc', (_req, res) => {
+    try {
+      const providers = rpcBalancer.providers.map((p) => {
+        const rawUrl = p.getUrl();
+        let host = 'unknown';
+        let suffix = '';
+        try {
+          const u = new URL(rawUrl);
+          host = u.host;
+          suffix = (u.pathname || '').slice(-6);
+        } catch {}
+
+        return {
+          name: p.name,
+          tier: p.tier,
+          host,
+          idSuffix: suffix, // last 6 chars of path, avoids exposing full keys
+          score: p.score,
+          avgLatency: p.avgLatency ?? null,
+          consecutiveFails: p.consecutiveFails,
+          requestCount: p.requestCount ?? 0,
+          rateLimited: !!p.isRateLimited,
+          rateLimitResetTime: p.rateLimitResetTime ? new Date(p.rateLimitResetTime).toISOString() : null,
+          lastHealthCheck: p.lastHealthCheck ? new Date(p.lastHealthCheck).toISOString() : null,
+          hasKey: 'hasKey' in p ? !!p.hasKey?.() : true,
+        };
+      });
+
+      const healthyCount = rpcBalancer.providers.filter(p => p.score > 70).length;
+      res.json({
+        time: new Date().toISOString(),
+        healthyCount,
+        total: rpcBalancer.providers.length,
+        providers,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'RPC debug error' });
+    }
+  });
   // Wallet logout endpoint
   app.post('/api/logout', (req: any, res) => {
     req.session.destroy((err: any) => {
