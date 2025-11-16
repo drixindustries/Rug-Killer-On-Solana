@@ -22,8 +22,6 @@ class FastRPCService {
   constructor() {
     // Use multiple high-performance RPC endpoints
     const endpoints = [
-      // Helius temporarily disabled - invalid API key
-      // process.env.HELIUS_RPC_URL || `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`,
       process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com',
       'https://solana-api.projectserum.com',
       'https://rpc.ankr.com/solana',

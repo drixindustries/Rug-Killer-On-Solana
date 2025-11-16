@@ -57,16 +57,6 @@ const RPC_PROVIDERS = [
     rateLimitWindow: 60000
   },
   // API key providers (premium with keys)
-  // { 
-  //   getUrl: () => `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_KEY || ""}`,
-  //   weight: 35, 
-  //   name: "Helius",
-  //   tier: "premium",
-  //   requiresKey: true,
-  //   hasKey: () => !!process.env.HELIUS_KEY,
-  //   rateLimit: 1000, // High limit with API key
-  //   rateLimitWindow: 60000
-  // },
   { 
     getUrl: () => `https://solana-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY || ""}`,
     weight: 25, 

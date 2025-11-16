@@ -9,10 +9,9 @@ import type {
   RiskFlag,
   RiskLevel,
   TransactionInfo,
-  QuillCheckData,
   DexScreenerData,
 } from "../shared/schema";
-// LIGHTNING FAST: Only Birdeye and GMGN APIs + fast cached RPC
+// LIGHTNING FAST: Only Birdeye API + fast cached RPC
 import { isKnownAddress, getKnownAddressInfo, detectBundledWallets, getPumpFunBondingCurveAddress, getPumpFunAssociatedBondingCurveAddress } from "./known-addresses.ts";
 import { getBirdeyeOverview } from "./services/birdeye-api.ts";
 import { checkPumpFun } from "./services/pumpfun-api.ts";
@@ -21,7 +20,6 @@ import { LPChecker } from "./services/lp-checker.ts";
 import { BundleDetectorService } from "./services/bundle-detector.ts";
 import { BubblemapsService } from "./services/bubblemaps-service.ts";
 import { WhaleDetectorService } from "./services/whale-detector.ts";
-import { GMGNService } from "./services/gmgn-service.ts";
 import { AgedWalletDetector } from "./services/aged-wallet-detector.ts";
 import { PumpDumpDetectorService } from "./services/pump-dump-detector.ts";
 import { LiquidityMonitorService } from "./services/liquidity-monitor.ts";
@@ -29,33 +27,28 @@ import { HolderTrackingService } from "./services/holder-tracking.ts";
 import { FundingSourceAnalyzer } from "./services/funding-source-analyzer.ts";
 import { walletIntelligenceService } from "./services/wallet-intelligence.ts";
 import { DexScreenerService } from "./dexscreener-service.ts";
-import { quillCheckService, QuillCheckService } from './services/quillcheck-service.ts';
 
 export class SolanaTokenAnalyzer {
-  // Core detection services - streamlined to focus on Birdeye and GMGN data
+  // Core detection services - streamlined to focus on Birdeye data
   private bundleDetector: BundleDetectorService;
   private bubblemapsService: BubblemapsService;
   private whaleDetector: WhaleDetectorService;
-  private gmgnService: GMGNService;
   private agedWalletDetector: AgedWalletDetector;
   private pumpDumpDetector: PumpDumpDetectorService;
   private liquidityMonitor: LiquidityMonitorService;
   private holderTracker: HolderTrackingService;
   private fundingAnalyzer: FundingSourceAnalyzer;
-  private quillService: QuillCheckService;
 
   constructor() {
-    // Streamlined to core detection services + Birdeye & GMGN
+    // Streamlined to core detection services + Birdeye
     this.bundleDetector = new BundleDetectorService();
     this.bubblemapsService = new BubblemapsService();
     this.whaleDetector = new WhaleDetectorService();
-    this.gmgnService = new GMGNService();
     this.agedWalletDetector = new AgedWalletDetector();
     this.pumpDumpDetector = new PumpDumpDetectorService();
     this.liquidityMonitor = new LiquidityMonitorService();
     this.holderTracker = new HolderTrackingService();
     this.fundingAnalyzer = new FundingSourceAnalyzer();
-    this.quillService = quillCheckService; // singleton
   }
 
   private getConnection(): Connection {
@@ -147,18 +140,17 @@ export class SolanaTokenAnalyzer {
       const mintAuthority = this.analyzeMintAuthority(mintInfo.mintAuthority);
       const freezeAuthority = this.analyzeFreezeAuthority(mintInfo.freezeAuthority);
       
-      // Fetch token accounts (holders) from on-chain and streamlined APIs (Birdeye + GMGN)
-      const [onChainHolders, totalHolderCount, recentTransactions, birdeyeData, pumpFunData, gmgnRawData, tokenCreationDate] = await Promise.all([
+      // Fetch token accounts (holders) from on-chain and streamlined APIs (Birdeye)
+      const [onChainHolders, totalHolderCount, recentTransactions, birdeyeData, pumpFunData, tokenCreationDate] = await Promise.all([
         this.fetchTopHolders(mintPubkey, mintInfo.decimals, mintInfo.supply),
         this.getTotalHolderCount(mintPubkey).catch(() => null),
         this.fetchRecentTransactions(mintPubkey),
         getBirdeyeOverview(tokenAddress).catch(() => null),
         checkPumpFun(tokenAddress).catch(() => ({ isPumpFun: false, devBought: 0, bondingCurve: 0 })),
-        this.gmgnService.getTokenAnalysis(tokenAddress).catch(() => null),
         this.getTokenCreationDate(mintPubkey).catch(() => undefined),
       ]);
       
-      // Process holders data - prioritize Birdeye/GMGN over on-chain for performance
+      // Process holders data - prioritize Birdeye over on-chain for performance
       const holders = onChainHolders.length > 0 
         ? onChainHolders 
         : []; // Fallback to empty array if on-chain fetch fails
@@ -230,7 +222,7 @@ export class SolanaTokenAnalyzer {
         filteredHolders.slice(0, 10).reduce((sum, h) => sum + (h.percentage || 0), 0)
       ));
 
-      // Advanced wallet intelligence analysis with age and GMGN-style classifications
+      // Advanced wallet intelligence analysis with age classifications
       let walletIntelligence = null;
       if (filteredHolders.length > 0) {
         try {
@@ -323,7 +315,7 @@ export class SolanaTokenAnalyzer {
           protocols: excludedAddresses.filter(a => a.type === 'protocol').length,
           bundled: bundledWallets.length,
           total: excludedAddresses.length,
-          // GMGN-style wallet intelligence totals
+          // Wallet intelligence totals
           degens: walletIntelligence?.totals.degens || 0,
           bots: walletIntelligence?.totals.bots || 0,
           smartMoney: walletIntelligence?.totals.smartMoney || 0,
@@ -358,21 +350,6 @@ export class SolanaTokenAnalyzer {
         console.log(`[Bubblemaps] Network Risk: ${networkAnalysis?.networkRiskScore || 0}, Clustered Wallets: ${networkAnalysis?.clusteredWallets || 0}`);
       } catch (error) {
         console.error('[Bubblemaps] Analysis failed:', error);
-      }
-
-      // GMGN.AI bundle & insider detection
-      let gmgnData = null;
-      try {
-        if (gmgnRawData) {
-          gmgnData = this.gmgnService.extractBundleInfo(gmgnRawData);
-          const smartMoneyActive = this.gmgnService.hasSmartMoneyActivity(gmgnRawData);
-          if (gmgnData) {
-            gmgnData.smartMoneyActive = smartMoneyActive;
-          }
-          console.log(`[GMGN] Bundled: ${gmgnData?.isBundled}, Insiders: ${gmgnData?.insiderCount}, Snipers: ${gmgnData?.sniperCount}, Confidence: ${gmgnData?.confidence}%`);
-        }
-      } catch (error) {
-        console.error('[GMGN] Data processing failed:', error);
       }
 
       // Aged wallet detection (fake volume)
@@ -450,17 +427,6 @@ export class SolanaTokenAnalyzer {
         }
       } catch (error) {
         console.error('[DexScreener] Failed to fetch data:', error);
-      }
-
-      // QuillCheck honeypot & tax detection
-      let quillcheckData: QuillCheckData | null = null;
-      try {
-        quillcheckData = await this.quillService.checkToken(tokenAddress);
-        if (quillcheckData) {
-          console.log(`[QuillCheck] Honeypot=${quillcheckData.isHoneypot} buyTax=${quillcheckData.buyTax} sellTax=${quillcheckData.sellTax}`);
-        }
-      } catch (qcErr) {
-        console.error('[QuillCheck] Integration failed:', qcErr);
       }
 
       // Build metadata - prefer DexScreener base token info, fallback to Birdeye
@@ -542,10 +508,8 @@ export class SolanaTokenAnalyzer {
         pumpFunData: pumpFunData || undefined,
         birdeyeData: birdeyeData || undefined,
         dexscreenerData: dexscreenerData || undefined,
-        quillcheckData: quillcheckData || undefined,
         advancedBundleData: advancedBundleData as any || undefined,
         networkAnalysis: networkAnalysis || undefined,
-        gmgnData: gmgnData || undefined,
         agedWalletData: agedWalletData || undefined,
         pumpDumpData: pumpDumpData || undefined,
         liquidityMonitor: liquidityMonitorData || undefined,
