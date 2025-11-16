@@ -19,32 +19,13 @@ interface RpcProvider {
 }
 
 const RPC_PROVIDERS = [
-  // Primary: QuickNode (if available)
-  { 
-    getUrl: () => `${process.env.QUICKNODE_RPC_URL || ""}`,
-    weight: 50, 
-    name: "QuickNode",
-    tier: "premium" as const,
-    requiresKey: true,
-    hasKey: () => !!process.env.QUICKNODE_RPC_URL,
-    rateLimit: 500,
-    rateLimitWindow: 60000
-  },
-  // Reliable public endpoints
+  // Only using Solana public RPC - reliable and always available
   { 
     getUrl: () => "https://api.mainnet-beta.solana.com",
-    weight: 30, 
+    weight: 100, 
     name: "Solana-Public",
     tier: "fallback" as const,
     rateLimit: 40,
-    rateLimitWindow: 60000
-  },
-  { 
-    getUrl: () => "https://rpc.ankr.com/solana",
-    weight: 20, 
-    name: "Ankr-Public",
-    tier: "fallback" as const,
-    rateLimit: 60,
     rateLimitWindow: 60000
   }
 ];
