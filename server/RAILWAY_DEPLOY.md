@@ -9,6 +9,7 @@ Set these in your Railway dashboard under **Variables**:
 NODE_ENV=production
 SESSION_SECRET=your-random-secret-here-change-me-minimum-32-characters
 ENABLE_DEBUG_ENDPOINTS=false
+DEBUG_ENDPOINTS_TOKEN=your-strong-random-debug-token
 
 # Database (optional - uses in-memory if not set)
 FORCE_IN_MEMORY_DB=true
@@ -60,10 +61,10 @@ Notes:
 - If none is set, the app falls back to the public Solana RPC
 
 Verify after deploy:
-- Temporarily set `ENABLE_DEBUG_ENDPOINTS=true`, redeploy, then:
-- GET `/api/debug/rpc` → should list `Ankr-Premium` with `host: rpc.ankr.com`
-- GET `/api/debug/ping-rpc?count=3` → shows latency and slots
-- Set `ENABLE_DEBUG_ENDPOINTS=false` again when finished.
+- Temporarily set `ENABLE_DEBUG_ENDPOINTS=true` and `DEBUG_ENDPOINTS_TOKEN` to a strong value, redeploy, then:
+- Send `GET /api/debug/rpc` with header `x-debug-token: <DEBUG_ENDPOINTS_TOKEN>` → should list `Ankr-Premium` with `host: rpc.ankr.com`
+- Send `GET /api/debug/ping-rpc?count=3` with the same header → shows latency and slots
+- Set `ENABLE_DEBUG_ENDPOINTS=false` when finished and redeploy.
 
 ## How to Deploy
 

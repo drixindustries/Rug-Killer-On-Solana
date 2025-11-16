@@ -57,8 +57,19 @@ const isAdmin = async (req: any, res: any, next: any) => {
 export async function registerRoutes(app: Express): Promise<Server> {
   const enableDebug = process.env.ENABLE_DEBUG_ENDPOINTS === 'true';
   if (enableDebug) {
+    // Optional header-based protection for debug endpoints
+    const requireDebugToken = (req: any, res: any, next: any) => {
+      const expected = process.env.DEBUG_ENDPOINTS_TOKEN;
+      if (!expected) return next();
+      const token = req.header('x-debug-token') || req.query.token;
+      if (token !== expected) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      next();
+    };
+
     // Debug: RPC health snapshot (no secrets exposed)
-    app.get('/api/debug/rpc', (_req, res) => {
+    app.get('/api/debug/rpc', requireDebugToken, (_req, res) => {
       try {
         const providers = rpcBalancer.providers.map((p) => {
           const rawUrl = p.getUrl();
@@ -99,7 +110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
 
     // Debug: actively ping the currently selected RPC and report latency
-    app.get('/api/debug/ping-rpc', async (req, res) => {
+    app.get('/api/debug/ping-rpc', requireDebugToken, async (req, res) => {
       const started = Date.now();
       try {
         const rawCount = parseInt(String((req.query.count ?? '1')));

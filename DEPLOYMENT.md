@@ -43,6 +43,7 @@ In Railway dashboard → Your Service → **Variables** tab, add:
 NODE_ENV=production
 SESSION_SECRET=your-super-secret-session-key-change-this
 ENABLE_DEBUG_ENDPOINTS=false
+DEBUG_ENDPOINTS_TOKEN=your-strong-random-debug-token
 
 # RPC Provider (recommended)
 ANKR_RPC_URL=https://rpc.ankr.com/solana/YOUR_ANKR_API_KEY
@@ -52,8 +53,9 @@ ANKR_RPC_URL=https://rpc.ankr.com/solana/YOUR_ANKR_API_KEY
 # Notes:
 # - Do not include quotes or spaces in the value
 # - Either `ANKR_RPC_URL` or `ANKR_API_KEY` works; URL takes precedence if both are set
-# - To verify RPC, temporarily set `ENABLE_DEBUG_ENDPOINTS=true` and after checking
-#   `/api/debug/rpc` and `/api/debug/ping-rpc?count=3`, set it back to `false`.
+# - To verify RPC, temporarily set `ENABLE_DEBUG_ENDPOINTS=true` and `DEBUG_ENDPOINTS_TOKEN`.
+#   Then call `/api/debug/rpc` and `/api/debug/ping-rpc?count=3` with header
+#   `x-debug-token: <DEBUG_ENDPOINTS_TOKEN>`; set `ENABLE_DEBUG_ENDPOINTS=false` after.
 
 # API Keys (optional)
 BIRDEYE_API_KEY=your-birdeye-api-key-here
