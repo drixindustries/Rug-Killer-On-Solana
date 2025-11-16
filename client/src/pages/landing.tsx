@@ -103,7 +103,7 @@ export default function Landing() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <CardDescription className="text-base">
-                    Aggregates security data from RugCheck, GoPlus, DexScreener, and Jupiter
+                    Aggregates security data from Birdeye and GMGN for comprehensive analysis
                   </CardDescription>
                   <div className="space-y-2 pt-2">
                     <div className="flex items-center gap-2 text-sm">

@@ -10,10 +10,7 @@ import type {
   RiskLevel,
   TransactionInfo,
 } from "@shared/schema";
-import { RugcheckService } from "./rugcheck-service";
-import { GoPlusSecurityService } from "./goplus-service";
-import { DexScreenerService } from "./dexscreener-service";
-import { JupiterPriceService } from "./jupiter-service";
+// Removed: RugCheck, GoPlus, DexScreener, Jupiter - keeping only Birdeye and GMGN
 import { isKnownAddress, getKnownAddressInfo, detectBundledWallets, getPumpFunBondingCurveAddress, getPumpFunAssociatedBondingCurveAddress } from "./known-addresses";
 import { getBirdeyeOverview } from "./services/birdeye-api";
 import { checkPumpFun } from "./services/pumpfun-api";
@@ -31,13 +28,9 @@ import { HolderTrackingService } from "./services/holder-tracking";
 import { FundingSourceAnalyzer } from "./services/funding-source-analyzer";
 
 export class SolanaTokenAnalyzer {
-  private rugcheckService: RugcheckService;
-  private goplusService: GoPlusSecurityService;
-  private dexscreenerService: DexScreenerService;
-  private jupiterPriceService: JupiterPriceService;
+  // Core detection services - streamlined to focus on Birdeye and GMGN data
   private bundleDetector: BundleDetectorService;
   private bubblemapsService: BubblemapsService;
-  private quillcheckService: QuillCheckService;
   private whaleDetector: WhaleDetectorService;
   private gmgnService: GMGNService;
   private agedWalletDetector: AgedWalletDetector;
@@ -47,13 +40,9 @@ export class SolanaTokenAnalyzer {
   private fundingAnalyzer: FundingSourceAnalyzer;
 
   constructor() {
-    this.rugcheckService = new RugcheckService();
-    this.goplusService = new GoPlusSecurityService();
-    this.dexscreenerService = new DexScreenerService();
-    this.jupiterPriceService = new JupiterPriceService();
+    // Streamlined to core detection services + Birdeye & GMGN
     this.bundleDetector = new BundleDetectorService();
     this.bubblemapsService = new BubblemapsService();
-    this.quillcheckService = new QuillCheckService();
     this.whaleDetector = new WhaleDetectorService();
     this.gmgnService = new GMGNService();
     this.agedWalletDetector = new AgedWalletDetector();
@@ -123,18 +112,13 @@ export class SolanaTokenAnalyzer {
       const mintAuthority = this.analyzeMintAuthority(mintInfo.mintAuthority);
       const freezeAuthority = this.analyzeFreezeAuthority(mintInfo.freezeAuthority);
       
-      // Fetch token accounts (holders) from on-chain and external APIs in parallel
-      const [onChainHolders, totalHolderCount, recentTransactions, rugcheckData, goplusData, dexscreenerData, jupiterPriceData, birdeyeData, pumpFunData, quillcheckData, gmgnRawData, tokenCreationDate] = await Promise.all([
+      // Fetch token accounts (holders) from on-chain and streamlined APIs (Birdeye + GMGN)
+      const [onChainHolders, totalHolderCount, recentTransactions, birdeyeData, pumpFunData, gmgnRawData, tokenCreationDate] = await Promise.all([
         this.fetchTopHolders(mintPubkey, mintInfo.decimals, mintInfo.supply),
         this.getTotalHolderCount(mintPubkey).catch(() => null),
         this.fetchRecentTransactions(mintPubkey),
-        this.rugcheckService.getTokenReport(tokenAddress).catch(() => null),
-        this.goplusService.getTokenSecurity(tokenAddress).catch(() => null),
-        this.dexscreenerService.getTokenData(tokenAddress).catch(() => null),
-        this.jupiterPriceService.getTokenPrice(tokenAddress).catch(() => null),
         getBirdeyeOverview(tokenAddress).catch(() => null),
         checkPumpFun(tokenAddress).catch(() => ({ isPumpFun: false, devBought: 0, bondingCurve: 0 })),
-        this.quillcheckService.checkToken(tokenAddress).catch(() => null),
         this.gmgnService.getTokenAnalysis(tokenAddress).catch(() => null),
         this.getTokenCreationDate(mintPubkey).catch(() => undefined),
       ]);
@@ -156,11 +140,10 @@ export class SolanaTokenAnalyzer {
       // First, get liquidity pool addresses from external sources
       const liquidityPool = this.analyzeLiquidity(0); // Pass 0 initially, will recalculate
 
-      // Enrich liquidity data with market information from Rugcheck and DexScreener
+      // Enrich liquidity data with market information from Birdeye and GMGN
       const enrichedLiquidity = await this.enrichLiquidityWithMarketData(
         liquidityPool,
-        rugcheckData,
-        dexscreenerData,
+        birdeyeData,
         tokenAddress
       );
       
@@ -171,12 +154,8 @@ export class SolanaTokenAnalyzer {
       const bundledWallets = detectBundledWallets(holders);
       
       // For pump.fun tokens, also exclude the bonding curve addresses
-      // Detect pump.fun from multiple sources for reliability
-      const isPumpFunFromAPI = pumpFunData?.isPumpFun || false;
-      const isPumpFunFromRugcheck = rugcheckData?.markets?.some((m: any) => 
-        m.marketType?.startsWith('pump_fun')
-      ) || false;
-      const isPumpFunToken = isPumpFunFromAPI || isPumpFunFromRugcheck;
+      // Detect pump.fun from API
+      const isPumpFunToken = pumpFunData?.isPumpFun || false;
       
       const pumpFunExclusions: string[] = [];
       if (isPumpFunToken) {
@@ -407,16 +386,16 @@ export class SolanaTokenAnalyzer {
       const primaryPair = dexscreenerData ? dexService.getMostLiquidPair(dexscreenerData) : null;
       
       const metadata: TokenMetadata = {
-        name: primaryPair?.baseToken?.name || "Unknown Token",
-        symbol: primaryPair?.baseToken?.symbol || tokenAddress.slice(0, 6),
+        name: birdeyeData?.twitter || "Unknown Token",
+        symbol: tokenAddress.slice(0, 6),
         decimals: mintInfo.decimals || 0,
         supply: safeSupply,
-        hasMetadata: !!(primaryPair?.baseToken?.name),
+        hasMetadata: !!birdeyeData,
         isMutable: mintAuthority.hasAuthority,
       };
       
-      // Build market data from DexScreener primary pair
-      const marketData = this.buildMarketData(primaryPair, rugcheckData);
+      // Build market data from Birdeye
+      const marketData = this.buildMarketDataFromBirdeye(birdeyeData);
       
       // Calculate risk flags (use enriched liquidity for accurate risk assessment)
       const redFlags = this.calculateRiskFlags(
@@ -427,7 +406,6 @@ export class SolanaTokenAnalyzer {
         holderCount,
         advancedBundleData,
         networkAnalysis,
-        quillcheckData,
         gmgnData,
         agedWalletData,
         pumpDumpData,
@@ -474,11 +452,6 @@ export class SolanaTokenAnalyzer {
         aiVerdict,
         pumpFunData: pumpFunData || undefined,
         birdeyeData: birdeyeData || undefined,
-        rugcheckData: rugcheckData || undefined,
-        goplusData: goplusData || undefined,
-        dexscreenerData: dexscreenerData || undefined,
-        jupiterPriceData: jupiterPriceData || undefined,
-        quillcheckData: quillcheckData || undefined,
         advancedBundleData: advancedBundleData as any || undefined,
         networkAnalysis: networkAnalysis || undefined,
         gmgnData: gmgnData || undefined,
@@ -965,14 +938,50 @@ export class SolanaTokenAnalyzer {
       }
       
       // Convert to milliseconds
-      return creationTime * 1000;
-    } catch (error) {
-      console.error("Error fetching token creation date:", error);
-      return undefined;
-    }
+    return creationTime * 1000;
+  } catch (error) {
+    console.error("Error fetching token creation date:", error);
+    return undefined;
+  }
+}
+
+private buildMarketDataFromBirdeye(birdeyeData: any) {
+  if (!birdeyeData) {
+    return {
+      price: 0,
+      priceChange24h: 0,
+      priceChange24hPercent: 0,
+      volume24h: 0,
+      marketCap: 0,
+      liquidity: 0,
+      tradingPairs: 0,
+    };
   }
 
-  private calculateRiskFlags(
+  return {
+    price: birdeyeData.price || 0,
+    priceChange24h: 0, // Birdeye doesn't provide this directly
+    priceChange24hPercent: birdeyeData.priceChange24hPercent || 0,
+    volume24h: birdeyeData.v24hUSD || 0,
+    marketCap: birdeyeData.mc || 0,
+    liquidity: birdeyeData.liquidity || 0,
+    tradingPairs: 1, // Simplified since we don't have this data from Birdeye
+  };
+}
+
+private async enrichLiquidityWithMarketData(
+  liquidityPool: any,
+  birdeyeData: any,
+  tokenAddress: string
+) {
+  // Simplified liquidity enrichment using Birdeye data
+  return {
+    ...liquidityPool,
+    lpAddresses: [], // Will be populated by other methods if needed
+    totalLiquidity: birdeyeData?.liquidity || 0,
+    liquidityLocked: birdeyeData?.lpBurned || false,
+  };
+}  private calculateRiskFlags(
     mintAuthority: AuthorityStatus,
     freezeAuthority: AuthorityStatus,
     liquidityPool: LiquidityPoolStatus,

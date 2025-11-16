@@ -506,33 +506,6 @@ export default function Home() {
                         />
                       </Suspense>
                       
-                      {analysis.rugcheckData && (
-                        <Suspense fallback={<ComponentLoader />}>
-                          <RugcheckCard 
-                            data={analysis.rugcheckData}
-                            tokenAddress={analysis.tokenAddress}
-                          />
-                        </Suspense>
-                      )}
-                      
-                      {analysis.goplusData && (
-                        <Suspense fallback={<ComponentLoader />}>
-                          <GoPlusCard 
-                            data={analysis.goplusData}
-                            tokenAddress={analysis.tokenAddress}
-                          />
-                        </Suspense>
-                      )}
-                      
-                      {analysis.dexscreenerData && (
-                        <Suspense fallback={<ComponentLoader />}>
-                          <MarketDataCard 
-                            data={analysis.dexscreenerData}
-                            tokenAddress={analysis.tokenAddress}
-                          />
-                        </Suspense>
-                      )}
-                      
                       <Suspense fallback={<ComponentLoader />}>
                         <TransactionTimeline transactions={analysis.recentTransactions || []} />
                       </Suspense>

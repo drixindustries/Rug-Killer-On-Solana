@@ -156,17 +156,13 @@ Rug Killer Alpha Bot is the most advanced Solana token security platform, combin
 - **Token Standards**: SPL Token + Token-2022 with smart program detection
 - **RPC Providers**: Multi-provider balancing (Helius, Alchemy, Public)
 
-### Detection Services (8 Integrations + 2 Custom)
-1. **QuillCheck** - AI honeypot simulation (2025)
-2. **Custom Bundle Detector** - Jito timing + CEX filtering (2025)
-3. **Custom Whale Detector** - Early accumulation detection (2025)
-4. **Bubblemaps** - Wallet network clustering (2025)
-5. **Pump.fun WebSocket** - Live token launch feed (2025)
-6. **RugCheck** - Community-driven token analysis
-7. **GoPlus Security** - Smart contract auditing
-8. **DexScreener** - DEX aggregation and liquidity tracking
-9. **Jupiter** - Price aggregation and routing
-10. **Birdeye** - Market data and price feeds
+### Detection Services (2 Core APIs + Custom Analytics)
+1. **Birdeye API** - Real-time token prices, market data, and liquidity tracking
+2. **GMGN API** - Advanced bundle detection, insider trading analysis, and smart money tracking
+3. **Custom Bundle Detector** - Jito timing + CEX filtering (2025)
+4. **Custom Whale Detector** - Early accumulation detection (2025)
+5. **Custom Aged Wallet Detection** - Fake volume detection (2025)
+6. **Custom Pump & Dump Detection** - Pattern recognition (2025)
 
 ### Platform Support
 | Platform | Traditional Detection | Advanced Detection | Live Auto-Scan | Whale Alerts |
@@ -417,11 +413,9 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## 🙏 Acknowledgments
 
-- **QuillCheck** - AI-powered honeypot detection
-- **Bubblemaps** - Wallet network analysis
+- **Birdeye** - Real-time market data and price feeds
+- **GMGN.AI** - Advanced bundle detection and insider analysis
 - **Pump.fun** - Real-time launch API
-- **RugCheck** - Community-driven token analysis
-- **GoPlus Security** - Smart contract auditing
 - **Solana Foundation** - RPC infrastructure
 - **Phantom Wallet** - Wallet authentication SDK
 
