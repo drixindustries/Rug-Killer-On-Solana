@@ -273,6 +273,14 @@ export default function Home() {
     onSuccess: (data) => {
       setAnalysis(data);
     },
+    onError: (error: Error) => {
+      console.error("Analysis error:", error);
+      toast({
+        variant: "destructive",
+        title: "Analysis Failed",
+        description: error.message || "Failed to analyze token. Please try again.",
+      });
+    },
   });
 
   const handleAnalyze = (address: string) => {
