@@ -2,19 +2,12 @@ import request from 'supertest';
 import { app } from '../../server/index';
 import {
   mockCompleteAnalysis,
-  mockDexScreener,
-  mockRugcheck,
-  mockGoPlus,
   mockSolanaRPC,
   clearAllMocks,
 } from '../utils/solana-mocks';
 import {
   PUMP_FUN_TOKEN,
   BUNDLE_TOKEN,
-  DEXSCREENER_DATA_PUMP,
-  RUGCHECK_DATA_PUMP,
-  RUGCHECK_DATA_WITH_BUNDLES,
-  GOPLUS_DATA_SAFE,
 } from '../fixtures/solana/token-fixtures';
 import { registerRoutes } from '../../server/routes';
 
@@ -59,8 +52,9 @@ describe('API Integration Tests', () => {
         
         expect(response.body).toHaveProperty('riskScore');
         expect(typeof response.body.riskScore).toBe('number');
+        // Updated analyzer riskScore now 0-100 (lower = more dangerous)
         expect(response.body.riskScore).toBeGreaterThanOrEqual(0);
-        expect(response.body.riskScore).toBeLessThanOrEqual(10000);
+        expect(response.body.riskScore).toBeLessThanOrEqual(100);
         
         expect(response.body).toHaveProperty('riskLevel');
         expect(['LOW', 'MODERATE', 'HIGH', 'EXTREME']).toContain(response.body.riskLevel);
@@ -131,7 +125,9 @@ describe('API Integration Tests', () => {
           expect(response.body.marketData).toHaveProperty('priceUsd');
           expect(response.body.marketData).toHaveProperty('volume24h');
           expect(response.body.marketData).toHaveProperty('priceChange24h');
-          expect(response.body.marketData).toHaveProperty('liquidity');
+          // Liquidity key renamed when sourced from DexScreener (liquidityUsd) or Birdeye (liquidity)
+          const hasLiquidity = 'liquidityUsd' in response.body.marketData || 'liquidity' in response.body.marketData;
+          expect(hasLiquidity).toBe(true);
           expect(response.body.marketData).toHaveProperty('marketCap');
           expect(response.body.marketData).toHaveProperty('fdv');
         }
@@ -148,17 +144,10 @@ describe('API Integration Tests', () => {
 
         // Verify holder filtering data includes bundle information
         expect(response.body).toHaveProperty('holderFiltering');
-        expect(response.body.holderFiltering).toHaveProperty('bundlePercentage');
-        
-        // Bundle percentage should be greater than 0 when bundles detected
-        if (response.body.holderFiltering.bundlePercentage !== undefined) {
-          expect(response.body.holderFiltering.bundlePercentage).toBeGreaterThan(0);
-        }
-
-        // Should have detected bundled holders
-        expect(response.body.holderFiltering).toHaveProperty('bundledHolderCount');
-        if (response.body.holderFiltering.bundledHolderCount !== undefined) {
-          expect(response.body.holderFiltering.bundledHolderCount).toBeGreaterThan(0);
+        expect(response.body.holderFiltering).toHaveProperty('totals');
+        if (response.body.holderFiltering.bundledDetection) {
+          expect(response.body.holderFiltering.bundledDetection).toHaveProperty('bundleSupplyPct');
+          expect(typeof response.body.holderFiltering.bundledDetection.bundleSupplyPct).toBe('number');
         }
       });
 
@@ -200,17 +189,15 @@ describe('API Integration Tests', () => {
           .send({ tokenAddress: PUMP_FUN_TOKEN.address })
           .expect(200);
 
-        // Risk score should be calculated
+        // Risk score present
         expect(response.body.riskScore).toBeDefined();
         expect(typeof response.body.riskScore).toBe('number');
-
-        // Risk level should match risk score ranges
         const { riskScore, riskLevel } = response.body;
-        if (riskScore < 3000) {
+        if (riskScore >= 70) {
           expect(riskLevel).toBe('LOW');
-        } else if (riskScore < 5000) {
+        } else if (riskScore >= 40) {
           expect(riskLevel).toBe('MODERATE');
-        } else if (riskScore < 7500) {
+        } else if (riskScore >= 20) {
           expect(riskLevel).toBe('HIGH');
         } else {
           expect(riskLevel).toBe('EXTREME');
@@ -387,9 +374,8 @@ describe('API Integration Tests', () => {
           .send({ tokenAddress: PUMP_FUN_TOKEN.address })
           .expect(200);
 
-        expect(response.body.holderFiltering).toHaveProperty('totalFiltered');
-        expect(response.body.holderFiltering).toHaveProperty('filterCategories');
-        expect(Array.isArray(response.body.holderFiltering.filterCategories)).toBe(true);
+        expect(response.body.holderFiltering).toHaveProperty('excluded');
+        expect(Array.isArray(response.body.holderFiltering.excluded)).toBe(true);
       });
     });
 

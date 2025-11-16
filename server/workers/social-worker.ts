@@ -1,5 +1,5 @@
-import { storage } from "../storage";
-import { socialService } from "../services/social-service";
+import { storage } from "../storage.ts";
+import { socialService } from "../services/social-service.ts";
 
 class SocialWorker {
   private reputationInterval: NodeJS.Timeout | null = null;

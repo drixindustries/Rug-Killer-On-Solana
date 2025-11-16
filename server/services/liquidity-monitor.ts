@@ -10,7 +10,7 @@
  * Created: Nov 15, 2025
  */
 
-import { DexScreenerPair } from "@shared/schema";
+import type { DexScreenerPair } from "../../shared/schema.ts";
 
 export interface LiquidityChange {
   type: 'sudden_drop' | 'gradual_drain' | 'lp_removal' | 'healthy';

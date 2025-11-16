@@ -1,8 +1,8 @@
-import { db } from "./db";
-import { badActorLabels, analysisRuns } from "@shared/schema";
-import type { TokenAnalysisResponse } from "@shared/schema";
+import { db } from "./db.ts";
+import { badActorLabels, analysisRuns } from "../shared/schema.ts";
+import type { TokenAnalysisResponse } from "../shared/schema.ts";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { storage } from "./storage";
+import { storage } from "./storage.ts";
 
 // ============================================================================
 // PHASE 1: RULES-BASED BLACKLIST ENGINE

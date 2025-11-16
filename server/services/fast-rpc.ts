@@ -9,8 +9,9 @@
  * - Block height: 10 seconds
  */
 
-import { Connection, PublicKey, GetProgramAccountsFilter } from '@solana/web3.js';
-import { redisCache } from './redis-cache';
+import { Connection, PublicKey } from '@solana/web3.js';
+import type { GetProgramAccountsFilter } from '@solana/web3.js';
+import { redisCache } from './redis-cache.ts';
 
 class FastRPCService {
   private connections: Connection[];

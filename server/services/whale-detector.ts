@@ -5,8 +5,8 @@
  */
 
 import { Connection, PublicKey } from "@solana/web3.js";
-import { rpcBalancer } from "./rpc-balancer";
-import { isExchangeWallet } from "../exchange-whitelist";
+import { rpcBalancer } from "./rpc-balancer.ts";
+import { isExchangeWallet } from "../exchange-whitelist.ts";
 
 export interface WhaleBuy {
   wallet: string;

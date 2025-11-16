@@ -11,7 +11,7 @@
  * Created: Nov 15, 2025
  */
 
-import { DexScreenerPair } from "@shared/schema";
+import type { DexScreenerPair } from "../../shared/schema.ts";
 
 export interface PumpDumpPattern {
   type: 'rapid_pump' | 'instant_dump' | 'coordinated_selloff' | 'volume_manipulation';

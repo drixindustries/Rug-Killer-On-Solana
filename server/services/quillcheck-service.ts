@@ -1,126 +1,74 @@
-/**
- * QuillCheck Integration
- * 
- * AI-powered honeypot simulation and tax detection
- * Free API with 1K calls/day limit
- * 
- * https://check.quillai.network
- */
+import type { QuillCheckData } from '@shared/schema';
 
-export interface QuillCheckResult {
-  riskScore: number; // 0-100
-  isHoneypot: boolean;
-  buyTax: number;
-  sellTax: number;
-  canSell: boolean;
-  liquidityRisk: boolean;
-  risks: string[];
+interface QuillCacheEntry {
+  data: QuillCheckData | null;
+  fetchedAt: number;
 }
 
+const CACHE = new Map<string, QuillCacheEntry>();
+const DEFAULT_TTL_MS = 60_000; // 1 minute cache – honeypot/tax unlikely to change rapidly
+
 export class QuillCheckService {
-  private readonly API_URL = "https://api.quillai.network/v1";
-  
-  /**
-   * Performs comprehensive honeypot and tax simulation
-   * Detects asymmetric taxes, liquidity drains, and sell restrictions
-   */
-  async checkToken(tokenAddress: string, chain: string = "solana"): Promise<QuillCheckResult | null> {
-    try {
-      const response = await fetch(
-        `${this.API_URL}/check/${chain}/${tokenAddress}`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-          signal: AbortSignal.timeout(5000),
-        }
-      );
-      
-      if (!response.ok) {
-        if (response.status === 429) {
-          console.warn("QuillCheck: Rate limit exceeded");
-          return null;
-        }
-        if (response.status === 404) {
-          console.log(`QuillCheck: Token ${tokenAddress} not found`);
-          return null;
-        }
-        console.warn(`QuillCheck API error: ${response.status}`);
-        return null;
-      }
-      
-      const data = await response.json();
-      return this.parseResult(data);
-      
-    } catch (error) {
-      console.error("QuillCheck API error:", error);
-      return null;
-    }
+  private apiUrl: string;
+  private ttlMs: number;
+
+  constructor(options?: { apiUrl?: string; ttlMs?: number }) {
+    this.apiUrl = options?.apiUrl || process.env.QUILLCHECK_API_URL || 'https://check.quillai.network';
+    this.ttlMs = options?.ttlMs ?? DEFAULT_TTL_MS;
   }
-  
-  private parseResult(data: any): QuillCheckResult {
-    const risks: string[] = [];
-    let riskScore = data.riskScore || 0;
-    
-    const buyTax = parseFloat(data.buyTax || "0");
-    const sellTax = parseFloat(data.sellTax || "0");
-    const isHoneypot = data.isHoneypot === true || data.honeypot === true;
-    const canSell = data.canSell !== false && !isHoneypot;
-    const liquidityRisk = data.liquidityRisk === true || data.liquidity?.risk === "high";
-    
-    // Analyze taxes
-    if (buyTax > 10) {
-      risks.push(`High buy tax: ${buyTax}%`);
-      riskScore += Math.min(20, buyTax);
-    }
-    
-    if (sellTax > 10) {
-      risks.push(`High sell tax: ${sellTax}%`);
-      riskScore += Math.min(30, sellTax * 1.5);
-    }
-    
-    // Asymmetric taxes are major red flag
-    if (sellTax - buyTax > 5) {
-      risks.push(`Asymmetric taxes: ${sellTax}% sell vs ${buyTax}% buy - honeypot risk`);
-      riskScore += 25;
-    }
-    
-    // Honeypot detection
-    if (isHoneypot) {
-      risks.push("HONEYPOT DETECTED - Cannot sell tokens");
-      riskScore = 100;
-    }
-    
-    if (!canSell) {
-      risks.push("Sell function is restricted or disabled");
-      riskScore += 40;
-    }
-    
-    // Liquidity risks
-    if (liquidityRisk) {
-      risks.push("Liquidity can be drained by contract owner");
-      riskScore += 30;
-    }
-    
-    riskScore = Math.min(100, riskScore);
-    
+
+  private normalize(raw: any): QuillCheckData | null {
+    if (!raw) return null;
+    // Expected raw shape (best-effort): { riskScore, honeypot, buyTax, sellTax, canSell, liquidityRisk, risks }
+    const riskScore = typeof raw.riskScore === 'number' ? raw.riskScore : (raw.score || 0);
+    const isHoneypot = !!(raw.isHoneypot || raw.honeypot);
+    const buyTax = Number(raw.buyTax ?? raw.buy_tax ?? 0);
+    const sellTax = Number(raw.sellTax ?? raw.sell_tax ?? 0);
+    const canSell = raw.canSell !== undefined ? !!raw.canSell : !isHoneypot;
+    const liquidityRisk = !!(raw.liquidityRisk || raw.canDrainLiquidity || raw.liquidity_drain);
+    const risks: string[] = Array.isArray(raw.risks) ? raw.risks : [];
     return {
-      riskScore,
+      riskScore: Math.min(100, Math.max(0, riskScore)),
       isHoneypot,
       buyTax,
       sellTax,
       canSell,
       liquidityRisk,
-      risks
+      risks,
     };
   }
-  
-  /**
-   * Quick honeypot check
-   * Returns true if token is definitely a honeypot
-   */
-  async isHoneypot(tokenAddress: string): Promise<boolean> {
-    const result = await this.checkToken(tokenAddress);
-    return result ? result.isHoneypot : false;
+
+  async checkToken(tokenAddress: string): Promise<QuillCheckData | null> {
+    const now = Date.now();
+    const cached = CACHE.get(tokenAddress);
+    if (cached && (now - cached.fetchedAt) < this.ttlMs) {
+      return cached.data;
+    }
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8_000);
+      const res = await fetch(`${this.apiUrl}/api/scan/${tokenAddress}`, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        console.warn(`[QuillCheck] API error ${res.status}`);
+        const entry: QuillCacheEntry = { data: null, fetchedAt: now };
+        CACHE.set(tokenAddress, entry);
+        return null;
+      }
+      const raw = await res.json();
+      const normalized = this.normalize(raw);
+      CACHE.set(tokenAddress, { data: normalized, fetchedAt: now });
+      return normalized;
+    } catch (err) {
+      if ((err as any).name === 'AbortError') {
+        console.warn('[QuillCheck] Request timed out');
+      } else {
+        console.error('[QuillCheck] Fetch failed:', err);
+      }
+      CACHE.set(tokenAddress, { data: null, fetchedAt: now });
+      return null;
+    }
   }
 }
+
+export const quillCheckService = new QuillCheckService();

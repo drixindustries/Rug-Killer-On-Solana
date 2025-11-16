@@ -14,8 +14,8 @@
  */
 
 import { Connection, PublicKey } from "@solana/web3.js";
-import { rpcBalancer } from "./rpc-balancer";
-import { HolderInfo } from "@shared/schema";
+import { rpcBalancer } from "./rpc-balancer.ts";
+import type { HolderInfo } from "../../shared/schema.ts";
 
 // Known funding sources and their patterns
 const KNOWN_FUNDING_SOURCES = {

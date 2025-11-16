@@ -1,4 +1,4 @@
-import { Connection, PublicKey, ParsedAccountData } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { getMint, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import type {
   TokenAnalysisResponse,
@@ -9,23 +9,27 @@ import type {
   RiskFlag,
   RiskLevel,
   TransactionInfo,
+  QuillCheckData,
+  DexScreenerData,
 } from "@shared/schema";
 // LIGHTNING FAST: Only Birdeye and GMGN APIs + fast cached RPC
-import { isKnownAddress, getKnownAddressInfo, detectBundledWallets, getPumpFunBondingCurveAddress, getPumpFunAssociatedBondingCurveAddress } from "./known-addresses";
-import { getBirdeyeOverview } from "./services/birdeye-api";
-import { checkPumpFun } from "./services/pumpfun-api";
-import { fastRPC } from "./services/fast-rpc";
-import { LPChecker } from "./services/lp-checker";
-import { BundleDetectorService } from "./services/bundle-detector";
-import { BubblemapsService } from "./services/bubblemaps-service";
-import { WhaleDetectorService } from "./services/whale-detector";
-import { GMGNService } from "./services/gmgn-service";
-import { AgedWalletDetector } from "./services/aged-wallet-detector";
-import { PumpDumpDetectorService } from "./services/pump-dump-detector";
-import { LiquidityMonitorService } from "./services/liquidity-monitor";
-import { HolderTrackingService } from "./services/holder-tracking";
-import { FundingSourceAnalyzer } from "./services/funding-source-analyzer";
-import { walletIntelligenceService } from "./services/wallet-intelligence";
+import { isKnownAddress, getKnownAddressInfo, detectBundledWallets, getPumpFunBondingCurveAddress, getPumpFunAssociatedBondingCurveAddress } from "./known-addresses.ts";
+import { getBirdeyeOverview } from "./services/birdeye-api.ts";
+import { checkPumpFun } from "./services/pumpfun-api.ts";
+import { fastRPC } from "./services/fast-rpc.ts";
+import { LPChecker } from "./services/lp-checker.ts";
+import { BundleDetectorService } from "./services/bundle-detector.ts";
+import { BubblemapsService } from "./services/bubblemaps-service.ts";
+import { WhaleDetectorService } from "./services/whale-detector.ts";
+import { GMGNService } from "./services/gmgn-service.ts";
+import { AgedWalletDetector } from "./services/aged-wallet-detector.ts";
+import { PumpDumpDetectorService } from "./services/pump-dump-detector.ts";
+import { LiquidityMonitorService } from "./services/liquidity-monitor.ts";
+import { HolderTrackingService } from "./services/holder-tracking.ts";
+import { FundingSourceAnalyzer } from "./services/funding-source-analyzer.ts";
+import { walletIntelligenceService } from "./services/wallet-intelligence.ts";
+import { DexScreenerService } from "./dexscreener-service.ts";
+import { quillCheckService, QuillCheckService } from './services/quillcheck-service.ts';
 
 export class SolanaTokenAnalyzer {
   // Core detection services - streamlined to focus on Birdeye and GMGN data
@@ -38,6 +42,7 @@ export class SolanaTokenAnalyzer {
   private liquidityMonitor: LiquidityMonitorService;
   private holderTracker: HolderTrackingService;
   private fundingAnalyzer: FundingSourceAnalyzer;
+  private quillService: QuillCheckService;
 
   constructor() {
     // Streamlined to core detection services + Birdeye & GMGN
@@ -50,6 +55,7 @@ export class SolanaTokenAnalyzer {
     this.liquidityMonitor = new LiquidityMonitorService();
     this.holderTracker = new HolderTrackingService();
     this.fundingAnalyzer = new FundingSourceAnalyzer();
+    this.quillService = quillCheckService; // singleton
   }
 
   private getConnection(): Connection {
@@ -420,21 +426,47 @@ export class SolanaTokenAnalyzer {
         console.error('[Funding Analysis] Failed:', error);
       }
       
-      // Build metadata - use Birdeye data
+      // Fetch DexScreener data (optional)
+      let dexscreenerData: DexScreenerData | null = null;
+      let primaryDexPair: any = null;
+      try {
+        const dexService = new DexScreenerService();
+        dexscreenerData = await dexService.getTokenData(tokenAddress);
+        if (dexscreenerData) {
+          primaryDexPair = dexService.getSOLPair(dexscreenerData) || dexService.getMostLiquidPair(dexscreenerData);
+        }
+      } catch (error) {
+        console.error('[DexScreener] Failed to fetch data:', error);
+      }
+
+      // QuillCheck honeypot & tax detection
+      let quillcheckData: QuillCheckData | null = null;
+      try {
+        quillcheckData = await this.quillService.checkToken(tokenAddress);
+        if (quillcheckData) {
+          console.log(`[QuillCheck] Honeypot=${quillcheckData.isHoneypot} buyTax=${quillcheckData.buyTax} sellTax=${quillcheckData.sellTax}`);
+        }
+      } catch (qcErr) {
+        console.error('[QuillCheck] Integration failed:', qcErr);
+      }
+
+      // Build metadata - prefer DexScreener base token info, fallback to Birdeye
       const supply = Number(mintInfo.supply);
       const safeSupply = isNaN(supply) || !isFinite(supply) ? 0 : supply;
       
       const metadata: TokenMetadata = {
-        name: birdeyeData?.twitter || "Unknown Token",
-        symbol: tokenAddress.slice(0, 6),
+        name: primaryDexPair?.baseToken?.name || birdeyeData?.twitter || "Unknown Token",
+        symbol: primaryDexPair?.baseToken?.symbol || tokenAddress.slice(0, 6),
         decimals: mintInfo.decimals || 0,
         supply: safeSupply,
         hasMetadata: !!birdeyeData,
         isMutable: mintAuthority.hasAuthority,
       };
       
-      // Build market data from Birdeye
-      const marketData = this.buildMarketDataFromBirdeye(birdeyeData);
+      // Build market data using DexScreener if available else Birdeye
+      const marketData = primaryDexPair
+        ? this.buildMarketData(primaryDexPair, null)
+        : this.buildMarketDataFromBirdeye(birdeyeData);
       
       // Calculate risk flags (use enriched liquidity for accurate risk assessment)
       const redFlags = this.calculateRiskFlags(
@@ -450,7 +482,8 @@ export class SolanaTokenAnalyzer {
         pumpDumpData,
         liquidityMonitorData,
         holderTrackingData,
-        fundingAnalysisData
+        fundingAnalysisData,
+        quillcheckData || undefined
       );
       
       // Calculate overall risk score with safety check
@@ -491,6 +524,8 @@ export class SolanaTokenAnalyzer {
         aiVerdict,
         pumpFunData: pumpFunData || undefined,
         birdeyeData: birdeyeData || undefined,
+        dexscreenerData: dexscreenerData || undefined,
+        quillcheckData: quillcheckData || undefined,
         advancedBundleData: advancedBundleData as any || undefined,
         networkAnalysis: networkAnalysis || undefined,
         gmgnData: gmgnData || undefined,
@@ -885,7 +920,7 @@ private async enrichLiquidityWithMarketData(
   };
 }
 
-private calculateRiskFlags(
+  private calculateRiskFlags(
     mintAuthority: AuthorityStatus,
     freezeAuthority: AuthorityStatus,
     liquidityPool: LiquidityPoolStatus,
@@ -898,7 +933,8 @@ private calculateRiskFlags(
     pumpDumpData?: any,
     liquidityMonitorData?: any,
     holderTrackingData?: any,
-    fundingAnalysisData?: any
+    fundingAnalysisData?: any,
+    quillcheckData?: QuillCheckData
   ): RiskFlag[] {
     const flags: RiskFlag[] = [];
 
@@ -912,7 +948,6 @@ private calculateRiskFlags(
           description: "This token cannot be sold. QuillCheck AI simulation detected sell restrictions.",
         });
       }
-
       if (!quillcheckData.canSell && !quillcheckData.isHoneypot) {
         flags.push({
           type: "honeypot",
@@ -921,7 +956,6 @@ private calculateRiskFlags(
           description: "Selling this token may be disabled or restricted.",
         });
       }
-
       if (quillcheckData.sellTax > 15) {
         flags.push({
           type: "tax",
@@ -930,7 +964,6 @@ private calculateRiskFlags(
           description: `Selling this token incurs a ${quillcheckData.sellTax}% tax, which may prevent profitable exits.`,
         });
       }
-
       if (quillcheckData.sellTax - quillcheckData.buyTax > 5) {
         flags.push({
           type: "tax",
@@ -939,7 +972,6 @@ private calculateRiskFlags(
           description: `Buy tax: ${quillcheckData.buyTax}%, Sell tax: ${quillcheckData.sellTax}% - major red flag for honeypot.`,
         });
       }
-
       if (quillcheckData.liquidityRisk) {
         flags.push({
           type: "liquidity_drain",

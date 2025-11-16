@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { redisCache } from './redis-cache';
+import { redisCache } from './redis-cache.ts';
 
 const BIRDEYE_API = 'https://public-api.birdeye.so';
 const API_KEY = process.env.BIRDEYE_API_KEY || '';

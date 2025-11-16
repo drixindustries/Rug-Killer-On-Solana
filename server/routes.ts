@@ -1,9 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { analyzeTokenSchema, insertWatchlistSchema } from "@shared/schema";
-import { tokenAnalyzer } from "./solana-analyzer";
+import { analyzeTokenSchema, insertWatchlistSchema } from "../shared/schema.ts";
+import { tokenAnalyzer } from "./solana-analyzer.ts";
 // import { setupAuth, isAuthenticated } from "./replitAuth"; // Disabled for non-Replit deployments
-import { storage } from "./storage";
+import { storage } from "./storage.ts";
 import { 
   createWhopCheckout, 
   getWhopMembership, 
@@ -11,10 +11,10 @@ import {
   mapWhopStatus,
   mapPlanToTier,
   WHOP_PLAN_IDS 
-} from "./whop-client";
-import { VanityAddressGenerator } from "./vanity-generator";
+} from "./whop-client.ts";
+import { VanityAddressGenerator } from "./vanity-generator.ts";
 import { z } from "zod";
-import { rpcBalancer } from "./services/rpc-balancer";
+import { rpcBalancer } from "./services/rpc-balancer.ts";
 
 // Stub authentication for Railway deployment (no Replit OIDC)
 const setupAuth = async (app: Express) => {
@@ -699,7 +699,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
   
   // Import crypto payment service
-  const cryptoPayments = await import('./crypto-payments');
+  const cryptoPayments = await import('./crypto-payments.ts');
   
   // POST /api/create-crypto-payment - Generate crypto payment address
   app.post('/api/create-crypto-payment', isAuthenticated, async (req: any, res) => {
@@ -823,7 +823,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AI BLACKLIST ROUTES
   // ============================================================================
   
-  const blacklist = await import('./ai-blacklist');
+  const blacklist = await import('./ai-blacklist.ts');
   
   // GET /api/blacklist/check/:wallet - Check if wallet is blacklisted
   app.get('/api/blacklist/check/:wallet', async (req, res) => {
@@ -964,7 +964,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/prices/:tokenAddress - Get price for single token
   app.get('/api/prices/:tokenAddress', async (req, res) => {
     try {
-      const { priceService } = await import('./services/price-service');
+      const { priceService } = await import('./services/price-service.ts');
       const { tokenAddress } = req.params;
       
       const price = await priceService.getPrice(tokenAddress);
@@ -987,7 +987,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/prices/batch - Get prices for multiple tokens
   app.post('/api/prices/batch', async (req, res) => {
     try {
-      const { priceService } = await import('./services/price-service');
+      const { priceService } = await import('./services/price-service.ts');
       const { tokenAddresses } = req.body;
       
       if (!Array.isArray(tokenAddresses)) {
@@ -1026,8 +1026,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/analytics/market-overview - Market overview with trending tokens
   app.get('/api/analytics/market-overview', async (req, res) => {
     try {
-      const { priceCache } = await import('./services/price-cache');
-      const { getBlacklist } = await import('./ai-blacklist');
+      const { priceCache } = await import('./services/price-cache.ts');
+      const { getBlacklist } = await import('./ai-blacklist.ts');
       
       // Get trending tokens (top 10)
       const trending = await storage.getTrendingTokens(10);
@@ -1150,7 +1150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const trending = await storage.getTrendingTokens(limit);
       
       // Enrich with latest price data
-      const { priceService } = await import('./services/price-service');
+      const { priceService } = await import('./services/price-service.ts');
       const enriched = await Promise.all(
         trending.map(async (t) => {
           const priceData = await priceService.getPrice(t.tokenAddress);
@@ -1234,7 +1234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/portfolio/transactions', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { insertPortfolioTransactionSchema } = await import('@shared/schema');
+      const { insertPortfolioTransactionSchema } = await import('../shared/schema.ts');
       
       const result = insertPortfolioTransactionSchema.safeParse(req.body);
       if (!result.success) {
@@ -1317,7 +1317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/alerts', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { insertPriceAlertSchema } = await import('@shared/schema');
+      const { insertPriceAlertSchema } = await import('../shared/schema.ts');
       
       const result = insertPriceAlertSchema.safeParse(req.body);
       if (!result.success) {
@@ -2240,7 +2240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/admin/creator-wallet - View creator wallet info (NO private key)
   app.get('/api/admin/creator-wallet', isAdmin, async (req, res) => {
     try {
-      const { getCreatorWallet } = await import('./creator-wallet');
+      const { getCreatorWallet } = await import('./creator-wallet.ts');
       const wallet = getCreatorWallet();
       const info = await wallet.getWalletInfo();
       
@@ -2259,7 +2259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/admin/creator-wallet/generate - Generate new wallet (returns private key ONCE)
   app.post('/api/admin/creator-wallet/generate', isAdmin, async (req, res) => {
     try {
-      const { CreatorWalletService } = await import('./creator-wallet');
+      const { CreatorWalletService } = await import('./creator-wallet.ts');
       const newWallet = CreatorWalletService.generateNewWallet();
       
       res.json({
@@ -2308,8 +2308,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/admin/wallets/discovery/status - Get wallet discovery status
   app.get('/api/admin/wallets/discovery/status', isAdmin, async (req, res) => {
     try {
-      const { getWalletScheduler } = await import('./wallet-scheduler');
-      const { getAlphaAlertService } = await import('./alpha-alerts');
+      const { getWalletScheduler } = await import('./wallet-scheduler.ts');
+      const { getAlphaAlertService } = await import('./alpha-alerts.ts');
       
       const scheduler = getWalletScheduler();
       const alphaService = getAlphaAlertService();
@@ -2327,7 +2327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/admin/wallets/discovery/run - Manually trigger wallet discovery
   app.post('/api/admin/wallets/discovery/run', isAdmin, async (req, res) => {
     try {
-      const { getWalletDiscoveryService } = await import('./services/wallet-discovery');
+      const { getWalletDiscoveryService } = await import('./services/wallet-discovery.ts');
       const discoveryService = getWalletDiscoveryService();
       
       // This would be async - return immediately
@@ -2347,7 +2347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/admin/wallets/add - Manually add a wallet
   app.post('/api/admin/wallets/add', isAdmin, async (req, res) => {
     try {
-      const { addManualWallet } = await import('./services/external-wallet-sources');
+      const { addManualWallet } = await import('./services/external-wallet-sources.ts');
       
       const { walletAddress, displayName, twitterHandle, source } = req.body;
       
@@ -2372,8 +2372,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/admin/wallets/list - List all tracked wallets
   app.get('/api/admin/wallets/list', isAdmin, async (req, res) => {
     try {
-      const { db } = await import('./db');
-      const { kolWallets } = await import('../shared/schema');
+      const { db } = await import('./db.ts');
+      const { kolWallets } = await import('../shared/schema.ts');
       const { desc } = await import('drizzle-orm');
       
       const limit = parseInt(req.query.limit as string) || 100;
@@ -2403,8 +2403,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DELETE /api/admin/wallets/:walletAddress - Remove a wallet
   app.delete('/api/admin/wallets/:walletAddress', isAdmin, async (req, res) => {
     try {
-      const { db } = await import('./db');
-      const { kolWallets } = await import('../shared/schema');
+      const { db } = await import('./db.ts');
+      const { kolWallets } = await import('../shared/schema.ts');
       const { eq } = await import('drizzle-orm');
       
       const { walletAddress } = req.params;
@@ -2423,7 +2423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/admin/wallets/external/sync - Sync from external sources
   app.post('/api/admin/wallets/external/sync', isAdmin, async (req, res) => {
     try {
-      const { getExternalWalletService } = await import('./services/external-wallet-sources');
+      const { getExternalWalletService } = await import('./services/external-wallet-sources.ts');
       const externalService = getExternalWalletService();
       
       res.json({ message: 'External wallet sync started', status: 'running' });
@@ -2465,7 +2465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/scan-history - Get recent scan history
   app.get('/api/scan-history', async (req, res) => {
     try {
-      const { getScanHistory } = await import('./live-scan-websocket');
+      const { getScanHistory } = await import('./live-scan-websocket.ts');
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
       
@@ -2480,7 +2480,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/scan-stats - Get scan statistics
   app.get('/api/scan-stats', async (req, res) => {
     try {
-      const { getScanStats } = await import('./live-scan-websocket');
+      const { getScanStats } = await import('./live-scan-websocket.ts');
       const stats = await getScanStats();
       res.json(stats);
     } catch (error) {
@@ -2492,7 +2492,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/live-scan/status - Get WebSocket and Pump.fun status
   app.get('/api/live-scan/status', async (req, res) => {
     try {
-      const { liveScanWS } = await import('./live-scan-websocket');
+      const { liveScanWS } = await import('./live-scan-websocket.ts');
       const stats = liveScanWS.getStats();
       res.json(stats);
     } catch (error) {
@@ -2506,8 +2506,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize WebSocket for live scans
   (async () => {
     try {
-      const { liveScanWS } = await import('./live-scan-websocket');
-      const { pumpFunWebhook } = await import('./services/pumpfun-webhook');
+      const { liveScanWS } = await import('./live-scan-websocket.ts');
+      const { pumpFunWebhook } = await import('./services/pumpfun-webhook.ts');
       
       // Initialize WebSocket server
       liveScanWS.initialize(httpServer);

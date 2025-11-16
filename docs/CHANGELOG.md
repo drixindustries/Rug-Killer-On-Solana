@@ -1,5 +1,50 @@
 # Changelog - Advanced Detection Implementation
 
+## November 2025 – Scanner Fix & DexScreener Reintroduction
+### Summary
+Restored DexScreener market data to `SolanaTokenAnalyzer` and fixed a runtime crash preventing tokens from displaying (undefined `quillcheckData` reference). Frontend components depending on `dexscreenerData` (e.g. `MarketDataCard`) now receive data again. Scanner scripts (`scripts/scan-100-tokens.ts` / pumpfun variant) resume population of price, liquidity and volume metrics.
+
+### Fixes
+- Reintroduced optional DexScreener fetch in `server/solana-analyzer.ts` (adds `dexscreenerData` + selects SOL or most liquid pair).
+- Added safe placeholder for `quillcheckData` and updated `calculateRiskFlags` signature to accept it, eliminating ReferenceError.
+- Metadata now prefers DexScreener base token name/symbol when available.
+- Market data selection logic: use DexScreener pair first, fallback to Birdeye aggregation.
+- Updated risk flag generation call to include (possibly null) quillcheck data without breaking flow.
+
+### Impact
+- Token analysis endpoint `/api/analyze` returns `dexscreenerData` again → UI cards render price/volume/liquidity.
+- Scanner scripts no longer produce empty or error-laden results and can compute price change / sell pressure metrics.
+- Stability improved: analyzer no longer throws on missing QuillCheck integration.
+
+### Recommended Follow-Up
+1. Re-enable real QuillCheck integration or remove related flags if deprecated.
+2. Add lightweight unit test to ensure `analyzeToken` returns `dexscreenerData` when API responds.
+3. Consider caching DexScreener responses to reduce external calls during batch scans.
+
+## November 2025 – DexScreener Caching & QuillCheck Restoration
+### Summary
+Implemented in-memory TTL cache (30s) for DexScreener token fetches to reduce redundant API calls during batch scans and restored live QuillCheck honeypot/tax detection via `server/services/quillcheck-service.ts`.
+
+### Changes
+- Added cache map & TTL logic to `server/dexscreener-service.ts` (null responses cached briefly to avoid hammering on failures).
+- Created `server/services/quillcheck-service.ts` with normalization + timeout (8s) and 60s TTL cache.
+- Integrated QuillCheck into `server/solana-analyzer.ts` (logs basic detection stats, feeds into existing risk flag logic).
+
+### Impact
+- Batch scripts (e.g. `scan-100-tokens.ts`) now reuse fresh DexScreener data, lowering latency & rate-limit risk.
+- Honeypot and asymmetric tax risks re-enabled (critical flags appear again when detected).
+
+### Configuration
+- Optional env `QUILLCHECK_API_URL` (defaults to `https://check.quillai.network`).
+- No new persistent storage; purely in-memory.
+
+### Next Steps
+1. Add unit tests for cache hit/miss behavior.
+2. Promote caching to LRU with size cap (avoid unbounded growth on large scans).
+3. Add circuit-breaker (disable external calls temporarily after consecutive failures).
+
+---
+
 ## Session Summary
 **Date**: January 2025
 **Focus**: Implementing cutting-edge rug detection based on 2025 research

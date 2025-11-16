@@ -15,8 +15,8 @@
  * Created: Nov 15, 2025
  */
 
-import { fastRPC } from './fast-rpc';
-import { redisCache } from './redis-cache';
+import { fastRPC } from './fast-rpc.ts';
+import { redisCache } from './redis-cache.ts';
 
 export interface WalletIntelligence {
   address: string;

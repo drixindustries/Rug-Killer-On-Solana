@@ -1,7 +1,7 @@
 import WebSocket from 'ws';
 import { EventEmitter } from 'events';
-import { tokenAnalyzer } from '../solana-analyzer';
-import type { TokenAnalysisResponse } from '@shared/schema';
+import { tokenAnalyzer } from '../solana-analyzer.ts';
+import type { TokenAnalysisResponse } from '../../shared/schema.ts';
 
 export interface PumpFunToken {
   mint: string;

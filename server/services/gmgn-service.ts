@@ -18,7 +18,7 @@
  * Updated: Lightning Fast Redis Integration
  */
 
-import { redisCache } from './redis-cache';
+import { redisCache } from './redis-cache.ts';
 
 interface GMGNTokenResponse {
   code: number;

@@ -1,9 +1,9 @@
-import { WebSocketServer, WebSocket } from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 import type { Server } from 'http';
-import { pumpFunWebhook } from './services/pumpfun-webhook';
-import { db } from './db';
-import { scanHistory } from '@shared/schema';
-import type { TokenAnalysisResponse } from '@shared/schema';
+import { pumpFunWebhook } from './services/pumpfun-webhook.ts';
+import { db } from './db.ts';
+import { scanHistory } from '../shared/schema.ts';
+import type { TokenAnalysisResponse } from '../shared/schema.ts';
 import { desc, sql } from 'drizzle-orm';
 
 export interface LiveScanMessage {

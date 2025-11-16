@@ -2,9 +2,9 @@
  * Production-ready Express server
  * Clean separation between development (Vite) and production (static files)
  */
-import express, { type Request, Response, NextFunction } from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import session from "express-session";
-import { registerRoutes } from "./routes";
+import { registerRoutes } from "./routes.ts";
 import path from "path";
 import fs from "fs";
 
@@ -123,7 +123,7 @@ export async function startServer() {
 async function startServices() {
   // Telegram bot
   if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_TOKEN !== 'PLACEHOLDER_TOKEN') {
-    const { startTelegramBot } = await import('./telegram-bot');
+    const { startTelegramBot } = await import('./telegram-bot.ts');
     startTelegramBot().catch(err => {
       console.error('❌ Telegram bot failed:', err);
     });
@@ -132,7 +132,7 @@ async function startServices() {
   // Discord bot
   if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_BOT_TOKEN !== 'PLACEHOLDER_TOKEN' &&
       process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_ID !== 'PLACEHOLDER_ID') {
-    const { startDiscordBot } = await import('./discord-bot');
+    const { startDiscordBot } = await import('./discord-bot.ts');
     startDiscordBot().catch(err => {
       console.error('❌ Discord bot failed:', err);
     });
@@ -140,20 +140,20 @@ async function startServices() {
 
   // Alpha alerts
   if (process.env.ALPHA_ALERTS_ENABLED === 'true') {
-    const { getAlphaAlertService } = await import('./alpha-alerts');
+    const { getAlphaAlertService } = await import('./alpha-alerts.ts');
     const alphaService = getAlphaAlertService();
     alphaService.start().catch(err => {
       console.error('❌ Alpha alerts failed:', err);
     });
 
-    const { initializeWalletDiscovery } = await import('./wallet-scheduler');
+    const { initializeWalletDiscovery } = await import('./wallet-scheduler.ts');
     initializeWalletDiscovery();
   }
 
   // Workers
-  const { analyticsWorker } = await import('./workers/analytics-worker');
+  const { analyticsWorker } = await import('./workers/analytics-worker.ts');
   analyticsWorker.start();
 
-  const { socialWorker } = await import('./workers/social-worker');
+  const { socialWorker } = await import('./workers/social-worker.ts');
   socialWorker.start();
 }

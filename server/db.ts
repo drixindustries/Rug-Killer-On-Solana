@@ -1,25 +1,56 @@
+import 'dotenv/config';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import * as schema from "@shared/schema";
+import * as schema from "../shared/schema.ts";
 
 // Railway provides DATABASE_URL automatically when PostgreSQL is attached
 const DATABASE_URL = process.env.DATABASE_URL;
+const FORCE_IN_MEMORY = process.env.FORCE_IN_MEMORY_DB === 'true';
 
-if (!DATABASE_URL) {
-  console.error('❌ FATAL: DATABASE_URL environment variable is not set!');
-  console.error('   Railway should provide this automatically when PostgreSQL is attached.');
-  console.error('   Check: Railway Dashboard → Your Service → Variables');
-  process.exit(1);
+let db: any;
+let pool: any = null;
+
+if (!DATABASE_URL || FORCE_IN_MEMORY) {
+  console.warn('⚠️ Starting in IN-MEMORY MODE (no persistence). Database features disabled.');
+  db = createInMemoryDbStub();
+  pool = null;
+} else {
+  try {
+    console.log('✅ Connecting to PostgreSQL...');
+    pool = new Pool({
+      connectionString: DATABASE_URL,
+      ssl: { rejectUnauthorized: false }
+    });
+    db = drizzle(pool, { schema });
+  } catch (err) {
+    console.error('❌ Failed to initialize PostgreSQL pool:', err);
+    console.warn('⚠️ Falling back to in-memory stub DB.');
+    db = createInMemoryDbStub();
+    pool = null;
+  }
 }
 
-console.log('✅ DATABASE_URL found, connecting to PostgreSQL...');
+function createInMemoryDbStub() {
+  // Chainable stub for all drizzle methods - returns empty results to prevent crashes
+  const chainable: any = () => chainable;
+  chainable.select = chainable;
+  chainable.from = chainable;
+  chainable.insert = chainable;
+  chainable.update = chainable;
+  chainable.delete = chainable;
+  chainable.where = chainable;
+  chainable.limit = chainable;
+  chainable.offset = chainable;
+  chainable.orderBy = chainable;
+  chainable.values = chainable;
+  chainable.set = chainable;
+  chainable.returning = () => [];
+  chainable.then = () => Promise.resolve([]);
+  
+  return new Proxy({}, {
+    get: () => chainable
+  });
+}
 
-export const pool = new Pool({ 
-  connectionString: DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false // Required for Railway/Heroku/Render PostgreSQL
-  }
-});
-
-export const db = drizzle(pool, { schema });
+export { db, pool };
   

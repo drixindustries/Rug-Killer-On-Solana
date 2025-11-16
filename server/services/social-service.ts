@@ -1,4 +1,4 @@
-import { storage } from "../storage";
+import { storage } from "../storage.ts";
 import { nanoid } from "nanoid";
 
 export class SocialService {

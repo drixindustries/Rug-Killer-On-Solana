@@ -2,9 +2,12 @@
  * Server entry point
  * Production-ready, no Vite dependencies
  */
-import { startServer } from "./app.js";
+const bootstrap = async () => {
+  const mod = await import('./app.ts');
+  await mod.startServer();
+};
 
-startServer().catch((err) => {
-  console.error("Failed to start server:", err);
+bootstrap().catch((err) => {
+  console.error('Failed to start server:', err);
   process.exit(1);
 });

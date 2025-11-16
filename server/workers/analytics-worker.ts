@@ -1,8 +1,8 @@
-import { storage } from "../storage";
-import { priceCache } from "../services/price-cache";
-import { tokenAnalyzer } from "../solana-analyzer";
-import { getTopFlaggedWallets } from "../ai-blacklist";
-import type { InsertTrendingToken } from "@shared/schema";
+import { storage } from "../storage.ts";
+import { priceCache } from "../services/price-cache.ts";
+import { tokenAnalyzer } from "../solana-analyzer.ts";
+import { getTopFlaggedWallets } from "../ai-blacklist.ts";
+import type { InsertTrendingToken } from "../../shared/schema.ts";
 
 /**
  * Analytics Worker

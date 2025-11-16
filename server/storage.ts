@@ -67,8 +67,8 @@ import {
   type InsertTokenReport,
   type UserActivity,
   type InsertUserActivity,
-} from "@shared/schema";
-import { db } from "./db";
+} from "../shared/schema.ts";
+import { db } from "./db.ts";
 import { eq, and, isNull, lt, inArray, desc, sql } from "drizzle-orm";
 
 export interface IStorage {

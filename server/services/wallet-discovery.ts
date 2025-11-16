@@ -2,7 +2,7 @@ import { Connection, PublicKey, ParsedTransactionWithMeta, ParsedInstruction } f
 import { db } from '../db';
 import { kolWallets } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
-import { rpcBalancer } from './rpc-balancer';
+import { rpcBalancer } from './rpc-balancer.ts';
 
 interface WalletPerformance {
   wallet: string;

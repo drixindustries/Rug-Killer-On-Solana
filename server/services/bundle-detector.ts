@@ -13,8 +13,8 @@
  */
 
 import { Connection, PublicKey } from "@solana/web3.js";
-import { rpcBalancer } from "./rpc-balancer";
-import { isExchangeWallet, filterExchangeWallets, isLegitExchangeLiquidity, getExchangeStats } from "../exchange-whitelist";
+import { rpcBalancer } from "./rpc-balancer.ts";
+import { isExchangeWallet, filterExchangeWallets, isLegitExchangeLiquidity, getExchangeStats } from "../exchange-whitelist.ts";
 
 export interface BundleDetectionResult {
   isBundled: boolean;

@@ -18,7 +18,7 @@
  */
 
 import { Connection, PublicKey } from "@solana/web3.js";
-import { rpcBalancer } from "./rpc-balancer";
+import { rpcBalancer } from "./rpc-balancer.ts";
 
 export interface AgedWalletBuy {
   wallet: string;
