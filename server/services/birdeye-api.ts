@@ -2,7 +2,7 @@ import axios from 'axios';
 import { redisCache } from './redis-cache.ts';
 
 const BIRDEYE_API = 'https://public-api.birdeye.so';
-const API_KEY = process.env.BIRDEYE_API_KEY || 'c0ecda95a02f4b69ba76c48bd5f830b5';
+const API_KEY = process.env.BIRDEYE_API_KEY; // Only use if explicitly set
 
 interface BirdeyeOverview {
   price: number;
@@ -30,10 +30,11 @@ interface BirdeyeHolder {
 
 /**
  * Cached Birdeye overview (30 seconds cache)
+ * Returns null if no API key configured
  */
 export async function getBirdeyeOverview(tokenAddress: string): Promise<BirdeyeOverview | null> {
   if (!API_KEY) {
-    console.warn('[Birdeye] No API key configured');
+    // Silently return null if no API key - Birdeye is optional
     return null;
   }
   
@@ -51,12 +52,10 @@ export async function getBirdeyeOverview(tokenAddress: string): Promise<BirdeyeO
         
         return response.data?.data || null;
       } catch (error: any) {
-        if (error.response?.status === 401) {
-          console.error('[Birdeye] Invalid API key');
-        } else if (error.response?.status === 429) {
-          console.warn('[Birdeye] Rate limited');
-        } else {
-          console.error('[Birdeye] Overview error:', error.message);
+        // Silently fail - Birdeye is optional
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          // Invalid/forbidden API key - disable future attempts
+          return null;
         }
         return null;
       }
@@ -87,11 +86,7 @@ export async function getBirdeyePrice(tokenAddress: string): Promise<number | nu
         
         return response.data?.data?.value || null;
       } catch (error: any) {
-        if (error.response?.status === 429) {
-          console.warn('[Birdeye] Price rate limited');
-        } else {
-          console.error('[Birdeye] Price error:', error.message);
-        }
+        // Silently fail - Birdeye is optional
         return null;
       }
     },
@@ -122,11 +117,7 @@ export async function getBirdeyePriceHistory(tokenAddress: string, days: number 
         
         return response.data?.data || [];
       } catch (error: any) {
-        if (error.response?.status === 429) {
-          console.warn('[Birdeye] History rate limited');
-        } else {
-          console.error('[Birdeye] History error:', error.message);
-        }
+        // Silently fail - Birdeye is optional
         return [];
       }
     },
@@ -156,11 +147,7 @@ export async function getBirdeyeTopHolders(tokenAddress: string): Promise<Birdey
         
         return response.data?.data?.slice(0, 20) || [];
       } catch (error: any) {
-        if (error.response?.status === 429) {
-          console.warn('[Birdeye] Holders rate limited');
-        } else {
-          console.error('[Birdeye] Holders error:', error.message);
-        }
+        // Silently fail - Birdeye is optional
         return [];
       }
     },
