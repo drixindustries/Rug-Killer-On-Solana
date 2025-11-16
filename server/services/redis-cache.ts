@@ -112,20 +112,23 @@ class RedisCache {
       if (cached) {
         return JSON.parse(cached);
       }
+    } catch (cacheError) {
+      // Cache read failed - continue to fetch
+      // Don't log spam, the constructor already handles error logging
+    }
 
-      // Fetch fresh data
-      const value = await fetchFn();
-      
-      // Cache the result (non-blocking)
+    // Fetch fresh data - NOT wrapped in the cache try/catch
+    // This allows RPC errors to propagate properly
+    const value = await fetchFn();
+    
+    // Cache the result (non-blocking, only if fetch succeeded)
+    if (this.isConnected && this.redis) {
       this.redis.setex(key, expiresInSeconds, JSON.stringify(value)).catch(() => {
         // Silent fail on cache write errors
       });
-      
-      return value;
-    } catch (error) {
-      // Graceful fallback - always return data
-      return await fetchFn();
     }
+    
+    return value;
   }
 
   /**
