@@ -27,23 +27,28 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Copy server package files and install production dependencies only
-COPY server/package.json server/package-lock.json ./
+COPY server/package.json server/package-lock.json ./server/
+WORKDIR /app/server
 RUN npm ci --omit=dev
 
+WORKDIR /app
 # Copy shared directory and server source
 COPY shared/ ./shared/
-COPY server/ ./
+COPY server/ ./server/
 
 # Copy frontend build from builder stage
-COPY --from=frontend-builder /app/dist/public ./dist/public
+COPY --from=frontend-builder /app/dist/public ./server/dist/public
 
 # Verify copy worked
-RUN ls -la ./dist/public/ && test -f ./dist/public/index.html && echo "✅ Frontend copied successfully" || (echo "❌ Frontend copy failed!" && exit 1)
+RUN ls -la ./server/dist/public/ && test -f ./server/dist/public/index.html && echo "✅ Frontend copied successfully" || (echo "❌ Frontend copy failed!" && exit 1)
 
 # Environment
 ENV NODE_ENV=production
 ENV PORT=8080
 EXPOSE 8080
+
+# Set working directory to server
+WORKDIR /app/server
 
 # Run tsx
 CMD ["node_modules/.bin/tsx", "index.ts"]
