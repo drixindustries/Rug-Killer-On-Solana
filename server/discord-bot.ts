@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits, EmbedBuilder, SlashCommandBuilder, REST, Rou
 import { tokenAnalyzer } from './solana-analyzer';
 import { storage } from './storage';
 import type { TokenAnalysisResponse } from './shared/schema';
+import { buildCompactMessage, formatNumber, getRiskEmoji, formatAddress } from './bot-formatter';
 
 // Client instance - only created when startDiscordBot() is called
 let clientInstance: Client | null = null;
@@ -9,21 +10,6 @@ let clientInstance: Client | null = null;
 // ============================================================================
 // HELPER FUNCTIONS (module-level for reuse/testing)
 // ============================================================================
-
-function formatAddress(address: string): string {
-  return `${address.slice(0, 4)}...${address.slice(-4)}`;
-}
-
-function formatNumber(num: number): string {
-  if (num >= 1_000_000_000) {
-    return (num / 1_000_000_000).toFixed(2) + 'B';
-  } else if (num >= 1_000_000) {
-    return (num / 1_000_000).toFixed(2) + 'M';
-  } else if (num >= 1_000) {
-    return (num / 1_000).toFixed(2) + 'K';
-  }
-  return num.toFixed(2);
-}
 
 function getRiskColor(riskLevel: string): number {
   switch (riskLevel) {
@@ -37,21 +23,6 @@ function getRiskColor(riskLevel: string): number {
       return 0xff0000; // Red
     default:
       return 0x808080; // Gray
-  }
-}
-
-function getRiskEmoji(riskLevel: string): string {
-  switch (riskLevel) {
-    case 'LOW':
-      return '✅';
-    case 'MODERATE':
-      return '⚠️';
-    case 'HIGH':
-      return '🚨';
-    case 'EXTREME':
-      return '❌';
-    default:
-      return '❓';
   }
 }
 
@@ -83,123 +54,108 @@ function getLiquidityFieldValue(liquidityPool: any): string {
 }
 
 function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
-  const emoji = getRiskEmoji(analysis.riskLevel);
+  const messageData = buildCompactMessage(analysis);
   const color = getRiskColor(analysis.riskLevel);
   
   const embed = new EmbedBuilder()
     .setColor(color)
-    .setTitle(`${emoji} ${analysis.metadata.name} (${analysis.metadata.symbol})`)
-    .setDescription(`**Risk Score: ${analysis.riskScore}/100** (${analysis.riskLevel})\n_Higher = Safer • 0=Dangerous, 100=Safe_`)
+    .setTitle(messageData.header)
+    .setDescription(`**Risk Score: ${analysis.riskScore}/100** (${analysis.riskLevel})\n_0 = Do Not Buy • 100 = Strong Buy_`)
     .setFooter({ text: `Contract: ${analysis.tokenAddress}` })
     .setTimestamp();
   
-  // AI ANALYSIS
-  if (analysis.aiVerdict) {
+  // AI VERDICT
+  if (messageData.aiVerdict) {
     embed.addFields({
       name: '🤖 AI Analysis',
-      value: `${analysis.aiVerdict.rating} - ${analysis.aiVerdict.verdict}`,
+      value: messageData.aiVerdict.replace(/\*\*/g, ''),
       inline: false
     });
   }
   
-  // CORE METRICS (3 columns)
-  const burnPct = analysis.liquidityPool.burnPercentage;
-  const burnEmoji = burnPct !== undefined ? (burnPct >= 99.99 ? '✅' : burnPct >= 50 ? '⚠️' : '❌') : '❓';
-  const burnText = burnPct !== undefined ? `${burnPct.toFixed(1)}%` : 'Unknown';
+  // CORE METRICS (Security, Holders, Market in columns)
+  embed.addFields({
+    name: '🔐 Security',
+    value: messageData.security.split('\n').slice(1).join('\n'), // Remove header
+    inline: true
+  });
   
-  embed.addFields(
-    {
-      name: '🔐 Security',
-      value: `Mint: ${analysis.mintAuthority.hasAuthority ? '❌' : '✅'}\nFreeze: ${analysis.freezeAuthority.hasAuthority ? '❌' : '✅'}\nLP: ${burnEmoji} ${burnText}`,
-      inline: true
-    },
-    {
-      name: '👥 Holders',
-      value: `Total: ${analysis.holderCount}\nTop 10: ${analysis.topHolderConcentration.toFixed(1)}%\nSupply: ${formatNumber(analysis.metadata.supply)}`,
-      inline: true
-    }
-  );
+  embed.addFields({
+    name: '👥 Holders',
+    value: messageData.holders.split('\n').slice(1).join('\n'), // Remove header
+    inline: true
+  });
   
-  // PRICE DATA (if available)
-  if (analysis.dexscreenerData?.pairs?.[0]) {
-    const pair = analysis.dexscreenerData.pairs[0];
-    const priceChange = pair.priceChange.h24 >= 0 ? '📈' : '📉';
+  if (messageData.market) {
     embed.addFields({
       name: '💰 Market',
-      value: `$${parseFloat(pair.priceUsd).toFixed(8)}\nMCap: $${formatNumber(pair.marketCap || 0)}\n${priceChange} ${pair.priceChange.h24.toFixed(1)}% (24h)`,
+      value: messageData.market.split('\n').slice(1).join('\n'), // Remove header
       inline: true
     });
   }
   
-  // PUMP.FUN INFO (if applicable)
-  if (analysis.pumpFunData?.isPumpFun) {
+  // PUMP.FUN
+  if (messageData.pumpFun) {
     embed.addFields({
       name: '🎯 Pump.fun',
-      value: `Dev: ${analysis.pumpFunData.devBought.toFixed(1)}%\nCurve: ${analysis.pumpFunData.bondingCurve.toFixed(1)}%`,
+      value: messageData.pumpFun.split('\n').slice(1).join('\n'), // Remove header
       inline: true
     });
   }
   
-  // ADVANCED WARNINGS (Consolidate critical issues)
-  const warnings = [];
+  // ADVANCED DETECTION (Consolidate into sections)
+  const advancedWarnings: string[] = [];
   
-  // Honeypot Detection
-  if (analysis.quillcheckData) {
-    const qc = analysis.quillcheckData;
-    if (qc.isHoneypot) {
-      warnings.push('🚨 **HONEYPOT** - Cannot sell!');
-    } else if (!qc.canSell) {
-      warnings.push('⚠️ Sell restrictions detected');
-    } else if (qc.sellTax > 15 || (qc.sellTax - qc.buyTax > 5)) {
-      warnings.push(`⚠️ High taxes: ${qc.buyTax}%/${qc.sellTax}%`);
-    }
+  if (messageData.honeypot) {
+    advancedWarnings.push(messageData.honeypot.replace(/\*\*/g, '**'));
   }
   
-  // Bundle Detection
-  if (analysis.advancedBundleData && analysis.advancedBundleData.bundleScore >= 35) {
-    const bd = analysis.advancedBundleData;
-    const bundleEmoji = bd.bundleScore >= 60 ? '🚨' : '⚠️';
-    warnings.push(`${bundleEmoji} Bundle: ${bd.bundleScore}/100 (${bd.bundledSupplyPercent.toFixed(1)}% in ${bd.suspiciousWallets.length} wallets)`);
+  if (messageData.funding) {
+    advancedWarnings.push(messageData.funding.replace(/\*\*/g, '**'));
   }
   
-  // Funding Analysis (Nova-style alerts)
-  if (analysis.fundingAnalysis && analysis.fundingAnalysis.suspiciousFunding) {
-    const fa = analysis.fundingAnalysis;
-    const breakdown = Object.entries(fa.fundingSourceBreakdown)
-      .filter(([_, percentage]) => percentage >= 5)
-      .map(([source, percentage]) => `${source} (${percentage.toFixed(1)}%)`)
-      .join(' and ');
-    
-    warnings.push(`🚨 Funding Alert: ${fa.totalSuspiciousPercentage.toFixed(1)}% from high-risk sources (${breakdown})`);
-  }
-
-  // Network Analysis
-  if (analysis.networkAnalysis && analysis.networkAnalysis.networkRiskScore >= 35) {
-    const na = analysis.networkAnalysis;
-    const networkEmoji = na.networkRiskScore >= 60 ? '🚨' : '⚠️';
-    warnings.push(`${networkEmoji} Network risk: ${na.networkRiskScore}/100 (${na.clusteredWallets} clustered wallets)`);
+  if (messageData.bundle) {
+    advancedWarnings.push(messageData.bundle.replace(/\*\*/g, '**'));
   }
   
-  // Whale Detection
-  if (analysis.whaleDetection && analysis.whaleDetection.whaleCount > 0) {
-    const wd = analysis.whaleDetection;
-    const whaleEmoji = wd.whaleCount >= 5 ? '🚨' : wd.whaleCount >= 3 ? '⚠️' : '🐋';
-    warnings.push(`${whaleEmoji} ${wd.whaleCount} whale${wd.whaleCount > 1 ? 's' : ''}: ${wd.totalWhaleSupplyPercent.toFixed(1)}% supply`);
+  if (messageData.network) {
+    advancedWarnings.push(messageData.network.replace(/\*\*/g, '**'));
   }
   
-  // Critical Red Flags
-  if (analysis.redFlags.length > 0) {
-    const criticalFlags = analysis.redFlags.filter(f => f.severity === 'critical' || f.severity === 'high');
-    criticalFlags.slice(0, 2).forEach(f => {
-      warnings.push(`${f.severity === 'critical' ? '🔴' : '🟠'} ${f.title}`);
-    });
+  if (messageData.whales) {
+    advancedWarnings.push(messageData.whales.replace(/\*\*/g, '**'));
   }
   
-  // Add warnings field if any exist
-  if (warnings.length > 0) {
+  if (messageData.pumpDump) {
+    advancedWarnings.push(messageData.pumpDump.replace(/\*\*/g, '**'));
+  }
+  
+  if (messageData.liquidity) {
+    advancedWarnings.push(messageData.liquidity.replace(/\*\*/g, '**'));
+  }
+  
+  if (messageData.holderActivity) {
+    advancedWarnings.push(messageData.holderActivity.replace(/\*\*/g, '**'));
+  }
+  
+  if (messageData.agedWallets) {
+    advancedWarnings.push(messageData.agedWallets.replace(/\*\*/g, '**'));
+  }
+  
+  if (messageData.gmgn) {
+    advancedWarnings.push(messageData.gmgn.replace(/\*\*/g, '**'));
+  }
+  
+  // Add alerts from red flags
+  if (messageData.alerts.length > 0) {
+    advancedWarnings.push(...messageData.alerts);
+  }
+  
+  // Add warnings field if any exist (max 1024 chars per field)
+  if (advancedWarnings.length > 0) {
     embed.addFields({
-      name: '⚠️ Alerts',
-      value: warnings.join('\\n').slice(0, 1024),
+      name: '⚠️ Advanced Detection',
+      value: advancedWarnings.join('\n\n').slice(0, 1024),
       inline: false
     });
   }
@@ -207,7 +163,7 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   // QUICK LINKS
   embed.addFields({
     name: '🔗 Quick Links',
-    value: `[Solscan](https://solscan.io/token/${analysis.tokenAddress}) • [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress}) • [Rugcheck](https://rugcheck.xyz/tokens/${analysis.tokenAddress})\\n[GMGN](https://gmgn.ai/sol/token/${analysis.tokenAddress}) • [Birdeye](https://birdeye.so/token/${analysis.tokenAddress}?chain=solana) • [Padre](https://t.me/padre_tg_bot?start=${analysis.tokenAddress})`
+    value: messageData.links.split('\n').join('\n')
   });
   
   embed.setURL(`https://solscan.io/token/${analysis.tokenAddress}`);

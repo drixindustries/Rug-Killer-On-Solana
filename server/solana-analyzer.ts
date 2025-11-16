@@ -514,6 +514,10 @@ export class SolanaTokenAnalyzer {
         freezeAuthority,
         liquidityPool: enrichedLiquidity,
         marketData,
+        holderCount,
+        topHolderConcentration,
+        creationDate,
+        agedWalletData,
       });
 
       return {
@@ -1340,35 +1344,119 @@ private async enrichLiquidityWithMarketData(
     riskScore: number;
     mintAuthority: { hasAuthority: boolean };
     freezeAuthority: { hasAuthority: boolean };
-    liquidityPool: { isBurned?: boolean; isLocked?: boolean };
+    liquidityPool: { isBurned?: boolean; isLocked?: boolean; burnPercentage?: number };
     marketData?: { marketCap: number | null };
+    holderCount: number;
+    topHolderConcentration: number;
+    creationDate?: number;
+    agedWalletData?: { riskScore: number; agedWalletCount: number; totalFakeVolumePercent: number };
   }): { rating: string; verdict: string } {
     const score = analysis.riskScore;
     const mintRenounced = !analysis.mintAuthority.hasAuthority;
     const freezeDisabled = !analysis.freezeAuthority.hasAuthority;
-    const lpBurned = analysis.liquidityPool.isBurned || analysis.liquidityPool.isLocked || false;
+    const lpBurnPct = analysis.liquidityPool.burnPercentage || 0;
+    const lpSecure = lpBurnPct >= 95 || analysis.liquidityPool.isBurned || analysis.liquidityPool.isLocked || false;
     const mcap = analysis.marketData?.marketCap || 0;
+    const holderCount = analysis.holderCount;
+    const concentration = analysis.topHolderConcentration;
     
-    // Inverted risk scoring (0=dangerous, 100=safe)
-    if (score >= 75 && mintRenounced && freezeDisabled && lpBurned) {
+    // Calculate token age in days
+    const tokenAge = analysis.creationDate ? Math.floor((Date.now() - analysis.creationDate) / (1000 * 60 * 60 * 24)) : null;
+    const isNewToken = tokenAge !== null && tokenAge < 30; // Less than 30 days old
+    const isVeryNewToken = tokenAge !== null && tokenAge < 7; // Less than 7 days old
+    
+    // Aged wallet detection for new tokens (critical risk factor)
+    const hasAgedWalletRisk = analysis.agedWalletData && analysis.agedWalletData.riskScore >= 40;
+    const hasHighAgedWalletRisk = analysis.agedWalletData && analysis.agedWalletData.riskScore >= 60;
+    
+    // Professional AI Analysis (0=Do Not Buy, 100=Strong Buy)
+    // CRITICAL: New tokens with aged wallet schemes are extremely dangerous
+    if (isNewToken && hasHighAgedWalletRisk) {
       return {
-        rating: '10/10',
-        verdict: '🟢 SAFE - Strong fundamentals, low risk'
+        rating: `${score}/100`,
+        verdict: `🚫 DO NOT BUY - New token (${tokenAge}d old) with aged wallet manipulation detected. ${analysis.agedWalletData!.totalFakeVolumePercent.toFixed(1)}% fake volume from ${analysis.agedWalletData!.agedWalletCount} aged wallets. Classic rug pull setup. AVOID COMPLETELY.`
       };
-    } else if (score >= 50 && mcap < 500000) {
+    }
+    
+    if (isVeryNewToken && hasAgedWalletRisk) {
       return {
-        rating: '7/10',
-        verdict: '🟡 SPECULATIVE - High risk/reward, monitor closely'
+        rating: `${score}/100`,
+        verdict: `❌ STRONG SELL - Brand new token (${tokenAge}d old) showing aged wallet activity. High probability of coordinated manipulation. Exit immediately if holding.`
       };
-    } else if (score >= 30) {
+    }
+    
+    if (score >= 80 && mintRenounced && freezeDisabled && lpSecure) {
+      // Even strong tokens need age consideration
+      if (isVeryNewToken) {
+        return {
+          rating: `${score}/100`,
+          verdict: `⚠️ CAUTIOUS BUY - Excellent fundamentals BUT token is very new (${tokenAge}d old). Security looks good with renounced authorities and locked liquidity. Consider small position and monitor for 30+ days before scaling in.`
+        };
+      }
       return {
-        rating: '5/10',
-        verdict: '🟠 RISKY - Proceed with extreme caution'
+        rating: `${score}/100`,
+        verdict: tokenAge !== null 
+          ? `✅ STRONG BUY - Excellent fundamentals. Token (${tokenAge}d old) demonstrates strong security practices with renounced authorities and locked liquidity. Recommended for investment.`
+          : '✅ STRONG BUY - Excellent fundamentals. Token demonstrates strong security practices with renounced authorities and locked liquidity. Recommended for investment.'
+      };
+    } else if (score >= 70 && mintRenounced && freezeDisabled) {
+      if (isNewToken && hasAgedWalletRisk) {
+        return {
+          rating: `${score}/100`,
+          verdict: `🚨 SELL - Despite good security, new token (${tokenAge}d old) shows aged wallet manipulation. Suspicious activity outweighs security measures. Avoid.`
+        };
+      }
+      if (isVeryNewToken) {
+        return {
+          rating: `${score}/100`,
+          verdict: `⚠️ CAUTIOUS BUY - Good security profile but very new (${tokenAge}d old). Mint and freeze properly renounced. Monitor closely for first 30 days. Small positions only.`
+        };
+      }
+      return {
+        rating: `${score}/100`,
+        verdict: tokenAge !== null
+          ? `✅ BUY - Good security profile. Token (${tokenAge}d old) has properly renounced authorities. Monitor liquidity status and holder distribution.`
+          : '✅ BUY - Good security profile. Mint and freeze authorities are properly renounced. Monitor liquidity status and holder distribution.'
+      };
+    } else if (score >= 60 && concentration < 40) {
+      if (isNewToken) {
+        const ageWarning = hasAgedWalletRisk 
+          ? ` WARNING: Aged wallet activity detected in ${tokenAge}d old token.`
+          : ` Note: Token is only ${tokenAge}d old - higher risk.`;
+        return {
+          rating: `${score}/100`,
+          verdict: `⚠️ HIGH RISK - Moderate issues detected.${ageWarning} Use very small position sizing if entering. Set tight stop losses.`
+        };
+      }
+      return {
+        rating: `${score}/100`,
+        verdict: '⚠️ CAUTIOUS BUY - Moderate risk detected. Review security metrics carefully. Consider small position sizing and set stop losses.'
+      };
+    } else if (score >= 50) {
+      const ageContext = isNewToken ? ` New token (${tokenAge}d old) adds additional risk.` : '';
+      return {
+        rating: `${score}/100`,
+        verdict: `⚠️ HOLD - Significant risks present.${ageContext} Not recommended for new positions. If holding, monitor closely and consider reducing exposure.`
+      };
+    } else if (score >= 40) {
+      const ageContext = isNewToken ? ` Token age (${tokenAge}d) increases rug risk.` : '';
+      return {
+        rating: `${score}/100`,
+        verdict: `🚨 SELL - High risk of loss. Multiple red flags detected.${ageContext} Exit positions and avoid entry. Risk outweighs potential reward.`
+      };
+    } else if (score >= 25) {
+      return {
+        rating: `${score}/100`,
+        verdict: tokenAge !== null && isNewToken
+          ? `❌ STRONG SELL - Critical security issues in ${tokenAge}d old token. Immediate exit recommended. High probability of rug pull or exploit.`
+          : '❌ STRONG SELL - Critical security issues identified. Immediate exit recommended. High probability of rug pull or exploit.'
       };
     } else {
       return {
-        rating: '3/10',
-        verdict: '🔴 DANGEROUS - High probability of rug pull'
+        rating: `${score}/100`,
+        verdict: tokenAge !== null && isNewToken
+          ? `🚫 DO NOT BUY - Extreme danger. New token (${tokenAge}d old) with multiple critical vulnerabilities. Classic fresh rug pull. AVOID COMPLETELY.`
+          : '🚫 DO NOT BUY - Extreme danger. Multiple critical vulnerabilities detected. This token exhibits classic rug pull characteristics. AVOID COMPLETELY.'
       };
     }
   }

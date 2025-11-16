@@ -1,0 +1,340 @@
+/**
+ * Shared formatting utilities for Discord and Telegram bots
+ * Ensures both bots show identical metrics in a compact, user-friendly format
+ */
+
+import type { TokenAnalysisResponse } from '../shared/schema';
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+export function formatAddress(address: string): string {
+  return `${address.slice(0, 4)}...${address.slice(-4)}`;
+}
+
+export function formatNumber(num: number): string {
+  if (num >= 1_000_000_000) {
+    return (num / 1_000_000_000).toFixed(2) + 'B';
+  } else if (num >= 1_000_000) {
+    return (num / 1_000_000).toFixed(2) + 'M';
+  } else if (num >= 1_000) {
+    return (num / 1_000).toFixed(2) + 'K';
+  }
+  return num.toFixed(2);
+}
+
+export function getRiskEmoji(riskLevel: string): string {
+  switch (riskLevel) {
+    case 'LOW':
+      return '✅';
+    case 'MODERATE':
+      return '⚠️';
+    case 'HIGH':
+      return '🚨';
+    case 'EXTREME':
+      return '❌';
+    default:
+      return '❓';
+  }
+}
+
+// ============================================================================
+// COMPACT MESSAGE BUILDER
+// ============================================================================
+
+export interface CompactMessageData {
+  header: string;
+  riskScore: string;
+  aiVerdict?: string;
+  security: string;
+  holders: string;
+  market?: string;
+  pumpFun?: string;
+  honeypot?: string;
+  funding?: string;
+  bundle?: string;
+  network?: string;
+  whales?: string;
+  pumpDump?: string;
+  liquidity?: string;
+  holderActivity?: string;
+  agedWallets?: string;
+  gmgn?: string;
+  alerts: string[];
+  links: string;
+}
+
+/**
+ * Build compact message data structure
+ * Both Discord and Telegram can render this in their own format
+ */
+export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMessageData {
+  const emoji = getRiskEmoji(analysis.riskLevel);
+  
+  // Calculate token age
+  const tokenAge = analysis.creationDate ? Math.floor((Date.now() - analysis.creationDate) / (1000 * 60 * 60 * 24)) : null;
+  const isNewToken = tokenAge !== null && tokenAge < 30;
+  const isVeryNewToken = tokenAge !== null && tokenAge < 7;
+  
+  // HEADER with age warning
+  let header = `${emoji} ${analysis.metadata.name} (${analysis.metadata.symbol})`;
+  if (isVeryNewToken) {
+    header += ` ⚠️ ${tokenAge}d OLD`;
+  } else if (isNewToken) {
+    header += ` 🆕 ${tokenAge}d old`;
+  }
+  
+  // RISK SCORE
+  const riskScore = `🎯 **Risk Score:** ${analysis.riskScore}/100 (${analysis.riskLevel})\n_0 = Do Not Buy • 100 = Strong Buy_`;
+  
+  // AI VERDICT (Professional recommendation with age context)
+  const aiVerdict = analysis.aiVerdict 
+    ? `🤖 **AI Analysis**\n**Rating:** ${analysis.aiVerdict.rating}\n**Recommendation:** ${analysis.aiVerdict.verdict}`
+    : undefined;
+  
+  // SECURITY
+  const burnPct = analysis.liquidityPool.burnPercentage;
+  const burnEmoji = burnPct !== undefined ? (burnPct >= 99.99 ? '✅' : burnPct >= 50 ? '⚠️' : '❌') : '❓';
+  const burnText = burnPct !== undefined ? `${burnPct.toFixed(1)}%` : 'Unknown';
+  const security = `🔐 **Security**\n• Mint: ${analysis.mintAuthority.hasAuthority ? '❌ Active' : '✅ Revoked'}\n• Freeze: ${analysis.freezeAuthority.hasAuthority ? '❌ Active' : '✅ Revoked'}\n• LP Burn: ${burnEmoji} ${burnText}`;
+  
+  // HOLDERS
+  const holders = `👥 **Holders**\n• Total: ${analysis.holderCount}\n• Top 10: ${analysis.topHolderConcentration.toFixed(1)}%\n• Supply: ${formatNumber(analysis.metadata.supply)}`;
+  
+  // MARKET DATA
+  let market: string | undefined;
+  if (analysis.dexscreenerData?.pairs?.[0]) {
+    const pair = analysis.dexscreenerData.pairs[0];
+    const priceChange = pair.priceChange.h24 >= 0 ? '📈' : '📉';
+    market = `💰 **Market**\n• Price: $${parseFloat(pair.priceUsd).toFixed(8)}\n• MCap: $${formatNumber(pair.marketCap || 0)}\n• 24h Vol: $${formatNumber(pair.volume.h24)}\n• 24h: ${priceChange} ${pair.priceChange.h24.toFixed(1)}%`;
+  }
+  
+  // PUMP.FUN
+  let pumpFun: string | undefined;
+  if (analysis.pumpFunData?.isPumpFun) {
+    pumpFun = `🎯 **Pump.fun**\n• Dev Bought: ${analysis.pumpFunData.devBought.toFixed(1)}%\n• Bonding Curve: ${analysis.pumpFunData.bondingCurve.toFixed(1)}%`;
+  }
+  
+  // HONEYPOT DETECTION
+  let honeypot: string | undefined;
+  if (analysis.quillcheckData) {
+    const qc = analysis.quillcheckData;
+    if (qc.isHoneypot) {
+      honeypot = `🍯 **HONEYPOT DETECTED** 🚨\n⛔ Cannot sell tokens!`;
+    } else if (!qc.canSell) {
+      honeypot = `🍯 **Sell Restrictions**\n⚠️ May not be able to sell`;
+    } else if (qc.sellTax > 15 || qc.sellTax - qc.buyTax > 5) {
+      honeypot = `🍯 **Tax Analysis**\n• Buy: ${qc.buyTax}% / Sell: ${qc.sellTax}%${qc.sellTax > 15 ? '\n⚠️ High sell tax!' : ''}${qc.sellTax - qc.buyTax > 5 ? '\n⚠️ Asymmetric taxes' : ''}`;
+    }
+  }
+  
+  // FUNDING ANALYSIS
+  let funding: string | undefined;
+  if (analysis.fundingAnalysis?.suspiciousFunding) {
+    const fa = analysis.fundingAnalysis;
+    const breakdown = Object.entries(fa.fundingSourceBreakdown)
+      .filter(([_, percentage]) => percentage >= 5)
+      .map(([source, percentage]) => `${source} (${percentage.toFixed(1)}%)`)
+      .join(', ');
+    funding = `🚨 **FUNDING ALERT**\n• Suspicious: ${fa.totalSuspiciousPercentage.toFixed(1)}%\n• Sources: ${breakdown}\n⚠️ High-risk funding detected`;
+  }
+  
+  // BUNDLE DETECTION
+  let bundle: string | undefined;
+  if (analysis.advancedBundleData && analysis.advancedBundleData.bundleScore >= 35) {
+    const bd = analysis.advancedBundleData;
+    const bundleEmoji = bd.bundleScore >= 60 ? '🚨' : '⚠️';
+    bundle = `${bundleEmoji} **BUNDLE DETECTED**\n• Score: ${bd.bundleScore}/100\n• Bundled Supply: ${bd.bundledSupplyPercent.toFixed(1)}%\n• Suspicious Wallets: ${bd.suspiciousWallets.length}`;
+    if (bd.earlyBuyCluster) {
+      bundle += `\n• Early Cluster: ${bd.earlyBuyCluster.walletCount} wallets in ${bd.earlyBuyCluster.avgTimingGapMs}ms`;
+    }
+  }
+  
+  // NETWORK ANALYSIS
+  let network: string | undefined;
+  if (analysis.networkAnalysis && analysis.networkAnalysis.networkRiskScore >= 35) {
+    const na = analysis.networkAnalysis;
+    const networkEmoji = na.networkRiskScore >= 60 ? '🚨' : '⚠️';
+    network = `${networkEmoji} **WALLET NETWORK**\n• Risk Score: ${na.networkRiskScore}/100\n• Clustered Wallets: ${na.clusteredWallets}`;
+    if (na.connectedGroups.length > 0) {
+      const topGroup = na.connectedGroups[0];
+      network += `\n• Largest Group: ${topGroup.wallets.length} wallets, ${topGroup.totalSupplyPercent.toFixed(1)}% supply`;
+    }
+  }
+  
+  // WHALE DETECTION
+  let whales: string | undefined;
+  if (analysis.whaleDetection && analysis.whaleDetection.whaleCount > 0) {
+    const wd = analysis.whaleDetection;
+    const whaleEmoji = wd.whaleCount >= 5 ? '🚨🐋' : wd.whaleCount >= 3 ? '⚠️🐋' : '🐋';
+    whales = `${whaleEmoji} **WHALE ACTIVITY**\n• Count: ${wd.whaleCount}\n• Total Supply: ${wd.totalWhaleSupplyPercent.toFixed(1)}%\n• Avg Buy: ${wd.averageBuySize.toFixed(2)}%`;
+    if (wd.largestBuy) {
+      whales += `\n• Largest: ${wd.largestBuy.percentageOfSupply.toFixed(2)}%${wd.largestBuy.isExchange ? ' (CEX)' : ''}`;
+    }
+  }
+  
+  // PUMP & DUMP DETECTION
+  let pumpDump: string | undefined;
+  if (analysis.pumpDumpData?.isRugPull) {
+    const pd = analysis.pumpDumpData;
+    pumpDump = `🚨 **RUG PULL DETECTED**\n• Confidence: ${pd.rugConfidence}%`;
+    if (pd.timeline.pumpPercentage) {
+      pumpDump += `\n• Pump: ${pd.timeline.pumpPercentage.toFixed(1)}%`;
+    }
+    if (pd.timeline.dumpPercentage) {
+      pumpDump += `\n• Dump: ${pd.timeline.dumpPercentage.toFixed(1)}%`;
+    }
+  }
+  
+  // LIQUIDITY MONITORING
+  let liquidity: string | undefined;
+  if (analysis.liquidityMonitor && !analysis.liquidityMonitor.isHealthy) {
+    const lm = analysis.liquidityMonitor;
+    liquidity = `💧 **LIQUIDITY ALERT**\n• Risk Score: ${lm.riskScore}/100\n• Trend: ${lm.liquidityTrend}\n• Current: $${formatNumber(lm.currentLiquidity)}`;
+    if (lm.liquidityToMcapRatio) {
+      liquidity += `\n• LP/MCap: ${lm.liquidityToMcapRatio.health}`;
+    }
+  }
+  
+  // HOLDER TRACKING
+  let holderActivity: string | undefined;
+  if (analysis.holderTracking?.coordinatedSelloff?.detected) {
+    const cs = analysis.holderTracking.coordinatedSelloff;
+    holderActivity = `📉 **COORDINATED SELLOFF**\n• Sellers: ${cs.sellersCount}\n• Combined Supply: ${cs.combinedSupplyPercent.toFixed(1)}%\n• ${cs.description}`;
+  }
+  
+  // AGED WALLETS (CRITICAL FOR NEW TOKENS)
+  let agedWallets: string | undefined;
+  if (analysis.agedWalletData && analysis.agedWalletData.riskScore >= 35) {
+    const aw = analysis.agedWalletData;
+    const ageWarning = isNewToken ? '🚨 CRITICAL - ' : '';
+    const emoji = aw.riskScore >= 60 ? '🚨⏰' : '⚠️⏰';
+    agedWallets = `${emoji} **AGED WALLET SCHEME ${ageWarning}**\n• Risk Score: ${aw.riskScore}/100\n• Fake Volume: ${aw.totalFakeVolumePercent.toFixed(1)}%\n• Suspicious Wallets: ${aw.agedWalletCount}`;
+    if (isNewToken) {
+      agedWallets += `\n⚠️ NEW TOKEN with aged wallets = HIGH RUG RISK`;
+    }
+  }
+  
+  // GMGN DATA
+  let gmgn: string | undefined;
+  if (analysis.gmgnData?.isBundled) {
+    const g = analysis.gmgnData;
+    gmgn = `📊 **GMGN Intelligence**\n• Bundled: ${g.bundleSupplyPercent.toFixed(1)}% in ${g.bundleWalletCount} wallets\n• Insiders: ${g.insiderCount} | Snipers: ${g.sniperCount}\n• Confidence: ${g.confidence}%`;
+  }
+  
+  // CRITICAL ALERTS
+  const alerts: string[] = [];
+  
+  // Add critical red flags
+  if (analysis.redFlags.length > 0) {
+    const criticalFlags = analysis.redFlags.filter(f => f.severity === 'critical' || f.severity === 'high');
+    criticalFlags.slice(0, 3).forEach(flag => {
+      alerts.push(`${flag.severity === 'critical' ? '🔴' : '🟠'} ${flag.title}`);
+    });
+  }
+  
+  // QUICK LINKS
+  const links = `🔗 [Solscan](https://solscan.io/token/${analysis.tokenAddress}) • [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress}) • [Rugcheck](https://rugcheck.xyz/tokens/${analysis.tokenAddress})
+[GMGN](https://gmgn.ai/sol/token/${analysis.tokenAddress}) • [Birdeye](https://birdeye.so/token/${analysis.tokenAddress}?chain=solana) • [Padre](https://t.me/padre_tg_bot?start=${analysis.tokenAddress})`;
+  
+  return {
+    header,
+    riskScore,
+    aiVerdict,
+    security,
+    holders,
+    market,
+    pumpFun,
+    honeypot,
+    funding,
+    bundle,
+    network,
+    whales,
+    pumpDump,
+    liquidity,
+    holderActivity,
+    agedWallets,
+    gmgn,
+    alerts,
+    links
+  };
+}
+
+/**
+ * Convert compact message data to plain text (for Telegram)
+ */
+export function toPlainText(data: CompactMessageData): string {
+  let message = `━━━━━━━━━━━━━━━━━━━━━━\n`;
+  message += `${data.header}\n`;
+  message += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  
+  message += `${data.riskScore}\n\n`;
+  
+  if (data.aiVerdict) {
+    message += `${data.aiVerdict}\n\n`;
+  }
+  
+  message += `${data.security}\n\n`;
+  message += `${data.holders}\n\n`;
+  
+  if (data.market) {
+    message += `${data.market}\n\n`;
+  }
+  
+  if (data.pumpFun) {
+    message += `${data.pumpFun}\n\n`;
+  }
+  
+  if (data.honeypot) {
+    message += `${data.honeypot}\n\n`;
+  }
+  
+  if (data.funding) {
+    message += `${data.funding}\n\n`;
+  }
+  
+  if (data.bundle) {
+    message += `${data.bundle}\n\n`;
+  }
+  
+  if (data.network) {
+    message += `${data.network}\n\n`;
+  }
+  
+  if (data.whales) {
+    message += `${data.whales}\n\n`;
+  }
+  
+  if (data.pumpDump) {
+    message += `${data.pumpDump}\n\n`;
+  }
+  
+  if (data.liquidity) {
+    message += `${data.liquidity}\n\n`;
+  }
+  
+  if (data.holderActivity) {
+    message += `${data.holderActivity}\n\n`;
+  }
+  
+  if (data.agedWallets) {
+    message += `${data.agedWallets}\n\n`;
+  }
+  
+  if (data.gmgn) {
+    message += `${data.gmgn}\n\n`;
+  }
+  
+  if (data.alerts.length > 0) {
+    message += `⚠️ **ALERTS**\n`;
+    data.alerts.forEach(alert => {
+      message += `${alert}\n`;
+    });
+    message += `\n`;
+  }
+  
+  message += `${data.links}`;
+  
+  return message;
+}

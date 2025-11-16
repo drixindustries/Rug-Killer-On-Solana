@@ -154,8 +154,8 @@ export default function BotGuide() {
                     <h4 className="font-semibold mb-2">What it does</h4>
                     <p className="text-sm text-muted-foreground">
                       Performs a deep dive analysis using 52+ risk metrics from Rugcheck, GoPlus Security, 
-                      DexScreener, Jupiter, and Birdeye. Returns comprehensive risk score (0-100, where 100=safe), 
-                      AI verdict, price data, security checks, holder analysis, and red flags.
+                      DexScreener, Jupiter, and Birdeye. Returns comprehensive risk score (0-100, where 100=Strong Buy), 
+                      professional AI buy/sell recommendation, price data, security checks, holder analysis, and red flags.
                     </p>
                   </div>
                   <div>
@@ -170,8 +170,8 @@ export default function BotGuide() {
                       <li className="flex items-start gap-2">
                         <Shield className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                         <div>
-                          <strong>Risk Score & AI Verdict</strong>
-                          <p className="text-muted-foreground">0-100 safety score with AI-powered recommendation</p>
+                          <strong>Risk Score & AI Analysis</strong>
+                          <p className="text-muted-foreground">0-100 score with professional buy/sell/hold recommendations</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-2">
@@ -211,12 +211,12 @@ export default function BotGuide() {
                       <p>✅ <strong>USDC (USDC)</strong></p>
                       <p>━━━━━━━━━━━━━━━━━━━━━━</p>
                       <p></p>
-                      <p>🤖 <strong>AI VERDICT</strong></p>
-                      <p>10/10 - 🟢 HIGHLY SAFE TOKEN</p>
+                      <p>🤖 <strong>AI Analysis</strong></p>
+                      <p><strong>Rating:</strong> 95/100</p>
+                      <p><strong>Recommendation:</strong> ✅ STRONG BUY - Excellent fundamentals. Token demonstrates strong security practices with renounced authorities and locked liquidity. Recommended for investment.</p>
                       <p></p>
-                      <p>🛡️ <strong>RISK SCORE</strong></p>
-                      <p>Score: <strong>95/100</strong> (LOW)</p>
-                      <p className="text-muted-foreground">Higher = Safer (0=Dangerous, 100=Safe)</p>
+                      <p>🎯 <strong>Risk Score:</strong> 95/100 (LOW)</p>
+                      <p className="text-muted-foreground">0 = Do Not Buy • 100 = Strong Buy</p>
                       <p></p>
                       <p>🔐 <strong>SECURITY</strong></p>
                       <p>• Mint: ✅ Revoked</p>
@@ -762,12 +762,13 @@ export default function BotGuide() {
                   <div>
                     <h4 className="font-semibold mb-2">Embed Fields</h4>
                     <ul className="space-y-1 text-sm text-muted-foreground">
-                      <li>• AI Verdict - Rating and recommendation</li>
-                      <li>• Risk Score - 0-100 safety score with level</li>
+                      <li>• AI Analysis - Professional buy/sell/hold recommendation with detailed reasoning</li>
+                      <li>• Risk Score - 0-100 investment score (0=Do Not Buy, 100=Strong Buy)</li>
                       <li>• Price - Current price, volume, market cap, 24h change</li>
                       <li>• Security - Mint/freeze status, LP burn percentage</li>
                       <li>• Holders - Total count, top 10 concentration</li>
-                      <li>• Quick Links - Solscan, DexScreener, Rugcheck, etc.</li>
+                      <li>• Advanced Detection - Honeypot, bundle, funding, network, whale alerts</li>
+                      <li>• Quick Links - Solscan, DexScreener, Rugcheck, GMGN, Birdeye, Padre</li>
                     </ul>
                   </div>
                 </CardContent>

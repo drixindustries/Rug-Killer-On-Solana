@@ -62,9 +62,34 @@ export function CondensedTokenHeader({ analysis }: CondensedTokenHeaderProps) {
 
   const tokenSymbol = analysis.metadata?.symbol || "TOKEN";
   const tokenName = analysis.metadata?.name || "Unknown Token";
+  
+  // Calculate token age
+  const tokenAge = analysis.creationDate ? Math.floor((Date.now() - analysis.creationDate) / (1000 * 60 * 60 * 24)) : null;
+  const isNewToken = tokenAge !== null && tokenAge < 30;
+  const isVeryNewToken = tokenAge !== null && tokenAge < 7;
 
   return (
     <Card className="p-6">
+      {/* New Token Warning Banner */}
+      {isVeryNewToken && (
+        <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5 text-orange-600" />
+          <div className="text-sm">
+            <span className="font-semibold text-orange-900">⚠️ VERY NEW TOKEN ({tokenAge}d old)</span>
+            <span className="text-orange-700"> - Extra caution advised. Monitor for aged wallet manipulation.</span>
+          </div>
+        </div>
+      )}
+      {isNewToken && !isVeryNewToken && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-2">
+          <Calendar className="h-5 w-5 text-yellow-600" />
+          <div className="text-sm">
+            <span className="font-semibold text-yellow-900">🆕 NEW TOKEN ({tokenAge}d old)</span>
+            <span className="text-yellow-700"> - Higher risk. Review security metrics carefully.</span>
+          </div>
+        </div>
+      )}
+      
       {/* Token Header Row */}
       <div className="flex items-start justify-between mb-6">
         <div className="flex items-center gap-4">
