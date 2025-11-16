@@ -2,9 +2,9 @@ FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app
 
-# Copy root package files
+# Copy root package files and install ALL dependencies (including devDependencies for vite)
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 # Copy necessary files for build
 COPY client/ ./client/
@@ -23,9 +23,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy server package files and install dependencies
+# Copy server package files and install production dependencies only
 COPY server/package*.json ./
-RUN npm install --production
+RUN npm ci --production
 
 # Copy shared directory and server source
 COPY shared/ ./shared/
