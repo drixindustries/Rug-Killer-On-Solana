@@ -1,4 +1,4 @@
-import type { JupiterPriceData } from "../shared/schema";
+import type { JupiterPriceData } from "./shared/schema";
 
 const JUPITER_PRICE_API_URL = "https://api.jup.ag/price/v2";
 

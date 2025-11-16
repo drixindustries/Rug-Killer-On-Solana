@@ -1,4 +1,4 @@
-import type { DexScreenerData } from "../shared/schema";
+import type { DexScreenerData } from "./shared/schema";
 
 const DEXSCREENER_API_URL = "https://api.dexscreener.com";
 

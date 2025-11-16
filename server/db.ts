@@ -7,7 +7,7 @@ try {
 
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import * as schema from "../shared/schema.ts";
+import * as schema from "./shared/schema.ts";
 
 // Railway provides DATABASE_URL automatically when PostgreSQL is attached
 const DATABASE_URL = process.env.DATABASE_URL;

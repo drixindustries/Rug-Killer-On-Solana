@@ -1,7 +1,7 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import WebSocket from 'ws';
 import { db } from './db';
-import { kolWallets } from '../shared/schema';
+import { kolWallets } from './shared/schema';
 import { gte } from 'drizzle-orm';
 
 interface AlphaAlert {

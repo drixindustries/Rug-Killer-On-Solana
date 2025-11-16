@@ -1,7 +1,7 @@
 import { Client, GatewayIntentBits, EmbedBuilder, SlashCommandBuilder, REST, Routes } from 'discord.js';
 import { tokenAnalyzer } from './solana-analyzer';
 import { storage } from './storage';
-import type { TokenAnalysisResponse } from '../shared/schema';
+import type { TokenAnalysisResponse } from './shared/schema';
 
 // Client instance - only created when startDiscordBot() is called
 let clientInstance: Client | null = null;
