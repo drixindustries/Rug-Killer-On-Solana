@@ -1,4 +1,4 @@
-import type { QuillCheckData } from '@shared/schema';
+import type { QuillCheckData } from '../../shared/schema';
 
 interface QuillCacheEntry {
   data: QuillCheckData | null;

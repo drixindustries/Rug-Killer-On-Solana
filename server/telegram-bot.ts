@@ -2,7 +2,7 @@ import { Telegraf, Context } from 'telegraf';
 import { message } from 'telegraf/filters';
 import { tokenAnalyzer } from './solana-analyzer';
 import { storage } from './storage';
-import type { TokenAnalysisResponse } from '@shared/schema';
+import type { TokenAnalysisResponse } from '../shared/schema';
 import { buildCompactMessage, toPlainText, formatAddress, formatNumber, getRiskEmoji } from './bot-formatter';
 
 // Bot instance - only created when startTelegramBot() is called

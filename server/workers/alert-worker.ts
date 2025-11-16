@@ -1,6 +1,6 @@
 import { storage } from "../storage";
 import { priceService } from "../services/price-service";
-import type { PriceAlert } from "@shared/schema";
+import type { PriceAlert } from "../../shared/schema";
 
 /**
  * Price Alert Worker
