@@ -11,6 +11,9 @@ COPY client/ ./client/
 COPY shared/ ./shared/
 COPY vite.config.ts ./
 COPY tsconfig*.json ./
+COPY postcss.config.js ./
+COPY tailwind.config.ts ./
+COPY components.json ./
 
 # Build ONLY frontend (not server)
 RUN npx vite build --config vite.config.ts
