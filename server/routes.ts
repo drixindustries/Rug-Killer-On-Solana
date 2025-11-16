@@ -1418,12 +1418,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Check if mint/freeze authority is blacklisted
+      const mintAuthority = analysis.authorities?.mintAuthority;
+      const freezeAuthority = analysis.authorities?.freezeAuthority;
+      
       const blacklistChecks = await Promise.all([
-        analysis.mintAuthority.authorityAddress 
-          ? blacklist.checkBlacklist(analysis.mintAuthority.authorityAddress)
+        mintAuthority 
+          ? blacklist.checkBlacklist(mintAuthority)
           : Promise.resolve({ isBlacklisted: false, severity: 0, labels: [], warnings: [] }),
-        analysis.freezeAuthority.authorityAddress
-          ? blacklist.checkBlacklist(analysis.freezeAuthority.authorityAddress)
+        freezeAuthority
+          ? blacklist.checkBlacklist(freezeAuthority)
           : Promise.resolve({ isBlacklisted: false, severity: 0, labels: [], warnings: [] }),
         blacklist.checkBlacklist(tokenAddress),
       ]);

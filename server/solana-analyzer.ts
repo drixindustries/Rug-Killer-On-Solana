@@ -121,9 +121,13 @@ export class SolanaTokenAnalyzer {
     }
   }
 
+  private getConnection() {
+    return rpcBalancer.getConnection();
+  }
+
   private async getOnChainData(tokenAddress: PublicKey) {
     try {
-      const connection = rpcBalancer.getConnection();
+      const connection = this.getConnection();
       
       // Get token mint info
       const mintInfo = await getMint(
