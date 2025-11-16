@@ -3,7 +3,9 @@ dist
 .git
 .env
 *.log
-client
 docs
 tests
 scripts
+coverage
+scan-results
+attached_assets
