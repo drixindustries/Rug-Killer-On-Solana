@@ -1,9 +1,9 @@
-﻿# Dependencies
+# Dependencies
 node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
+pnpm-debug.log*
 
 # Build outputs
 dist
@@ -11,21 +11,19 @@ build
 .cache
 server/public
 
-# Environment variables - ALL VARIANTS
+# Environment variables
 .env
 .env.*
 !.env.example
 *.env
 .envrc
 
-# Secrets and credentials
+# Secrets
 secrets/
 *.secret
 *.secrets
 credentials.json
 service-account*.json
-
-# SSL/TLS certificates and keys
 ssl/
 *.pem
 *.key
@@ -34,103 +32,43 @@ ssl/
 *.p12
 *.pfx
 *.csr
-
-# Private keys and tokens
 *_rsa
 *_rsa.pub
 *.private
-id_rsa*
-id_dsa*
-id_ecdsa*
-id_ed25519*
 
-# API keys and tokens (various formats)
-*token*
-*secret*
-*apikey*
-*api_key*
-!*token*.ts
-!*token*.tsx
-!*token*.js
-!*secret*.md
-# But exclude code files about tokens
-!client/src/components/token*.tsx
-!client/src/pages/*token*.tsx
-!tests/**/token*.ts
-!tests/**/*token*.spec.ts
-
-# IDE & Editor
-.vscode/
-.idea/
+# Temporary files
+*.log
+*.tmp
+*.temp
 *.swp
 *.swo
 *~
 .DS_Store
+Thumbs.db
 
-# Database
-*.db
-*.sqlite
-postgres-data/
-*.sql.gz
-
-# Logs
-logs
-*.log
-/tmp/
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea
+*.iml
+*.sublime-*
 
 # Testing
 coverage/
-.nyc_output/
+.nyc_output
+*.lcov
 test-results/
 playwright-report/
-.last-run.json
 
-# Temporary files
-*.tmp
-*.temp
-vite.config.ts.*
-*.tar.gz
-
-# OS
-Thumbs.db
-.DS_Store
-
-# Replit-specific
-.replit
-.upm
-.config/
-replit.nix
-.breakpoints
-
-# Attached assets (old pasted files)
-attached_assets/Pasted-*.txt
-attached_assets/IMG_*.jpeg
-attached_assets/IMG_*.png
-attached_assets/*.html
-
-# Generated files
-analysis_fullpage.png
-generated-icon.png
-delete.sh
-
-# Internal/dangerous files
-replit.md
-design_guidelines.md
-server/sniper-bot.ts
-server/token-deployer.ts
-
-# Backup files
-*.backup
-*.bak
-*.old
-
-# Compiled binaries
-*.exe
-*.dll
-*.so
-*.dylib
-coverage/
+# Misc
+.nixpacksdir
 scan-results/
+attached_assets/
+*.backup
+*.old
 *.zip
-test-*.mjs
-test-*.js
+*.tar
+*.gz
