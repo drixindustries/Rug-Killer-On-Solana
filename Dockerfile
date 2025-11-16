@@ -15,6 +15,9 @@ COPY tsconfig*.json ./
 # Build ONLY frontend (not server)
 RUN npx vite build --config vite.config.ts
 
+# Verify build output
+RUN ls -la /app/dist/public/ || echo "Build directory not found!"
+
 # Production stage
 FROM node:20-alpine
 
@@ -29,7 +32,11 @@ COPY shared/ ./shared/
 COPY server/ ./
 
 # Copy frontend build from builder stage
-COPY --from=frontend-builder /app/dist/public/ ./dist/public/
+COPY --from=frontend-builder /app/dist/public ./dist/public
+
+# Verify copy worked
+RUN ls -la ./dist/public/ || echo "Frontend not copied!"
+RUN test -f ./dist/public/index.html && echo " index.html found" || echo " index.html missing"
 
 # Environment
 ENV NODE_ENV=production
