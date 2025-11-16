@@ -1,6 +1,6 @@
 /**
  * Simplified Solana Token Analyzer
- * Only uses DexScreener + QuillCheck for fast, reliable analysis
+ * Uses DexScreener + QuillCheck + Birdeye for fast, reliable analysis
  */
 
 import { Connection, PublicKey } from "@solana/web3.js";
@@ -16,6 +16,7 @@ import type {
 } from "../shared/schema";
 import { DexScreenerService } from "./dexscreener-service.ts";
 import { QuillCheckService } from "./services/quillcheck-service.ts";
+import { getBirdeyeOverview } from "./services/birdeye-api.ts";
 import { rpcBalancer } from "./services/rpc-balancer.ts";
 
 export class SolanaTokenAnalyzer {
@@ -43,15 +44,17 @@ export class SolanaTokenAnalyzer {
         throw new Error("Invalid token address format");
       }
 
-      // Fetch data in parallel - only DexScreener and QuillCheck
-      const [dexData, quillData, onChainData] = await Promise.allSettled([
+      // Fetch data in parallel - DexScreener, QuillCheck, and Birdeye
+      const [dexData, quillData, birdeyeData, onChainData] = await Promise.allSettled([
         options.skipExternal ? null : this.dexScreener.getTokenData(tokenMintAddress),
         options.skipExternal ? null : this.quillCheck.checkToken(tokenMintAddress),
+        options.skipExternal ? null : getBirdeyeOverview(tokenMintAddress),
         options.skipOnChain ? null : this.getOnChainData(tokenAddress),
       ]);
 
       const dex = dexData.status === 'fulfilled' ? dexData.value : null;
       const quill = quillData.status === 'fulfilled' ? quillData.value : null;
+      const birdeye = birdeyeData.status === 'fulfilled' ? birdeyeData.value : null;
       const onChain = onChainData.status === 'fulfilled' ? onChainData.value : null;
 
       console.log(`✅ [Analyzer] Data fetched in ${Date.now() - startTime}ms`);
@@ -60,19 +63,22 @@ export class SolanaTokenAnalyzer {
       const response: TokenAnalysisResponse = {
         tokenAddress: tokenMintAddress,
         
-        // Market data from DexScreener
-        price: dex?.pairs?.[0]?.priceUsd ? parseFloat(dex.pairs[0].priceUsd) : null,
-        marketCap: this.calculateMarketCap(dex, onChain),
-        liquidity: dex?.pairs?.[0]?.liquidity?.usd || null,
-        volume24h: dex?.pairs?.[0]?.volume?.h24 || null,
-        priceChange24h: dex?.pairs?.[0]?.priceChange?.h24 || null,
+        // Market data - prefer Birdeye, fallback to DexScreener
+        price: birdeye?.price || (dex?.pairs?.[0]?.priceUsd ? parseFloat(dex.pairs[0].priceUsd) : null),
+        marketCap: birdeye?.mc || this.calculateMarketCap(dex, onChain),
+        liquidity: birdeye?.liquidity || dex?.pairs?.[0]?.liquidity?.usd || null,
+        volume24h: birdeye?.v24hUSD || dex?.pairs?.[0]?.volume?.h24 || null,
+        priceChange24h: birdeye?.priceChange24hPercent || dex?.pairs?.[0]?.priceChange?.h24 || null,
         
-        // On-chain metadata
+        // On-chain metadata with social links from Birdeye
         metadata: onChain?.metadata || {
           name: dex?.pairs?.[0]?.baseToken?.name || "Unknown",
           symbol: dex?.pairs?.[0]?.baseToken?.symbol || "???",
           decimals: onChain?.decimals || 9,
           supply: onChain?.supply || null,
+          twitter: birdeye?.twitter || undefined,
+          telegram: birdeye?.telegram || undefined,
+          website: birdeye?.website || undefined,
         },
         
         // Authority status
@@ -83,10 +89,10 @@ export class SolanaTokenAnalyzer {
           freezeDisabled: false,
         },
         
-        // Risk assessment from QuillCheck
-        riskScore: this.calculateRiskScore(quill, dex),
-        riskLevel: this.determineRiskLevel(quill, dex),
-        riskFlags: this.generateRiskFlags(quill, dex, onChain),
+        // Risk assessment from QuillCheck + Birdeye
+        riskScore: this.calculateRiskScore(quill, dex, birdeye),
+        riskLevel: this.determineRiskLevel(quill, dex, birdeye),
+        riskFlags: this.generateRiskFlags(quill, dex, birdeye, onChain),
         
         // Holder data (basic from on-chain)
         holderCount: onChain?.holderCount || null,
@@ -155,7 +161,7 @@ export class SolanaTokenAnalyzer {
     return price * supply;
   }
 
-  private calculateRiskScore(quill: any, dex: any): number {
+  private calculateRiskScore(quill: any, dex: any, birdeye: any): number {
     // Start with QuillCheck score if available
     if (quill?.riskScore !== null && quill?.riskScore !== undefined) {
       return Math.min(100, Math.max(0, quill.riskScore));
@@ -178,16 +184,19 @@ export class SolanaTokenAnalyzer {
     if (quill?.liquidityRisk) score += 25;
     if (!quill?.canSell) score += 40;
     
-    // Low liquidity from DexScreener
-    const liquidityUsd = dex?.pairs?.[0]?.liquidity?.usd || 0;
+    // Low liquidity - prefer Birdeye, fallback to DexScreener
+    const liquidityUsd = birdeye?.liquidity || dex?.pairs?.[0]?.liquidity?.usd || 0;
     if (liquidityUsd < 1000) score += 15;
     if (liquidityUsd < 100) score += 25;
+    
+    // LP not burned (Birdeye specific)
+    if (birdeye && birdeye.lpBurned === false) score += 10;
 
     return Math.min(100, score);
   }
 
-  private determineRiskLevel(quill: any, dex: any): RiskLevel {
-    const score = this.calculateRiskScore(quill, dex);
+  private determineRiskLevel(quill: any, dex: any, birdeye: any): RiskLevel {
+    const score = this.calculateRiskScore(quill, dex, birdeye);
     
     if (score >= 80) return "EXTREME";
     if (score >= 60) return "HIGH";
@@ -195,7 +204,7 @@ export class SolanaTokenAnalyzer {
     return "LOW";
   }
 
-  private generateRiskFlags(quill: any, dex: any, onChain: any): RiskFlag[] {
+  private generateRiskFlags(quill: any, dex: any, birdeye: any, onChain: any): RiskFlag[] {
     const flags: RiskFlag[] = [];
 
     // QuillCheck flags
@@ -263,8 +272,18 @@ export class SolanaTokenAnalyzer {
       });
     }
 
-    // Liquidity flags
-    const liquidityUsd = dex?.pairs?.[0]?.liquidity?.usd || 0;
+    // LP Burn check from Birdeye
+    if (birdeye && birdeye.lpBurned === false) {
+      flags.push({
+        type: "low_liquidity",
+        severity: "medium",
+        title: "LP Not Burned",
+        description: "Liquidity provider tokens have not been burned, owner can remove liquidity.",
+      });
+    }
+
+    // Liquidity flags - prefer Birdeye data
+    const liquidityUsd = birdeye?.liquidity || dex?.pairs?.[0]?.liquidity?.usd || 0;
     if (liquidityUsd < 1000) {
       flags.push({
         type: "low_liquidity",

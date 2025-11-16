@@ -47,10 +47,25 @@ export class QuillCheckService {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8_000);
-      const res = await fetch(`${this.apiUrl}/api/scan/${tokenAddress}`, { signal: controller.signal });
+      
+      // Add headers that might help avoid 403
+      const headers: Record<string, string> = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      };
+      
+      // Add API key if available
+      if (process.env.QUILLCHECK_API_KEY) {
+        headers['Authorization'] = `Bearer ${process.env.QUILLCHECK_API_KEY}`;
+      }
+      
+      const res = await fetch(`${this.apiUrl}/api/scan/${tokenAddress}`, { 
+        signal: controller.signal,
+        headers 
+      });
       clearTimeout(timeout);
       if (!res.ok) {
-        console.warn(`[QuillCheck] API error ${res.status}`);
+        console.warn(`[QuillCheck] API error ${res.status} - ${res.statusText}`);
         const entry: QuillCacheEntry = { data: null, fetchedAt: now };
         CACHE.set(tokenAddress, entry);
         return null;
