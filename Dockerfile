@@ -47,8 +47,6 @@ ENV NODE_ENV=production
 ENV PORT=8080
 EXPOSE 8080
 
-# Set working directory to server
+# Run tsx from server directory
 WORKDIR /app/server
-
-# Run tsx
-CMD ["node_modules/.bin/tsx", "index.ts"]
+CMD ["sh", "-c", "cd /app/server && node_modules/.bin/tsx index.ts"]
