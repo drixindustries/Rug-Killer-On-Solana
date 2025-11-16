@@ -447,6 +447,10 @@ export class SolanaTokenAnalyzer {
         ? this.buildMarketData(primaryDexPair, null)
         : this.buildMarketDataFromBirdeye(birdeyeData);
       
+      // GMGN and QuillCheck removed - APIs no longer available
+      const gmgnData = null;
+      const quillcheckData = null;
+      
       // Calculate risk flags (use enriched liquidity for accurate risk assessment)
       const redFlags = this.calculateRiskFlags(
         mintAuthority,
@@ -462,7 +466,7 @@ export class SolanaTokenAnalyzer {
         liquidityMonitorData,
         holderTrackingData,
         fundingAnalysisData,
-        quillcheckData || undefined
+        quillcheckData
       );
       
       // Calculate overall risk score with safety check
