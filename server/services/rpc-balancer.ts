@@ -57,16 +57,16 @@ const RPC_PROVIDERS = [
     rateLimitWindow: 60000
   },
   // API key providers (premium with keys)
-  { 
-    getUrl: () => `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_KEY || ""}`,
-    weight: 35, 
-    name: "Helius",
-    tier: "premium",
-    requiresKey: true,
-    hasKey: () => !!process.env.HELIUS_KEY,
-    rateLimit: 1000, // High limit with API key
-    rateLimitWindow: 60000
-  },
+  // { 
+  //   getUrl: () => `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_KEY || ""}`,
+  //   weight: 35, 
+  //   name: "Helius",
+  //   tier: "premium",
+  //   requiresKey: true,
+  //   hasKey: () => !!process.env.HELIUS_KEY,
+  //   rateLimit: 1000, // High limit with API key
+  //   rateLimitWindow: 60000
+  // },
   { 
     getUrl: () => `https://solana-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY || ""}`,
     weight: 25, 
@@ -84,6 +84,22 @@ const RPC_PROVIDERS = [
     name: "Public",
     tier: "fallback",
     rateLimit: 40, // Conservative public limit
+    rateLimitWindow: 60000
+  },
+  { 
+    getUrl: () => "https://solana-api.projectserum.com",
+    weight: 12, 
+    name: "Serum",
+    tier: "fallback",
+    rateLimit: 50,
+    rateLimitWindow: 60000
+  },
+  { 
+    getUrl: () => "https://rpc.ankr.com/solana",
+    weight: 15, 
+    name: "Ankr-Public",
+    tier: "fallback",
+    rateLimit: 60,
     rateLimitWindow: 60000
   },
   { 

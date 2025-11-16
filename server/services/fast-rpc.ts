@@ -20,10 +20,13 @@ class FastRPCService {
   constructor() {
     // Use multiple high-performance RPC endpoints
     const endpoints = [
-      process.env.HELIUS_RPC_URL || `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`,
+      // Helius temporarily disabled - invalid API key
+      // process.env.HELIUS_RPC_URL || `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`,
       process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com',
       'https://solana-api.projectserum.com',
       'https://rpc.ankr.com/solana',
+      'https://solana.drpc.org',
+      'https://solana.api.pocket.network/',
     ].filter(Boolean);
 
     this.connections = endpoints.map(url => new Connection(url, {

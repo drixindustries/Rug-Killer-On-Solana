@@ -23,9 +23,12 @@ const REQUIRED_CONFIRMATIONS = 6; // Number of confirmations before activating s
 
 // Solana connection
 const getSolanaConnection = () => {
-  const rpcUrl = process.env.HELIUS_API_KEY
-    ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
-    : "https://api.mainnet-beta.solana.com";
+  // Helius temporarily disabled - invalid API key
+  // const rpcUrl = process.env.HELIUS_API_KEY
+  //   ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
+  //   : "https://api.mainnet-beta.solana.com";
+  
+  const rpcUrl = process.env.QUICKNODE_RPC_URL || "https://api.mainnet-beta.solana.com";
   
   return new Connection(rpcUrl, "confirmed");
 };
