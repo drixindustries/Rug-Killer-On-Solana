@@ -785,7 +785,7 @@ export default function Documentation() {
                             className="mt-2"
                           >
                             <a 
-                              href="https://discord.com/oauth2/authorize?client_id=1437952073319714879&scope=bot&permissions=3072" 
+                              href="https://discord.com/oauth2/authorize?client_id=1439815848628846654&permissions=3072&scope=bot%20applications.commands" 
                               target="_blank" 
                               rel="noopener noreferrer"
                             >
@@ -858,7 +858,7 @@ export default function Documentation() {
                             className="mt-2"
                           >
                             <a 
-                              href="https://discord.com/oauth2/authorize?client_id=1437952073319714879&scope=bot&permissions=3072" 
+                              href="https://discord.com/oauth2/authorize?client_id=1439815848628846654&permissions=3072&scope=bot%20applications.commands" 
                               target="_blank" 
                               rel="noopener noreferrer"
                             >

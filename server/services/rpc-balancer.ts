@@ -84,8 +84,79 @@ function getAnkrUrl(): string | undefined {
   }
 }
 
+// Build QuickNode URL from env (full endpoint URL)
+function getQuickNodeUrl(): string | undefined {
+  const url = getEnv('QUICKNODE_RPC_URL')?.trim();
+  
+  console.log('[QuickNode Config] QUICKNODE_RPC_URL present:', !!url);
+  
+  if (!url || url.length === 0) {
+    console.log('[QuickNode Config] No QuickNode URL found');
+    return undefined;
+  }
+
+  // Strip quotes and whitespace
+  const cleaned = url.replace(/^\"|\"$/g, '').trim();
+  
+  // Validate URL format
+  try {
+    const u = new URL(cleaned);
+    if (u.protocol !== 'https:') {
+      u.protocol = 'https:';
+    }
+    const finalUrl = u.toString();
+    console.log('[QuickNode Config] QuickNode URL configured:', finalUrl.substring(0, 50) + '...');
+    return finalUrl;
+  } catch (err) {
+    console.error('[QuickNode Config] Error parsing QuickNode URL:', err);
+    return undefined;
+  }
+}
+
+// Build Shyft API URL using API key
+function getShyftUrl(): string | undefined {
+  const apiKey = getEnv('SHYFT_KEY')?.trim();
+  
+  console.log('[Shyft Config] SHYFT_KEY present:', !!apiKey);
+  
+  if (!apiKey || apiKey.length === 0) {
+    console.log('[Shyft Config] No Shyft API key found');
+    return undefined;
+  }
+
+  // Strip quotes and whitespace
+  const cleaned = apiKey.replace(/^\"|\"$/g, '').trim();
+  
+  // Shyft RPC endpoint format: https://rpc.shyft.to?api_key=YOUR_KEY
+  const finalUrl = `https://rpc.shyft.to?api_key=${cleaned}`;
+  console.log('[Shyft Config] Shyft URL configured');
+  return finalUrl;
+}
+
 const RPC_PROVIDERS = [
-  // Ankr Premium RPC (primary if available)
+  // QuickNode Premium RPC (highest priority if available)
+  { 
+    getUrl: () => `${getQuickNodeUrl() || ""}`,
+    weight: 60, 
+    name: "QuickNode",
+    tier: "premium" as const,
+    requiresKey: true,
+    hasKey: () => !!getQuickNodeUrl(),
+    rateLimit: 1000,
+    rateLimitWindow: 60000
+  },
+  // Shyft Premium RPC
+  { 
+    getUrl: () => `${getShyftUrl() || ""}`,
+    weight: 55, 
+    name: "Shyft",
+    tier: "premium" as const,
+    requiresKey: true,
+    hasKey: () => !!getShyftUrl(),
+    rateLimit: 500,
+    rateLimitWindow: 60000
+  },
+  // Ankr Premium RPC
   { 
     getUrl: () => `${getAnkrUrl() || ""}`,
     weight: 50, 
