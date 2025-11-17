@@ -35,10 +35,14 @@ function getRiskColor(riskLevel: string): number {
 }
 
 function getLiquidityFieldValue(liquidityPool: any): string {
-  let value = `Status: ${liquidityPool.status}`;
+  if (!liquidityPool) {
+    return `Status: No Data\nLP Burn: ❓ No Data Available`;
+  }
+  
+  let value = `Status: ${liquidityPool.status || 'Unknown'}`;
   
   // Add LP Burn Information - only show if data is available
-  if (liquidityPool.burnPercentage !== undefined) {
+  if (liquidityPool.burnPercentage !== undefined && liquidityPool.burnPercentage !== null) {
     const burnPct = liquidityPool.burnPercentage;
     let burnEmoji = '';
     
@@ -55,7 +59,7 @@ function getLiquidityFieldValue(liquidityPool: any): string {
     value += `\nLP Burn: ${burnEmoji} ${burnPct.toFixed(2)}%`;
   } else {
     // Data unavailable - don't mislead users
-    value += `\nLP Burn: ❓ Unknown`;
+    value += `\nLP Burn: ❓ No Data`;
   }
   
   return value;
