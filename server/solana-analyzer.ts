@@ -16,6 +16,7 @@ import type {
 } from "../shared/schema";
 import { DexScreenerService } from "./dexscreener-service.ts";
 import { rpcBalancer } from "./services/rpc-balancer.ts";
+import { checkPumpFun } from "./services/pumpfun-api.ts";
 
 export class SolanaTokenAnalyzer {
   private dexScreener: DexScreenerService;
@@ -40,61 +41,114 @@ export class SolanaTokenAnalyzer {
         throw new Error("Invalid token address format");
       }
 
-      // Fetch data in parallel - only DexScreener and on-chain data
-      const [dexData, onChainData, creationDateData] = await Promise.allSettled([
+      // Fetch data in parallel - DexScreener, on-chain data, and pump.fun check
+      const [dexData, onChainData, creationDateData, pumpFunData] = await Promise.allSettled([
         options.skipExternal ? null : this.dexScreener.getTokenData(tokenMintAddress),
         options.skipOnChain ? null : this.getOnChainData(tokenAddress),
         options.skipOnChain ? null : this.getTokenCreationDate(tokenAddress),
+        options.skipExternal ? null : checkPumpFun(tokenMintAddress),
       ]);
 
       const dex = dexData.status === 'fulfilled' ? dexData.value : null;
       const onChain = onChainData.status === 'fulfilled' ? onChainData.value : null;
       const creationDate = creationDateData.status === 'fulfilled' ? creationDateData.value : undefined;
+      const pumpFun = pumpFunData.status === 'fulfilled' ? pumpFunData.value : null;
 
       console.log(`✅ [Analyzer] Data fetched in ${Date.now() - startTime}ms`);
 
       // Build analysis response
       const response: TokenAnalysisResponse = {
         tokenAddress: tokenMintAddress,
+        analyzedAt: Date.now(),
         
-        // Market data from DexScreener only
-        price: dex?.pairs?.[0]?.priceUsd ? parseFloat(dex.pairs[0].priceUsd) : null,
-        marketCap: this.calculateMarketCap(dex, onChain),
-        liquidity: dex?.pairs?.[0]?.liquidity?.usd || null,
-        volume24h: dex?.pairs?.[0]?.volume?.h24 || null,
-        priceChange24h: dex?.pairs?.[0]?.priceChange?.h24 || null,
+        // Authority status (converted to AuthorityStatus format)
+        mintAuthority: {
+          hasAuthority: !onChain?.authorities?.mintDisabled && !!onChain?.authorities?.mintAuthority,
+          authorityAddress: onChain?.authorities?.mintAuthority || null,
+          isRevoked: onChain?.authorities?.mintDisabled || !onChain?.authorities?.mintAuthority,
+        },
+        freezeAuthority: {
+          hasAuthority: !onChain?.authorities?.freezeDisabled && !!onChain?.authorities?.freezeAuthority,
+          authorityAddress: onChain?.authorities?.freezeAuthority || null,
+          isRevoked: onChain?.authorities?.freezeDisabled || !onChain?.authorities?.freezeAuthority,
+        },
         
-        // On-chain metadata
-        metadata: onChain?.metadata || {
+        // Token metadata
+        metadata: {
           name: dex?.pairs?.[0]?.baseToken?.name || "Unknown",
           symbol: dex?.pairs?.[0]?.baseToken?.symbol || "???",
           decimals: onChain?.decimals || 9,
-          supply: onChain?.supply || null,
+          supply: onChain?.supply || 0,
+          hasMetadata: true,
+          isMutable: false,
         },
         
-        // Authority status
-        authorities: onChain?.authorities || {
-          mintAuthority: null,
-          freezeAuthority: null,
-          mintDisabled: false,
-          freezeDisabled: false,
+        // Holder analysis
+        holderCount: onChain?.holderCount || 0,
+        topHolders: onChain?.topHolders || [],
+        topHolderConcentration: onChain?.top10Concentration || 0,
+        holderFiltering: {
+          totals: {
+            lp: 0,
+            exchanges: 0,
+            protocols: 0,
+            bundled: 0,
+            total: 0,
+            degens: 0,
+            bots: 0,
+            smartMoney: 0,
+            snipers: 0,
+            aged: 0,
+            newWallets: 0,
+          },
+          excluded: [],
         },
         
-        // Basic risk assessment from DexScreener data
+        // Liquidity pool
+        liquidityPool: {
+          exists: !!dex?.pairs?.[0]?.liquidity?.usd,
+          status: dex?.pairs?.[0]?.liquidity?.usd && dex.pairs[0].liquidity.usd > 1000 ? 'SAFE' : 'RISKY',
+        },
+        
+        // Market data (normalized structure)
+        marketData: dex?.pairs?.[0] ? {
+          priceUsd: parseFloat(dex.pairs[0].priceUsd || '0'),
+          priceNative: parseFloat(dex.pairs[0].priceNative || '0'),
+          marketCap: dex.pairs[0].marketCap || this.calculateMarketCap(dex, onChain),
+          fdv: dex.pairs[0].fdv || null,
+          volume24h: dex.pairs[0].volume?.h24 || null,
+          priceChange24h: dex.pairs[0].priceChange?.h24 || null,
+          txns24h: dex.pairs[0].txns?.h24 ? {
+            buys: dex.pairs[0].txns.h24.buys,
+            sells: dex.pairs[0].txns.h24.sells,
+          } : null,
+          liquidityUsd: dex.pairs[0].liquidity?.usd || null,
+          source: 'dexscreener',
+          pairAddress: dex.pairs[0].pairAddress || null,
+          dexId: dex.pairs[0].dexId || null,
+          updatedAt: Date.now(),
+        } : undefined,
+        
+        // Transactions (empty for now)
+        recentTransactions: [],
+        suspiciousActivityDetected: false,
+        
+        // Risk assessment
         riskScore: this.calculateRiskScore(dex, onChain),
         riskLevel: this.determineRiskLevel(dex, onChain),
-        riskFlags: this.generateRiskFlags(dex, onChain),
+        redFlags: this.generateRiskFlags(dex, onChain),
         
-        // Token age
+        // Creation info
         creationDate: creationDate,
         
-        // Holder data (basic from on-chain)
-        holderCount: onChain?.holderCount || null,
-        top10Concentration: onChain?.top10Concentration || null,
-        holders: onChain?.topHolders || [],
-        
-        // Liquidity pool status
-        liquidityPools: this.extractLiquidityPools(dex),
+        // Pump.fun specific data
+        pumpFunData: pumpFun && pumpFun.isPumpFun ? {
+          isPumpFun: true,
+          devBought: pumpFun.devBought,
+          bondingCurve: pumpFun.bondingCurve,
+          mayhemMode: pumpFun.mayhemMode,
+          king: pumpFun.king,
+        } : undefined,
         
         // External data references
         dexScreenerData: dex,
