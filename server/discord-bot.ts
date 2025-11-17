@@ -7,6 +7,11 @@ import { buildCompactMessage, formatNumber, getRiskEmoji, formatAddress } from '
 // Client instance - only created when startDiscordBot() is called
 let clientInstance: Client | null = null;
 
+// Lightweight status helper for health checks
+export function isDiscordBotRunning(): boolean {
+  return !!clientInstance;
+}
+
 // ============================================================================
 // HELPER FUNCTIONS (module-level for reuse/testing)
 // ============================================================================

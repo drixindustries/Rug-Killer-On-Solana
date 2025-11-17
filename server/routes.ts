@@ -2358,6 +2358,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ---------------------------------------------------------------------------
+  // BOT HEALTH (non-sensitive)
+  // ---------------------------------------------------------------------------
+  app.get('/api/health/bot', async (_req, res) => {
+    try {
+      const discordEnabled = process.env.DISCORD_ENABLED === 'true';
+      const discordConfigured = Boolean(
+        process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_BOT_TOKEN !== 'PLACEHOLDER_TOKEN' &&
+        process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_ID !== 'PLACEHOLDER_ID'
+      );
+
+      let discordRunning = false;
+      try {
+        const mod: any = await import('./discord-bot.ts');
+        if (typeof mod.isDiscordBotRunning === 'function') {
+          discordRunning = !!mod.isDiscordBotRunning();
+        }
+      } catch {
+        // ignore - module not loaded yet
+      }
+
+      const telegramEnabled = process.env.TELEGRAM_ENABLED === 'true';
+      const telegramConfigured = Boolean(
+        process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_TOKEN !== 'PLACEHOLDER_TOKEN'
+      );
+
+      res.json({
+        discord: { enabled: discordEnabled, configured: discordConfigured, running: discordRunning },
+        telegram: { enabled: telegramEnabled, configured: telegramConfigured }
+      });
+    } catch (error: any) {
+      console.error('Error in /api/health/bot:', error);
+      res.status(500).json({ message: 'Failed to get bot health: ' + error.message });
+    }
+  });
+
   // ========================================
   // ADMIN ROUTES
   // ========================================
