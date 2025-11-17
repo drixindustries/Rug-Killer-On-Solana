@@ -1456,10 +1456,26 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     } catch (error) {
       console.error('Discord command error:', error);
       
+      // Get meaningful error message
+      let errorMsg = '❌ Error executing command.';
+      if (error instanceof Error) {
+        // Show specific error details for debugging
+        if (error.message.includes('Invalid') || error.message.includes('not found')) {
+          errorMsg += ` ${error.message}`;
+        } else if (error.message.includes('timeout') || error.message.includes('timed out')) {
+          errorMsg += ' Request timed out. The RPC might be slow. Try again.';
+        } else if (error.message.includes('rate limit')) {
+          errorMsg += ' Rate limited. Please wait a moment and try again.';
+        } else {
+          errorMsg += ` ${error.message}`;
+        }
+      }
+      errorMsg += '\n\n*Tip: Make sure you\'re using a valid Solana token address.*';
+      
       if (interaction.deferred) {
-        await interaction.editReply({ content: '❌ Error executing command. Please check the address and try again.' });
+        await interaction.editReply({ content: errorMsg });
       } else {
-        await interaction.reply({ content: '❌ Error executing command. Please check the address and try again.', ephemeral: true });
+        await interaction.reply({ content: errorMsg, ephemeral: true });
       }
     }
   });
