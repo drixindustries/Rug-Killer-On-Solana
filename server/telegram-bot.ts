@@ -530,8 +530,8 @@ function createTelegramBot(botToken: string): Telegraf {
       }
       
       // LP burn check
-      if (analysis.liquidityPool?.burnPercentage !== undefined) {
-        const burnPct = analysis.liquidityPool.burnPercentage;
+      const burnPct = analysis.liquidityPool?.burnPercentage;
+      if (burnPct !== undefined && burnPct !== null) {
         if (burnPct >= 99.99) {
           message += `✅ LP Fully Burned (${burnPct.toFixed(1)}%)\n`;
         } else if (burnPct >= 80) {
@@ -544,6 +544,9 @@ function createTelegramBot(botToken: string): Telegraf {
           message += `❌ LP Not Burned (${burnPct.toFixed(1)}%)\n`;
           dangerFlags++;
         }
+      } else {
+        message += `❓ LP Burn Status: No Data\n`;
+        warningFlags++;
       }
       
       message += `\n📊 **HOLDER ANALYSIS:**\n`;
@@ -637,17 +640,19 @@ function createTelegramBot(botToken: string): Telegraf {
         message += `\n🔥 **LP TOKEN STATUS:**\n`;
         
         // LP burn percentage
-        if (analysis.liquidityPool?.burnPercentage !== undefined) {
-          const burnPct = analysis.liquidityPool.burnPercentage;
-          message += `• Burned: ${burnPct.toFixed(2)}%\n`;
+        const lpBurnPct = analysis.liquidityPool?.burnPercentage;
+        if (lpBurnPct !== undefined && lpBurnPct !== null) {
+          message += `• Burned: ${lpBurnPct.toFixed(2)}%\n`;
           
-          if (burnPct >= 99.99) {
+          if (lpBurnPct >= 99.99) {
             message += `✅ LP is locked forever - Cannot be pulled!\n`;
-          } else if (burnPct >= 80) {
-            message += `⚠️ Most LP burned, but ${(100 - burnPct).toFixed(2)}% could be pulled\n`;
+          } else if (lpBurnPct >= 80) {
+            message += `⚠️ Most LP burned, but ${(100 - lpBurnPct).toFixed(2)}% could be pulled\n`;
           } else {
-            message += `❌ ${(100 - burnPct).toFixed(2)}% LP can be pulled - RUG RISK!\n`;
+            message += `❌ ${(100 - lpBurnPct).toFixed(2)}% LP can be pulled - RUG RISK!\n`;
           }
+        } else {
+          message += `❓ LP burn data not available\n⚠️ Cannot verify if liquidity is locked\n`;
         }
         
         // Volume to liquidity ratio

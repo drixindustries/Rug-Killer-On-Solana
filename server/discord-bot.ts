@@ -873,8 +873,8 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           securityChecks += '✅ Freeze Authority Revoked\n';
         }
         
-        if (analysis.liquidityPool?.burnPercentage !== undefined) {
-          const burnPct = analysis.liquidityPool.burnPercentage;
+        const burnPct = analysis.liquidityPool?.burnPercentage;
+        if (burnPct !== undefined && burnPct !== null) {
           if (burnPct >= 99.99) {
             securityChecks += `✅ LP Fully Burned (${burnPct.toFixed(1)}%)\n`;
           } else if (burnPct >= 80) {
@@ -887,6 +887,9 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             securityChecks += `❌ LP Not Burned (${burnPct.toFixed(1)}%)\n`;
             dangerFlags++;
           }
+        } else {
+          securityChecks += `❓ LP Burn Status: No Data\n`;
+          warningFlags++;
         }
         
         embed.addFields({ name: '🔐 Security Checks', value: securityChecks });
@@ -976,9 +979,9 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             embed.addFields({ name: '📊 Liquidity Breakdown', value: breakdown });
           }
           
+          const burnPct = analysis.liquidityPool?.burnPercentage;
           let lpStatus = '';
-          if (analysis.liquidityPool?.burnPercentage !== undefined) {
-            const burnPct = analysis.liquidityPool.burnPercentage;
+          if (burnPct !== undefined && burnPct !== null) {
             lpStatus += `• Burned: ${burnPct.toFixed(2)}%\n\n`;
             
             if (burnPct >= 99.99) {
@@ -988,11 +991,11 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             } else {
               lpStatus += `❌ ${(100 - burnPct).toFixed(2)}% LP can be pulled - RUG RISK!`;
             }
+          } else {
+            lpStatus = '❓ LP burn data not available\n⚠️ Cannot verify if liquidity is locked';
           }
           
-          if (lpStatus) {
-            embed.addFields({ name: '🔥 LP Token Status', value: lpStatus });
-          }
+          embed.addFields({ name: '🔥 LP Token Status', value: lpStatus });
           
           const volumeToLiqRatio = liquidityUsd > 0 ? (pair.volume.h24 / liquidityUsd) : 0;
           let tradingMetrics = `• 24h Volume: $${formatNumber(pair.volume.h24)}\n`;
