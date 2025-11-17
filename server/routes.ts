@@ -2636,19 +2636,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // GET /api/bot/invite-links - Get bot invite links for footer
   app.get('/api/bot/invite-links', (req, res) => {
-    const telegramBotUsername = process.env.TELEGRAM_BOT_USERNAME || 'rugkilleralphabot';
-    const discordClientId = process.env.DISCORD_CLIENT_ID;
+    const telegramBotUsername = process.env.TELEGRAM_BOT_USERNAME;
+    const discordInviteUrl = process.env.DISCORD_INVITE_URL;
     
     const links: {
       telegram?: string;
       discord?: string;
       message?: string;
-    } = {
-      telegram: `https://t.me/${telegramBotUsername}`,
-    };
+    } = {};
 
-    if (discordClientId) {
-      links.discord = `https://discord.com/api/oauth2/authorize?client_id=${discordClientId}&permissions=2147486720&scope=bot%20applications.commands`;
+    if (telegramBotUsername) {
+      links.telegram = `https://t.me/${telegramBotUsername}`;
+    }
+
+    if (discordInviteUrl) {
+      links.discord = discordInviteUrl;
     }
 
     res.json(links);
