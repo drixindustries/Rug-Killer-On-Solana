@@ -154,7 +154,7 @@ export async function startServer() {
 async function startServices() {
   // Telegram bot (optional)
   if (
-    process.env.TELEGRAM_ENABLED === 'true' &&
+    (process.env.TELEGRAM_ENABLED || '').toLowerCase() === 'true' &&
     process.env.TELEGRAM_BOT_TOKEN &&
     process.env.TELEGRAM_BOT_TOKEN !== 'PLACEHOLDER_TOKEN'
   ) {
@@ -172,7 +172,7 @@ async function startServices() {
 
   // Discord bot (optional)
   if (
-    process.env.DISCORD_ENABLED === 'true' &&
+    (process.env.DISCORD_ENABLED || '').toLowerCase() === 'true' &&
     process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_BOT_TOKEN !== 'PLACEHOLDER_TOKEN' &&
     process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_ID !== 'PLACEHOLDER_ID'
   ) {
