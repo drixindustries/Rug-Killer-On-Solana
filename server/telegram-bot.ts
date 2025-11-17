@@ -21,8 +21,8 @@ function formatAnalysis(analysis: TokenAnalysisResponse, compact: boolean = fals
     return `${emoji} **${analysis.metadata.name} (${analysis.metadata.symbol})**
     
 ðŸŽ¯ Risk Score: **${analysis.riskScore}/100** (${analysis.riskLevel})
-ðŸ“Š Holders: ${analysis.holderCount}
-ðŸ’§ Top 10 Concentration: ${analysis.topHolderConcentration.toFixed(2)}%
+ðŸ“Š Holders: ${analysis.holderCount ?? 0}
+ðŸ’§ Top 10 Concentration: ${(analysis.topHolderConcentration ?? 0).toFixed(2)}%
 
 Use /execute ${analysis.tokenAddress.slice(0, 8)}... for full analysis`;
   }
@@ -154,13 +154,13 @@ function createTelegramBot(botToken: string): Telegraf {
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
       
       let message = `ðŸ“Š **TOP 20 HOLDERS - ${analysis.metadata.symbol}**\n\n`;
-      message += `Total Top 10 Concentration: **${analysis.topHolderConcentration.toFixed(2)}%**\n\n`;
+      message += `Total Top 10 Concentration: **${(analysis.topHolderConcentration ?? 0).toFixed(2)}%**\n\n`;
       
       analysis.topHolders.slice(0, 20).forEach((holder, index) => {
         message += `${index + 1}. \`${formatAddress(holder.address)}\` - ${holder.percentage.toFixed(2)}%\n`;
       });
       
-      if (analysis.topHolderConcentration > 50) {
+      if ((analysis.topHolderConcentration ?? 0) > 50) {
         message += `\nâš ï¸ WARNING: High holder concentration detected!`;
       }
       
@@ -183,7 +183,7 @@ function createTelegramBot(botToken: string): Telegraf {
       await ctx.reply('ðŸ“Š Fetching holders...');
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
       let message = `ðŸ“Š **TOP ${n} HOLDERS - ${analysis.metadata.symbol}**\n\n`;
-      message += `Top 10 Concentration: **${analysis.topHolderConcentration.toFixed(2)}%**\n\n`;
+      message += `Top 10 Concentration: **${(analysis.topHolderConcentration ?? 0).toFixed(2)}%**\n\n`;
       analysis.topHolders.slice(0, n).forEach((h, i) => {
         message += `${i + 1}. \`${formatAddress(h.address)}\` - ${h.percentage.toFixed(2)}%\n`;
       });
@@ -552,17 +552,17 @@ function createTelegramBot(botToken: string): Telegraf {
       message += `\nðŸ“Š **HOLDER ANALYSIS:**\n`;
       
       // Holder concentration
-      if (analysis.topHolderConcentration > 80) {
-        message += `âŒ Extreme Concentration (${analysis.topHolderConcentration.toFixed(1)}%)\n`;
+      if ((analysis.topHolderConcentration ?? 0) > 80) {
+        message += `âŒ Extreme Concentration (${(analysis.topHolderConcentration ?? 0).toFixed(1)}%)\n`;
         dangerFlags++;
-      } else if (analysis.topHolderConcentration > 50) {
-        message += `âš ï¸ High Concentration (${analysis.topHolderConcentration.toFixed(1)}%)\n`;
+      } else if ((analysis.topHolderConcentration ?? 0) > 50) {
+        message += `âš ï¸ High Concentration (${(analysis.topHolderConcentration ?? 0).toFixed(1)}%)\n`;
         warningFlags++;
       } else {
-        message += `âœ… Good Distribution (${analysis.topHolderConcentration.toFixed(1)}%)\n`;
+        message += `âœ… Good Distribution (${(analysis.topHolderConcentration ?? 0).toFixed(1)}%)\n`;
       }
       
-      message += `â€¢ Total Holders: ${analysis.holderCount}\n`;
+      message += `â€¢ Total Holders: ${analysis.holderCount ?? 0}\n`;
       
       // AI verdict if available
       if (analysis.aiVerdict) {
@@ -750,8 +750,8 @@ function createTelegramBot(botToken: string): Telegraf {
       
       // Holder concentration
       message += `ðŸ‘¥ **HOLDER DISTRIBUTION**\n`;
-      message += `A: ${analysis1.topHolderConcentration.toFixed(1)}% (${analysis1.holderCount} holders)\n`;
-      message += `B: ${analysis2.topHolderConcentration.toFixed(1)}% (${analysis2.holderCount} holders)\n`;
+      message += `A: ${(analysis1.topHolderConcentration ?? 0).toFixed(1)}% (${(analysis1.holderCount ?? 0)} holders)\n`;
+      message += `B: ${(analysis2.topHolderConcentration ?? 0).toFixed(1)}% (${(analysis2.holderCount ?? 0)} holders)\n`;
       
       const betterDist = analysis1.topHolderConcentration < analysis2.topHolderConcentration ? 'A' : 'B';
       message += `ðŸ‘‘ Better Distribution: Token ${betterDist}\n\n`;
