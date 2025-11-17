@@ -180,7 +180,7 @@ export const RUGCHECK_DATA_WITH_BUNDLES = {
     },
   ],
   fileMeta: {
-    name: 'Solana Rug Killer',
+    name: 'Rug Killer Alpha Bot',
     symbol: 'ANTIRUG',
   },
 };

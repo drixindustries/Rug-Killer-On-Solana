@@ -20,7 +20,7 @@ export default function Privacy() {
             <Alert>
               <Shield className="h-4 w-4" />
               <AlertDescription>
-                At Solana Rug Killer, we take your privacy seriously. This Privacy Policy explains how 
+                At Rug Killer Alpha Bot, we take your privacy seriously. This Privacy Policy explains how 
                 we collect, use, disclose, and safeguard your information.
               </AlertDescription>
             </Alert>
@@ -31,7 +31,7 @@ export default function Privacy() {
               </CardHeader>
               <CardContent className="space-y-4 text-muted-foreground">
                 <h3 className="font-semibold text-foreground">1.1 Personal Information</h3>
-                <p>When you use Solana Rug Killer, we may collect:</p>
+                <p>When you use Rug Killer Alpha Bot, we may collect:</p>
                 <ul className="list-disc pl-6 space-y-2">
                   <li><strong>Account Information:</strong> Wallet address (via Phantom Wallet signature)</li>
                   <li><strong>Authentication Data:</strong> OAuth tokens from Google, GitHub, X (Twitter), or Apple</li>
@@ -216,7 +216,7 @@ export default function Privacy() {
               </CardHeader>
               <CardContent className="space-y-4 text-muted-foreground">
                 <p>
-                  Solana Rug Killer is not intended for users under 18 years of age. We do not knowingly 
+                  Rug Killer Alpha Bot is not intended for users under 18 years of age. We do not knowingly 
                   collect personal information from children under 18.
                 </p>
                 <p>
@@ -354,7 +354,7 @@ export default function Privacy() {
 
             <Alert>
               <AlertDescription>
-                By using Solana Rug Killer, you acknowledge that you have read and understood this Privacy 
+                By using Rug Killer Alpha Bot, you acknowledge that you have read and understood this Privacy 
                 Policy and consent to the collection, use, and disclosure of your information as described.
               </AlertDescription>
             </Alert>

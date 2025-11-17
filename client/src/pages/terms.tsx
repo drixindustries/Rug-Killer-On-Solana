@@ -20,7 +20,7 @@ export default function Terms() {
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Please read these Terms of Service carefully before using Solana Rug Killer. 
+                Please read these Terms of Service carefully before using Rug Killer Alpha Bot. 
                 By accessing or using our service, you agree to be bound by these terms.
               </AlertDescription>
             </Alert>
@@ -31,7 +31,7 @@ export default function Terms() {
               </CardHeader>
               <CardContent className="space-y-4 text-muted-foreground">
                 <p>
-                  By accessing and using Solana Rug Killer ("Service", "we", "us", or "our"), you accept 
+                  By accessing and using Rug Killer Alpha Bot ("Service", "we", "us", or "our"), you accept 
                   and agree to be bound by the terms and provision of this agreement. If you do not agree 
                   to these Terms of Service, please do not use our Service.
                 </p>
@@ -48,7 +48,7 @@ export default function Terms() {
               </CardHeader>
               <CardContent className="space-y-4 text-muted-foreground">
                 <p>
-                  Solana Rug Killer is a token analysis platform that provides information and risk 
+                  Rug Killer Alpha Bot is a token analysis platform that provides information and risk 
                   assessments for Solana SPL tokens. Our Service aggregates data from multiple sources 
                   including:
                 </p>
@@ -74,7 +74,7 @@ export default function Terms() {
                 <div className="bg-destructive/10 border border-destructive p-4 rounded-md">
                   <p className="font-semibold text-destructive">IMPORTANT DISCLAIMER:</p>
                   <p className="mt-2">
-                    Solana Rug Killer provides informational analysis only. Our Service is NOT financial 
+                    Rug Killer Alpha Bot provides informational analysis only. Our Service is NOT financial 
                     advice, investment advice, trading advice, or a recommendation to buy, sell, or hold 
                     any cryptocurrency or token.
                   </p>
@@ -234,7 +234,7 @@ export default function Terms() {
                 <div className="bg-destructive/10 border border-destructive p-4 rounded-md">
                   <p className="font-semibold text-destructive">MAXIMUM LIABILITY:</p>
                   <p className="mt-2">
-                    TO THE MAXIMUM EXTENT PERMITTED BY LAW, SOLANA RUG KILLER SHALL NOT BE LIABLE FOR ANY 
+                    TO THE MAXIMUM EXTENT PERMITTED BY LAW, RUG KILLER ALPHA BOT SHALL NOT BE LIABLE FOR ANY 
                     INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF 
                     PROFITS OR REVENUES, WHETHER INCURRED DIRECTLY OR INDIRECTLY, OR ANY LOSS OF DATA, 
                     USE, GOODWILL, OR OTHER INTANGIBLE LOSSES RESULTING FROM:
@@ -282,7 +282,7 @@ export default function Terms() {
               </CardHeader>
               <CardContent className="space-y-4 text-muted-foreground">
                 <p>
-                  You agree to indemnify, defend, and hold harmless Solana Rug Killer, its officers, 
+                  You agree to indemnify, defend, and hold harmless Rug Killer Alpha Bot, its officers, 
                   directors, employees, contractors, and agents from any claims, liabilities, damages, 
                   losses, costs, or expenses (including reasonable attorneys' fees) arising from:
                 </p>
@@ -323,7 +323,7 @@ export default function Terms() {
               <CardContent className="space-y-4 text-muted-foreground">
                 <p>
                   These Terms shall be governed by and construed in accordance with the laws of the 
-                  jurisdiction in which Solana Rug Killer operates, without regard to its conflict 
+                  jurisdiction in which Rug Killer Alpha Bot operates, without regard to its conflict 
                   of law provisions.
                 </p>
                 <p>
@@ -368,7 +368,7 @@ export default function Terms() {
 
             <Alert>
               <AlertDescription>
-                By using Solana Rug Killer, you acknowledge that you have read, understood, and agree to 
+                By using Rug Killer Alpha Bot, you acknowledge that you have read, understood, and agree to 
                 be bound by these Terms of Service. If you do not agree, please discontinue use of the 
                 Service immediately.
               </AlertDescription>

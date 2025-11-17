@@ -27,7 +27,7 @@ export default function About() {
           <div className="space-y-8">
             {/* Hero Section */}
             <div className="text-center space-y-4">
-              <h1 className="text-4xl font-bold" data-testid="heading-about">About Solana Rug Killer</h1>
+              <h1 className="text-4xl font-bold" data-testid="heading-about">About Rug Killer Alpha Bot</h1>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                 Protecting investors from rug pulls with AI-powered analysis and multi-source intelligence
               </p>
@@ -41,7 +41,7 @@ export default function About() {
                   Official Token - $ANTIRUG
                 </CardTitle>
                 <CardDescription>
-                  Vanity address generated for the Solana Rug Killer project
+                  Vanity address generated for the Rug Killer Alpha Bot project
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -76,7 +76,7 @@ export default function About() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-muted-foreground">
-                  Solana Rug Killer is a comprehensive web application designed to analyze Solana SPL tokens 
+                  Rug Killer Alpha Bot is a comprehensive web application designed to analyze Solana SPL tokens 
                   for potential rug pull risks. Our primary purpose is to provide real-time analysis of common 
                   indicators like mint/freeze authority, holder concentration, liquidity pool status, and 
                   suspicious transaction patterns.

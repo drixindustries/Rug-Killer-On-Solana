@@ -19,7 +19,7 @@ export default function BotGuide() {
               <h1 className="text-4xl font-bold" data-testid="heading-bot-guide">Bot Usage Guide</h1>
             </div>
             <p className="text-lg text-muted-foreground">
-              Master the Solana Rug Killer bots - comprehensive command reference with examples
+              Master the Rug Killer Alpha Bot bots - comprehensive command reference with examples
             </p>
           </div>
 
@@ -129,7 +129,7 @@ export default function BotGuide() {
                   <div>
                     <h4 className="font-semibold mb-2">Example Response</h4>
                     <div className="bg-muted px-4 py-3 rounded text-sm space-y-2">
-                      <p>🛡️ <strong>Welcome to Solana Rug Killer Bot!</strong></p>
+                      <p>🛡️ <strong>Welcome to Rug Killer Alpha Bot!</strong></p>
                       <p className="text-muted-foreground">Your guardian against Solana rug pulls.</p>
                       <p className="text-muted-foreground">Available commands:</p>
                       <p className="text-muted-foreground">• /execute - Full token analysis</p>

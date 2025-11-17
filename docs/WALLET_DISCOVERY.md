@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Solana Rug Killer now includes an **automated wallet discovery system** that continuously identifies and monitors profitable traders on Solana. This system combines:
+The Rug Killer Alpha Bot now includes an **automated wallet discovery system** that continuously identifies and monitors profitable traders on Solana. This system combines:
 
 1. **Manual Wallet Seeding** - 45 pre-verified KOL wallets from kolscan.io
 2. **Automated Discovery** - Analyzes successful tokens to find early buyers with high win rates
@@ -503,4 +503,4 @@ MIT License - See LICENSE file for details
 
 ---
 
-**Built with ❤️ by the Solana Rug Killer team**
+**Built with ❤️ by the Rug Killer Alpha Bot team**

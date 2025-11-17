@@ -259,7 +259,7 @@ export default function BotSetup() {
                 Invite Discord Bot to Your Server
               </CardTitle>
               <CardDescription>
-                Add the Solana Rug Killer bot to your Discord server instantly
+                Add the Rug Killer Alpha Bot bot to your Discord server instantly
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

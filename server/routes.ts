@@ -2299,7 +2299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const preview = {
         url: `${baseUrl}/?token=${tokenAddress}`,
-        title: `Solana Rug Killer - Token Analysis`,
+        title: `Rug Killer Alpha Bot - Token Analysis`,
         description: `Analyze ${tokenAddress} for rug pull risks`,
         image: `${baseUrl}/favicon.png`,
       };
@@ -2331,7 +2331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
       
       const url = `${baseUrl}/?token=${tokenAddress}`;
-      const text = `Check out this token analysis on Solana Rug Killer`;
+      const text = `Check out this token analysis on Rug Killer Alpha Bot`;
       const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
       
       res.json({ url: twitterUrl });
@@ -2348,7 +2348,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
       
       const url = `${baseUrl}/?token=${tokenAddress}`;
-      const text = `Check out this token analysis on Solana Rug Killer`;
+      const text = `Check out this token analysis on Rug Killer Alpha Bot`;
       const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
       
       res.json({ url: telegramUrl });

@@ -62,7 +62,7 @@ const pdfStyles = StyleSheet.create({
 const DocumentationPDF = () => (
   <Document>
     <Page size="A4" style={pdfStyles.page}>
-      <Text style={pdfStyles.title}>Solana Rug Killer - Complete Documentation</Text>
+      <Text style={pdfStyles.title}>Rug Killer Alpha Bot - Complete Documentation</Text>
       
       <View style={pdfStyles.section}>
         <Text style={pdfStyles.heading}>Overview</Text>
@@ -79,7 +79,7 @@ const DocumentationPDF = () => (
         <Text style={pdfStyles.subheading}>Official Contract Address</Text>
         <Text style={pdfStyles.code}>{CONTRACT_ADDRESS}</Text>
         <Text style={pdfStyles.text}>
-          This is the official vanity Solana address generated for the Solana Rug Killer project. 
+          This is the official vanity Solana address generated for the Rug Killer Alpha Bot project. 
           The address features the suffix "rtek" and serves as the project's official contract identifier 
           on the Solana blockchain.
         </Text>
@@ -166,7 +166,7 @@ const DocumentationPDF = () => (
       </View>
 
       <Text style={pdfStyles.footer}>
-        © 2025 Solana Rug Killer - Page 1 of 3
+        © 2025 Rug Killer Alpha Bot - Page 1 of 3
       </Text>
     </Page>
 
@@ -238,7 +238,7 @@ const DocumentationPDF = () => (
       </View>
 
       <Text style={pdfStyles.footer}>
-        © 2025 Solana Rug Killer - Page 2 of 3
+        © 2025 Rug Killer Alpha Bot - Page 2 of 3
       </Text>
     </Page>
 
@@ -382,7 +382,7 @@ const DocumentationPDF = () => (
       </View>
 
       <Text style={pdfStyles.footer}>
-        © 2025 Solana Rug Killer - Page 3 of 3 | Protecting Solana investors from rug pulls
+        © 2025 Rug Killer Alpha Bot - Page 3 of 3 | Protecting Solana investors from rug pulls
       </Text>
     </Page>
   </Document>
@@ -430,7 +430,7 @@ export default function Documentation() {
               <h1 className="text-4xl font-bold">Complete Documentation</h1>
             </div>
             <p className="text-lg text-muted-foreground mb-6">
-              Everything you need to know about Solana Rug Killer - comprehensive guide with PDF download
+              Everything you need to know about Rug Killer Alpha Bot - comprehensive guide with PDF download
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
@@ -470,7 +470,7 @@ export default function Documentation() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">
-                Solana Rug Killer is a comprehensive web application designed to analyze Solana SPL tokens 
+                Rug Killer Alpha Bot is a comprehensive web application designed to analyze Solana SPL tokens 
                 for potential rug pull risks. It provides real-time analysis by aggregating data from multiple 
                 trusted sources and applying AI-powered detection algorithms to identify common indicators such 
                 as mint/freeze authority, holder concentration, liquidity pool status, and suspicious transaction patterns.
@@ -1331,7 +1331,7 @@ export default function Documentation() {
               <h2 className="text-2xl font-bold">Download Complete Documentation</h2>
             </div>
             <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
-              Get the full Solana Rug Killer documentation in PDF format. Includes detailed guides on wallet 
+              Get the full Rug Killer Alpha Bot documentation in PDF format. Includes detailed guides on wallet 
               connection, Whop payments, API endpoints, bot commands, and technical specifications.
             </p>
             

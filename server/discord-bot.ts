@@ -308,7 +308,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       if (interaction.commandName === 'help') {
         const helpEmbed = new EmbedBuilder()
           .setColor(0x5865f2)
-          .setTitle('🔥 SOLANA RUG KILLER')
+          .setTitle('🔥 RUG KILLER ALPHA BOT')
           .setDescription('Protect yourself from rug pulls with comprehensive token analysis!')
           .addFields(
             {
@@ -328,7 +328,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
               value: 'You can also paste any Solana token address directly in chat for instant analysis!'
             }
           )
-          .setFooter({ text: 'Solana Rug Killer • Protecting the Solana ecosystem' })
+          .setFooter({ text: 'Rug Killer Alpha Bot • Protecting the Solana ecosystem' })
           .setTimestamp();
         
         await interaction.reply({ embeds: [helpEmbed], ephemeral: true });

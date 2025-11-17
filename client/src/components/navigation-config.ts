@@ -112,7 +112,7 @@ export const navigationConfig: NavSection[] = [
       {
         title: "About",
         href: "/about",
-        description: "Learn about Solana Rug Killer"
+        description: "Learn about Rug Killer Alpha Bot"
       },
       {
         title: "Terms",

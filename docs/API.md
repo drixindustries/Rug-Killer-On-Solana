@@ -1,6 +1,6 @@
 # API Documentation
 
-This document describes the REST API endpoints available in Solana Rug Killer.
+This document describes the REST API endpoints available in Rug Killer Alpha Bot.
 
 ## Base URL
 
@@ -68,7 +68,7 @@ Performs comprehensive analysis of a Solana token.
   "riskLevel": "MEDIUM",
   "analyzedAt": 1699564800000,
   "metadata": {
-    "name": "Solana Rug Killer",
+    "name": "Rug Killer Alpha Bot",
     "symbol": "ANTIRUG",
     "decimals": 9,
     "supply": 1000000000
