@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx index.ts",
     "build": "echo 'No build needed - using tsx runtime'",
-    "start": "tsx index.ts"
+    "start": "tsx index.ts",
+    "test": "tsx tests/run-tests.ts"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.8",

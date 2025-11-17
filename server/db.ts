@@ -53,8 +53,15 @@ function createInMemoryDbStub() {
   chainable.orderBy = chainable;
   chainable.values = chainable;
   chainable.set = chainable;
+  chainable.onConflictDoUpdate = chainable;
+  chainable.onConflictDoNothing = chainable;
+  chainable.for = chainable; // e.g., SELECT ... FOR UPDATE
   chainable.returning = () => [];
   chainable.then = () => Promise.resolve([]);
+  chainable.transaction = async (cb: any) => {
+    // Provide the same chainable as a faux transaction object
+    return await cb(chainable);
+  };
   
   return new Proxy({}, {
     get: () => chainable
