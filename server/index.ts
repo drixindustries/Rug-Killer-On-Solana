@@ -10,8 +10,16 @@ console.log('========================================');
 
 // Try to load .env if it exists (local dev), but don't fail if it doesn't (Railway)
 try {
-  await import('dotenv/config');
-  console.log('✅ dotenv loaded');
+  const dotenv = await import('dotenv');
+  const path = await import('path');
+  const envPath = path.join(process.cwd(), '.env');
+  const result = dotenv.config({ path: envPath });
+  if (result.error) {
+    console.log('ℹ️  No .env file found (Railway mode)');
+  } else {
+    console.log('✅ dotenv loaded from:', envPath);
+    console.log('✅ Loaded', Object.keys(result.parsed || {}).length, 'environment variables');
+  }
 } catch (e) {
   console.log('ℹ️  No dotenv (Railway mode)');
 }
@@ -30,18 +38,12 @@ if (process.env.NODE_ENV !== 'production') {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('⚠️  Unhandled Rejection at:', promise);
   console.error('⚠️  Reason:', reason);
-  // Don't exit in production - log and continue
-  if (process.env.NODE_ENV !== 'production') {
-    process.exit(1);
-  }
+  // Don't exit - log and continue (allows server to stay running with degraded services)
 });
 
 process.on('uncaughtException', (error) => {
   console.error('⚠️  Uncaught Exception:', error);
-  // Don't exit in production - log and continue
-  if (process.env.NODE_ENV !== 'production') {
-    process.exit(1);
-  }
+  // Don't exit - log and continue (allows server to stay running with degraded services)
 });
 
 const bootstrap = async () => {

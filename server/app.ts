@@ -172,16 +172,22 @@ async function startServices() {
   }
 
   // Discord bot (optional)
+  const rawToken = process.env.DISCORD_BOT_TOKEN;
+  const trimmedToken = rawToken?.trim();
   console.log('🔍 Discord check - DISCORD_ENABLED:', process.env.DISCORD_ENABLED);
-  console.log('🔍 Discord check - BOT_TOKEN length:', process.env.DISCORD_BOT_TOKEN?.length || 0);
-  console.log('🔍 Discord check - BOT_TOKEN is PLACEHOLDER?:', process.env.DISCORD_BOT_TOKEN === 'PLACEHOLDER_TOKEN');
-  console.log('🔍 Discord check - BOT_TOKEN empty?:', !process.env.DISCORD_BOT_TOKEN);
-  console.log('🔍 Discord check - BOT_TOKEN first 10 chars:', process.env.DISCORD_BOT_TOKEN?.substring(0, 10) || 'NONE');
-  console.log('🔍 Discord check - CLIENT_ID exists:', !!process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_ID !== 'PLACEHOLDER_ID');
+  console.log('🔍 Discord check - RAW BOT_TOKEN length:', rawToken?.length || 0);
+  console.log('🔍 Discord check - TRIMMED BOT_TOKEN length:', trimmedToken?.length || 0);
+  console.log('🔍 Discord check - BOT_TOKEN has quotes?:', rawToken?.startsWith('"') || rawToken?.startsWith("'"));
+  console.log('🔍 Discord check - BOT_TOKEN has spaces?:', rawToken !== trimmedToken);
+  console.log('🔍 Discord check - BOT_TOKEN first 10 chars:', trimmedToken?.substring(0, 10) || 'NONE');
+  console.log('🔍 Discord check - CLIENT_ID:', process.env.DISCORD_CLIENT_ID);
+  
+  // Clean the token - remove quotes and trim spaces
+  const cleanToken = trimmedToken?.replace(/^["']|["']$/g, '');
   
   if (
     (process.env.DISCORD_ENABLED || '').toLowerCase() === 'true' &&
-    process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_BOT_TOKEN !== 'PLACEHOLDER_TOKEN' &&
+    cleanToken && cleanToken.length > 10 &&
     process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_ID !== 'PLACEHOLDER_ID'
   ) {
     try {

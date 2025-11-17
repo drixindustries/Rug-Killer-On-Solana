@@ -1554,10 +1554,11 @@ export async function startDiscordBot() {
     clientInstance = createDiscordClient(BOT_TOKEN, CLIENT_ID);
     await clientInstance.login(BOT_TOKEN);
     console.log('✅ Discord bot started successfully');
-  } catch (error) {
-    console.error('Error starting Discord bot:', error);
+  } catch (error: any) {
+    console.error('❌ Error starting Discord bot:', error?.message || error);
+    console.log('⚠️ Discord bot unavailable (silenced):', error?.message || 'Unknown error');
     clientInstance = null;
-    throw error;
+    // Don't throw - allow server to continue
   }
 }
 
