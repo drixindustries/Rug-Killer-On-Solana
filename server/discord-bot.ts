@@ -873,7 +873,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           securityChecks += '✅ Freeze Authority Revoked\n';
         }
         
-        if (analysis.liquidityPool.burnPercentage !== undefined) {
+        if (analysis.liquidityPool?.burnPercentage !== undefined) {
           const burnPct = analysis.liquidityPool.burnPercentage;
           if (burnPct >= 99.99) {
             securityChecks += `✅ LP Fully Burned (${burnPct.toFixed(1)}%)\n`;
@@ -977,7 +977,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           }
           
           let lpStatus = '';
-          if (analysis.liquidityPool.burnPercentage !== undefined) {
+          if (analysis.liquidityPool?.burnPercentage !== undefined) {
             const burnPct = analysis.liquidityPool.burnPercentage;
             lpStatus += `• Burned: ${burnPct.toFixed(2)}%\n\n`;
             

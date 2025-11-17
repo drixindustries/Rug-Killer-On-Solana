@@ -94,7 +94,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     : undefined;
   
   // SECURITY
-  const burnPct = analysis.liquidityPool.burnPercentage;
+  const burnPct = analysis.liquidityPool?.burnPercentage;
   const burnEmoji = burnPct !== undefined ? (burnPct >= 99.99 ? '✅' : burnPct >= 50 ? '⚠️' : '❌') : '❓';
   const burnText = burnPct !== undefined ? `${burnPct.toFixed(1)}%` : 'Unknown';
   const security = `🔐 **Security**\n• Mint: ${analysis.mintAuthority.hasAuthority ? '❌ Active' : '✅ Revoked'}\n• Freeze: ${analysis.freezeAuthority.hasAuthority ? '❌ Active' : '✅ Revoked'}\n• LP Burn: ${burnEmoji} ${burnText}`;

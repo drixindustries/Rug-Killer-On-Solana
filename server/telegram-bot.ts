@@ -530,7 +530,7 @@ function createTelegramBot(botToken: string): Telegraf {
       }
       
       // LP burn check
-      if (analysis.liquidityPool.burnPercentage !== undefined) {
+      if (analysis.liquidityPool?.burnPercentage !== undefined) {
         const burnPct = analysis.liquidityPool.burnPercentage;
         if (burnPct >= 99.99) {
           message += `✅ LP Fully Burned (${burnPct.toFixed(1)}%)\n`;
@@ -637,7 +637,7 @@ function createTelegramBot(botToken: string): Telegraf {
         message += `\n🔥 **LP TOKEN STATUS:**\n`;
         
         // LP burn percentage
-        if (analysis.liquidityPool.burnPercentage !== undefined) {
+        if (analysis.liquidityPool?.burnPercentage !== undefined) {
           const burnPct = analysis.liquidityPool.burnPercentage;
           message += `• Burned: ${burnPct.toFixed(2)}%\n`;
           
