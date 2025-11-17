@@ -862,15 +862,15 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         let warningFlags = 0;
         
         let securityChecks = '';
-        
-        if (analysis.mintAuthority.hasAuthority && !analysis.mintAuthority.isRevoked) {
+
+        if (analysis.mintAuthority && analysis.mintAuthority.hasAuthority && !analysis.mintAuthority.isRevoked) {
           securityChecks += '❌ Mint Authority Active\n';
           dangerFlags++;
         } else {
           securityChecks += '✅ Mint Authority Revoked\n';
         }
-        
-        if (analysis.freezeAuthority.hasAuthority && !analysis.freezeAuthority.isRevoked) {
+
+        if (analysis.freezeAuthority && analysis.freezeAuthority.hasAuthority && !analysis.freezeAuthority.isRevoked) {
           securityChecks += '❌ Freeze Authority Active\n';
           dangerFlags++;
         } else {
@@ -1081,13 +1081,11 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         holderComparison += `👑 Better Distribution: Token ${betterDist}`;
         
         embed.addFields({ name: '👥 Holder Distribution', value: holderComparison });
-        
-        const a_mint = analysis1.mintAuthority.hasAuthority ? '❌' : '✅';
-        const b_mint = analysis2.mintAuthority.hasAuthority ? '❌' : '✅';
-        const a_freeze = analysis1.freezeAuthority.hasAuthority ? '❌' : '✅';
-        const b_freeze = analysis2.freezeAuthority.hasAuthority ? '❌' : '✅';
-        
-        let security = `Mint Revoked: A ${a_mint} | B ${b_mint}\n`;
+
+        const a_mint = analysis1.mintAuthority?.hasAuthority ? '❌' : '✅';
+        const b_mint = analysis2.mintAuthority?.hasAuthority ? '❌' : '✅';
+        const a_freeze = analysis1.freezeAuthority?.hasAuthority ? '❌' : '✅';
+        const b_freeze = analysis2.freezeAuthority?.hasAuthority ? '❌' : '✅';        let security = `Mint Revoked: A ${a_mint} | B ${b_mint}\n`;
         security += `Freeze Revoked: A ${a_freeze} | B ${b_freeze}`;
         
         embed.addFields({ name: '🔐 Security', value: security });

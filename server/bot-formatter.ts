@@ -97,7 +97,9 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   const burnPct = analysis.liquidityPool?.burnPercentage ?? null;
   const burnEmoji = burnPct !== null ? (burnPct >= 99.99 ? '✅' : burnPct >= 50 ? '⚠️' : '❌') : '❓';
   const burnText = burnPct !== null ? `${burnPct.toFixed(1)}%` : 'No Data';
-  const security = `🔐 **Security**\n• Mint: ${analysis.mintAuthority.hasAuthority ? '❌ Active' : '✅ Revoked'}\n• Freeze: ${analysis.freezeAuthority.hasAuthority ? '❌ Active' : '✅ Revoked'}\n• LP Burn: ${burnEmoji} ${burnText}`;
+  const mintStatus = analysis.mintAuthority?.hasAuthority ? '❌ Active' : '✅ Revoked';
+  const freezeStatus = analysis.freezeAuthority?.hasAuthority ? '❌ Active' : '✅ Revoked';
+  const security = `🔐 **Security**\n• Mint: ${mintStatus}\n• Freeze: ${freezeStatus}\n• LP Burn: ${burnEmoji} ${burnText}`;
   
   // HOLDERS
   const holders = `👥 **Holders**\n• Total: ${analysis.holderCount}\n• Top 10: ${analysis.topHolderConcentration.toFixed(1)}%\n• Supply: ${formatNumber(analysis.metadata.supply)}`;

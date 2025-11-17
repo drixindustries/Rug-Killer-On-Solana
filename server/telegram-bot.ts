@@ -214,7 +214,7 @@ function createTelegramBot(botToken: string): Telegraf {
       
       // Mint Authority Check
       message += `🪙 **MINT AUTHORITY**\n`;
-      if (analysis.mintAuthority.hasAuthority && !analysis.mintAuthority.isRevoked) {
+      if (analysis.mintAuthority && analysis.mintAuthority.hasAuthority && !analysis.mintAuthority.isRevoked) {
         message += `❌ ACTIVE - Dev can mint unlimited tokens!\n`;
         if (analysis.mintAuthority.authorityAddress) {
           message += `Authority: \`${formatAddress(analysis.mintAuthority.authorityAddress)}\`\n`;
@@ -227,7 +227,7 @@ function createTelegramBot(botToken: string): Telegraf {
       
       // Freeze Authority Check
       message += `🧊 **FREEZE AUTHORITY**\n`;
-      if (analysis.freezeAuthority.hasAuthority && !analysis.freezeAuthority.isRevoked) {
+      if (analysis.freezeAuthority && analysis.freezeAuthority.hasAuthority && !analysis.freezeAuthority.isRevoked) {
         message += `❌ ACTIVE - Dev can freeze accounts!\n`;
         if (analysis.freezeAuthority.authorityAddress) {
           message += `Authority: \`${formatAddress(analysis.freezeAuthority.authorityAddress)}\`\n`;
@@ -514,15 +514,15 @@ function createTelegramBot(botToken: string): Telegraf {
       let warningFlags = 0;
       
       message += `🔐 **SECURITY CHECKS:**\n`;
-      
-      if (analysis.mintAuthority.hasAuthority && !analysis.mintAuthority.isRevoked) {
+
+      if (analysis.mintAuthority && analysis.mintAuthority.hasAuthority && !analysis.mintAuthority.isRevoked) {
         message += `❌ Mint Authority Active\n`;
         dangerFlags++;
       } else {
         message += `✅ Mint Authority Revoked\n`;
       }
-      
-      if (analysis.freezeAuthority.hasAuthority && !analysis.freezeAuthority.isRevoked) {
+
+      if (analysis.freezeAuthority && analysis.freezeAuthority.hasAuthority && !analysis.freezeAuthority.isRevoked) {
         message += `❌ Freeze Authority Active\n`;
         dangerFlags++;
       } else {
@@ -758,12 +758,12 @@ function createTelegramBot(botToken: string): Telegraf {
       
       // Security
       message += `🔐 **SECURITY**\n`;
-      const a_mint = analysis1.mintAuthority.hasAuthority ? '❌' : '✅';
-      const b_mint = analysis2.mintAuthority.hasAuthority ? '❌' : '✅';
+      const a_mint = analysis1.mintAuthority?.hasAuthority ? '❌' : '✅';
+      const b_mint = analysis2.mintAuthority?.hasAuthority ? '❌' : '✅';
       message += `Mint Revoked: A ${a_mint} | B ${b_mint}\n`;
-      
-      const a_freeze = analysis1.freezeAuthority.hasAuthority ? '❌' : '✅';
-      const b_freeze = analysis2.freezeAuthority.hasAuthority ? '❌' : '✅';
+
+      const a_freeze = analysis1.freezeAuthority?.hasAuthority ? '❌' : '✅';
+      const b_freeze = analysis2.freezeAuthority?.hasAuthority ? '❌' : '✅';
       message += `Freeze Revoked: A ${a_freeze} | B ${b_freeze}\n\n`;
       
       // Overall recommendation
