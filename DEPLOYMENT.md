@@ -60,11 +60,13 @@ ANKR_RPC_URL=https://rpc.ankr.com/solana/YOUR_ANKR_API_KEY
 # API Keys (optional)
 BIRDEYE_API_KEY=your-birdeye-api-key-here
 
-# Discord Bot (optional)
+# Discord Bot (optional - requires DISCORD_ENABLED=true to activate)
+DISCORD_ENABLED=true
 DISCORD_BOT_TOKEN=your-discord-bot-token
 DISCORD_CLIENT_ID=your-discord-client-id
 
-# Telegram Bot (optional)
+# Telegram Bot (optional - requires TELEGRAM_ENABLED=true to activate)
+TELEGRAM_ENABLED=true
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token
 
 # Pump.fun Webhook (optional but recommended)
@@ -313,13 +315,19 @@ docker-compose up -d
 4. Copy Token → `DISCORD_BOT_TOKEN`
 5. Copy Application ID → `DISCORD_CLIENT_ID`
 6. Enable "Message Content Intent"
-7. Invite bot: `https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot`
+7. **Set environment variable:** `DISCORD_ENABLED=true`
+8. Invite bot: `https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot`
+
+**Note:** The bot will NOT start without `DISCORD_ENABLED=true` set in your environment variables!
 
 ### Telegram Bot
 1. Message @BotFather on Telegram
 2. Send `/newbot`
 3. Follow instructions
 4. Copy token → `TELEGRAM_BOT_TOKEN`
+5. **Set environment variable:** `TELEGRAM_ENABLED=true`
+
+**Note:** The bot will NOT start without `TELEGRAM_ENABLED=true` set in your environment variables!
 
 ### QuillCheck (Honeypot Detection - Optional)
 1. Go to https://quillcheck.io/
