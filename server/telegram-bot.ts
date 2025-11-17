@@ -4,6 +4,9 @@ import { tokenAnalyzer } from './solana-analyzer';
 import { storage } from './storage';
 import type { TokenAnalysisResponse } from '../shared/schema';
 import { buildCompactMessage, toPlainText, formatAddress, formatNumber, getRiskEmoji } from './bot-formatter';
+import { getAlphaAlertService } from './alpha-alerts';
+import { checkBlacklist, reportWallet, getBlacklistStats, getTopFlaggedWallets } from './ai-blacklist';
+import { getExchangeStats } from './exchange-whitelist';
 
 // Bot instance - only created when startTelegramBot() is called
 let botInstance: Telegraf | null = null;
@@ -41,6 +44,7 @@ function createTelegramBot(botToken: string): Telegraf {
     { command: 'start', description: 'Show available commands' },
     { command: 'execute', description: 'Full 52-metric scan - /execute <address>' },
     { command: 'first20', description: 'Top 20 holder analysis - /first20 <address>' },
+    { command: 'holders', description: 'Top N holders - /holders <address> [n]' },
     { command: 'devaudit', description: 'Dev wallet history - /devaudit <address>' },
     { command: 'blacklist', description: 'Check wallet blacklist - /blacklist <wallet>' },
     { command: 'whaletrack', description: 'Smart money in token - /whaletrack <address>' },
@@ -49,7 +53,33 @@ function createTelegramBot(botToken: string): Telegraf {
     { command: 'rugcheck', description: 'Instant rug scan - /rugcheck <address>' },
     { command: 'liquidity', description: 'LP analysis - /liquidity <address>' },
     { command: 'compare', description: 'Compare 2 tokens - /compare <addr1> <addr2>' },
-    { command: 'trending', description: 'Show trending tokens by volume' }
+    { command: 'trending', description: 'Show trending tokens by volume' },
+    { command: 'exchanges', description: 'Exchange presence - /exchanges <address>' },
+    { command: 'pumpfun', description: 'Pump.fun view - /pumpfun <address>' },
+    { command: 'chart', description: 'Chart links - /chart <address>' },
+    { command: 'watch', description: 'Add to watchlist - /watch <address>' },
+    { command: 'unwatch', description: 'Remove from watchlist - /unwatch <address>' },
+    { command: 'watchlist', description: 'Show your watchlist' },
+    { command: 'alert', description: 'Price alert - /alert <address> above|below <price>' },
+    { command: 'report', description: 'Report a wallet - /report <wallet> <reason>' },
+    { command: 'blackliststats', description: 'Blacklist statistics' },
+    { command: 'blacklisttop', description: 'Top flagged wallets - /blacklisttop [limit]' },
+    { command: 'alpha_status', description: 'Alpha status (admin)' },
+    { command: 'alpha_start', description: 'Start alpha (admin)' },
+    { command: 'alpha_stop', description: 'Stop alpha (admin)' },
+    { command: 'alpha_add', description: 'Add alpha caller - /alpha_add <wallet> <name>' },
+    { command: 'alpha_remove', description: 'Remove alpha caller - /alpha_remove <wallet>' },
+    { command: 'alpha_here', description: 'Set this chat for alpha pings (admin)' },
+    { command: 'alpha_clear', description: 'Clear alpha ping chat (admin)' },
+    { command: 'alpha_channel', description: 'Show current alpha ping chat' }
+    ,{ command: 'smart_here', description: 'Set this chat for Smart Money calls (admin)' }
+    ,{ command: 'smart_clear', description: 'Clear Smart Money chat (admin)' }
+    ,{ command: 'smart_channel', description: 'Show current Smart Money call chat' }
+    ,{ command: 'smartwallet_add', description: 'Add smart wallet - /smartwallet_add <wallet> <name> [influence]' }
+    ,{ command: 'smartwallet_remove', description: 'Deactivate smart wallet - /smartwallet_remove <wallet>' }
+    ,{ command: 'smartwallet_activate', description: 'Reactivate smart wallet - /smartwallet_activate <wallet>' }
+    ,{ command: 'smartwallet_list', description: 'List active smart wallets - /smartwallet_list [limit]' }
+    ,{ command: 'smartwallet_view', description: 'View smart wallet details - /smartwallet_view <wallet>' }
   ]).catch((err) => {
     console.warn('⚠️ Failed to set Telegram bot commands (silenced):', (err as any)?.message || String(err));
   });
@@ -59,19 +89,29 @@ function createTelegramBot(botToken: string): Telegraf {
     await ctx.reply(
       '🔥 **RUG KILLER ALPHA BOT**\n\n' +
       '**Core Commands:**\n' +
-      '/execute <address> - Full 52-metric scan\n' +
-      '/first20 <address> - Top 20 holder analysis\n' +
+      '/execute <address> - Full scan\n' +
+      '/holders <address> [n] - Top N holders\n' +
       '/devaudit <address> - Dev wallet history\n' +
       '/blacklist <wallet> - Check if wallet is flagged\n\n' +
       '**Group Tier Commands:**\n' +
       '/whaletrack <address> - Smart money tracking\n' +
       '/kol <wallet> - Check if wallet is KOL\n\n' +
       '**Quick Commands:**\n' +
-      '/price <address> - Quick price lookup\n' +
-      '/rugcheck <address> - Instant rug detection\n' +
-      '/liquidity <address> - LP pool analysis\n' +
-      '/compare <addr1> <addr2> - Compare 2 tokens\n' +
-      '/trending - Show trending tokens\n\n' +
+      '/price <address> - Quick price\n' +
+      '/rugcheck <address> - Instant rug scan\n' +
+      '/liquidity <address> - LP analysis\n' +
+      '/compare <addr1> <addr2> - Compare tokens\n' +
+      '/trending - Trending tokens\n' +
+      '/exchanges <address> - Exchange presence\n' +
+      '/pumpfun <address> - Pump.fun view\n' +
+      '/chart <address> - Chart links\n\n' +
+      '**Personal Tools:**\n' +
+      '/watch <address> • /unwatch <address> • /watchlist\n' +
+      '/alert <address> above|below <price>\n\n' +
+      '**Admin/Community:**\n' +
+      '/report <wallet> <reason>\n' +
+      '/blackliststats • /blacklisttop [limit]\n' +
+      'alpha_* commands (admins)\n\n' +
       'Send any token address for quick analysis!',
       { parse_mode: 'Markdown' }
     );
@@ -128,6 +168,28 @@ function createTelegramBot(botToken: string): Telegraf {
     } catch (error) {
       console.error('Telegram bot first20 error:', error);
       ctx.reply('❌ Error fetching holder data. Please check the address and try again.');
+    }
+  });
+
+  // /holders command - Top N holders
+  bot.command('holders', async (ctx) => {
+    const args = ctx.message.text.split(' ').filter(Boolean);
+    if (args.length < 2) {
+      return ctx.reply('❌ Please provide a token address.\n\nExample: `/holders EPjF... 30`', { parse_mode: 'Markdown' });
+    }
+    const tokenAddress = args[1];
+    const n = Math.min(parseInt(args[2] || '20', 10) || 20, 50);
+    try {
+      await ctx.reply('📊 Fetching holders...');
+      const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      let message = `📊 **TOP ${n} HOLDERS - ${analysis.metadata.symbol}**\n\n`;
+      message += `Top 10 Concentration: **${analysis.topHolderConcentration.toFixed(2)}%**\n\n`;
+      analysis.topHolders.slice(0, n).forEach((h, i) => {
+        message += `${i + 1}. \`${formatAddress(h.address)}\` - ${h.percentage.toFixed(2)}%\n`;
+      });
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (e) {
+      ctx.reply('❌ Error fetching holders.');
     }
   });
   
@@ -219,15 +281,33 @@ function createTelegramBot(botToken: string): Telegraf {
     const walletAddress = args[1];
     
     try {
-      await ctx.reply(
-        `🔍 **BLACKLIST CHECK**\n\n` +
-        `Wallet: \`${formatAddress(walletAddress)}\`\n\n` +
-        `✅ Not currently flagged`,
-        { parse_mode: 'Markdown' }
-      );
+      const result = await checkBlacklist(walletAddress);
+      let message = `🔍 **BLACKLIST CHECK**\n\nWallet: \`${formatAddress(walletAddress)}\`\n\n`;
+      message += result.isBlacklisted ? `🚨 FLAGGED (severity ${result.severity})\n` : '✅ Not currently flagged\n';
+      if (result.labels.length > 0) {
+        message += `\nLabels:\n` + result.labels.map(l => `• ${l.type} (sev ${l.severity})`).join('\n');
+      }
+      await ctx.reply(message, { parse_mode: 'Markdown' });
     } catch (error) {
       console.error('Telegram bot blacklist error:', error);
       ctx.reply('❌ Error checking blacklist.');
+    }
+  });
+
+  // /report command - Report suspicious wallet
+  bot.command('report', async (ctx) => {
+    const args = ctx.message.text.split(' ').filter(Boolean);
+    if (args.length < 3) {
+      return ctx.reply('❌ Usage: `/report <wallet> <reason>`', { parse_mode: 'Markdown' });
+    }
+    const wallet = args[1];
+    const reason = args.slice(2).join(' ');
+    const platformUserId = `telegram:${ctx.from?.id}`;
+    try {
+      await reportWallet(wallet, 'scammer', reason, platformUserId);
+      await ctx.reply('✅ Report submitted. Thank you!');
+    } catch (e) {
+      await ctx.reply('❌ Could not submit report.');
     }
   });
   
@@ -757,6 +837,333 @@ function createTelegramBot(botToken: string): Telegraf {
     } catch (error) {
       console.error('Telegram bot trending error:', error);
       ctx.reply('❌ Error fetching trending tokens. Please try again later.');
+    }
+  });
+
+  // /exchanges - Exchange presence among holders
+  bot.command('exchanges', async (ctx) => {
+    const args = ctx.message.text.split(' ').filter(Boolean);
+    if (args.length < 2) {
+      return ctx.reply('❌ Usage: `/exchanges <address>`', { parse_mode: 'Markdown' });
+    }
+    const tokenAddress = args[1];
+    try {
+      await ctx.reply('🏦 Checking exchanges in holders...');
+      const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      const stats = getExchangeStats(analysis.topHolders.map(h => ({ address: h.address, percentage: h.percentage })));
+      let message = `🏦 **EXCHANGE PRESENCE - ${analysis.metadata.symbol}**\n\n`;
+      message += `Exchanges hold ${stats.totalPercentage.toFixed(2)}% across ${stats.count} wallets\n`;
+      if (stats.holders.length > 0) {
+        message += `\nTop Exchange Holders:\n` + stats.holders.slice(0, 10).map(h => `• \`${formatAddress(h.address)}\` — ${h.percentage.toFixed(2)}%`).join('\n');
+      }
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (e) {
+      ctx.reply('❌ Error fetching exchange stats.');
+    }
+  });
+
+  // /pumpfun - Pump.fun specific view
+  bot.command('pumpfun', async (ctx) => {
+    const args = ctx.message.text.split(' ').filter(Boolean);
+    if (args.length < 2) {
+      return ctx.reply('❌ Usage: `/pumpfun <address>`', { parse_mode: 'Markdown' });
+    }
+    const tokenAddress = args[1];
+    try {
+      await ctx.reply('🎯 Loading pump.fun view...');
+      const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      const pf = analysis.pumpFunData;
+      let message = `🎯 **PUMPFUN VIEW - ${analysis.metadata.symbol}**\n\n`;
+      if (pf?.isPumpFun) {
+        message += `• Bonding: ${((pf.bondingCurve || 0) * 100).toFixed(0)}%\n`;
+        if (pf.devBought) message += `• Dev Bought: ${pf.devBought}%\n`;
+        if (pf.mayhemMode) message += `• Mayhem Mode active\n`;
+        if (pf.king) message += `• King: \`${formatAddress(pf.king.address)}\` (${pf.king.percentage.toFixed(2)}%)\n`;
+        message += `\nLinks: https://pump.fun/${tokenAddress} • https://gmgn.ai/sol/token/${tokenAddress}`;
+      } else {
+        message += 'Not identified as a pump.fun token.';
+      }
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (e) {
+      ctx.reply('❌ Error loading pump.fun data.');
+    }
+  });
+
+  // /chart - Chart links
+  bot.command('chart', async (ctx) => {
+    const args = ctx.message.text.split(' ').filter(Boolean);
+    if (args.length < 2) {
+      return ctx.reply('❌ Usage: `/chart <address>`', { parse_mode: 'Markdown' });
+    }
+    const tokenAddress = args[1];
+    await ctx.reply(`📈 Chart links for \`${formatAddress(tokenAddress)}\`\n• DexScreener: https://dexscreener.com/solana/${tokenAddress}\n• GMGN: https://gmgn.ai/sol/token/${tokenAddress}`, { parse_mode: 'Markdown', disable_web_page_preview: true });
+  });
+
+  // Watchlist & alerts require user record; helper
+  const ensureUser = async (ctx: Context) => {
+    const userId = `telegram:${ctx.from?.id}`;
+    try { await storage.upsertUser({ id: userId, email: null as any }); } catch {}
+    return userId;
+  };
+
+  // /watch
+  bot.command('watch', async (ctx) => {
+    const args = ctx.message.text.split(' ').filter(Boolean);
+    if (args.length < 2) return ctx.reply('❌ Usage: `/watch <address>`', { parse_mode: 'Markdown' });
+    const tokenAddress = args[1];
+    const userId = await ensureUser(ctx);
+    try {
+      await storage.addToWatchlist({ userId, tokenAddress, label: null as any, metadata: null as any });
+      await ctx.reply(`✅ Added to your watchlist: \`${formatAddress(tokenAddress)}\``, { parse_mode: 'Markdown' });
+    } catch (e: any) {
+      await ctx.reply(`⚠️ Could not add: ${(e as any)?.message || 'unknown error'}`);
+    }
+  });
+
+  // /unwatch
+  bot.command('unwatch', async (ctx) => {
+    const args = ctx.message.text.split(' ').filter(Boolean);
+    if (args.length < 2) return ctx.reply('❌ Usage: `/unwatch <address>`', { parse_mode: 'Markdown' });
+    const tokenAddress = args[1];
+    const userId = await ensureUser(ctx);
+    try {
+      await storage.removeFromWatchlist(userId, tokenAddress);
+      await ctx.reply(`✅ Removed from your watchlist: \`${formatAddress(tokenAddress)}\``, { parse_mode: 'Markdown' });
+    } catch (e: any) {
+      await ctx.reply(`⚠️ Could not remove: ${(e as any)?.message || 'unknown error'}`);
+    }
+  });
+
+  // /watchlist
+  bot.command('watchlist', async (ctx) => {
+    const userId = await ensureUser(ctx);
+    const list = await storage.getWatchlist(userId);
+    if (list.length === 0) return ctx.reply('ℹ️ Your watchlist is empty. Use `/watch <address>`.', { parse_mode: 'Markdown' });
+    const lines = list.map((w, i) => `${i + 1}. \`${formatAddress(w.tokenAddress)}\`${w.label ? ` — ${w.label}` : ''}`).join('\n');
+    await ctx.reply(`📝 **YOUR WATCHLIST (${list.length})**\n\n${lines}`, { parse_mode: 'Markdown' });
+  });
+
+  // /alert
+  bot.command('alert', async (ctx) => {
+    const args = ctx.message.text.split(' ').filter(Boolean);
+    if (args.length < 4) return ctx.reply('❌ Usage: `/alert <address> above|below <price>`', { parse_mode: 'Markdown' });
+    const tokenAddress = args[1];
+    const direction = (args[2] || '').toLowerCase();
+    const price = parseFloat(args[3]);
+    if (!['above','below'].includes(direction) || !isFinite(price)) return ctx.reply('❌ Usage: `/alert <address> above|below <price>`', { parse_mode: 'Markdown' });
+    const alertType = direction === 'above' ? 'price_above' : 'price_below';
+    const userId = await ensureUser(ctx);
+    try {
+      await storage.createPriceAlert({ userId, tokenAddress, alertType: alertType as any, targetValue: price.toString(), lookbackWindowMinutes: null as any });
+      await ctx.reply(`🔔 Alert set: ${direction.toUpperCase()} $${price} for \`${formatAddress(tokenAddress)}\``, { parse_mode: 'Markdown' });
+    } catch (e: any) {
+      await ctx.reply(`⚠️ Could not create alert: ${(e as any)?.message || 'unknown error'}`);
+    }
+  });
+
+  // Blacklist stats/top
+  bot.command('blackliststats', async (ctx) => {
+    const s = await getBlacklistStats();
+    let message = `📛 **BLACKLIST STATS**\n\n`;
+    message += `Total: ${(s as any).total || 0}\nActive: ${(s as any).active || 0}\nAvg Severity: ${((s as any).avgSeverity || 0).toFixed(1)}\n`;
+    message += `Ruggers: ${(s as any).ruggers || 0} • Scammers: ${(s as any).scammers || 0} • Honeypots: ${(s as any).honeypots || 0}`;
+    await ctx.reply(message, { parse_mode: 'Markdown' });
+  });
+
+  bot.command('blacklisttop', async (ctx) => {
+    const args = ctx.message.text.split(' ').filter(Boolean);
+    const limit = Math.min(parseInt(args[1] || '10', 10) || 10, 50);
+    const top = await getTopFlaggedWallets(limit);
+    if (top.length === 0) return ctx.reply('No data');
+    let message = `🚫 **TOP FLAGGED WALLETS**\n\n`;
+    message += top.map((w, i) => `${i + 1}. \`${formatAddress(w.walletAddress)}\` — sev ${w.severity}, rugs ${w.rugCount}`).join('\n');
+    await ctx.reply(message, { parse_mode: 'Markdown' });
+  });
+
+  // Admin alpha controls
+  const isAdminEnv = (userId?: number) => {
+    const allow = (process.env.ALPHA_TELEGRAM_ADMIN_IDS || '')
+      .split(',').map(s => s.trim()).filter(Boolean);
+    return userId ? allow.includes(String(userId)) : false;
+  };
+
+  const isChatAdminOrEnv = async (ctx: Context) => {
+    const uid = ctx.from?.id;
+    if (!uid) return false;
+    try {
+      if (ctx.chat && typeof ctx.chat.id !== 'undefined') {
+        const member = await ctx.telegram.getChatMember(ctx.chat.id, uid);
+        const status = (member as any)?.status;
+        if (status === 'creator' || status === 'administrator') return true;
+      }
+    } catch {
+      // Ignore, fall back to env
+    }
+    return isAdminEnv(uid);
+  };
+
+  bot.command('alpha_status', async (ctx) => {
+    if (!(await isChatAdminOrEnv(ctx))) return ctx.reply('⛔ Admins only.');
+    const st = getAlphaAlertService().getStatus();
+    await ctx.reply(`Alpha Status: running=${st.isRunning}, callers=${st.monitoredCallers}/${st.totalCallers}, listeners=${st.activeListeners}, websockets=${st.activeWebSockets}`);
+  });
+  bot.command('alpha_start', async (ctx) => {
+    if (!(await isChatAdminOrEnv(ctx))) return ctx.reply('⛔ Admins only.');
+    await getAlphaAlertService().start();
+    await ctx.reply('✅ Alpha monitoring started.');
+  });
+  bot.command('alpha_stop', async (ctx) => {
+    if (!(await isChatAdminOrEnv(ctx))) return ctx.reply('⛔ Admins only.');
+    await getAlphaAlertService().stop();
+    await ctx.reply('🛑 Alpha monitoring stopped.');
+  });
+  bot.command('alpha_add', async (ctx) => {
+    if (!(await isChatAdminOrEnv(ctx))) return ctx.reply('⛔ Admins only.');
+    const args = ctx.message.text.split(' ').filter(Boolean);
+    if (args.length < 3) return ctx.reply('❌ Usage: `/alpha_add <wallet> <name>`', { parse_mode: 'Markdown' });
+    const wallet = args[1];
+    const name = args.slice(2).join(' ');
+    getAlphaAlertService().addCaller(wallet, name);
+    await ctx.reply(`✅ Added alpha caller ${name} (${formatAddress(wallet)})`, { parse_mode: 'Markdown' });
+  });
+  bot.command('alpha_remove', async (ctx) => {
+    if (!(await isChatAdminOrEnv(ctx))) return ctx.reply('⛔ Admins only.');
+    const args = ctx.message.text.split(' ').filter(Boolean);
+    if (args.length < 2) return ctx.reply('❌ Usage: `/alpha_remove <wallet>`', { parse_mode: 'Markdown' });
+    const wallet = args[1];
+    getAlphaAlertService().removeCaller(wallet);
+    await ctx.reply(`✅ Removed alpha caller (${formatAddress(wallet)})`, { parse_mode: 'Markdown' });
+  });
+
+  // Alpha destination controls (Telegram)
+  bot.command('alpha_here', async (ctx) => {
+    if (!(await isChatAdminOrEnv(ctx))) return ctx.reply('⛔ Admins only.');
+    const chatId = String(ctx.chat?.id);
+    if (!chatId) return ctx.reply('❌ Unable to read chat id.');
+    try {
+      await storage.setAlphaTarget({ platform: 'telegram', groupId: chatId, channelId: chatId });
+      await ctx.reply('✅ This chat is now set to receive alpha alerts.');
+    } catch (e) {
+      await ctx.reply('❌ Failed to set alpha chat.');
+    }
+  });
+  bot.command('alpha_clear', async (ctx) => {
+    if (!(await isChatAdminOrEnv(ctx))) return ctx.reply('⛔ Admins only.');
+    const chatId = String(ctx.chat?.id);
+    if (!chatId) return ctx.reply('❌ Unable to read chat id.');
+    try {
+      await storage.clearAlphaTarget('telegram', chatId);
+      await ctx.reply('🧹 Cleared alpha alert chat for this group.');
+    } catch (e) {
+      await ctx.reply('❌ Failed to clear alpha chat.');
+    }
+  });
+  bot.command('alpha_channel', async (ctx) => {
+    const chatId = String(ctx.chat?.id);
+    const cfg = chatId ? await storage.getAlphaTarget('telegram', chatId) : undefined;
+    await ctx.reply(cfg ? `📍 This chat is configured for alpha alerts.` : 'ℹ️ No alpha alert chat configured here.');
+  });
+
+  // Smart Money destination controls (Telegram)
+  bot.command('smart_here', async (ctx) => {
+    if (!(await isChatAdminOrEnv(ctx))) return ctx.reply('⛔ Admins only.');
+    const chatId = String(ctx.chat?.id);
+    if (!chatId) return ctx.reply('❌ Unable to read chat id.');
+    try {
+      await storage.setSmartTarget({ platform: 'telegram', groupId: chatId, channelId: chatId });
+      await ctx.reply('✅ This chat is now set to receive Smart Money calls.');
+    } catch (e) {
+      await ctx.reply('❌ Failed to set Smart Money chat.');
+    }
+  });
+  bot.command('smart_clear', async (ctx) => {
+    if (!(await isChatAdminOrEnv(ctx))) return ctx.reply('⛔ Admins only.');
+    const chatId = String(ctx.chat?.id);
+    if (!chatId) return ctx.reply('❌ Unable to read chat id.');
+    try {
+      await storage.clearSmartTarget('telegram', chatId);
+      await ctx.reply('🧹 Cleared Smart Money call chat for this group.');
+    } catch (e) {
+      await ctx.reply('❌ Failed to clear Smart Money chat.');
+    }
+  });
+  bot.command('smart_channel', async (ctx) => {
+    const chatId = String(ctx.chat?.id);
+    const cfg = chatId ? await storage.getSmartTarget('telegram', chatId) : undefined;
+    await ctx.reply(cfg ? `📍 This chat is configured for Smart Money calls.` : 'ℹ️ No Smart Money call chat configured here.');
+  });
+
+  // Smart wallet management commands (Telegram)
+  bot.command('smartwallet_add', async (ctx) => {
+    if (!(await isChatAdminOrEnv(ctx))) return ctx.reply('⛔ Admins only.');
+    const args = ctx.message.text.split(' ').filter(Boolean);
+    if (args.length < 3) return ctx.reply('❌ Usage: `/smartwallet_add <wallet> <name> [influence]`', { parse_mode: 'Markdown' });
+    const wallet = args[1];
+    const name = args.slice(2, args.length - 1).join(' ') || args[2];
+    const influence = parseInt(args[args.length - 1]) || 60;
+    try {
+      await storage.upsertSmartWallet({ walletAddress: wallet, displayName: name, influenceScore: influence, source: 'manual', isActive: true });
+      await ctx.reply(`✅ Smart wallet added: \`${formatAddress(wallet)}\` (${name}) with influence ${influence}`, { parse_mode: 'Markdown' });
+      getAlphaAlertService().addCaller(wallet, name);
+    } catch (e: any) {
+      await ctx.reply(`❌ Failed: ${e.message}`);
+    }
+  });
+  bot.command('smartwallet_remove', async (ctx) => {
+    if (!(await isChatAdminOrEnv(ctx))) return ctx.reply('⛔ Admins only.');
+    const args = ctx.message.text.split(' ').filter(Boolean);
+    if (args.length < 2) return ctx.reply('❌ Usage: `/smartwallet_remove <wallet>`', { parse_mode: 'Markdown' });
+    const wallet = args[1];
+    try {
+      await storage.setSmartWalletActive(wallet, false);
+      await ctx.reply(`✅ Smart wallet deactivated: \`${formatAddress(wallet)}\``, { parse_mode: 'Markdown' });
+      getAlphaAlertService().removeCaller(wallet);
+    } catch (e: any) {
+      await ctx.reply(`❌ Failed: ${e.message}`);
+    }
+  });
+  bot.command('smartwallet_activate', async (ctx) => {
+    if (!(await isChatAdminOrEnv(ctx))) return ctx.reply('⛔ Admins only.');
+    const args = ctx.message.text.split(' ').filter(Boolean);
+    if (args.length < 2) return ctx.reply('❌ Usage: `/smartwallet_activate <wallet>`', { parse_mode: 'Markdown' });
+    const wallet = args[1];
+    try {
+      const w = await storage.setSmartWalletActive(wallet, true);
+      await ctx.reply(`✅ Smart wallet re-activated: \`${formatAddress(wallet)}\``, { parse_mode: 'Markdown' });
+      getAlphaAlertService().addCaller(wallet, w.displayName || 'Trader');
+    } catch (e: any) {
+      await ctx.reply(`❌ Failed: ${e.message}`);
+    }
+  });
+  bot.command('smartwallet_list', async (ctx) => {
+    if (!(await isChatAdminOrEnv(ctx))) return ctx.reply('⛔ Admins only.');
+    const args = ctx.message.text.split(' ').filter(Boolean);
+    const limit = parseInt(args[1]) || 20;
+    const wallets = await storage.getActiveSmartWallets(0, limit);
+    if (!wallets.length) {
+      await ctx.reply('No smart wallets in DB.');
+    } else {
+      const lines = wallets.map((w, i) => `${i + 1}. \`${formatAddress(w.walletAddress)}\` — ${w.displayName || 'Unknown'} (inf ${w.influenceScore})`);
+      await ctx.reply(`🧠 **Smart Wallets (${wallets.length})**\n\n${lines.join('\n')}`, { parse_mode: 'Markdown' });
+    }
+  });
+  bot.command('smartwallet_view', async (ctx) => {
+    if (!(await isChatAdminOrEnv(ctx))) return ctx.reply('⛔ Admins only.');
+    const args = ctx.message.text.split(' ').filter(Boolean);
+    if (args.length < 2) return ctx.reply('❌ Usage: `/smartwallet_view <wallet>`', { parse_mode: 'Markdown' });
+    const wallet = args[1];
+    const w = await storage.getSmartWallet(wallet);
+    if (!w) {
+      await ctx.reply(`❌ Wallet not found in smart DB: \`${formatAddress(wallet)}\``, { parse_mode: 'Markdown' });
+    } else {
+      const msg = `🧠 **Smart Wallet Details**\n\n` +
+        `**Address:** \`${w.walletAddress}\`\n` +
+        `**Name:** ${w.displayName || 'N/A'}\n` +
+        `**Source:** ${w.source || 'N/A'}\n` +
+        `**Influence:** ${w.influenceScore ?? 'N/A'}\n` +
+        `**Win Rate:** ${w.winRate ?? 'N/A'}%\n` +
+        `**Active:** ${w.isActive ? '✅' : '❌'}`;
+      await ctx.reply(msg, { parse_mode: 'Markdown' });
     }
   });
   

@@ -1,8 +1,11 @@
-import { Client, GatewayIntentBits, EmbedBuilder, SlashCommandBuilder, REST, Routes } from 'discord.js';
+import { Client, GatewayIntentBits, EmbedBuilder, SlashCommandBuilder, REST, Routes, ChannelType, PermissionFlagsBits } from 'discord.js';
 import { tokenAnalyzer } from './solana-analyzer';
 import { storage } from './storage';
-import type { TokenAnalysisResponse } from './shared/schema';
+import type { TokenAnalysisResponse } from '../shared/schema';
 import { buildCompactMessage, formatNumber, getRiskEmoji, formatAddress } from './bot-formatter';
+import { getAlphaAlertService } from './alpha-alerts';
+import { checkBlacklist, reportWallet, getBlacklistStats, getTopFlaggedWallets } from './ai-blacklist';
+import { getExchangeStats } from './exchange-whitelist';
 
 // Client instance - only created when startDiscordBot() is called
 let clientInstance: Client | null = null;
@@ -272,6 +275,136 @@ const commands = [
   new SlashCommandBuilder()
     .setName('trending')
     .setDescription('Show trending Solana tokens by volume'),
+  new SlashCommandBuilder()
+    .setName('watch')
+    .setDescription('Add a token to your watchlist')
+    .addStringOption(option =>
+      option.setName('address')
+        .setDescription('Token contract address')
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName('unwatch')
+    .setDescription('Remove a token from your watchlist')
+    .addStringOption(option =>
+      option.setName('address')
+        .setDescription('Token contract address')
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName('watchlist')
+    .setDescription('Show your watchlist'),
+  new SlashCommandBuilder()
+    .setName('alert')
+    .setDescription('Create a price alert')
+    .addStringOption(option =>
+      option.setName('address')
+        .setDescription('Token contract address')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option.setName('direction')
+        .setDescription('Alert when price goes ...')
+        .addChoices({ name: 'above', value: 'above' }, { name: 'below', value: 'below' })
+        .setRequired(true)
+    )
+    .addNumberOption(option =>
+      option.setName('price')
+        .setDescription('Target price in USD')
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName('alpha')
+    .setDescription('Alpha feed controls (admin)')
+    .addSubcommand(sc => sc.setName('status').setDescription('Show alpha service status'))
+    .addSubcommand(sc => sc.setName('start').setDescription('Start alpha monitoring'))
+    .addSubcommand(sc => sc.setName('stop').setDescription('Stop alpha monitoring'))
+    .addSubcommand(sc => sc.setName('setchannel')
+      .setDescription('Set this server\'s alpha alert channel')
+      .addChannelOption(o => o
+        .setName('channel')
+        .setDescription('Channel to receive alpha pings')
+        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+      )
+    )
+    .addSubcommand(sc => sc.setName('clearchannel').setDescription('Clear the configured alpha alert channel'))
+    .addSubcommand(sc => sc.setName('where').setDescription('Show the configured alpha alert channel'))
+    .addSubcommand(sc => sc.setName('add')
+      .setDescription('Add alpha caller wallet')
+      .addStringOption(o => o.setName('wallet').setDescription('Wallet address').setRequired(true))
+      .addStringOption(o => o.setName('name').setDescription('Display name').setRequired(true))
+    )
+    .addSubcommand(sc => sc.setName('remove')
+      .setDescription('Remove alpha caller wallet')
+      .addStringOption(o => o.setName('wallet').setDescription('Wallet address').setRequired(true))
+    ),
+  new SlashCommandBuilder()
+    .setName('smart')
+    .setDescription('Smart Money calls routing (admin)')
+    .addSubcommand(sc => sc.setName('setchannel')
+      .setDescription('Set this server\'s Smart Money alert channel')
+      .addChannelOption(o => o
+        .setName('channel')
+        .setDescription('Channel to receive Smart Money calls')
+        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+      )
+    )
+    .addSubcommand(sc => sc.setName('clearchannel').setDescription('Clear the configured Smart Money alert channel'))
+    .addSubcommand(sc => sc.setName('where').setDescription('Show the configured Smart Money alert channel')),
+  new SlashCommandBuilder()
+    .setName('holders')
+    .setDescription('Show top N holders')
+    .addStringOption(option => option.setName('address').setDescription('Token address').setRequired(true))
+    .addIntegerOption(option => option.setName('n').setDescription('How many holders (max 50)').setMinValue(1).setMaxValue(50)),
+  new SlashCommandBuilder()
+    .setName('exchanges')
+    .setDescription('Show exchange wallet presence in holders')
+    .addStringOption(option => option.setName('address').setDescription('Token address').setRequired(true)),
+  new SlashCommandBuilder()
+    .setName('pumpfun')
+    .setDescription('Pump.fun specific view')
+    .addStringOption(option => option.setName('address').setDescription('Token address').setRequired(true)),
+  new SlashCommandBuilder()
+    .setName('report')
+    .setDescription('Report a suspicious wallet')
+    .addStringOption(option => option.setName('wallet').setDescription('Wallet address').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Why is it suspicious?').setRequired(true)),
+  new SlashCommandBuilder()
+    .setName('blackliststats')
+    .setDescription('Show blacklist statistics'),
+  new SlashCommandBuilder()
+    .setName('blacklisttop')
+    .setDescription('Show top flagged wallets')
+    .addIntegerOption(option => option.setName('limit').setDescription('How many to show (max 50)').setMinValue(1).setMaxValue(50)),
+  new SlashCommandBuilder()
+    .setName('chart')
+    .setDescription('Show a quick chart link')
+    .addStringOption(option => option.setName('address').setDescription('Token address').setRequired(true)),
+  new SlashCommandBuilder()
+    .setName('smartwallet')
+    .setDescription('Manage Smart Money wallet DB (admin)')
+    .addSubcommand(sc => sc.setName('add')
+      .setDescription('Add smart wallet to DB')
+      .addStringOption(o => o.setName('wallet').setDescription('Wallet address').setRequired(true))
+      .addStringOption(o => o.setName('name').setDescription('Display name').setRequired(true))
+      .addIntegerOption(o => o.setName('influence').setDescription('Influence score 0-100').setMinValue(0).setMaxValue(100))
+    )
+    .addSubcommand(sc => sc.setName('remove')
+      .setDescription('Deactivate a smart wallet')
+      .addStringOption(o => o.setName('wallet').setDescription('Wallet address').setRequired(true))
+    )
+    .addSubcommand(sc => sc.setName('activate')
+      .setDescription('Re-activate a smart wallet')
+      .addStringOption(o => o.setName('wallet').setDescription('Wallet address').setRequired(true))
+    )
+    .addSubcommand(sc => sc.setName('list')
+      .setDescription('List active smart wallets')
+      .addIntegerOption(o => o.setName('limit').setDescription('How many to show').setMinValue(1).setMaxValue(50))
+    )
+    .addSubcommand(sc => sc.setName('view')
+      .setDescription('View smart wallet details')
+      .addStringOption(o => o.setName('wallet').setDescription('Wallet address').setRequired(true))
+    ),
 ].map(command => command.toJSON());
 
 // ============================================================================
@@ -310,6 +443,27 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     if (!interaction.isChatInputCommand()) return;
     
     try {
+      const platformUserId = `discord:${interaction.user.id}`;
+      const isAdminEnv = (process.env.ALPHA_DISCORD_ADMIN_IDS || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+        .includes(interaction.user.id);
+      const hasGuildPerms = !!(interaction.memberPermissions && (
+        interaction.memberPermissions.has(PermissionFlagsBits.Administrator) ||
+        interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild) ||
+        interaction.memberPermissions.has(PermissionFlagsBits.ManageChannels)
+      ));
+      const canAdmin = (cmdName: string) => {
+        // For alpha-related admin commands, require guild perms in servers; fallback to env allowlist for DMs or edge cases
+        if (interaction.guildId) return hasGuildPerms || isAdminEnv;
+        return isAdminEnv;
+      };
+      const ensureUser = async () => {
+        try {
+          await storage.upsertUser({ id: platformUserId, email: null as any });
+        } catch {}
+      };
       if (interaction.commandName === 'help') {
         const helpEmbed = new EmbedBuilder()
           .setColor(0x5865f2)
@@ -318,7 +472,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           .addFields(
             {
               name: '📋 Core Commands',
-              value: '`/execute <address>` - Full 52-metric scan\n`/first20 <address>` - Top 20 holder analysis\n`/devaudit <address>` - Dev wallet history\n`/blacklist <wallet>` - Check if wallet is flagged\n`/help` - Show this help message'
+              value: '`/execute <address>` - Full scan\n`/holders <address> [n]` - Top N holders\n`/devaudit <address>` - Dev wallet history\n`/blacklist <wallet>` - Check blacklist\n`/help` - Show this help message'
             },
             {
               name: '👥 Group Tier Commands',
@@ -326,7 +480,15 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             },
             {
               name: '🔥 NEW Popular Commands',
-              value: '`/price <address>` - Quick price lookup\n`/rugcheck <address>` - Instant rug detection\n`/liquidity <address>` - LP analysis\n`/compare <token1> <token2>` - Side-by-side comparison\n`/trending` - Top 10 tokens by volume'
+              value: '`/price <address>` - Quick price\n`/rugcheck <address>` - Instant rug scan\n`/liquidity <address>` - LP analysis\n`/compare <token1> <token2>` - Compare tokens\n`/trending` - Top tokens by volume\n`/exchanges <address>` - Exchange presence\n`/pumpfun <address>` - Pump.fun view\n`/chart <address>` - Chart link'
+            },
+            {
+              name: '🔔 Personal Tools',
+              value: '`/watch <address>` add • `/unwatch <address>` remove • `/watchlist` show\n`/alert <address> above|below <price>` set price alert'
+            },
+            {
+              name: '🧰 Admin/Community',
+              value: '`/report <wallet> <reason>` report scammer\n`/blackliststats` stats • `/blacklisttop [limit]` top\n`/alpha <subcommand>` status|start|stop|add|remove (admin)'
             },
             {
               name: '💡 Quick Tip',
@@ -478,19 +640,18 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         
       } else if (interaction.commandName === 'blacklist') {
         const walletAddress = interaction.options.getString('wallet', true);
-        
         await interaction.deferReply();
-        
+        const result = await checkBlacklist(walletAddress);
+        const color = result.isBlacklisted ? 0xff0000 : 0x00cc66;
         const embed = new EmbedBuilder()
-          .setColor(0x00ff00)
+          .setColor(color)
           .setTitle('🔍 Blacklist Check')
           .setDescription(`Wallet: \`${formatAddress(walletAddress)}\``)
-          .addFields({
-            name: 'Status',
-            value: '✅ Not currently flagged'
-          })
+          .addFields({ name: 'Status', value: result.isBlacklisted ? `🚨 FLAGGED (severity ${result.severity})` : '✅ Not currently flagged' })
           .setTimestamp();
-        
+        if (result.labels.length > 0) {
+          embed.addFields({ name: 'Labels', value: result.labels.map(l => `• ${l.type} (sev ${l.severity})`).join('\n') });
+        }
         await interaction.editReply({ embeds: [embed] });
         
       } else if (interaction.commandName === 'whaletrack') {
@@ -1005,6 +1166,291 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         });
         
         await interaction.editReply({ embeds: [embed] });
+      } else if (interaction.commandName === 'holders') {
+        const tokenAddress = interaction.options.getString('address', true);
+        const n = interaction.options.getInteger('n') ?? 20;
+        await interaction.deferReply();
+        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        const embed = new EmbedBuilder()
+          .setColor(0x3498db)
+          .setTitle(`📊 Top ${Math.min(n, 50)} Holders - ${analysis.metadata.symbol}`)
+          .setDescription(`Top 10 Concentration: **${analysis.topHolderConcentration.toFixed(2)}%**`)
+          .setTimestamp();
+        analysis.topHolders.slice(0, Math.min(n, 50)).forEach((h, idx) => {
+          embed.addFields({ name: `#${idx + 1}` , value: `\`${formatAddress(h.address)}\` - ${h.percentage.toFixed(2)}%`, inline: false });
+        });
+        await interaction.editReply({ embeds: [embed] });
+      } else if (interaction.commandName === 'report') {
+        const wallet = interaction.options.getString('wallet', true);
+        const reason = interaction.options.getString('reason', true);
+        await interaction.deferReply({ ephemeral: true });
+        await reportWallet(wallet, 'scammer', reason, platformUserId);
+        await interaction.editReply({ content: '✅ Report submitted. Thank you for helping keep the ecosystem safe!' });
+      } else if (interaction.commandName === 'watch') {
+        const tokenAddress = interaction.options.getString('address', true);
+        await interaction.deferReply({ ephemeral: true });
+        await ensureUser();
+        try {
+          await storage.addToWatchlist({ userId: platformUserId, tokenAddress, label: null as any, metadata: null as any });
+          await interaction.editReply({ content: `✅ Added to your watchlist: \`${formatAddress(tokenAddress)}\`` });
+        } catch (e: any) {
+          await interaction.editReply({ content: `⚠️ Could not add: ${e?.message || 'unknown error'}` });
+        }
+      } else if (interaction.commandName === 'unwatch') {
+        const tokenAddress = interaction.options.getString('address', true);
+        await interaction.deferReply({ ephemeral: true });
+        await ensureUser();
+        try {
+          await storage.removeFromWatchlist(platformUserId, tokenAddress);
+          await interaction.editReply({ content: `✅ Removed from your watchlist: \`${formatAddress(tokenAddress)}\`` });
+        } catch (e: any) {
+          await interaction.editReply({ content: `⚠️ Could not remove: ${e?.message || 'unknown error'}` });
+        }
+      } else if (interaction.commandName === 'watchlist') {
+        await interaction.deferReply({ ephemeral: true });
+        await ensureUser();
+        const list = await storage.getWatchlist(platformUserId);
+        if (list.length === 0) {
+          await interaction.editReply({ content: 'ℹ️ Your watchlist is empty. Use `/watch <address>` to add tokens.' });
+        } else {
+          const lines = list.map((w, i) => `${i + 1}. \`${formatAddress(w.tokenAddress)}\`${w.label ? ` — ${w.label}` : ''}`);
+          await interaction.editReply({ content: `📝 Your Watchlist (${list.length}):\n${lines.join('\n')}` });
+        }
+      } else if (interaction.commandName === 'alert') {
+        const tokenAddress = interaction.options.getString('address', true);
+        const direction = interaction.options.getString('direction', true) as 'above' | 'below';
+        const price = interaction.options.getNumber('price', true);
+        await interaction.deferReply({ ephemeral: true });
+        await ensureUser();
+        const alertType = direction === 'above' ? 'price_above' : 'price_below';
+        try {
+          await storage.createPriceAlert({ userId: platformUserId, tokenAddress, alertType: alertType as any, targetValue: price.toString(), lookbackWindowMinutes: null as any });
+          await interaction.editReply({ content: `🔔 Alert set: ${direction.toUpperCase()} $${price} for \`${formatAddress(tokenAddress)}\`` });
+        } catch (e: any) {
+          await interaction.editReply({ content: `⚠️ Could not create alert: ${e?.message || 'unknown error'}` });
+        }
+      } else if (interaction.commandName === 'alpha') {
+        const sub = interaction.options.getSubcommand(true);
+        const alpha = getAlphaAlertService();
+        if (!canAdmin('alpha')) {
+          await interaction.reply({ content: '⛔ Admins only.', ephemeral: true });
+          return;
+        }
+        await interaction.deferReply({ ephemeral: true });
+        if (sub === 'status') {
+          const st = alpha.getStatus();
+          await interaction.editReply({ content: `Alpha Status: running=${st.isRunning}, callers=${st.monitoredCallers}/${st.totalCallers}, listeners=${st.activeListeners}, websockets=${st.activeWebSockets}` });
+        } else if (sub === 'start') {
+          await alpha.start();
+          await interaction.editReply({ content: '✅ Alpha monitoring started.' });
+        } else if (sub === 'stop') {
+          await alpha.stop();
+          await interaction.editReply({ content: '🛑 Alpha monitoring stopped.' });
+        } else if (sub === 'setchannel') {
+          if (!interaction.guildId) {
+            await interaction.editReply({ content: '❌ This command must be used in a server.' });
+            return;
+          }
+          const channel = interaction.options.getChannel('channel') || interaction.channel;
+          if (!channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)) {
+            await interaction.editReply({ content: '❌ Please select a text or announcement channel.' });
+            return;
+          }
+          await storage.setAlphaTarget({ platform: 'discord', groupId: interaction.guildId, channelId: channel.id });
+          await interaction.editReply({ content: `✅ Alpha alerts will be sent to <#${channel.id}> (@everyone).` });
+        } else if (sub === 'clearchannel') {
+          if (!interaction.guildId) {
+            await interaction.editReply({ content: '❌ This command must be used in a server.' });
+            return;
+          }
+          await storage.clearAlphaTarget('discord', interaction.guildId);
+          await interaction.editReply({ content: '🧹 Cleared this server\'s alpha alert channel.' });
+        } else if (sub === 'where') {
+          if (!interaction.guildId) {
+            await interaction.editReply({ content: '❌ This command must be used in a server.' });
+            return;
+          }
+          const cfg = await storage.getAlphaTarget('discord', interaction.guildId);
+          await interaction.editReply({ content: cfg ? `📍 Alpha alerts go to <#${cfg.channelId}>` : 'ℹ️ No channel configured for this server.' });
+        } else if (sub === 'add') {
+          const wallet = interaction.options.getString('wallet', true);
+          const name = interaction.options.getString('name', true);
+          alpha.addCaller(wallet, name);
+          await interaction.editReply({ content: `✅ Added alpha caller ${name} (${formatAddress(wallet)})` });
+        } else if (sub === 'remove') {
+          const wallet = interaction.options.getString('wallet', true);
+          alpha.removeCaller(wallet);
+          await interaction.editReply({ content: `✅ Removed alpha caller (${formatAddress(wallet)})` });
+        }
+      } else if (interaction.commandName === 'smart') {
+        const sub = interaction.options.getSubcommand(true);
+        if (!canAdmin('smart')) {
+          await interaction.reply({ content: '⛔ Admins only.', ephemeral: true });
+          return;
+        }
+        await interaction.deferReply({ ephemeral: true });
+        if (!interaction.guildId) {
+          await interaction.editReply({ content: '❌ This command must be used in a server.' });
+          return;
+        }
+        if (sub === 'setchannel') {
+          const channel = interaction.options.getChannel('channel') || interaction.channel;
+          if (!channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)) {
+            await interaction.editReply({ content: '❌ Please select a text or announcement channel.' });
+            return;
+          }
+          await storage.setSmartTarget({ platform: 'discord', groupId: interaction.guildId, channelId: channel.id });
+          await interaction.editReply({ content: `✅ Smart Money calls will be sent to <#${channel.id}> (@everyone).` });
+        } else if (sub === 'clearchannel') {
+          await storage.clearSmartTarget('discord', interaction.guildId);
+          await interaction.editReply({ content: '🧹 Cleared this server\'s Smart Money alert channel.' });
+        } else if (sub === 'where') {
+          const cfg = await storage.getSmartTarget('discord', interaction.guildId);
+          await interaction.editReply({ content: cfg ? `📍 Smart Money calls go to <#${cfg.channelId}>` : 'ℹ️ No Smart Money channel configured for this server.' });
+        }
+      } else if (interaction.commandName === 'exchanges') {
+        const tokenAddress = interaction.options.getString('address', true);
+        await interaction.deferReply();
+        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        const stats = getExchangeStats(analysis.topHolders.map(h => ({ address: h.address, percentage: h.percentage })));
+        const embed = new EmbedBuilder()
+          .setColor(stats.isSignificant ? 0xffa500 : 0x00cc66)
+          .setTitle(`🏦 Exchange Presence - ${analysis.metadata.symbol}`)
+          .setDescription(`Exchanges hold ${stats.totalPercentage.toFixed(2)}% across ${stats.count} wallets`)
+          .setTimestamp();
+        if (stats.holders.length > 0) {
+          embed.addFields({ name: 'Exchange Holders', value: stats.holders.slice(0, 10).map(h => `• \`${formatAddress(h.address)}\` — ${h.percentage.toFixed(2)}%`).join('\n') });
+        }
+        await interaction.editReply({ embeds: [embed] });
+      } else if (interaction.commandName === 'pumpfun') {
+        const tokenAddress = interaction.options.getString('address', true);
+        await interaction.deferReply();
+        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        const pf = analysis.pumpFunData;
+        const embed = new EmbedBuilder()
+          .setColor(0xff66aa)
+          .setTitle(`🎯 Pump.fun View - ${analysis.metadata.symbol}`)
+          .setTimestamp();
+        if (pf?.isPumpFun) {
+          let body = `• Bonding: ${((pf.bondingCurve || 0) * 100).toFixed(0)}% complete\n`;
+          if (pf.devBought) body += `• Dev Bought: ${pf.devBought}%\n`;
+          if (pf.mayhemMode) body += `• Mayhem Mode active\n`;
+          if (pf.king) body += `• King: \`${formatAddress(pf.king.address)}\` (${pf.king.percentage.toFixed(2)}%)\n`;
+          body += `\nLinks: [pump.fun](https://pump.fun/${tokenAddress}) • [gmgn](https://gmgn.ai/sol/token/${tokenAddress})`;
+          embed.setDescription(body);
+        } else {
+          embed.setDescription('Not identified as a pump.fun token.');
+        }
+        await interaction.editReply({ embeds: [embed] });
+      } else if (interaction.commandName === 'blackliststats') {
+        await interaction.deferReply();
+        const s = await getBlacklistStats();
+        const embed = new EmbedBuilder()
+          .setColor(0x8888ff)
+          .setTitle('📛 Blacklist Statistics')
+          .addFields(
+            { name: 'Total Labels', value: String((s as any).total || 0), inline: true },
+            { name: 'Active', value: String((s as any).active || 0), inline: true },
+            { name: 'Avg Severity', value: ((s as any).avgSeverity || 0).toFixed(1), inline: true },
+          )
+          .addFields(
+            { name: 'Ruggers', value: String((s as any).ruggers || 0), inline: true },
+            { name: 'Scammers', value: String((s as any).scammers || 0), inline: true },
+            { name: 'Honeypots', value: String((s as any).honeypots || 0), inline: true },
+          )
+          .setTimestamp();
+        await interaction.editReply({ embeds: [embed] });
+      } else if (interaction.commandName === 'blacklisttop') {
+        const limit = interaction.options.getInteger('limit') ?? 10;
+        await interaction.deferReply();
+        const top = await getTopFlaggedWallets(Math.min(limit, 50));
+        const embed = new EmbedBuilder()
+          .setColor(0xff4444)
+          .setTitle('🚫 Top Flagged Wallets')
+          .setDescription(top.length ? top.map((w, i) => `${i + 1}. \`${formatAddress(w.walletAddress)}\` — sev ${w.severity}, rugs ${w.rugCount}`).join('\n') : 'No data')
+          .setTimestamp();
+        await interaction.editReply({ embeds: [embed] });
+      } else if (interaction.commandName === 'chart') {
+        const tokenAddress = interaction.options.getString('address', true);
+        await interaction.reply({ content: `📈 Chart links for \`${formatAddress(tokenAddress)}\`\n• DexScreener: https://dexscreener.com/solana/${tokenAddress}\n• GMGN: https://gmgn.ai/sol/token/${tokenAddress}`, ephemeral: false });
+      } else if (interaction.commandName === 'smartwallet') {
+        const sc = interaction.options.getSubcommand();
+        const member = interaction.member as any;
+        const isAdmin = member?.permissions?.has?.(PermissionFlagsBits.Administrator) ||
+          member?.permissions?.has?.(PermissionFlagsBits.ManageGuild) ||
+          member?.permissions?.has?.(PermissionFlagsBits.ManageChannels) ||
+          (process.env.DISCORD_ADMIN_IDS || '').split(',').includes(interaction.user.id);
+        if (!isAdmin) {
+          await interaction.reply({ content: '❌ Admin only (Administrator, Manage Guild, or Manage Channels).', ephemeral: true });
+          return;
+        }
+        if (sc === 'add') {
+          const wallet = interaction.options.getString('wallet', true);
+          const name = interaction.options.getString('name', true);
+          const influence = interaction.options.getInteger('influence') ?? 60;
+          await interaction.deferReply();
+          try {
+            const added = await storage.upsertSmartWallet({ walletAddress: wallet, displayName: name, influenceScore: influence, source: 'manual', isActive: true });
+            await interaction.editReply(`✅ Smart wallet added: \`${formatAddress(wallet)}\` (${name}) with influence ${influence}`);
+            const alphaService = getAlphaAlertService();
+            alphaService.addCaller(wallet, name);
+          } catch (e: any) {
+            await interaction.editReply(`❌ Failed: ${e.message}`);
+          }
+        } else if (sc === 'remove') {
+          const wallet = interaction.options.getString('wallet', true);
+          await interaction.deferReply();
+          try {
+            await storage.setSmartWalletActive(wallet, false);
+            await interaction.editReply(`✅ Smart wallet deactivated: \`${formatAddress(wallet)}\``);
+            const alphaService = getAlphaAlertService();
+            alphaService.removeCaller(wallet);
+          } catch (e: any) {
+            await interaction.editReply(`❌ Failed: ${e.message}`);
+          }
+        } else if (sc === 'activate') {
+          const wallet = interaction.options.getString('wallet', true);
+          await interaction.deferReply();
+          try {
+            const w = await storage.setSmartWalletActive(wallet, true);
+            await interaction.editReply(`✅ Smart wallet re-activated: \`${formatAddress(wallet)}\``);
+            const alphaService = getAlphaAlertService();
+            alphaService.addCaller(wallet, w.displayName || 'Trader');
+          } catch (e: any) {
+            await interaction.editReply(`❌ Failed: ${e.message}`);
+          }
+        } else if (sc === 'list') {
+          const limit = interaction.options.getInteger('limit') ?? 20;
+          await interaction.deferReply();
+          const wallets = await storage.getActiveSmartWallets(0, limit);
+          if (!wallets.length) {
+            await interaction.editReply('No smart wallets in DB.');
+          } else {
+            const lines = wallets.map((w, i) => `${i + 1}. \`${formatAddress(w.walletAddress)}\` — ${w.displayName || 'Unknown'} (inf ${w.influenceScore})`);
+            await interaction.editReply(`🧠 **Smart Wallets (${wallets.length})**\n${lines.join('\n')}`);
+          }
+        } else if (sc === 'view') {
+          const wallet = interaction.options.getString('wallet', true);
+          await interaction.deferReply();
+          const w = await storage.getSmartWallet(wallet);
+          if (!w) {
+            await interaction.editReply(`❌ Wallet not found in smart DB: \`${formatAddress(wallet)}\``);
+          } else {
+            const embed = new EmbedBuilder()
+              .setColor(0x66ccff)
+              .setTitle('🧠 Smart Wallet Details')
+              .addFields(
+                { name: 'Address', value: `\`\`\`${w.walletAddress}\`\`\``, inline: false },
+                { name: 'Name', value: w.displayName || 'N/A', inline: true },
+                { name: 'Source', value: w.source || 'N/A', inline: true },
+                { name: 'Influence', value: String(w.influenceScore ?? 'N/A'), inline: true },
+                { name: 'Win Rate', value: `${w.winRate ?? 'N/A'}%`, inline: true },
+                { name: 'Active', value: w.isActive ? '✅' : '❌', inline: true },
+              )
+              .setTimestamp();
+            await interaction.editReply({ embeds: [embed] });
+          }
+        }
       }
       
     } catch (error) {

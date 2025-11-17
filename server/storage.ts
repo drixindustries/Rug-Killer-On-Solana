@@ -67,6 +67,18 @@ import {
   type InsertTokenReport,
   type UserActivity,
   type InsertUserActivity,
+  alphaAlertTargets,
+  type AlphaAlertTarget,
+  type InsertAlphaAlertTarget,
+  smartAlertTargets,
+  type SmartAlertTarget,
+  type InsertSmartAlertTarget,
+  smartWallets,
+  type SmartWallet,
+  type InsertSmartWallet,
+  smartSignals,
+  type SmartSignal,
+  type InsertSmartSignal,
 } from "../shared/schema.ts";
 import { db } from "./db.ts";
 import { eq, and, isNull, lt, inArray, desc, sql } from "drizzle-orm";
@@ -184,6 +196,30 @@ export interface IStorage {
   recordActivity(activity: Omit<InsertUserActivity, 'id' | 'createdAt'>): Promise<UserActivity>;
   getUserActivities(userId: string, limit?: number): Promise<UserActivity[]>;
   calculateUserReputation(userId: string): Promise<number>;
+
+  // Alpha alert destinations
+  setAlphaTarget(target: Omit<InsertAlphaAlertTarget, 'id' | 'createdAt' | 'updatedAt'>): Promise<AlphaAlertTarget>;
+  clearAlphaTarget(platform: string, groupId: string): Promise<void>;
+  getAlphaTarget(platform: string, groupId: string): Promise<AlphaAlertTarget | undefined>;
+  getAlphaTargets(): Promise<AlphaAlertTarget[]>;
+
+  // Smart Money alert destinations
+  setSmartTarget(target: Omit<InsertSmartAlertTarget, 'id' | 'createdAt' | 'updatedAt'>): Promise<SmartAlertTarget>;
+  clearSmartTarget(platform: string, groupId: string): Promise<void>;
+  getSmartTarget(platform: string, groupId: string): Promise<SmartAlertTarget | undefined>;
+  getSmartTargets(): Promise<SmartAlertTarget[]>;
+
+  // Smart Money wallets DB
+  upsertSmartWallet(wallet: Omit<InsertSmartWallet, 'id' | 'createdAt' | 'updatedAt'>): Promise<SmartWallet>;
+  getSmartWallet(walletAddress: string): Promise<SmartWallet | undefined>;
+  getActiveSmartWallets(minInfluence?: number, limit?: number): Promise<SmartWallet[]>;
+  setSmartWalletActive(walletAddress: string, isActive: boolean): Promise<SmartWallet>;
+
+  // Smart Money signals log
+  recordSmartSignal(signal: Omit<InsertSmartSignal, 'id' | 'createdAt'>): Promise<SmartSignal>;
+  getRecentSmartSignals(limit?: number): Promise<SmartSignal[]>;
+  getSmartSignalsByToken(tokenAddress: string, limit?: number): Promise<SmartSignal[]>;
+  getSmartSignalsByWallet(walletAddress: string, limit?: number): Promise<SmartSignal[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1389,6 +1425,163 @@ export class DatabaseStorage implements IStorage {
       .where(eq(userActivities.userId, userId));
     
     return result[0]?.totalPoints || 0;
+  }
+
+  // Alpha alert destinations
+  async setAlphaTarget(target: Omit<InsertAlphaAlertTarget, 'id' | 'createdAt' | 'updatedAt'>): Promise<AlphaAlertTarget> {
+    const [row] = await db
+      .insert(alphaAlertTargets)
+      .values(target)
+      .onConflictDoUpdate({
+        target: [alphaAlertTargets.platform, alphaAlertTargets.groupId],
+        set: {
+          channelId: target.channelId,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return row;
+  }
+
+  async clearAlphaTarget(platform: string, groupId: string): Promise<void> {
+    await db
+      .delete(alphaAlertTargets)
+      .where(and(eq(alphaAlertTargets.platform, platform), eq(alphaAlertTargets.groupId, groupId)));
+  }
+
+  async getAlphaTarget(platform: string, groupId: string): Promise<AlphaAlertTarget | undefined> {
+    const [row] = await db
+      .select()
+      .from(alphaAlertTargets)
+      .where(and(eq(alphaAlertTargets.platform, platform), eq(alphaAlertTargets.groupId, groupId)))
+      .limit(1);
+    return row;
+  }
+
+  async getAlphaTargets(): Promise<AlphaAlertTarget[]> {
+    return await db.select().from(alphaAlertTargets);
+  }
+
+  // Smart Money alert destinations
+  async setSmartTarget(target: Omit<InsertSmartAlertTarget, 'id' | 'createdAt' | 'updatedAt'>): Promise<SmartAlertTarget> {
+    const [row] = await db
+      .insert(smartAlertTargets)
+      .values(target)
+      .onConflictDoUpdate({
+        target: [smartAlertTargets.platform, smartAlertTargets.groupId],
+        set: {
+          channelId: target.channelId,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return row;
+  }
+
+  async clearSmartTarget(platform: string, groupId: string): Promise<void> {
+    await db
+      .delete(smartAlertTargets)
+      .where(and(eq(smartAlertTargets.platform, platform), eq(smartAlertTargets.groupId, groupId)));
+  }
+
+  async getSmartTarget(platform: string, groupId: string): Promise<SmartAlertTarget | undefined> {
+    const [row] = await db
+      .select()
+      .from(smartAlertTargets)
+      .where(and(eq(smartAlertTargets.platform, platform), eq(smartAlertTargets.groupId, groupId)))
+      .limit(1);
+    return row;
+  }
+
+  async getSmartTargets(): Promise<SmartAlertTarget[]> {
+    return await db.select().from(smartAlertTargets);
+  }
+
+  // Smart Money wallets DB
+  async upsertSmartWallet(wallet: Omit<InsertSmartWallet, 'id' | 'createdAt' | 'updatedAt'>): Promise<SmartWallet> {
+    const [row] = await db
+      .insert(smartWallets)
+      .values(wallet)
+      .onConflictDoUpdate({
+        target: smartWallets.walletAddress,
+        set: {
+          displayName: wallet.displayName,
+          source: wallet.source,
+          profitSol: wallet.profitSol,
+          wins: wallet.wins,
+          losses: wallet.losses,
+          winRate: wallet.winRate,
+          influenceScore: wallet.influenceScore,
+          isActive: wallet.isActive ?? true,
+          notes: wallet.notes,
+          lastActiveAt: wallet.lastActiveAt,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return row;
+  }
+
+  async getSmartWallet(walletAddress: string): Promise<SmartWallet | undefined> {
+    const [row] = await db
+      .select()
+      .from(smartWallets)
+      .where(eq(smartWallets.walletAddress, walletAddress))
+      .limit(1);
+    return row;
+  }
+
+  async getActiveSmartWallets(minInfluence: number = 60, limit: number = 100): Promise<SmartWallet[]> {
+    return await db
+      .select()
+      .from(smartWallets)
+      .where(and(eq(smartWallets.isActive, true), sql`${smartWallets.influenceScore} >= ${minInfluence}`))
+      .orderBy(desc(smartWallets.influenceScore))
+      .limit(limit);
+  }
+
+  async setSmartWalletActive(walletAddress: string, isActive: boolean): Promise<SmartWallet> {
+    const [row] = await db
+      .update(smartWallets)
+      .set({ isActive, updatedAt: new Date() })
+      .where(eq(smartWallets.walletAddress, walletAddress))
+      .returning();
+    return row;
+  }
+
+  // Smart Money signals log
+  async recordSmartSignal(signal: Omit<InsertSmartSignal, 'id' | 'createdAt'>): Promise<SmartSignal> {
+    const [row] = await db
+      .insert(smartSignals)
+      .values(signal)
+      .returning();
+    return row;
+  }
+
+  async getRecentSmartSignals(limit: number = 50): Promise<SmartSignal[]> {
+    return await db
+      .select()
+      .from(smartSignals)
+      .orderBy(desc(smartSignals.detectedAt))
+      .limit(limit);
+  }
+
+  async getSmartSignalsByToken(tokenAddress: string, limit: number = 50): Promise<SmartSignal[]> {
+    return await db
+      .select()
+      .from(smartSignals)
+      .where(eq(smartSignals.tokenAddress, tokenAddress))
+      .orderBy(desc(smartSignals.detectedAt))
+      .limit(limit);
+  }
+
+  async getSmartSignalsByWallet(walletAddress: string, limit: number = 50): Promise<SmartSignal[]> {
+    return await db
+      .select()
+      .from(smartSignals)
+      .where(eq(smartSignals.walletAddress, walletAddress))
+      .orderBy(desc(smartSignals.detectedAt))
+      .limit(limit);
   }
 }
 

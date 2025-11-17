@@ -1,8 +1,9 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import WebSocket from 'ws';
 import { db } from './db';
-import { kolWallets } from './shared/schema';
-import { gte } from 'drizzle-orm';
+import { kolWallets, smartWallets, smartSignals } from '../shared/schema.ts';
+import { gte, and, eq } from 'drizzle-orm';
+import { GMGNService } from './services/gmgn-service.ts';
 
 interface AlphaAlert {
   type: 'new_token' | 'whale_buy' | 'caller_signal';
@@ -31,6 +32,7 @@ export class AlphaAlertService {
   private isRunning = false;
   private alphaCallers: AlphaCallerConfig[];
   private autoRefreshInterval: NodeJS.Timeout | null = null;
+  private gmgn = new GMGNService();
 
   constructor(rpcUrl?: string, customCallers?: AlphaCallerConfig[]) {
     this.connection = new Connection(rpcUrl || 'https://api.mainnet-beta.solana.com', 'confirmed');
@@ -43,13 +45,27 @@ export class AlphaAlertService {
    */
   async loadWalletsFromDatabase(minInfluence: number = 60): Promise<void> {
     try {
-      const topWallets = await db
-        .select()
-        .from(kolWallets)
-        .where(gte(kolWallets.influenceScore, minInfluence))
-        .limit(100); // Monitor top 100 wallets
+      // Prefer smart wallets DB; fallback to KOL if none
+      let wallets: Array<{ walletAddress: string; displayName: string | null; influenceScore: number | null }>; 
 
-      const walletsToAdd: AlphaCallerConfig[] = topWallets.map(w => ({
+      const smart = await db
+        .select({ walletAddress: smartWallets.walletAddress, displayName: smartWallets.displayName, influenceScore: smartWallets.influenceScore })
+        .from(smartWallets)
+        .where(and(eq(smartWallets.isActive, true), gte(smartWallets.influenceScore, minInfluence)))
+        .limit(100);
+
+      if (smart.length > 0) {
+        wallets = smart as any;
+      } else {
+        const kol = await db
+          .select({ walletAddress: kolWallets.walletAddress, displayName: kolWallets.displayName, influenceScore: kolWallets.influenceScore })
+          .from(kolWallets)
+          .where(gte(kolWallets.influenceScore, minInfluence))
+          .limit(100);
+        wallets = kol as any;
+      }
+
+      const walletsToAdd: AlphaCallerConfig[] = wallets.map(w => ({
         wallet: w.walletAddress,
         name: w.displayName || `Trader ${w.walletAddress.substring(0, 6)}`,
         enabled: true,
@@ -92,17 +108,48 @@ export class AlphaAlertService {
     }
   }
 
-  // Register callback for alerts
-  onAlert(callback: (alert: AlphaAlert) => void): void {
+  // Register callback for alerts; includes formatted message for convenience
+  onAlert(callback: (alert: AlphaAlert, message: string) => void): void {
     this.alertCallbacks.push(callback);
   }
 
   private async sendAlert(alert: AlphaAlert): Promise<void> {
     let message = '';
     if (alert.type === 'caller_signal') {
-      message = `🚨 **ALPHA CALL from ${alert.source}**\n\n` +
+      // Try to enrich with GMGN smart/bundle info
+      let gmgnLines = '';
+      try {
+        const gmgnData = await this.gmgn.getTokenAnalysis(alert.mint);
+        if (gmgnData) {
+          const bundle = this.gmgn.extractBundleInfo(gmgnData);
+          const smart = this.gmgn.hasSmartMoneyActivity(gmgnData);
+          const smartDegen = gmgnData.data.smart_degen;
+          const parts: string[] = [];
+          if (smart && smartDegen) {
+            parts.push(`🧠 Smart traders: ${smartDegen.count} (avg cost ${smartDegen.avg_cost?.toFixed?.(2) ?? smartDegen.avg_cost})`);
+          }
+          if (bundle) {
+            parts.push(`🧩 Bundle: ${bundle.isBundled ? 'yes' : 'no'} (wallets ${bundle.bundleWalletCount}, conf ${bundle.confidence}%)`);
+            if (bundle.insiderCount) parts.push(`🕵️ Insiders: ${bundle.insiderCount}`);
+            if (bundle.sniperCount) parts.push(`🎯 Snipers: ${bundle.sniperCount}`);
+          }
+          if (parts.length > 0) gmgnLines = `\n${parts.join(' • ')}`;
+        }
+      } catch {}
+
+      try {
+        await db.insert(smartSignals).values({
+          walletAddress: alert.data?.wallet || alert.source,
+          tokenAddress: alert.mint,
+          action: 'buy',
+          source: 'alpha-alerts',
+          detectedAt: new Date(),
+        });
+      } catch {}
+
+      message = `🚨 **SMART MONEY BUY: ${alert.source}**\n\n` +
         `📍 CA: \`${alert.mint}\`\n` +
-        `👤 Caller: ${alert.source}\n` +
+        `👤 Wallet: ${alert.source}${gmgnLines}\n` +
         `🔗 https://pump.fun/${alert.mint}\n` +
         `💎 https://dexscreener.com/solana/${alert.mint}`;
     } else if (alert.type === 'new_token') {
@@ -157,7 +204,7 @@ export class AlphaAlertService {
     // Also trigger callbacks for extensibility
     for (const callback of this.alertCallbacks) {
       try {
-        await callback(alert);
+        await callback(alert, message);
       } catch (error) {
         console.error('[ALPHA ALERT] Callback error:', error);
       }

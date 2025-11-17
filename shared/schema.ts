@@ -712,6 +712,54 @@ export const kolWallets = pgTable("kol_wallets", {
 export type KolWallet = typeof kolWallets.$inferSelect;
 export type InsertKolWallet = typeof kolWallets.$inferInsert;
 
+// ----------------------------------------------------------------------------
+// SMART MONEY TABLES (separate from KOL)
+// ----------------------------------------------------------------------------
+
+export const smartWallets = pgTable("smart_wallets", {
+  id: serial("id").primaryKey(),
+  walletAddress: varchar("wallet_address", { length: 255 }).notNull().unique(),
+  displayName: varchar("display_name", { length: 255 }),
+  source: varchar("source", { length: 50 }).default("gmgn"),
+  profitSol: decimal("profit_sol", { precision: 20, scale: 9 }),
+  wins: integer("wins").default(0),
+  losses: integer("losses").default(0),
+  winRate: integer("win_rate").default(0), // 0-100 percentage
+  influenceScore: integer("influence_score").default(50), // 0-100
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  lastActiveAt: timestamp("last_active_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_smart_wallet_address").on(table.walletAddress),
+  index("idx_smart_influence").on(table.influenceScore),
+  index("idx_smart_active").on(table.isActive),
+]);
+
+export type SmartWallet = typeof smartWallets.$inferSelect;
+export type InsertSmartWallet = typeof smartWallets.$inferInsert;
+
+export const smartSignals = pgTable("smart_signals", {
+  id: serial("id").primaryKey(),
+  walletAddress: varchar("wallet_address", { length: 255 }).notNull(),
+  tokenAddress: varchar("token_address", { length: 44 }).notNull(),
+  action: varchar("action", { length: 10 }).notNull().default("buy"), // 'buy' | 'sell'
+  amountTokens: decimal("amount_tokens", { precision: 38, scale: 12 }),
+  priceUsd: decimal("price_usd", { precision: 24, scale: 8 }),
+  txSignature: varchar("tx_signature", { length: 120 }).unique(),
+  confidence: integer("confidence").default(80), // 0-100
+  source: varchar("source", { length: 50 }).default("alpha-alerts"),
+  detectedAt: timestamp("detected_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("idx_smart_signals_token").on(table.tokenAddress),
+  index("idx_smart_signals_detected").on(table.detectedAt),
+]);
+
+export type SmartSignal = typeof smartSignals.$inferSelect;
+export type InsertSmartSignal = typeof smartSignals.$inferInsert;
+
 // ============================================================================
 // CRYPTO PAYMENTS TABLES
 // ============================================================================
@@ -1232,6 +1280,41 @@ export const userActivities = pgTable("user_activities", {
 
 export type UserActivity = typeof userActivities.$inferSelect;
 export type InsertUserActivity = typeof userActivities.$inferInsert;
+
+// ============================================================================
+// ALERT DESTINATIONS (Discord/Telegram group configurable channels)
+// ============================================================================
+
+export const alphaAlertTargets = pgTable("alpha_alert_targets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  platform: varchar("platform", { length: 20 }).notNull(), // 'discord' | 'telegram'
+  groupId: varchar("group_id", { length: 64 }).notNull(), // Discord guildId or Telegram chatId
+  channelId: varchar("channel_id", { length: 64 }).notNull(), // Discord channelId or Telegram chatId (same as group for TG)
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_alpha_target").on(table.platform, table.groupId),
+  index("idx_alpha_target_platform").on(table.platform),
+]);
+
+export type AlphaAlertTarget = typeof alphaAlertTargets.$inferSelect;
+export type InsertAlphaAlertTarget = typeof alphaAlertTargets.$inferInsert;
+
+// Separate routing for Smart Money Calls (top profitable wallet buys)
+export const smartAlertTargets = pgTable("smart_alert_targets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  platform: varchar("platform", { length: 20 }).notNull(), // 'discord' | 'telegram'
+  groupId: varchar("group_id", { length: 64 }).notNull(), // Discord guildId or Telegram chatId
+  channelId: varchar("channel_id", { length: 64 }).notNull(), // Discord channelId or Telegram chatId (same as group for TG)
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_smart_target").on(table.platform, table.groupId),
+  index("idx_smart_target_platform").on(table.platform),
+]);
+
+export type SmartAlertTarget = typeof smartAlertTargets.$inferSelect;
+export type InsertSmartAlertTarget = typeof smartAlertTargets.$inferInsert;
 
 // Zod schemas for social features using createInsertSchema
 import { createInsertSchema } from "drizzle-zod";

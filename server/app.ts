@@ -7,6 +7,7 @@ import session from "express-session";
 import { registerRoutes } from "./routes.ts";
 import path from "path";
 import fs from "fs";
+import { storage } from './storage.ts';
 
 export const app = express();
 
@@ -195,6 +196,54 @@ async function startServices() {
       const alphaService = getAlphaAlertService();
       alphaService.start().catch(err => {
         console.error('❌ Alpha alerts failed:', err);
+      });
+
+      // Broadcast alpha alerts to configured bot destinations
+      alphaService.onAlert(async (alert, message) => {
+        try {
+          const targets = await storage.getAlphaTargets();
+          const smartTargets = alert.type === 'caller_signal' ? await storage.getSmartTargets() : [];
+
+          if (targets.length === 0 && smartTargets.length === 0) return;
+
+          // Lazy import to avoid circular deps at module load
+          let discordClient: import('discord.js').Client | null = null;
+          let telegramBot: any = null;
+          try {
+            const { getDiscordClient } = await import('./discord-bot.ts');
+            discordClient = getDiscordClient();
+          } catch {}
+          try {
+            const { getTelegramBot } = await import('./telegram-bot.ts');
+            telegramBot = getTelegramBot();
+          } catch {}
+
+          const all = [...targets, ...smartTargets];
+          for (const t of all) {
+            if (t.platform === 'discord' && discordClient) {
+              try {
+                const ch = await discordClient.channels.fetch(t.channelId);
+                // @ts-ignore - send exists on text-based channels
+                if (ch && 'send' in ch) {
+                  // Prepend @everyone for ping
+                  // @ts-ignore
+                  await ch.send(`@everyone ${message}`);
+                }
+              } catch (e) {
+                console.warn('⚠️ Failed to send Discord alert to channel', t.channelId, e);
+              }
+            }
+            if (t.platform === 'telegram' && telegramBot) {
+              try {
+                await telegramBot.telegram.sendMessage(t.channelId, message, { parse_mode: 'Markdown' });
+              } catch (e) {
+                console.warn('⚠️ Failed to send Telegram alert to chat', t.channelId, e);
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('⚠️ Alpha alert broadcast error:', (err as any)?.message || err);
+        }
       });
 
       const { initializeWalletDiscovery } = await import('./wallet-scheduler.ts');

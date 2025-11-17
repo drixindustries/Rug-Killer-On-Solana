@@ -1,3 +1,54 @@
+## Summary
+**Users are now protected across all platforms with industry-leading rug detection!**
+
+---
+
+## Group Alert Routing (Discord/Telegram)
+
+- **Alpha Alerts** (new tokens, general signals):
+  - Discord: `/alpha setchannel` • `/alpha where` • `/alpha clearchannel`
+  - Telegram: `/alpha_here` • `/alpha_channel` • `/alpha_clear`
+
+- **Smart Money Calls** (top profitable wallets buy):
+  - Discord: `/smart setchannel` • `/smart where` • `/smart clearchannel`
+  - Telegram: `/smart_here` • `/smart_channel` • `/smart_clear`
+
+**Database Requirements:**
+- Creates tables: `alpha_alert_targets`, `smart_alert_targets`, `smart_wallets`, `smart_signals`
+- If using migrations, run `npm run migrate` in `server/` directory before enabling alerts
+
+**Permissions:**
+- Discord: Administrator, Manage Guild, or Manage Channels required
+- Telegram: Chat admin or env allowlist (`TELEGRAM_ADMIN_IDS` or `DISCORD_ADMIN_IDS`)
+- Bot must have permission to send messages and mention `@everyone` in target channel
+
+---
+
+## Smart Wallet Management (Admin Commands)
+
+Manage the Smart Money DB for monitoring profitable wallets:
+
+### Discord Commands
+- `/smartwallet add <wallet> <name> [influence]` - Add smart wallet to DB
+- `/smartwallet remove <wallet>` - Deactivate smart wallet
+- `/smartwallet activate <wallet>` - Re-activate smart wallet
+- `/smartwallet list [limit]` - List active smart wallets
+- `/smartwallet view <wallet>` - View smart wallet details
+
+### Telegram Commands
+- `/smartwallet_add <wallet> <name> [influence]` - Add smart wallet to DB
+- `/smartwallet_remove <wallet>` - Deactivate smart wallet
+- `/smartwallet_activate <wallet>` - Re-activate smart wallet
+- `/smartwallet_list [limit]` - List active smart wallets
+- `/smartwallet_view <wallet>` - View smart wallet details
+
+**Notes:**
+- Smart wallets are monitored separately from KOL wallets
+- `influence` score (0-100) determines monitoring priority; default is 60
+- Alpha service loads from `smart_wallets` DB first, falls back to `kol_wallets` if empty
+- All smart wallet buy signals are logged to `smart_signals` table for history/analytics
+
+---
 # Quick Start Guide - Advanced Detection
 
 ## What's New?
