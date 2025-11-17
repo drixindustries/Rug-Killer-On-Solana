@@ -89,6 +89,8 @@ Visit \http://localhost:5173\
 - [Advanced Rug Detection](docs/ADVANCED_RUG_DETECTION.md)
 - [Pump.fun Integration](docs/QUICKSTART_PUMPFUN.md)
 - [Railway Deployment](RAILWAY_ENV_SETUP.md)
+- **[Discord Bot Setup](DISCORD_BOT_SETUP.md)** - Setup and configuration guide
+- **[Discord Bot Troubleshooting](DISCORD_BOT_TROUBLESHOOTING.md)** - Common issues and solutions
 
 ---
 

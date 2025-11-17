@@ -1,5 +1,19 @@
 # Discord Bot Setup Guide
 
+## ⚠️ QUICK FIX - Bot Commands Not Showing?
+
+**If your Discord bot commands are not appearing in your server, the most common issue is:**
+
+The `DISCORD_ENABLED` environment variable is **NOT set to `true`**!
+
+**Solution:**
+1. Add `DISCORD_ENABLED=true` to your environment variables (Railway, Replit Secrets, or .env file)
+2. Restart your application
+3. Check the server logs - you should see "✅ Discord bot started successfully"
+4. If you see "ℹ️ Discord bot disabled", the bot is not enabled
+
+---
+
 ## Quick Setup Checklist
 
 Your Discord bot is **RugKillerAlphaBot** with Application ID: `1437952073319714879`
@@ -33,13 +47,16 @@ https://discord.com/api/oauth2/authorize?client_id=1437952073319714879&permissio
 
 ### ✅ Step 3: Verify Environment Variables
 
-Make sure these are set in Replit Secrets:
+**IMPORTANT:** Make sure these are set in your environment (Replit Secrets, Railway, or .env file):
 
 ```bash
+DISCORD_ENABLED=true
 DISCORD_BOT_TOKEN=your-bot-token-here
 DISCORD_CLIENT_ID=1437952073319714879
 DISCORD_PUBLIC_KEY=78e4e4e211267262d640e1b019c769940c58d46cd8ec3d15043c27832d38bc84
 ```
+
+**Note:** The `DISCORD_ENABLED=true` variable is **required** for the bot to start. Without it, the bot will not load even if you have valid credentials.
 
 ### ✅ Step 4: Test the Bot
 
@@ -119,10 +136,13 @@ Checks if a wallet is flagged in our AI-powered blacklist:
 
 ### Bot Not Responding
 
-1. **Check bot is online** - Look for green status in Discord server
-2. **Verify permissions** - Bot needs Send Messages and Use Slash Commands
-3. **Re-invite bot** - Use the invite link above with fresh permissions
-4. **Check logs** - Restart the Replit application and check console
+1. **Check DISCORD_ENABLED is set to true** - This is the most common issue! The bot won't start without `DISCORD_ENABLED=true` in your environment
+2. **Check bot is online** - Look for green status in Discord server and check server logs for "Discord bot started successfully"
+3. **Verify permissions** - Bot needs Send Messages and Use Slash Commands
+4. **Re-invite bot** - Use the invite link above with fresh permissions
+5. **Check logs** - Restart the application and check console for:
+   - "✅ Discord bot started successfully" (bot is running)
+   - "ℹ️ Discord bot disabled" (bot is not enabled - check DISCORD_ENABLED variable)
 
 ### Commands Not Showing
 
