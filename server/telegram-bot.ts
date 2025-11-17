@@ -7,6 +7,7 @@ import { buildCompactMessage, toPlainText, formatAddress, formatNumber, getRiskE
 import { getAlphaAlertService } from './alpha-alerts';
 import { checkBlacklist, reportWallet, getBlacklistStats, getTopFlaggedWallets } from './ai-blacklist';
 import { getExchangeStats } from './exchange-whitelist';
+import { nameCache } from './name-cache';
 
 // Bot instance - only created when startTelegramBot() is called
 let botInstance: Telegraf | null = null;
@@ -38,6 +39,7 @@ Use /execute ${analysis.tokenAddress.slice(0, 8)}... for full analysis`;
 
 function createTelegramBot(botToken: string): Telegraf {
   const bot = new Telegraf(botToken);
+  const lastResponded: Map<string, number> = new Map(); // key: chatId:symbol
   
   // Register bot commands for autocomplete menu
   bot.telegram.setMyCommands([
@@ -130,6 +132,7 @@ function createTelegramBot(botToken: string): Telegraf {
       await ctx.reply('ðŸ” Analyzing token... This may take a few seconds.');
       
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
       const message = formatAnalysis(analysis);
       
       await ctx.reply(message, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } });
@@ -152,6 +155,7 @@ function createTelegramBot(botToken: string): Telegraf {
       await ctx.reply('ðŸ” Fetching holder data...');
       
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
       
       let message = `ðŸ“Š **TOP 20 HOLDERS - ${analysis.metadata.symbol}**\n\n`;
       message += `Total Top 10 Concentration: **${(analysis.topHolderConcentration ?? 0).toFixed(2)}%**\n\n`;
@@ -182,6 +186,7 @@ function createTelegramBot(botToken: string): Telegraf {
     try {
       await ctx.reply('ðŸ“Š Fetching holders...');
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
       let message = `ðŸ“Š **TOP ${n} HOLDERS - ${analysis.metadata.symbol}**\n\n`;
       message += `Top 10 Concentration: **${(analysis.topHolderConcentration ?? 0).toFixed(2)}%**\n\n`;
       analysis.topHolders.slice(0, n).forEach((h, i) => {
@@ -206,6 +211,7 @@ function createTelegramBot(botToken: string): Telegraf {
       await ctx.reply('ðŸ”¥ Torturing dev wallet...');
       
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
       
       let message = `ðŸ”¥ **Dev Audit REPORT - ${analysis.metadata.symbol}**\n\n`;
       message += `Token: \`${tokenAddress}\`\n\n`;
@@ -324,6 +330,7 @@ function createTelegramBot(botToken: string): Telegraf {
       await ctx.reply('ðŸ‹ Tracking smart money wallets...');
       
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
       const holderAddresses = analysis.topHolders.map(h => h.address);
       const kolHolders = await storage.getKolWalletsByAddresses(holderAddresses);
       
@@ -450,6 +457,7 @@ function createTelegramBot(botToken: string): Telegraf {
       await ctx.reply('ðŸ’° Fetching price...');
       
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
       const pair = analysis.dexscreenerData?.pairs?.[0];
       
       let message = `ðŸ’° **PRICE CHECK - ${analysis.metadata.symbol}**\n\n`;
@@ -501,6 +509,7 @@ function createTelegramBot(botToken: string): Telegraf {
       await ctx.reply('ðŸ” Running rug detection...');
       
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
       
       let message = `ðŸ”’ **RUG CHECK - ${analysis.metadata.symbol}**\n\n`;
       
@@ -607,6 +616,7 @@ function createTelegramBot(botToken: string): Telegraf {
       await ctx.reply('ðŸ’§ Analyzing liquidity...');
       
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
       const pair = analysis.dexscreenerData?.pairs?.[0];
       
       let message = `ðŸ’§ **LIQUIDITY ANALYSIS - ${analysis.metadata.symbol}**\n\n`;
@@ -700,6 +710,8 @@ function createTelegramBot(botToken: string): Telegraf {
         tokenAnalyzer.analyzeToken(token1),
         tokenAnalyzer.analyzeToken(token2)
       ]);
+      try { nameCache.remember(token1, analysis1?.metadata?.symbol, analysis1?.metadata?.name as any); } catch {}
+      try { nameCache.remember(token2, analysis2?.metadata?.symbol, analysis2?.metadata?.name as any); } catch {}
       
       let message = `âš–ï¸ **TOKEN COMPARISON**\n\n`;
       
@@ -855,6 +867,7 @@ function createTelegramBot(botToken: string): Telegraf {
     try {
       await ctx.reply('ðŸ¦ Checking exchanges in holders...');
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
       const stats = getExchangeStats(analysis.topHolders.map(h => ({ address: h.address, percentage: h.percentage })));
       let message = `ðŸ¦ **EXCHANGE PRESENCE - ${analysis.metadata.symbol}**\n\n`;
       message += `Exchanges hold ${stats.totalPercentage.toFixed(2)}% across ${stats.count} wallets\n`;
@@ -877,6 +890,7 @@ function createTelegramBot(botToken: string): Telegraf {
     try {
       await ctx.reply('ðŸŽ¯ Loading pump.fun view...');
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
       const pf = analysis.pumpFunData;
       let message = `ðŸŽ¯ **PUMPFUN VIEW - ${analysis.metadata.symbol}**\n\n`;
       if (pf?.isPumpFun) {
@@ -1196,6 +1210,35 @@ function createTelegramBot(botToken: string): Telegraf {
       return;
     }
     
+    // $SYMBOL quick analysis via cache (seeded by prior /execute)
+    const symMatch = text.match(/\$([A-Za-z0-9]{2,15})/);
+    if (symMatch) {
+      const sym = symMatch[1];
+      const resolved = nameCache.resolve(sym);
+      if (resolved) {
+        const throttleKey = `${ctx.chat?.id}:${sym.toLowerCase()}`;
+        const now = Date.now();
+        const last = lastResponded.get(throttleKey) || 0;
+        if (now - last < 15000) {
+          return; // prevent spam within 15s for same symbol in chat
+        }
+        lastResponded.set(throttleKey, now);
+        try {
+          const analysis = await tokenAnalyzer.analyzeToken(resolved);
+          try { nameCache.remember(resolved, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
+          const msg = formatAnalysis(analysis, true);
+          await ctx.reply(msg, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } });
+          return;
+        } catch (err) {
+          await ctx.reply(`Couldn't fetch analysis for $${sym}. Use /execute with the contract address once.`);
+          return;
+        }
+      } else {
+        await ctx.reply(`I don't recognize $${sym} yet. Run /execute with its contract address first.`);
+        return;
+      }
+    }
+
     // Auto-detect token addresses in messages
     if (text.length >= 32 && text.length <= 44 && !/\s/.test(text)) {
       try {

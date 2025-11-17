@@ -6,6 +6,7 @@ import { buildCompactMessage, formatNumber, getRiskEmoji, formatAddress } from '
 import { getAlphaAlertService } from './alpha-alerts';
 import { checkBlacklist, reportWallet, getBlacklistStats, getTopFlaggedWallets } from './ai-blacklist';
 import { getExchangeStats } from './exchange-whitelist';
+import { nameCache } from './name-cache';
 
 // Client instance - only created when startDiscordBot() is called
 let clientInstance: Client | null = null;
@@ -510,6 +511,8 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         await interaction.deferReply();
         
         const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        // Remember symbol/name mapping for quick $symbol lookups later
+        try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
         const embed = createAnalysisEmbed(analysis);
         
         await interaction.editReply({ embeds: [embed] });
@@ -520,6 +523,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         await interaction.deferReply();
         
         const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
         
         const embed = new EmbedBuilder()
           .setColor(0x3498db)
@@ -561,6 +565,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         
         try {
           const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+          try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
           
           let hasFlags = false;
           
@@ -664,6 +669,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         await interaction.deferReply();
         
         const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
         const holderAddresses = analysis.topHolders.map(h => h.address);
         const kolHolders = await storage.getKolWalletsByAddresses(holderAddresses);
         
@@ -803,6 +809,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         await interaction.deferReply();
         
         const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
         const pair = analysis.dexscreenerData?.pairs?.[0];
         
         const embed = new EmbedBuilder()
@@ -848,6 +855,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         await interaction.deferReply();
         
         const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
         
         const riskEmoji = getRiskEmoji(analysis.riskLevel);
         const color = getRiskColor(analysis.riskLevel);
@@ -940,6 +948,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         await interaction.deferReply();
         
         const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
         const pair = analysis.dexscreenerData?.pairs?.[0];
         
         const embed = new EmbedBuilder()
@@ -1033,6 +1042,8 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           tokenAnalyzer.analyzeToken(token1),
           tokenAnalyzer.analyzeToken(token2)
         ]);
+        try { nameCache.remember(token1, analysis1?.metadata?.symbol, analysis1?.metadata?.name as any); } catch {}
+        try { nameCache.remember(token2, analysis2?.metadata?.symbol, analysis2?.metadata?.name as any); } catch {}
         
         const pair1 = analysis1.dexscreenerData?.pairs?.[0];
         const pair2 = analysis2.dexscreenerData?.pairs?.[0];
@@ -1176,6 +1187,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         const n = interaction.options.getInteger('n') ?? 20;
         await interaction.deferReply();
         const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
         const embed = new EmbedBuilder()
           .setColor(0x3498db)
           .setTitle(`📊 Top ${Math.min(n, 50)} Holders - ${analysis.metadata.symbol}`)
@@ -1317,6 +1329,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         const tokenAddress = interaction.options.getString('address', true);
         await interaction.deferReply();
         const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
         const stats = getExchangeStats(analysis.topHolders.map(h => ({ address: h.address, percentage: h.percentage })));
         const embed = new EmbedBuilder()
           .setColor(stats.isSignificant ? 0xffa500 : 0x00cc66)
@@ -1331,6 +1344,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         const tokenAddress = interaction.options.getString('address', true);
         await interaction.deferReply();
         const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
         const pf = analysis.pumpFunData;
         const embed = new EmbedBuilder()
           .setColor(0xff66aa)
@@ -1498,6 +1512,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
   ];
 
   // Handle direct messages and mentions
+  const lastResponded: Map<string, number> = new Map(); // key: channelId:symbol
   client.on('messageCreate', async message => {
     // Ignore bot messages
     if (message.author.bot) return;
@@ -1514,6 +1529,36 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       return;
     }
     
+    // Handle $symbol mentions using cached address (based on prior analyses)
+    const symbolMatch = text.match(/\$([A-Za-z0-9]{2,15})/);
+    if (symbolMatch) {
+      const sym = symbolMatch[1];
+      const resolved = nameCache.resolve(sym);
+      if (resolved) {
+        const throttleKey = `${message.channelId}:${sym.toLowerCase()}`;
+        const now = Date.now();
+        const last = lastResponded.get(throttleKey) || 0;
+        if (now - last < 15_000) {
+          return; // prevent spam within 15s for same symbol in channel
+        }
+        lastResponded.set(throttleKey, now);
+        try {
+          await message.channel.sendTyping();
+          const analysis = await tokenAnalyzer.analyzeToken(resolved);
+          try { nameCache.remember(resolved, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
+          const embed = createAnalysisEmbed(analysis);
+          await message.reply({ embeds: [embed] });
+          return;
+        } catch (err) {
+          await message.reply(`Could not fetch analysis for $${sym}. Try using /execute with the contract address.`);
+          return;
+        }
+      } else {
+        await message.reply(`I don't recognize $${sym} yet. Run /execute with its contract address once, then you can use $${sym}.`);
+        return;
+      }
+    }
+
     // Check if it's a Solana address (base58, 32-44 chars, no spaces)
     if (text.length >= 32 && text.length <= 44 && !/\s/.test(text)) {
       try {

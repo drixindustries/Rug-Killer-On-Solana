@@ -356,3 +356,13 @@ Users can now reference:
   - Wallet networks (coordinated control)
 
 **Users are now protected across all platforms with industry-leading rug detection!**
+
+---
+
+## Chat Shortcuts ($SYMBOL)
+
+You can now reference tokens in Discord chat using `$SYMBOL` after you’ve analyzed them once with `/execute <address>`:
+
+- Type `$BONK` (for example) and the bot will resolve it to the last analyzed BONK contract and reply with the compact analysis embed.
+- This uses an in-memory cache and resets on server restart.
+- If a symbol isn’t known yet, the bot prompts you to run `/execute <address>` first to seed the mapping.

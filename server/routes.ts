@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { analyzeTokenSchema, insertWatchlistSchema } from "../shared/schema.ts";
 import { tokenAnalyzer } from "./solana-analyzer.ts";
+import { nameCache } from "./name-cache.ts";
 // import { setupAuth, isAuthenticated } from "./replitAuth"; // Disabled for non-Replit deployments
 import { storage } from "./storage.ts";
 import { 
@@ -262,6 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        try { nameCache.remember(tokenAddress, (analysis as any)?.metadata?.symbol, (analysis as any)?.metadata?.name); } catch {}
         
         res.json({
           success: true,
@@ -1541,6 +1543,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Perform token analysis
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      try { nameCache.remember(tokenAddress, (analysis as any)?.metadata?.symbol, (analysis as any)?.metadata?.name); } catch {}
       
       // Get userId if authenticated
       const userId = (req as any).user?.claims?.sub;
@@ -1610,6 +1613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const analysisPromises = tokenAddresses.map(async (tokenAddress) => {
         try {
           const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+          try { nameCache.remember(tokenAddress, (analysis as any)?.metadata?.symbol, (analysis as any)?.metadata?.name); } catch {}
           
           // Get userId if authenticated (optional)
           const userId = (req as any).user?.claims?.sub;
