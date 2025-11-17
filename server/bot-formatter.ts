@@ -126,6 +126,33 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     pumpFun = `🎯 **Pump.fun**\n• Dev Bought: ${devBought.toFixed(1)}%\n• Bonding Curve: ${bondingCurve.toFixed(1)}%`;
   }
   
+    // FLOOR DETECTION
+    let floorInfo: string | undefined;
+    if (analysis.floorData?.hasFloor) {
+      const floor = analysis.floorData;
+      const floorPrice = floor.floorPrice?.toFixed(8) ?? 'N/A';
+      const confidence = floor.floorConfidence ?? 0;
+      const priceVsFloor = floor.currentPriceVsFloor ?? 0;
+    
+      let floorText = `📊 **Support Analysis**\n`;
+      floorText += `• Floor: $${floorPrice} (${confidence}% confidence)\n`;
+      floorText += `• Current vs Floor: ${priceVsFloor >= 0 ? '+' : ''}${priceVsFloor.toFixed(1)}%\n`;
+    
+      // Show top 2 support levels
+      if (floor.supportLevels && floor.supportLevels.length > 0) {
+        floorText += `• Support Levels:\n`;
+        floor.supportLevels.slice(0, 2).forEach((level, idx) => {
+          floorText += `  ${idx + 1}. $${level.priceUsd.toFixed(8)} (${level.percentOfTotalBuys}% of buys)\n`;
+        });
+      }
+    
+      if (floor.insight) {
+        floorText += `• ${floor.insight}`;
+      }
+    
+      floorInfo = floorText;
+    }
+  
   // HONEYPOT DETECTION
   let honeypot: string | undefined;
   if (analysis.quillcheckData) {
@@ -256,6 +283,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     holders,
     market,
     pumpFun,
+      floorInfo,
     honeypot,
     funding,
     bundle,

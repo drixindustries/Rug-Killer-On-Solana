@@ -283,6 +283,21 @@ export interface PumpFunData {
   };
 }
 
+  // Floor Detection (Buy Support Levels)
+  export interface FloorData {
+    hasFloor: boolean;
+    floorPrice: number | null; // Primary floor price in USD
+    floorConfidence: number; // 0-100, confidence in floor detection
+    supportLevels: Array<{
+      priceUsd: number;
+      buyVolume: number; // Total volume bought at this level
+      buyCount: number; // Number of buys at this level
+      percentOfTotalBuys: number; // % of total buy volume
+    }>;
+    currentPriceVsFloor: number | null; // % above/below floor (negative = below)
+    insight: string; // Human-readable floor analysis
+  }
+
 // AI Verdict
 export interface AIVerdict {
   rating: string;
@@ -530,6 +545,7 @@ export interface TokenAnalysisResponse {
   aiVerdict?: AIVerdict;
   pumpFunData?: PumpFunData;
   birdeyeData?: BirdeyeData;
+    floorData?: FloorData;
   
   // External API data (raw for debugging)
   rugcheckData?: RugcheckData;
