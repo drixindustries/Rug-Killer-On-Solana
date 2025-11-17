@@ -237,7 +237,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   const alerts: string[] = [];
   
   // Add critical red flags
-  if (analysis.redFlags.length > 0) {
+  if (analysis.redFlags && analysis.redFlags.length > 0) {
     const criticalFlags = analysis.redFlags.filter(f => f.severity === 'critical' || f.severity === 'high');
     criticalFlags.slice(0, 3).forEach(flag => {
       alerts.push(`${flag.severity === 'critical' ? '🔴' : '🟠'} ${flag.title}`);
