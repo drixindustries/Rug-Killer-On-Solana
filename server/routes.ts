@@ -2394,6 +2394,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ---------------------------------------------------------------------------
+  // BOT INVITE LINKS (non-sensitive)
+  // ---------------------------------------------------------------------------
+  app.get('/api/bot/invite-links', async (_req, res) => {
+    try {
+      const discordClientId = process.env.DISCORD_CLIENT_ID;
+      const permissions = process.env.DISCORD_PERMISSIONS || '84992'; // View Channels + Send Messages + Embed Links + Read History
+      const links: { discord?: string } = {};
+
+      if (discordClientId) {
+        links.discord = `https://discord.com/api/oauth2/authorize?client_id=${discordClientId}&permissions=${permissions}&scope=bot%20applications.commands`;
+      }
+
+      res.json(links);
+    } catch (error: any) {
+      console.error('Error fetching bot invite links:', error);
+      res.status(500).json({ message: 'Failed to fetch bot invite links' });
+    }
+  });
+
   // ========================================
   // ADMIN ROUTES
   // ========================================
