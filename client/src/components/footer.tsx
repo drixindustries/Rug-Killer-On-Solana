@@ -127,9 +127,8 @@ export function Footer() {
                 )}
               </div>
               
-              {/* Bot Invite Buttons */}
+              {/* Main Website Link */}
               <div className="space-y-2">
-                {/* Main Website Link */}
                 <Button
                   variant="outline"
                   size="sm"
@@ -145,44 +144,6 @@ export function Footer() {
                     Main Website
                   </a>
                 </Button>
-                
-                {botLinks?.telegram && (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    asChild
-                    className="w-full text-xs"
-                    data-testid="footer-button-add-telegram"
-                  >
-                    <a 
-                      href={botLinks.telegram} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                    >
-                      <SiTelegram className="h-3.5 w-3.5 mr-2" />
-                      Add Telegram Bot
-                    </a>
-                  </Button>
-                )}
-                
-                {botLinks?.discord && (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    asChild
-                    className="w-full text-xs"
-                    data-testid="footer-button-invite-discord"
-                  >
-                    <a 
-                      href={botLinks.discord} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                    >
-                      <SiDiscord className="h-3.5 w-3.5 mr-2" />
-                      Invite Discord Bot
-                    </a>
-                  </Button>
-                )}
               </div>
             </div>
           </div>
