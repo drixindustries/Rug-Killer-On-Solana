@@ -72,7 +72,7 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(color)
     .setTitle(messageData.header)
-    .setDescription(`**Risk Score: ${analysis.riskScore}/100** (${analysis.riskLevel})\n_0 = Do Not Buy • 100 = Strong Buy_`)
+    .setDescription(`**Safety Score: ${analysis.riskScore}/100** (${analysis.riskLevel})\n_100 = Strong Buy • 0 = Do Not Buy_`)
     .setFooter({ text: `Contract: ${analysis.tokenAddress}` })
     .setTimestamp();
   

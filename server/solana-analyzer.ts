@@ -331,27 +331,29 @@ export class SolanaTokenAnalyzer {
   }
 
   private calculateRiskScore(dex: any, onChain: any): number {
-    let score = 0;
+    let penalties = 0;
 
     // Low liquidity penalties
     const liquidityUsd = dex?.pairs?.[0]?.liquidity?.usd || 0;
-    if (liquidityUsd < 1000) score += 25;
-    if (liquidityUsd < 100) score += 40;
+    if (liquidityUsd < 1000) penalties += 25;
+    if (liquidityUsd < 100) penalties += 40;
     
     // Mint/freeze authority still enabled
-    if (onChain?.authorities?.mintAuthority) score += 15;
-    if (onChain?.authorities?.freezeAuthority) score += 15;
+    if (onChain?.authorities?.mintAuthority) penalties += 15;
+    if (onChain?.authorities?.freezeAuthority) penalties += 15;
 
-    return Math.min(100, score);
+    // Invert score: 100 = good (no penalties), 0 = bad (max penalties)
+    return Math.max(0, 100 - penalties);
   }
 
   private determineRiskLevel(dex: any, onChain: any): RiskLevel {
     const score = this.calculateRiskScore(dex, onChain);
     
-    if (score >= 80) return "EXTREME";
-    if (score >= 60) return "HIGH";
-    if (score >= 40) return "MODERATE";
-    return "LOW";
+    // Inverted: higher score = safer
+    if (score >= 80) return "LOW";
+    if (score >= 60) return "MODERATE";
+    if (score >= 40) return "HIGH";
+    return "EXTREME";
   }
 
   private generateRiskFlags(dex: any, onChain: any): RiskFlag[] {
