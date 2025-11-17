@@ -810,8 +810,8 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           .setTimestamp();
         
         if (pair) {
-          const price = parseFloat(pair.priceUsd);
-          const change24h = pair.priceChange.h24;
+          const price = parseFloat(pair.priceUsd || '0');
+          const change24h = pair.priceChange?.h24 ?? 0;
           
           embed.setColor(change24h >= 0 ? 0x00ff00 : 0xff0000);
           
@@ -824,7 +824,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           embed.setDescription(priceInfo);
           
           embed.addFields(
-            { name: '📦 24h Volume', value: `$${formatNumber(pair.volume.h24)}`, inline: true },
+            { name: '📦 24h Volume', value: `$${formatNumber(pair.volume?.h24 ?? 0)}`, inline: true },
             { name: '💧 Liquidity', value: `$${formatNumber(pair.liquidity?.usd || 0)}`, inline: true }
           );
           
@@ -973,7 +973,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           
           let breakdown = '';
           if (pair.liquidity?.base !== undefined) {
-            breakdown += `• Token: ${formatNumber(pair.liquidity.base)} ${analysis.metadata.symbol}\n`;
+            breakdown += `• Token: ${formatNumber(pair.liquidity.base)} ${analysis.metadata?.symbol || 'TOKEN'}\n`;
           }
           if (pair.liquidity?.quote !== undefined) {
             breakdown += `• ${pair.quoteToken?.symbol || 'SOL'}: ${formatNumber(pair.liquidity.quote)}`;
@@ -1051,9 +1051,9 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         embed.addFields({ name: '🛡️ Risk Score', value: riskComparison });
         
         if (pair1 && pair2) {
-          const betterVol = pair1.volume.h24 > pair2.volume.h24 ? 'A' : 'B';
-          let priceVol = `A: $${parseFloat(pair1.priceUsd).toFixed(8)} | Vol: $${formatNumber(pair1.volume.h24)}\n`;
-          priceVol += `B: $${parseFloat(pair2.priceUsd).toFixed(8)} | Vol: $${formatNumber(pair2.volume.h24)}\n`;
+          const betterVol = (pair1.volume?.h24 ?? 0) > (pair2.volume?.h24 ?? 0) ? 'A' : 'B';
+          let priceVol = `A: $${parseFloat(pair1.priceUsd || '0').toFixed(8)} | Vol: $${formatNumber(pair1.volume?.h24 ?? 0)}\n`;
+          priceVol += `B: $${parseFloat(pair2.priceUsd || '0').toFixed(8)} | Vol: $${formatNumber(pair2.volume?.h24 ?? 0)}\n`;
           priceVol += `👑 Higher Volume: Token ${betterVol}`;
           
           embed.addFields({ name: '💰 Price & Volume', value: priceVol });

@@ -102,20 +102,28 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   const security = `🔐 **Security**\n• Mint: ${mintStatus}\n• Freeze: ${freezeStatus}\n• LP Burn: ${burnEmoji} ${burnText}`;
   
   // HOLDERS
-  const holders = `👥 **Holders**\n• Total: ${analysis.holderCount}\n• Top 10: ${analysis.topHolderConcentration.toFixed(1)}%\n• Supply: ${formatNumber(analysis.metadata.supply)}`;
+  const holderCount = analysis.holderCount ?? 0;
+  const topHolderConc = analysis.topHolderConcentration ?? 0;
+  const supply = analysis.metadata?.supply ?? 0;
+  const holders = `👥 **Holders**\n• Total: ${holderCount}\n• Top 10: ${topHolderConc.toFixed(1)}%\n• Supply: ${formatNumber(supply)}`;
   
   // MARKET DATA
   let market: string | undefined;
   if (analysis.dexscreenerData?.pairs?.[0]) {
     const pair = analysis.dexscreenerData.pairs[0];
-    const priceChange = pair.priceChange.h24 >= 0 ? '📈' : '📉';
-    market = `💰 **Market**\n• Price: $${parseFloat(pair.priceUsd).toFixed(8)}\n• MCap: $${formatNumber(pair.marketCap || 0)}\n• 24h Vol: $${formatNumber(pair.volume.h24)}\n• 24h: ${priceChange} ${pair.priceChange.h24.toFixed(1)}%`;
+    const priceChange = (pair.priceChange?.h24 ?? 0) >= 0 ? '📈' : '📉';
+    const price = parseFloat(pair.priceUsd || '0');
+    const vol24h = pair.volume?.h24 ?? 0;
+    const h24Change = pair.priceChange?.h24 ?? 0;
+    market = `💰 **Market**\n• Price: $${price.toFixed(8)}\n• MCap: $${formatNumber(pair.marketCap || 0)}\n• 24h Vol: $${formatNumber(vol24h)}\n• 24h: ${priceChange} ${h24Change.toFixed(1)}%`;
   }
   
   // PUMP.FUN
   let pumpFun: string | undefined;
   if (analysis.pumpFunData?.isPumpFun) {
-    pumpFun = `🎯 **Pump.fun**\n• Dev Bought: ${analysis.pumpFunData.devBought.toFixed(1)}%\n• Bonding Curve: ${analysis.pumpFunData.bondingCurve.toFixed(1)}%`;
+    const devBought = analysis.pumpFunData.devBought ?? 0;
+    const bondingCurve = analysis.pumpFunData.bondingCurve ?? 0;
+    pumpFun = `🎯 **Pump.fun**\n• Dev Bought: ${devBought.toFixed(1)}%\n• Bonding Curve: ${bondingCurve.toFixed(1)}%`;
   }
   
   // HONEYPOT DETECTION

@@ -631,7 +631,7 @@ function createTelegramBot(botToken: string): Telegraf {
         
         // Base/Quote amounts
         if (pair.liquidity?.base !== undefined) {
-          message += `• Token: ${formatNumber(pair.liquidity.base)} ${analysis.metadata.symbol}\n`;
+          message += `• Token: ${formatNumber(pair.liquidity.base)} ${analysis.metadata?.symbol || 'TOKEN'}\n`;
         }
         if (pair.liquidity?.quote !== undefined) {
           message += `• ${pair.quoteToken?.symbol || 'SOL'}: ${formatNumber(pair.liquidity.quote)}\n`;
