@@ -1,4 +1,4 @@
-#  Rug Killer on Solana
+# Rug Killer on Solana
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Solana](https://img.shields.io/badge/Solana-14F195?style=flat&logo=solana&logoColor=white)
@@ -12,29 +12,29 @@
 
 ---
 
-##  Features
+## Features
 
-###  Multi-Layer Detection
+### Multi-Layer Detection
 - **Liquidity Analysis** - Pool depth, lock periods, LP token burns
 - **Holder Distribution** - Whale detection with CEX wallet filtering  
 - **Creator Tracking** - Multi-account detection & blacklist verification
 - **Smart Contract Analysis** - Mint/freeze authority checks
 - **AI-Powered Risk Assessment** - Machine learning scam detection
 
-###  Pump.fun Integration
+### Pump.fun Integration
 - **Live Auto-Scanning** - Every new token launch analyzed instantly
 - **Real-Time WebSocket** - Live scan feed to all clients
-- **Grade System** - Diamond  Gold  Silver  Bronze  Red Flag
+- **Grade System** - Diamond, Gold, Silver, Bronze, Red Flag
 - **Scan History** - Database of last 100 auto-scanned tokens
 
-###  Whale Detection
+### Whale Detection
 - **1% Supply Threshold** - Detects large early accumulation
 - **40+ CEX Wallets Filtered** - Binance, OKX, Bybit, etc.
 - **Smart Insights** - Actionable recommendations
 - **Discord/Telegram Alerts** - Real-time notifications
 - **Wallet Age Safety Score** - 0-100 scoring system to detect aged wallet manipulation
 
-###  Modern UI
+### Modern UI
 - Beautiful dark mode interface
 - Mobile-optimized responsive design
 - Real-time updates via WebSockets
@@ -42,7 +42,7 @@
 
 ---
 
-##  Quick Start
+## Quick Start
 
 \\\ash
 # Clone the repository
@@ -73,17 +73,17 @@ Visit \http://localhost:5173\
 
 ---
 
-##  Deploy to Railway
+## Deploy to Railway
 
 1. Fork this repository
 2. Create a new project on [Railway](https://railway.app)
 3. Connect your GitHub repository
 4. Add environment variables (see [RPC_SETUP_GUIDE.md](RPC_SETUP_GUIDE.md) and [DEPLOYMENT.md](DEPLOYMENT.md))
-5. Deploy! 
+5. Deploy 
 
 ---
 
-##  Documentation
+## Documentation
 
 - [Quick Start Guide](docs/QUICK_START.md)
 - [API Reference](docs/API.md)
@@ -95,7 +95,7 @@ Visit \http://localhost:5173\
 
 ---
 
-##  Tech Stack
+## Tech Stack
 
 **Frontend:** React + TypeScript + Vite + Tailwind CSS + Framer Motion  
 **Backend:** Node.js + Express + TypeScript + Drizzle ORM + PostgreSQL  
@@ -104,24 +104,24 @@ Visit \http://localhost:5173\
 
 ---
 
-##  Contributing
+## Contributing
 
 Contributions welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ---
 
-##  License
+## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-##  Disclaimer
+## Disclaimer
 
 This tool is for educational purposes only. Always DYOR before investing. Rug Killer cannot guarantee 100% accuracy.
 
 ---
 
-**Built with  for the Solana community**
+**Built for the Solana community**
 
-[ Star us on GitHub](https://github.com/drixindustries/Rug-Killer-On-Solana)  [Report Bug](https://github.com/drixindustries/Rug-Killer-On-Solana/issues)
+[Star us on GitHub](https://github.com/drixindustries/Rug-Killer-On-Solana) | [Report Bug](https://github.com/drixindustries/Rug-Killer-On-Solana/issues)

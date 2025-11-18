@@ -1,4 +1,4 @@
-# 🚀 Deployment Guide - Rug Killer on Solana
+# Deployment Guide - Rug Killer on Solana
 
 Complete guide to deploy your Rug Killer application to production.
 
@@ -339,7 +339,7 @@ docker-compose up -d
 
 ---
 
-## ✅ Post-Deployment Checklist
+## Post-Deployment Checklist
 
 - [ ] App is accessible at deployment URL
 - [ ] Database connection successful (check logs)
@@ -415,7 +415,7 @@ pm2 restart rug-killer
 
 ---
 
-## 📊 Monitoring
+## Monitoring
 
 ### Railway Dashboard
 - View logs in real-time
@@ -432,7 +432,7 @@ pm2 status             # Check status
 
 ---
 
-## 💰 Costs
+## Costs
 
 ### Railway
 - **Free Tier**: $5 free credit/month
