@@ -480,7 +480,8 @@ const performHealthChecks = async () => {
         p.score = Math.max(0, p.score - 15);
         p.lastHealthCheck = Date.now();
         const msg = fallbackErr?.message || primaryErr;
-        console.log(`❌ ${p.name}: Failed (${msg}) - consecutive fails: ${p.consecutiveFails}`);
+        const errDetails = fallbackErr?.code || fallbackErr?.errno || fallbackErr?.type || '';
+        console.log(`❌ ${p.name}: Failed (${msg}${errDetails ? ` [${errDetails}]` : ''}) - URL: ${url.substring(0, 60)}... - consecutive fails: ${p.consecutiveFails}`);
       }
     }
   });
