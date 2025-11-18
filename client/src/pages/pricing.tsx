@@ -76,8 +76,7 @@ const pricingTiers = [
       "Advanced smart money tracking",
       "Bundling detection",
       "Historical data (90 days)",
-      "White-glove support",
-      "Team collaboration (up to 5 users)"
+      "White-glove support"
     ],
     cta: "Subscribe to GROUP",
     ctaVariant: "default" as const,
