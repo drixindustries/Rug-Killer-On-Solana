@@ -464,11 +464,19 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     
     try {
       const platformUserId = `discord:${interaction.user.id}`;
-      const isAdminEnv = (process.env.ALPHA_DISCORD_ADMIN_IDS || '')
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean)
-        .includes(interaction.user.id);
+      // Build admin allowlist from multiple env vars for compatibility
+      const adminEnvVars = [
+        process.env.ALPHA_DISCORD_ADMIN_IDS,
+        process.env.DISCORD_ADMIN_IDS,
+        process.env.DISCORD_ADMIN_ID,
+        process.env.ADMIN_DISCORD_IDS,
+      ].filter(Boolean) as string[];
+      const adminAllowlist = new Set(
+        adminEnvVars
+          .flatMap(v => v.split(',').map(s => s.trim()))
+          .filter(Boolean)
+      );
+      const isAdminEnv = adminAllowlist.has(interaction.user.id);
       const hasGuildPerms = !!(interaction.memberPermissions && (
         interaction.memberPermissions.has(PermissionFlagsBits.Administrator) ||
         interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild) ||
