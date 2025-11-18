@@ -94,10 +94,9 @@ const pricingTiers = [
     features: [
       "Everything in GROUP tier",
       "Lifetime access (no monthly fees)",
-      "Exclusive holder perks",
+      "Exclusive holder perks (To Be Announced)",
       "Early access to new features",
       "Governance voting rights",
-      "NFT rewards",
       "VIP Discord channel"
     ],
     cta: "Connect Wallet",
