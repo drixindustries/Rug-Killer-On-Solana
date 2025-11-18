@@ -589,16 +589,6 @@ export default function BotGuide() {
   );
 }
                   </div>
-                  <CardDescription>Display welcome message and available commands</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold mb-2">What it does</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Shows a friendly welcome message with a list of all available commands and how to use them. 
-                      This is the first command to try when you add the bot!
-                    </p>
-                  </div>
                   <div>
                     <h4 className="font-semibold mb-2">Usage</h4>
                     <code className="block bg-muted px-4 py-3 rounded font-mono text-sm">
