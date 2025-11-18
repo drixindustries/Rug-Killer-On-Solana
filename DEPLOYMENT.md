@@ -45,14 +45,20 @@ SESSION_SECRET=your-super-secret-session-key-change-this
 ENABLE_DEBUG_ENDPOINTS=false
 DEBUG_ENDPOINTS_TOKEN=your-strong-random-debug-token
 
-# RPC Provider (recommended)
-ANKR_RPC_URL=https://rpc.ankr.com/solana/YOUR_ANKR_API_KEY
+# RPC Providers (REQUIRED for production)
+# Ankr is the PRIMARY RPC provider - highly recommended
+ANKR_RPC_URL=https://rpc.ankr.com/multichain/YOUR_ANKR_API_KEY
+# OR use API key format (server constructs URL):
+ANKR_API_KEY=YOUR_ANKR_API_KEY
 
-# Alternatively, set only the key (the server constructs the URL):
-# ANKR_API_KEY=YOUR_ANKR_API_KEY
+# Shyft is the SECONDARY fallback provider (optional but recommended)
+SHYFT_KEY=your_shyft_api_key_here
+
 # Notes:
 # - Do not include quotes or spaces in the value
 # - Either `ANKR_RPC_URL` or `ANKR_API_KEY` works; URL takes precedence if both are set
+# - Solana Public RPC is used as tertiary fallback automatically (no key needed)
+# - DO NOT USE deprecated providers: HELIUS_KEY, ALCHEMY_KEY (removed from codebase)
 # - To verify RPC, temporarily set `ENABLE_DEBUG_ENDPOINTS=true` and `DEBUG_ENDPOINTS_TOKEN`.
 #   Then call `/api/debug/rpc` and `/api/debug/ping-rpc?count=3` with header
 #   `x-debug-token: <DEBUG_ENDPOINTS_TOKEN>`; set `ENABLE_DEBUG_ENDPOINTS=false` after.

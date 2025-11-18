@@ -32,6 +32,7 @@
 - **40+ CEX Wallets Filtered** - Binance, OKX, Bybit, etc.
 - **Smart Insights** - Actionable recommendations
 - **Discord/Telegram Alerts** - Real-time notifications
+- **Wallet Age Safety Score** - 0-100 scoring system to detect aged wallet manipulation
 
 ###  Modern UI
 - Beautiful dark mode interface

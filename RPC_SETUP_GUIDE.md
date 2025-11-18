@@ -1,53 +1,90 @@
-# RPC Load Balancer Setup Guide
+# RPC Load Balancer Setup Guide (2025)
 
 ## Current Status ✅
 
 Your RPC balancer is **already implemented and working**! The system automatically rotates between multiple RPC providers to avoid rate limits.
 
-## What's Already Configured
+## What's Currently Configured
 
-- ✅ **Solana Public RPC** (40% weight) - Active
-- ✅ **Helius RPC** (30% weight) - Needs API key
-- ✅ **Alchemy RPC** (20% weight) - Needs API key  
-- ✅ **Project Serum RPC** (10% weight) - Active
+- ✅ **Ankr RPC** (PRIMARY) - Premium multichain endpoint (Weight: 100, Rate limit: 1500 req/min)
+- ✅ **Shyft RPC** (Secondary fallback) - High-speed RPC (Weight: 55, Rate limit: 500 req/min)
+- ✅ **Solana Public RPC** (Tertiary fallback) - Free public endpoint (Weight: 30, Rate limit: 40 req/min)
+
+### ⚠️ DEPRECATED PROVIDERS (DO NOT USE)
+- ❌ **Helius** - Causing 401 errors (removed from codebase)
+- ❌ **Alchemy** - Inconsistent for Solana (removed from codebase)
+- ❌ **Project Serum** - Deprecated/shutdown
+- ❌ **GenesysGo** - Deprecated/shutdown
 
 ## How It Works
 
 The balancer uses **weighted random selection** with health scoring:
 
-1. **Automatic Rotation**: Selects providers based on weight (more weight = higher priority)
-2. **Health Monitoring**: Pings all providers every 30 seconds
-3. **Smart Failover**: If a provider fails, its health score drops and it's used less
+1. **Automatic Rotation**: Selects providers based on weight (Ankr gets selected most often as PRIMARY)
+2. **Health Monitoring**: Pings all providers every 20 seconds
+3. **Smart Failover**: If Ankr fails, automatically switches to Shyft → Public
 4. **Auto-Recovery**: Providers automatically recover as health improves
 5. **Retry Logic**: 3 attempts with exponential backoff before giving up
 
 ## Get Free API Keys (5 minutes)
 
-### 1. Helius (Free: 100 req/sec)
+### 1. Ankr (PRIMARY - Recommended) 🔥
 
-1. Go to https://helius.dev
+**Free Tier:** Generous rate limits perfect for production
+
+1. Go to https://www.ankr.com/rpc/
+2. Sign up with email or GitHub
+3. Enable **"Advanced API"** checkbox
+4. Enable **"Solana mainnet"** under blockchain options
+5. Copy your API key (64-character string)
+
+**Setup:**
+```bash
+# Option 1: Just the API key (recommended - server constructs URL)
+ANKR_API_KEY=380a1e0b86b7763334f51e2b3d44fe3ea694299cc8f8b373cad0243eea4bd6ea
+
+# Option 2: Full URL format
+ANKR_RPC_URL=https://rpc.ankr.com/multichain/YOUR_API_KEY_HERE
+```
+
+### 2. Shyft (SECONDARY - Optional but Recommended) 
+
+**Free Tier:** High-speed RPC with good limits
+
+1. Go to https://shyft.to/
 2. Sign up with email
-3. Click "Create New Project"
-4. Copy your API key (starts with `a1b2c3...`)
+3. Get your API key from dashboard
+4. Copy your API key
 
-### 2. Alchemy (Free: 300M compute units/month)
 
-1. Go to https://alchemy.com
-2. Sign up with email
-3. Click "Create App" → Select "Solana Mainnet"
-4. Copy your API key (starts with `abc123...`)
+**Setup:**
+```bash
+SHYFT_KEY=your_shyft_api_key_here
+```
 
 ## Set Environment Variables
 
-Once you have both keys, run this command:
+### For Railway Deployment:
 
 ```powershell
-railway variables --set HELIUS_KEY=<paste-helius-key-here> --set ALCHEMY_KEY=<paste-alchemy-key-here>
+# Set Ankr (PRIMARY - required)
+railway variables --set ANKR_API_KEY=your_ankr_api_key_here
+
+# Set Shyft (SECONDARY - recommended)
+railway variables --set SHYFT_KEY=your_shyft_api_key_here
 ```
 
-**Example:**
-```powershell
-railway variables --set HELIUS_KEY=a1b2c3d4e5f6g7h8 --set ALCHEMY_KEY=abc123def456ghi789
+### For Local Development:
+
+Add to `server/.env`:
+```bash
+# Ankr RPC (PRIMARY)
+ANKR_API_KEY=your_ankr_api_key_here
+
+# Shyft RPC (SECONDARY - optional)
+SHYFT_KEY=your_shyft_api_key_here
+
+# Solana Public RPC (automatically used as fallback, no key needed)
 ```
 
 Railway will automatically redeploy with the new keys.

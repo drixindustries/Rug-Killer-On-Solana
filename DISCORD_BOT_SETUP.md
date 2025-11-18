@@ -70,6 +70,17 @@ Performs comprehensive 52-metric rug detection including:
 /execute 2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt
 ```
 
+**📊 Wallet Age Safety Score** (displayed in results):
+- **Safety Score**: 0-100 rating based on wallet age distribution
+- **Grades**: 
+  - ✅ EXCELLENT (80-100): Very safe holder age distribution
+  - 🟢 GOOD (60-79): Acceptable wallet ages
+  - 🟡 FAIR (40-59): Some concerns with wallet ages  
+  - 🟠 POOR (20-39): High risk aged wallet pattern
+  - 🔴 CRITICAL (0-19): Extreme risk - likely fake volume scheme
+- **Metrics**: Shows aged wallet count and fake volume percentage
+- **Warning**: New tokens (<30 days) with many aged wallets receive severe penalties
+
 ### `/first20 <token_address>`
 **Holder Analysis**
 
@@ -113,6 +124,28 @@ Checks if a wallet is flagged in our AI-powered blacklist:
 **Example:**
 ```
 /blacklist AbCd1234EfGh5678IjKl9012MnOp3456QrSt7890UvWx
+```
+
+### `/smartwallet` (Admin Only)
+**Smart Wallet Management**
+
+Manage the Smart Money database for monitoring profitable wallets:
+
+**Commands:**
+- `/smartwallet add <wallet> <name> [influence]` - Add smart wallet to DB
+- `/smartwallet remove <wallet>` - Deactivate smart wallet
+- `/smartwallet activate <wallet>` - Re-activate smart wallet
+- `/smartwallet list [limit]` - List active smart wallets
+- `/smartwallet view <wallet>` - View smart wallet details
+
+**Notes:**
+- Influence score (0-100) determines monitoring priority; default is 60
+- Smart wallets are monitored separately from KOL wallets
+- All buy signals are logged to `smart_signals` table for analytics
+
+**Example:**
+```
+/smartwallet add 7xG3m9kLp8qR2nM4sT5vW6aY1hD3fJ9cK WhaleMaster 85
 ```
 
 ## Troubleshooting
@@ -173,6 +206,5 @@ For bot issues:
 
 - **Discord Developer Portal**: https://discord.com/developers/applications
 - **Bot Invite**: https://discord.com/api/oauth2/authorize?client_id=1437952073319714879&permissions=277025770496&scope=bot%20applications.commands
-- **Main Documentation**: See [BOT_SETUP_GUIDE.md](./BOT_SETUP_GUIDE.md)
-- **Terms of Service**: https://yourwebsite.com/terms
-- **Privacy Policy**: https://yourwebsite.com/privacy
+- **Documentation**: See [Quick Start Guide](docs/QUICK_START.md) and [API Reference](docs/API.md)
+- **GitHub Issues**: https://github.com/drixindustries/Rug-Killer-On-Solana/issues
