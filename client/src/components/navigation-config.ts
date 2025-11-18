@@ -45,6 +45,11 @@ export const navigationConfig: NavSection[] = [
     title: "Community",
     items: [
       {
+        title: "Trending Calls",
+        href: "/trending-calls",
+        description: "Top tokens mentioned in Discord & Telegram"
+      },
+      {
         title: "Leaderboard",
         href: "/leaderboard",
         description: "Top contributors and reputation rankings"

@@ -9,6 +9,7 @@ import { checkBlacklist, reportWallet, getBlacklistStats, getTopFlaggedWallets }
 import { getExchangeStats } from './exchange-whitelist';
 import { nameCache } from './name-cache';
 import { rally } from './bot-personality';
+import { trendingCallsTracker } from './trending-calls-tracker';
 
 // Bot instance - only created when startTelegramBot() is called
 let botInstance: Telegraf | null = null;
@@ -1290,9 +1291,35 @@ function createTelegramBot(botToken: string): Telegraf {
       
       if (resolved) {
         lastResponded.set(throttleKey, now);
+        
+        // Track this cashtag mention for trending calls
+        try {
+          const channelName = ctx.chat.type === 'private' ? 'DM' : 'title' in ctx.chat ? ctx.chat.title : 'Unknown';
+          trendingCallsTracker.trackCashtag(
+            sym,
+            resolved,
+            'telegram',
+            ctx.chat.id.toString(),
+            channelName || 'Unknown',
+            ctx.from?.id.toString() || 'unknown',
+            ctx.from?.username || ctx.from?.first_name || 'Unknown',
+            text
+          );
+        } catch (trackErr) {
+          console.warn('[TrendingCalls] Failed to track cashtag:', trackErr);
+        }
+        
         try {
           const analysis = await tokenAnalyzer.analyzeToken(resolved);
           try { nameCache.remember(resolved, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
+          
+          // Update risk score in tracker
+          try {
+            trendingCallsTracker.updateRiskScore(resolved, analysis.riskScore);
+          } catch (updateErr) {
+            console.warn('[TrendingCalls] Failed to update risk score:', updateErr);
+          }
+          
           const msg = formatAnalysis(analysis, true);
           await ctx.reply(msg, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } });
           return;

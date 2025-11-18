@@ -26,6 +26,7 @@ import Analytics from "@/pages/analytics";
 import Profile from "@/pages/profile";
 import Leaderboard from "@/pages/leaderboard";
 import LiveScans from "@/pages/live-scans";
+import TrendingCalls from "@/pages/trending-calls";
 import Moderation from "@/pages/admin/moderation";
 import NotFound from "@/pages/not-found";
 
@@ -48,6 +49,7 @@ function Router() {
       <Route path="/profile/:userId" component={Profile} />
       <Route path="/leaderboard" component={Leaderboard} />
       <Route path="/live-scans" component={LiveScans} />
+      <Route path="/trending-calls" component={TrendingCalls} />
       <Route path="/admin/moderation" component={Moderation} />
       <Route path="/documentation" component={Documentation} />
       <Route path="/about" component={About} />

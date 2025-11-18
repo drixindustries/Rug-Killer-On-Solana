@@ -8,6 +8,7 @@ import { checkBlacklist, reportWallet, getBlacklistStats, getTopFlaggedWallets }
 import { getExchangeStats } from './exchange-whitelist';
 import { nameCache } from './name-cache';
 import { rally } from './bot-personality';
+import { trendingCallsTracker } from './trending-calls-tracker';
 
 // Client instance - only created when startDiscordBot() is called
 let clientInstance: Client | null = null;
@@ -1864,10 +1865,36 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       
       if (resolved) {
         lastResponded.set(throttleKey, now);
+        
+        // Track this cashtag mention for trending calls
+        try {
+          const channelName = message.channel && 'name' in message.channel ? message.channel.name : 'DM';
+          trendingCallsTracker.trackCashtag(
+            sym,
+            resolved,
+            'discord',
+            message.channelId,
+            channelName || 'Unknown',
+            message.author.id,
+            message.author.username,
+            text
+          );
+        } catch (trackErr) {
+          console.warn('[TrendingCalls] Failed to track cashtag:', trackErr);
+        }
+        
         try {
           await message.channel.sendTyping();
           const analysis = await tokenAnalyzer.analyzeToken(resolved);
           try { nameCache.remember(resolved, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
+          
+          // Update risk score in tracker
+          try {
+            trendingCallsTracker.updateRiskScore(resolved, analysis.riskScore);
+          } catch (updateErr) {
+            console.warn('[TrendingCalls] Failed to update risk score:', updateErr);
+          }
+          
           const embed = createAnalysisEmbed(analysis);
           await message.reply({ embeds: [embed] });
           return;

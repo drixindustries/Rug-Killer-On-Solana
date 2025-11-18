@@ -257,6 +257,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Trending Calls Endpoint
+  app.get("/api/trending-calls", async (req, res) => {
+    try {
+      const { trendingCallsTracker } = await import('./trending-calls-tracker.js');
+      const timeframe = (req.query.timeframe as '1h' | '6h' | '24h' | '7d') || '24h';
+      const platform = req.query.platform as 'discord' | 'telegram' | undefined;
+      
+      const calls = trendingCallsTracker.getTrendingCalls(timeframe, platform);
+      
+      // Convert Sets to arrays for JSON serialization
+      const serializedCalls = calls.map(call => ({
+        id: call.id,
+        symbol: call.symbol,
+        contractAddress: call.contractAddress,
+        platform: call.platform,
+        channelName: call.channelNames[0] || 'Unknown',
+        mentions: call.mentions,
+        uniqueUsers: call.uniqueUsers.size,
+        firstSeen: call.firstSeen,
+        lastSeen: call.lastSeen,
+        sentiment: call.sentiment,
+        riskScore: call.riskScore,
+      }));
+      
+      res.json(serializedCalls);
+    } catch (error) {
+      console.error('[TrendingCalls API] Error:', error);
+      res.status(500).json({ error: "Failed to fetch trending calls" });
+    }
+  });
+
   // Aged Wallet Detection Endpoint
   app.post("/api/aged-wallets", async (req, res) => {
     try {

@@ -61,6 +61,7 @@ export function CascadingAnalysisBars({ analysis }: CascadingAnalysisBarsProps) 
   const bars: BarData[] = [];
 
   // Risk Score Bar
+  const redFlagsCount = analysis.redFlags?.length || 0;
   bars.push({
     id: "risk-score",
     title: "Overall Risk Score",
@@ -72,10 +73,10 @@ export function CascadingAnalysisBars({ analysis }: CascadingAnalysisBarsProps) 
     mainValue: `${analysis.riskScore}/100`,
     subValues: [
       { label: "Level", value: analysis.riskLevel },
-      { label: "Flags", value: `${analysis.redFlags?.length || 0} Critical` }
+      { label: "Flags", value: `${redFlagsCount} detected` }
     ],
-    expandable: (analysis.redFlags?.length || 0) > 0,
-    details: analysis.redFlags
+    expandable: redFlagsCount > 0,
+    details: analysis.redFlags?.map(flag => `${flag.title}: ${flag.description}`) || []
   });
 
   // Mint Authority
@@ -107,36 +108,64 @@ export function CascadingAnalysisBars({ analysis }: CascadingAnalysisBarsProps) 
   });
 
   // Liquidity
-  if (analysis.liquidityPool) {
+  if (analysis.liquidityPool && analysis.liquidityPool.exists) {
     const burnPercent = analysis.liquidityPool.burnPercentage || 0;
+    const liquidityUsd = analysis.marketData?.liquidityUsd || analysis.liquidityPool.lpReserve || 0;
+    const hasLiquidityData = liquidityUsd > 0;
+    
     bars.push({
       id: "liquidity",
       title: "Liquidity Pool",
       icon: <Droplet className="h-5 w-5" />,
-      status: burnPercent >= 90 ? "safe" : burnPercent >= 50 ? "warning" : "danger",
-      mainValue: `${burnPercent.toFixed(1)}% Burned`,
+      status: liquidityUsd < 1000 ? "danger" : 
+              burnPercent >= 90 ? "safe" : 
+              burnPercent >= 50 ? "warning" : "danger",
+      mainValue: hasLiquidityData ? `$${liquidityUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "RISKY",
       subValues: [
-        { label: "Status", value: analysis.liquidityPool.isBurned ? "Locked" : "Unlocked" },
-        { label: "Reserve", value: `$${(analysis.liquidityPool.lpReserve || 0).toLocaleString()}` }
+        { label: "Status", value: analysis.liquidityPool.status || "UNKNOWN" },
+        { label: "Burned", value: burnPercent > 0 ? `${burnPercent.toFixed(1)}%` : "Unknown" }
+      ]
+    });
+  } else if (analysis.marketData?.liquidityUsd) {
+    // Show liquidity even if liquidityPool object doesn't exist
+    const liquidityUsd = analysis.marketData.liquidityUsd;
+    bars.push({
+      id: "liquidity",
+      title: "Liquidity Pool",
+      icon: <Droplet className="h-5 w-5" />,
+      status: liquidityUsd < 1000 ? "danger" : liquidityUsd < 5000 ? "warning" : "safe",
+      mainValue: `$${liquidityUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+      subValues: [
+        { label: "Status", value: liquidityUsd < 1000 ? "RISKY" : "SAFE" },
+        { label: "Source", value: "DexScreener" }
       ]
     });
   }
 
-  // Holder Distribution
-  if (analysis.topHolders && analysis.topHolders.length > 0) {
-    const top10Percent = analysis.topHolders.slice(0, 10).reduce((sum, h) => sum + h.percentage, 0);
-    bars.push({
-      id: "holders",
-      title: "Holder Distribution",
-      icon: <Users className="h-5 w-5" />,
-      status: top10Percent > 80 ? "danger" : top10Percent > 50 ? "warning" : "safe",
-      mainValue: `${analysis.holderCount || 0} Holders`,
-      subValues: [
-        { label: "Top 10", value: `${top10Percent.toFixed(1)}% supply` },
-        { label: "Largest", value: `${analysis.topHolders[0]?.percentage.toFixed(1)}%` }
-      ]
-    });
-  }
+  // Holder Distribution - Always show this metric
+  const holderCount = analysis.holderCount || 0;
+  const supply = analysis.metadata?.supply || 0;
+  const topHolders = analysis.topHolders || [];
+  const top10Percent = analysis.topHolderConcentration || 
+    (topHolders.length > 0 ? topHolders.slice(0, 10).reduce((sum, h) => sum + (h.percentage || 0), 0) : 0);
+  
+  bars.push({
+    id: "holders",
+    title: "Holder Distribution",
+    icon: <Users className="h-5 w-5" />,
+    status: holderCount === 0 ? "warning" : 
+            top10Percent > 80 ? "danger" : 
+            top10Percent > 50 ? "warning" : "safe",
+    mainValue: holderCount > 0 ? `${holderCount.toLocaleString()} Holders` : "Unknown",
+    subValues: [
+      { label: "Supply", value: supply > 0 ? supply.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "Unknown" },
+      { label: "Top 10", value: top10Percent > 0 ? `${top10Percent.toFixed(1)}%` : "Unknown" }
+    ],
+    expandable: topHolders.length > 0,
+    details: topHolders.length > 0 ? 
+      topHolders.slice(0, 5).map((h, i) => `#${i+1}: ${h.percentage?.toFixed(2)}% (${h.address?.slice(0, 8)}...)`) : 
+      ["Holder data not available - may require premium RPC access"]
+  });
 
   // Honeypot Detection
   if (analysis.quillcheckData) {
@@ -152,7 +181,7 @@ export function CascadingAnalysisBars({ analysis }: CascadingAnalysisBarsProps) 
         { label: "Sell Tax", value: `${hp.sellTax}%` }
       ],
       expandable: hp.isHoneypot,
-      details: hp.isHoneypot ? [hp.reason] : undefined
+      details: hp.isHoneypot ? hp.risks : undefined
     });
   }
 
@@ -174,73 +203,87 @@ export function CascadingAnalysisBars({ analysis }: CascadingAnalysisBarsProps) 
     });
   }
 
-  // Aged Wallet Detection
+  // Aged Wallet Detection - Always show when data exists
   if (analysis.agedWalletData) {
     const aw = analysis.agedWalletData;
-    const safetyScore = 100 - aw.riskScore;
+    const safetyScore = 100 - (aw.riskScore || 0);
+    const suspiciousCount = aw.suspiciousWallets?.length || 0;
+    const fakeVolume = aw.totalFakeVolumePercent || 0;
+    
     bars.push({
       id: "aged-wallets",
       title: "Aged Wallet Analysis",
       icon: <Clock className="h-5 w-5" />,
-      status: safetyScore >= 80 ? "safe" : safetyScore >= 50 ? "warning" : "danger",
-      mainValue: `${safetyScore}/100 Safety`,
+      status: suspiciousCount === 0 ? "safe" : 
+              safetyScore >= 70 ? "warning" : "danger",
+      mainValue: suspiciousCount === 0 ? "CLEAN" : `${suspiciousCount} Suspicious`,
       subValues: [
-        { label: "Suspicious", value: `${aw.suspiciousWallets.length} wallets` },
-        { label: "Fake Volume", value: `${aw.totalFakeVolumePercent.toFixed(1)}%` }
+        { label: "Safety Score", value: `${safetyScore}/100` },
+        { label: "Fake Volume", value: `${fakeVolume.toFixed(1)}%` }
       ],
-      expandable: aw.suspiciousWallets.length > 0,
-      details: aw.suspiciousWallets.length > 0 ? 
-        [`${aw.suspiciousWallets.length} aged wallets detected with coordinated behavior`] : undefined,
-      link: `/?analyze=${analysis.tokenAddress}#aged-wallets`
+      expandable: suspiciousCount > 0,
+      details: suspiciousCount > 0 ? 
+        [
+          `${suspiciousCount} aged wallets detected with coordinated behavior`,
+          `Potential fake volume: ${fakeVolume.toFixed(1)}%`,
+          `Risk Score: ${aw.riskScore}/100`
+        ] : undefined
     });
   }
 
   // Whale Detection
-  if (analysis.whaleDetection && analysis.whaleDetection.whaleWallets.length > 0) {
+  if (analysis.whaleDetection && analysis.whaleDetection.whaleCount > 0) {
     const wd = analysis.whaleDetection;
     bars.push({
       id: "whales",
       title: "Whale Activity",
       icon: <TrendingUp className="h-5 w-5" />,
-      status: wd.riskScore > 70 ? "danger" : wd.riskScore > 40 ? "warning" : "info",
-      mainValue: `${wd.whaleWallets.length} Whales`,
+      status: wd.totalWhaleSupplyPercent > 40 ? "danger" : wd.totalWhaleSupplyPercent > 20 ? "warning" : "info",
+      mainValue: `${wd.whaleCount} Whales`,
       subValues: [
-        { label: "Risk Score", value: `${wd.riskScore}/100` },
-        { label: "Total Holding", value: `${wd.totalWhalePercentage.toFixed(1)}%` }
-      ]
+        { label: "Supply", value: `${wd.totalWhaleSupplyPercent.toFixed(1)}%` },
+        { label: "Avg Buy", value: `${wd.averageBuySize.toFixed(2)} tokens` }
+      ],
+      expandable: wd.whaleBuys.length > 0,
+      details: wd.insight ? [wd.insight] : undefined
     });
   }
 
   // Network Analysis
   if (analysis.networkAnalysis) {
     const na = analysis.networkAnalysis;
+    const groupCount = na.connectedGroups?.length || 0;
     bars.push({
       id: "network",
       title: "Network Analysis",
       icon: <Network className="h-5 w-5" />,
-      status: na.suspiciousPatterns.length > 0 ? "warning" : "safe",
-      mainValue: `${na.clusters.length} Clusters`,
+      status: na.networkRiskScore > 70 ? "danger" : na.networkRiskScore > 40 ? "warning" : "safe",
+      mainValue: `${groupCount} Groups`,
       subValues: [
-        { label: "Patterns", value: `${na.suspiciousPatterns.length} suspicious` },
-        { label: "Connected", value: `${na.totalConnections} links` }
-      ]
+        { label: "Risk", value: `${na.networkRiskScore}/100` },
+        { label: "Clustered", value: `${na.clusteredWallets} wallets` }
+      ],
+      expandable: na.risks.length > 0,
+      details: na.risks
     });
   }
 
   // Funding Analysis
   if (analysis.fundingAnalysis) {
     const fa = analysis.fundingAnalysis;
-    const suspiciousFunding = fa.centralizedExchangeFunding > 0 || fa.newWalletCount > 10;
+    const patternCount = fa.fundingPatterns?.length || 0;
     bars.push({
       id: "funding",
       title: "Funding Sources",
       icon: <Wallet className="h-5 w-5" />,
-      status: suspiciousFunding ? "warning" : "info",
-      mainValue: `${fa.patterns.length} Patterns`,
+      status: fa.suspiciousFunding ? "warning" : "safe",
+      mainValue: patternCount > 0 ? `${patternCount} Patterns` : "CLEAN",
       subValues: [
-        { label: "CEX Funding", value: `${fa.centralizedExchangeFunding.toFixed(1)}%` },
-        { label: "New Wallets", value: `${fa.newWalletCount}` }
-      ]
+        { label: "Suspicious", value: `${fa.totalSuspiciousPercentage.toFixed(1)}%` },
+        { label: "Status", value: fa.suspiciousFunding ? "Risk Detected" : "Safe" }
+      ],
+      expandable: fa.risks.length > 0,
+      details: fa.risks
     });
   }
 
