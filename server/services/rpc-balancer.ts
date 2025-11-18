@@ -33,7 +33,7 @@ function getQuickNodeUrl(): string | undefined {
   
   console.log('[QuickNode Config] QUICKNODE_RPC_URL present:', !!url);
   
-  if (!url || url.length === 0) {
+  if (!url || url.length === 0 || url === 'UNUSED') {
     return undefined;
   }
 

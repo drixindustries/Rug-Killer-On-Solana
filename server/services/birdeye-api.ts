@@ -129,7 +129,7 @@ export async function getBirdeyePriceHistory(tokenAddress: string, days: number 
  * Cached Birdeye top holders (5 minutes cache - rarely changes)
  */
 export async function getBirdeyeTopHolders(tokenAddress: string): Promise<BirdeyeHolder[]> {
-  if (!API_KEY) {
+  if (!API_KEY || API_KEY === 'UNUSED') {
     return [];
   }
   
@@ -147,6 +147,9 @@ export async function getBirdeyeTopHolders(tokenAddress: string): Promise<Birdey
         
         return response.data?.data?.slice(0, 20) || [];
       } catch (error: any) {
+        if (error.response?.status === 401) {
+          console.error('[Birdeye] Invalid API key (401) - check BIRDEYE_API_KEY in Railway');
+        }
         // Silently fail - Birdeye is optional
         return [];
       }
