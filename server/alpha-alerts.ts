@@ -308,7 +308,9 @@ export class AlphaAlertService {
             if (bundle.insiderCount) parts.push(`🕵️ Insiders: ${bundle.insiderCount}`);
             if (bundle.sniperCount) parts.push(`🎯 Snipers: ${bundle.sniperCount}`);
           }
-          if (parts.length > 0) gmgnLines = `\n${parts.join(' • ')}`;
+          if (parts.length > 0) {
+            gmgnLines = parts.join('\n');
+          }
         }
       } catch {}
 
@@ -320,89 +322,59 @@ export class AlphaAlertService {
           source: 'alpha-alerts',
           detectedAt: new Date(),
         });
-          if (alert.type === 'caller_signal') {
-            let gmgnLines = '';
-            try {
-              const gmgnData = await this.gmgn.getTokenAnalysis(alert.mint);
-              if (gmgnData) {
-                const bundle = this.gmgn.extractBundleInfo(gmgnData);
-                const smart = this.gmgn.hasSmartMoneyActivity(gmgnData);
-                const smartDegen = gmgnData.data.smart_degen;
-                const parts: string[] = [];
-                if (smart && smartDegen) {
-                  parts.push(`🧠 Smart traders: ${smartDegen.count} (avg cost ${smartDegen.avg_cost?.toFixed?.(2) ?? smartDegen.avg_cost})`);
-                }
-                if (bundle) {
-                  parts.push(`🧩 Bundle: ${bundle.isBundled ? 'yes' : 'no'} (wallets ${bundle.bundleWalletCount}, conf ${bundle.confidence}%)`);
-                  if (bundle.insiderCount) parts.push(`🕵️ Insiders: ${bundle.insiderCount}`);
-                  if (bundle.sniperCount) parts.push(`🎯 Snipers: ${bundle.sniperCount}`);
-                }
-                if (parts.length > 0) {
-                  gmgnLines = parts.join('\n');
-                }
-              }
-            } catch {}
+      } catch {}
 
-            if (alert.data?.source !== 'nansen') {
-              try {
-                await db.insert(smartSignals).values({
-                  walletAddress: alert.data?.wallet || alert.source,
-                  tokenAddress: alert.mint,
-                  action: 'buy',
-                  source: 'alpha-alerts',
-                  detectedAt: new Date(),
-                });
-              } catch {}
-            }
+      const walletAddress = typeof alert.data?.wallet === 'string' ? alert.data.wallet : undefined;
+      const shortWallet = walletAddress ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}` : null;
+      const providerLabel = typeof alert.data?.provider === 'string' ? alert.data.provider : 'Alpha Alerts';
+      const tokenSymbol = alert.data?.tokenSymbol || alert.data?.tokenName;
+      const tokenName = alert.data?.tokenName && alert.data?.tokenName !== tokenSymbol ? alert.data?.tokenName : undefined;
+      const amountToken = Number(alert.data?.amountToken);
+      const amountUsd = Number(alert.data?.amountUsd);
+      const txHash = typeof alert.data?.txHash === 'string' ? alert.data.txHash : undefined;
+      const sourceUrl = typeof alert.data?.sourceUrl === 'string' ? alert.data.sourceUrl : undefined;
 
-            const walletAddress = typeof alert.data?.wallet === 'string' ? alert.data.wallet : undefined;
-            const shortWallet = walletAddress ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}` : null;
-            const providerLabel = typeof alert.data?.provider === 'string' ? alert.data.provider : 'Alpha Alerts';
-            const tokenSymbol = alert.data?.tokenSymbol || alert.data?.tokenName;
-            const tokenName = alert.data?.tokenName && alert.data?.tokenName !== tokenSymbol ? alert.data?.tokenName : undefined;
-            const amountToken = Number(alert.data?.amountToken);
-            const amountUsd = Number(alert.data?.amountUsd);
-            const txHash = typeof alert.data?.txHash === 'string' ? alert.data.txHash : undefined;
-            const sourceUrl = typeof alert.data?.sourceUrl === 'string' ? alert.data.sourceUrl : undefined;
+      const formatValue = (value: number, fraction: number) => {
+        if (!Number.isFinite(value) || value <= 0) return undefined;
+        return value.toLocaleString(undefined, { maximumFractionDigits: fraction });
+      };
 
-            const formatValue = (value: number, fraction: number) => {
-              if (!Number.isFinite(value) || value <= 0) return undefined;
-              return value.toLocaleString(undefined, { maximumFractionDigits: fraction });
-            };
+      const summaryLines: string[] = [];
+      summaryLines.push(`📍 CA: \`${alert.mint}\``);
+      summaryLines.push(`👤 Wallet: ${alert.source}${shortWallet ? ` (${shortWallet})` : ''}`);
+      if (providerLabel) {
+        summaryLines.push(`📡 Source: ${providerLabel}`);
+      }
+      if (walletAddress) {
+        summaryLines.push(`🔑 Address: \`${walletAddress}\``);
+      }
+      if (tokenSymbol) {
+        summaryLines.push(`🏷️ Token: ${tokenSymbol}${tokenName ? ` (${tokenName})` : ''}`);
+      }
+      const formattedSize = formatValue(amountToken, amountToken > 1 ? 2 : 4);
+      if (formattedSize) {
+        summaryLines.push(`🪙 Size: ${formattedSize} tokens`);
+      }
+      const formattedUsd = formatValue(amountUsd, amountUsd > 1000 ? 0 : 2);
+      if (formattedUsd) {
+        summaryLines.push(`💵 USD: $${formattedUsd}`);
+      }
+      if (gmgnLines) {
+        summaryLines.push(gmgnLines);
+      }
+      if (txHash) {
+        summaryLines.push(`🧾 Tx: \`${txHash}\``);
+      }
+      summaryLines.push(`🔗 https://pump.fun/${alert.mint}`);
+      summaryLines.push(`💎 https://dexscreener.com/solana/${alert.mint}`);
+      if (sourceUrl) {
+        summaryLines.push(`🛰️ Trace: ${sourceUrl}`);
+      }
 
-            const summaryLines: string[] = [];
-            summaryLines.push(`📍 CA: \`${alert.mint}\``);
-            summaryLines.push(`👤 Wallet: ${alert.source}${shortWallet ? ` (${shortWallet})` : ''}`);
-            if (providerLabel) {
-              summaryLines.push(`📡 Source: ${providerLabel}`);
-            }
-            if (walletAddress) {
-              summaryLines.push(`🔑 Address: \`${walletAddress}\``);
-            }
-            if (tokenSymbol) {
-              summaryLines.push(`🏷️ Token: ${tokenSymbol}${tokenName ? ` (${tokenName})` : ''}`);
-            }
-            const formattedSize = formatValue(amountToken, amountToken > 1 ? 2 : 4);
-            if (formattedSize) {
-              summaryLines.push(`🪙 Size: ${formattedSize} tokens`);
-            }
-            const formattedUsd = formatValue(amountUsd, amountUsd > 1000 ? 0 : 2);
-            if (formattedUsd) {
-              summaryLines.push(`💵 USD: $${formattedUsd}`);
-            }
-            if (gmgnLines) {
-              summaryLines.push(gmgnLines);
-            }
-            if (txHash) {
-              summaryLines.push(`🧾 Tx: \`${txHash}\``);
-            }
-            summaryLines.push(`🔗 https://pump.fun/${alert.mint}`);
-            summaryLines.push(`💎 https://dexscreener.com/solana/${alert.mint}`);
-            if (sourceUrl) {
-              summaryLines.push(`🛰️ Trace: ${sourceUrl}`);
-            }
-
-            message = `🚨 **SMART MONEY BUY: ${alert.source}**\n\n${summaryLines.join('\n')}`;
+      message = `🚨 **SMART MONEY BUY: ${alert.source}**\n\n${summaryLines.join('\n')}`;
+    }
+    
+    const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
     const TELEGRAM_CHAT = process.env.ALPHA_TELEGRAM_CHAT_ID;
     if (TELEGRAM_TOKEN && TELEGRAM_CHAT) {
       try {
