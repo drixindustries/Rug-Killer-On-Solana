@@ -327,7 +327,6 @@ export default function Home() {
                     Made by trenchers, for trenchers.
                   </p>
                 </div>
-                </div>
               </div>
             )}
 
