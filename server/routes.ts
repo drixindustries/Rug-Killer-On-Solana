@@ -20,6 +20,7 @@ import { rpcBalancer } from "./services/rpc-balancer.ts";
 import { holderAnalysis } from "./services/holder-analysis.ts";
 import { streamMetrics, normalizeSolanaWebhook } from "./services/stream-metrics.ts";
 import crypto from 'crypto';
+import { tokenMetrics } from './services/token-metrics.ts';
 
 // Stub authentication for Railway deployment (no Replit OIDC)
 const setupAuth = async (app: Express) => {
@@ -517,6 +518,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   } else {
     console.log('ℹ️ Solana stream webhooks disabled (set ENABLE_SOLANA_STREAM_WEBHOOK=true to enable)');
   }
+
+  // Full token metrics aggregator
+  app.get('/api/metrics/token/:mint/full', async (req, res) => {
+    try {
+      const { mint } = req.params;
+      const metrics = await tokenMetrics.getFullMetrics(mint);
+      res.json(metrics);
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || 'metrics error' });
+    }
+  });
 
   // Subscription routes
   app.get('/api/subscription/status', isAuthenticated, async (req: any, res) => {
