@@ -35,8 +35,29 @@ export class AlphaAlertService {
   private gmgn = new GMGNService();
 
   constructor(rpcUrl?: string, customCallers?: AlphaCallerConfig[]) {
-    const ankrUrl = process.env.ANKR_RPC_URL || (process.env.ANKR_API_KEY ? `https://rpc.ankr.com/premium-http/solana_mainnet/${process.env.ANKR_API_KEY}` : null);
-    this.connection = new Connection(ankrUrl || rpcUrl || 'https://api.mainnet-beta.solana.com', 'confirmed');
+    // Resolve separate HTTP and WS endpoints to ensure subscriptions work reliably
+    const explicitHttp = process.env.ALPHA_HTTP_RPC?.trim();
+    const explicitWs = process.env.ALPHA_WS_RPC?.trim();
+
+    // Helius preferred if key provided
+    const heliusKey = process.env.HELIUS_API_KEY?.trim();
+    const heliusHttp = heliusKey ? `https://mainnet.helius-rpc.com/?api-key=${heliusKey}` : null;
+    const heliusWs = heliusKey ? `wss://atlas-mainnet.helius-rpc.com/?api-key=${heliusKey}` : null;
+
+    // Ankr endpoints (explicit override wins)
+    const ankrHttp = process.env.ANKR_RPC_URL?.trim() || (process.env.ANKR_API_KEY ? `https://rpc.ankr.com/premium-http/solana_mainnet/${process.env.ANKR_API_KEY}` : null);
+    const ankrWsExplicit = process.env.ANKR_WS_URL?.trim();
+    // Derive an Ankr WS URL from HTTP if possible
+    const ankrWsDerived = ankrHttp
+      ? ankrHttp
+          .replace('https://', 'wss://')
+          .replace('/premium-http/', '/premium-ws/')
+      : null;
+
+    const httpEndpoint = explicitHttp || heliusHttp || ankrHttp || rpcUrl || 'https://api.mainnet-beta.solana.com';
+    const wsEndpoint = explicitWs || heliusWs || ankrWsExplicit || ankrWsDerived || undefined;
+
+    this.connection = new Connection(httpEndpoint, { commitment: 'confirmed', wsEndpoint });
     this.alphaCallers = customCallers || DEFAULT_ALPHA_CALLERS;
   }
 
@@ -440,6 +461,14 @@ export class AlphaAlertService {
       
       if (this.isRunning) {
         this.monitorAlphaCaller(caller);
+      } else {
+        // Auto-start the service when a caller is added to ensure tracking begins
+        try {
+          // Fire and forget to avoid changing method signature
+          void this.start();
+        } catch (e) {
+          console.error('[ALPHA ALERT] Autostart failed after addCaller:', e);
+        }
       }
     }
   }
