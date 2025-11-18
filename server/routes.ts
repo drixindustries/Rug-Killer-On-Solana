@@ -18,6 +18,7 @@ import { z } from "zod";
 import { nanoid } from "nanoid";
 import { rpcBalancer } from "./services/rpc-balancer.ts";
 import { holderAnalysis } from "./services/holder-analysis.ts";
+import { streamMetrics, normalizeSolanaWebhook } from "./services/stream-metrics.ts";
 
 // Stub authentication for Railway deployment (no Replit OIDC)
 const setupAuth = async (app: Express) => {
@@ -440,6 +441,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+
+  // Solana Streams Webhook Receiver (Helius/QuickNode-compatible)
+  if (process.env.ENABLE_SOLANA_STREAM_WEBHOOK === 'true') {
+    app.post('/api/webhooks/solana/stream/:provider?', async (req: any, res) => {
+      try {
+        const provider = (req.params.provider || req.header('x-provider') || 'unknown').toString().toLowerCase();
+        const sharedSecret = process.env.SOLANA_STREAM_WEBHOOK_SECRET?.trim();
+        const providedSecret = (req.header('x-stream-secret') || req.query.secret || req.header('x-quicknode-signature') || req.header('x-helius-signature')) as string | undefined;
+
+        if (sharedSecret && providedSecret !== sharedSecret) {
+          return res.status(401).json({ ok: false, error: 'Invalid webhook secret' });
+        }
+
+        const events = normalizeSolanaWebhook(req.body);
+        streamMetrics.ingest(provider, events);
+
+        // Respond quickly to keep providers happy
+        res.json({ ok: true, received: events.length });
+      } catch (err: any) {
+        console.error('[StreamsWebhook] Error:', err);
+        res.status(500).json({ ok: false, error: err?.message || 'Webhook error' });
+      }
+    });
+
+    // Stream metrics endpoints
+    app.get('/api/metrics/stream/summary', (_req, res) => {
+      try {
+        res.json(streamMetrics.getSummary());
+      } catch (e: any) {
+        res.status(500).json({ error: e?.message || 'summary error' });
+      }
+    });
+
+    app.get('/api/metrics/stream/token/:mint', (req, res) => {
+      try {
+        const { mint } = req.params;
+        res.json(streamMetrics.getTokenSummary(mint));
+      } catch (e: any) {
+        res.status(500).json({ error: e?.message || 'token summary error' });
+      }
+    });
+  } else {
+    console.log('ℹ️ Solana stream webhooks disabled (set ENABLE_SOLANA_STREAM_WEBHOOK=true to enable)');
+  }
 
   // Subscription routes
   app.get('/api/subscription/status', isAuthenticated, async (req: any, res) => {
