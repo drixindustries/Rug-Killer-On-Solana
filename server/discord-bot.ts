@@ -520,18 +520,28 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         
       } else if (interaction.commandName === 'execute') {
         const tokenAddress = interaction.options.getString('address', true);
+        console.log(`[Discord /execute] User ${interaction.user.tag} scanning: ${tokenAddress}`);
         
         await interaction.deferReply();
         
         try {
-          const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+          // Add timeout to prevent hanging
+          const analysisPromise = tokenAnalyzer.analyzeToken(tokenAddress);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Analysis timeout after 30 seconds')), 30000)
+          );
+          
+          const analysis = await Promise.race([analysisPromise, timeoutPromise]) as any;
+          console.log(`[Discord /execute] Analysis complete for ${tokenAddress}`);
+          
           // Remember symbol/name mapping for quick $symbol lookups later
           try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
           const embed = createAnalysisEmbed(analysis);
           
           await interaction.editReply({ embeds: [embed] });
+          console.log(`[Discord /execute] Reply sent for ${tokenAddress}`);
         } catch (error: any) {
-          console.error('Discord execute command error:', error);
+          console.error(`[Discord /execute] Error for ${tokenAddress}:`, error.message);
           const errorEmbed = new EmbedBuilder()
             .setColor(0xff0000)
             .setTitle('❌ Analysis Failed')
@@ -1736,15 +1746,26 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     const scanMatch = text.match(/^!(?:scan|execute)\s+([1-9A-HJ-NP-Za-km-z]{32,44})$/i);
     if (scanMatch) {
       const tokenAddress = scanMatch[1];
+      console.log(`[Discord !scan] User ${message.author.tag} scanning: ${tokenAddress}`);
       try {
         await message.channel.sendTyping();
-        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        
+        // Add timeout to prevent hanging
+        const analysisPromise = tokenAnalyzer.analyzeToken(tokenAddress);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Analysis timeout after 30 seconds')), 30000)
+        );
+        
+        const analysis = await Promise.race([analysisPromise, timeoutPromise]) as any;
+        console.log(`[Discord !scan] Analysis complete for ${tokenAddress}`);
+        
         try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
         const embed = createAnalysisEmbed(analysis);
         await message.reply({ embeds: [embed] });
+        console.log(`[Discord !scan] Reply sent for ${tokenAddress}`);
         return;
       } catch (error: any) {
-        console.error('Discord !scan command error:', error);
+        console.error(`[Discord !scan] Error for ${tokenAddress}:`, error.message);
         const errorEmbed = new EmbedBuilder()
           .setColor(0xff0000)
           .setTitle('❌ Analysis Failed')
