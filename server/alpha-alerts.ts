@@ -58,6 +58,57 @@ export class AlphaAlertService {
     this.alphaCallers = customCallers || DEFAULT_ALPHA_CALLERS;
   }
 
+  // Lightweight wallet monitor as a fallback to Nansen feed
+  // Uses onLogs with mentions filter and heuristics to extract candidate token mints
+  private async monitorAlphaCaller(caller: AlphaCallerConfig): Promise<void> {
+    try {
+      if (!caller.enabled) return;
+      if (!caller.wallet) return;
+
+      if (this.listeners.has(caller.wallet)) {
+        return; // already monitoring
+      }
+
+      const pubkey = new PublicKey(caller.wallet);
+
+      const listenerId = await this.connection.onLogs({ mentions: [pubkey] }, async (logInfo) => {
+        try {
+          // Heuristic: extract base58 addresses from logs and test a few as token mints
+          const text = (logInfo.logs || []).join('\n');
+          const matches = text.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/g) || [];
+
+          // De-duplicate and cap work
+          const uniques = Array.from(new Set(matches)).slice(0, 5);
+
+          for (const candidate of uniques) {
+            // Basic sanity check and quality filter (fast short-circuit)
+            if (candidate.length < 32) continue;
+            const ok = await this.isQualityToken(candidate);
+            if (!ok) continue;
+
+            await this.sendAlert({
+              type: 'caller_signal',
+              mint: candidate,
+              source: caller.name || 'Alpha Caller',
+              timestamp: Date.now(),
+              data: {
+                wallet: caller.wallet,
+                provider: 'Wallet Monitor',
+              },
+            });
+            break; // send a single alert per tx/log burst
+          }
+        } catch (err) {
+          console.error('[Alpha Alerts] monitorAlphaCaller log handler error:', err);
+        }
+      });
+
+      this.listeners.set(caller.wallet, listenerId);
+    } catch (error) {
+      console.error(`[Alpha Alerts] Failed to monitor caller ${caller.name || caller.wallet}:`, error);
+    }
+  }
+
   /**
    * Load profitable wallets from database to monitor
    * Automatically includes discovered wallets + seeded KOLs
