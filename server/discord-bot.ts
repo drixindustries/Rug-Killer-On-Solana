@@ -1743,7 +1743,8 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     const text = message.content.trim();
     
     // Handle plain text commands for Android users (!scan or !execute)
-    const scanMatch = text.match(/^!(?:scan|execute)\s+([1-9A-HJ-NP-Za-km-z]{32,44})$/i);
+    // Support both "!scan ADDRESS" and "!scan\nADDRESS" (newline) formats
+    const scanMatch = text.match(/^!(?:scan|execute)[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
     if (scanMatch) {
       const tokenAddress = scanMatch[1];
       console.log(`[Discord !scan] User ${message.author.tag} scanning: ${tokenAddress}`);
