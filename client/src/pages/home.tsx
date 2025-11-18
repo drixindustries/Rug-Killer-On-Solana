@@ -327,32 +327,6 @@ export default function Home() {
                     Advanced Solana token security platform with 99%+ rug detection
                   </p>
                 </div>
-                
-                {/* Official Token - $ANTIRUG */}
-                <div className="flex flex-col items-center gap-3 pt-6">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-sm font-semibold text-muted-foreground">Official Token</span>
-                  </div>
-                  <div className="text-3xl font-bold text-primary mb-2">
-                    $ANTIRUG
-                  </div>
-                  <div className="text-xs text-muted-foreground mb-1">Contract Address (CA)</div>
-                  <div className="flex items-center gap-2 bg-muted/50 backdrop-blur-sm px-3 sm:px-4 py-2.5 rounded-lg max-w-full overflow-x-auto border border-border/50">
-                    <code className="font-mono text-xs sm:text-sm select-all break-all" data-testid="text-contract-address">
-                      {CONTRACT_ADDRESS}
-                    </code>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 shrink-0"
-                      onClick={() => copyToClipboard(CONTRACT_ADDRESS)}
-                      aria-label="Copy contract address"
-                      data-testid="button-copy-contract"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
                 </div>
               </div>
             )}
