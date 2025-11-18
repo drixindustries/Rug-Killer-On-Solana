@@ -132,7 +132,38 @@ function getShyftUrl(): string | undefined {
   return finalUrl;
 }
 
+// Build Helius API URL using API key
+function getHeliusUrl(): string | undefined {
+  const apiKey = getEnv('HELIUS_API_KEY')?.trim();
+  
+  console.log('[Helius Config] HELIUS_API_KEY present:', !!apiKey);
+  
+  if (!apiKey || apiKey.length === 0) {
+    console.log('[Helius Config] No Helius API key found');
+    return undefined;
+  }
+
+  // Strip quotes and whitespace
+  const cleaned = apiKey.replace(/^\"|\"$/g, '').trim();
+  
+  // Helius RPC endpoint format: https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
+  const finalUrl = `https://mainnet.helius-rpc.com/?api-key=${cleaned}`;
+  console.log('[Helius Config] Helius URL configured');
+  return finalUrl;
+}
+
 const RPC_PROVIDERS = [
+  // Helius Premium RPC (50% weight)
+  { 
+    getUrl: () => `${getHeliusUrl() || ""}`,
+    weight: 50, 
+    name: "Helius",
+    tier: "premium" as const,
+    requiresKey: true,
+    hasKey: () => !!getHeliusUrl(),
+    rateLimit: 1000,
+    rateLimitWindow: 60000
+  },
   // Ankr Premium RPC (PRIMARY - highest priority)
   { 
     getUrl: () => `${getAnkrUrl() || ""}`,

@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
+import { Header } from "@/components/header-new";
+import { Footer } from "@/components/footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -171,8 +173,11 @@ export default function Analytics() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-6 py-8 space-y-8">
+    <div className="min-h-screen flex flex-col bg-background">
+      <Header />
+      
+      <main className="flex-1">
+        <div className="container mx-auto px-6 py-8 space-y-8">
         {/* Page Header */}
         <div>
           <h1 className="text-4xl font-bold text-white mb-2" data-testid="text-analytics-title">
@@ -794,7 +799,10 @@ export default function Analytics() {
             </Card>
           </div>
         </div>
-      </div>
+        </div>
+      </main>
+
+      <Footer />
     </div>
   );
 }
