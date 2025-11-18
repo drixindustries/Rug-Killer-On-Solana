@@ -434,18 +434,6 @@ export default function Documentation() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-              <Button size="lg" asChild>
-                <a 
-                  href="https://drix.gitbook.io/rug-killer-on-solana" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center"
-                >
-                  <Code className="h-4 w-4 mr-2" />
-                  View GitBook Docs
-                </a>
-              </Button>
-              
               <PDFDownloadLink
                 document={<DocumentationPDF />}
                 fileName="solana-rug-killer-documentation.pdf"
