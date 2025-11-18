@@ -211,15 +211,17 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     funding = `🚨 **FUNDING ALERT**\n• Suspicious: ${fa.totalSuspiciousPercentage.toFixed(1)}%\n• Sources: ${breakdown}\n⚠️ High-risk funding detected`;
   }
   
-  // BUNDLE DETECTION
+  // BUNDLE DETECTION (Jito Bundle Analysis)
   let bundle: string | undefined;
   if (analysis.advancedBundleData && analysis.advancedBundleData.bundleScore >= 35) {
     const bd = analysis.advancedBundleData;
-    const bundleEmoji = bd.bundleScore >= 60 ? '🚨' : '⚠️';
+    const bundleEmoji = bd.bundleScore >= 60 ? '🚨📦' : '⚠️📦';
+    const websiteUrl = process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'https://rugkiller.app';
     bundle = `${bundleEmoji} **BUNDLE DETECTED**\n• Score: ${bd.bundleScore}/100\n• Bundled Supply: ${bd.bundledSupplyPercent.toFixed(1)}%\n• Suspicious Wallets: ${bd.suspiciousWallets.length}`;
     if (bd.earlyBuyCluster) {
-      bundle += `\n• Early Cluster: ${bd.earlyBuyCluster.walletCount} wallets in ${bd.earlyBuyCluster.avgTimingGapMs}ms`;
+      bundle += `\n• Early Cluster: ${bd.earlyBuyCluster.walletCount} wallets in ${bd.earlyBuyCluster.avgTimingGapMs}ms (Jito)`;
     }
+    bundle += `\n📊 [View Bundle Age Chart](${websiteUrl}/?analyze=${analysis.tokenAddress})`;
   }
   
   // NETWORK ANALYSIS
@@ -333,6 +335,8 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
       gradeStatus = 'CRITICAL';
     }
     
+    const websiteUrl = process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'https://rugkiller.app';
+    
     walletAges = `${gradeEmoji} **WALLET AGES** (${gradeStatus})\n`;
     walletAges += `• Safety Score: **${walletAgesScore}/100**\n`;
     walletAges += `• Aged Wallets: ${aw.agedWalletCount}\n`;
@@ -342,7 +346,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
       walletAges += `⚠️ **WARNING**: Token <30d old with aged wallets!\n`;
     }
     
-    walletAges += `🔗 [Detailed Analysis](https://solscan.io/token/${analysis.tokenAddress}#holders)`;
+    walletAges += `📦 [View Age Distribution Chart](${websiteUrl}/?analyze=${analysis.tokenAddress})`;
   }
   
   // GMGN DATA

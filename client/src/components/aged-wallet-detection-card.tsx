@@ -28,16 +28,46 @@ export function AgedWalletDetectionCard({ data }: AgedWalletDetectionCardProps) 
     return <Badge variant="destructive">Critical</Badge>;
   };
 
-  // Prepare pie chart data
-  const fakeVolumePercent = Math.min(data.totalFakeVolumePercent, 100);
-  const legitimateVolumePercent = Math.max(100 - fakeVolumePercent, 0);
-  
-  const pieData = [
-    { name: 'Fake Volume (Aged Wallets)', value: fakeVolumePercent, color: '#ef4444' },
-    { name: 'Legitimate Volume', value: legitimateVolumePercent, color: '#22c55e' },
-  ];
+  // Analyze wallet age distribution
+  const now = Date.now();
+  const walletAgeGroups = {
+    bundled: { count: 0, percentage: 0 }, // Jito bundle wallets (<400ms timing)
+    veryOld: { count: 0, percentage: 0 }, // >400 days (suspicious aged wallets)
+    old: { count: 0, percentage: 0 }, // 90-400 days
+    moderate: { count: 0, percentage: 0 }, // 30-90 days
+    new: { count: 0, percentage: 0 }, // <30 days (legitimate)
+  };
 
-  const COLORS = ['#ef4444', '#22c55e'];
+  // Categorize suspicious wallets by age
+  data.suspiciousWallets.forEach(wallet => {
+    const ageDays = wallet.walletAge;
+    if (ageDays > 400) {
+      walletAgeGroups.veryOld.count++;
+    } else if (ageDays > 90) {
+      walletAgeGroups.old.count++;
+    } else if (ageDays > 30) {
+      walletAgeGroups.moderate.count++;
+    } else {
+      walletAgeGroups.new.count++;
+    }
+  });
+
+  // Calculate percentages
+  const totalWallets = data.suspiciousWallets.length || 1;
+  Object.keys(walletAgeGroups).forEach(key => {
+    walletAgeGroups[key as keyof typeof walletAgeGroups].percentage = 
+      (walletAgeGroups[key as keyof typeof walletAgeGroups].count / totalWallets) * 100;
+  });
+
+  // Prepare enhanced pie chart data with age groups
+  const pieData = [
+    { name: 'Aged Wallets (>400d)', value: walletAgeGroups.veryOld.percentage, color: '#dc2626', count: walletAgeGroups.veryOld.count },
+    { name: 'Old Wallets (90-400d)', value: walletAgeGroups.old.percentage, color: '#f97316', count: walletAgeGroups.old.count },
+    { name: 'Moderate (30-90d)', value: walletAgeGroups.moderate.percentage, color: '#eab308', count: walletAgeGroups.moderate.count },
+    { name: 'New Wallets (<30d)', value: walletAgeGroups.new.percentage, color: '#22c55e', count: walletAgeGroups.new.count },
+  ].filter(item => item.value > 0);
+
+  const COLORS = ['#dc2626', '#f97316', '#eab308', '#22c55e'];
 
   return (
     <Card className="border-orange-500/20">
@@ -86,12 +116,12 @@ export function AgedWalletDetectionCard({ data }: AgedWalletDetectionCardProps) 
           </div>
         </div>
 
-        {/* Volume Distribution Pie Chart */}
-        {fakeVolumePercent > 0 && (
+        {/* Wallet Age Distribution Pie Chart */}
+        {data.suspiciousWallets.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm font-medium">
               <PieChartIcon className="w-4 h-4 text-orange-500" />
-              Volume Distribution
+              📦 Wallet Age Distribution (Bundle Analysis)
             </div>
             <div className="bg-muted/30 rounded-lg p-4">
               <ResponsiveContainer width="100%" height={200}>
@@ -101,13 +131,13 @@ export function AgedWalletDetectionCard({ data }: AgedWalletDetectionCardProps) 
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                    label={({ name, count, percent }) => `${name}: ${count} wallets (${(percent * 100).toFixed(1)}%)`}
                     outerRadius={60}
                     fill="#8884d8"
                     dataKey="value"
                   >
                     {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index]} />
+                      <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip 
@@ -116,7 +146,10 @@ export function AgedWalletDetectionCard({ data }: AgedWalletDetectionCardProps) 
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '6px'
                     }}
-                    formatter={(value: number) => `${value.toFixed(1)}%`}
+                    formatter={(value: number, name: string, props: any) => [
+                      `${props.payload.count} wallets (${value.toFixed(1)}%)`,
+                      name
+                    ]}
                   />
                   <Legend 
                     wrapperStyle={{ fontSize: '12px' }}
@@ -204,12 +237,12 @@ export function AgedWalletDetectionCard({ data }: AgedWalletDetectionCardProps) 
         {/* What This Means */}
         <div className={`p-3 rounded border ${safetyScore >= 80 ? 'bg-green-500/10 border-green-500/20' : 'bg-blue-500/10 border-blue-500/20'}`}>
           <div className={`text-sm font-medium mb-1 ${safetyScore >= 80 ? 'text-green-400' : 'text-blue-400'}`}>
-            {safetyScore >= 80 ? '✅ Good News:' : 'What This Means:'}
+            {safetyScore >= 80 ? '✅ Good News:' : '📦 What This Means:'}
           </div>
           <p className="text-xs text-muted-foreground">
             {safetyScore >= 80 
-              ? 'No aged wallet manipulation detected. The token\'s volume appears to be from legitimate traders with natural wallet ages.'
-              : 'Scammers create wallets months in advance, give them transaction history, then use them to buy their own token. This creates fake volume and tricks traders into thinking there\'s genuine interest. These aged wallets rarely sell.'
+              ? 'No aged wallet manipulation or bundle detected. The token\'s volume appears to be from legitimate traders with natural wallet ages.'
+              : 'Scammers create wallets months in advance, give them transaction history, then use Jito bundles (coordinated atomic transactions within 400ms) to buy their own token. This creates fake volume and tricks traders into thinking there\'s genuine interest. These aged wallets rarely sell.'
             }
           </p>
         </div>

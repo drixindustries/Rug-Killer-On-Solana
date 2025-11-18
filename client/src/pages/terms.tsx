@@ -359,7 +359,7 @@ export default function Terms() {
                 </p>
                 <ul className="space-y-2">
                   <li><strong>GitHub Issues:</strong> <a href="https://github.com/drixindustries/Rug-Killer-On-Solana/issues" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Report legal concerns</a></li>
-                  <li><strong>Discord:</strong> <a href="https://discord.gg/8xvBYhE9mK" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Join our community</a></li>
+                  <li><strong>Discord:</strong> <a href="https://discord.com/oauth2/authorize?client_id=1439815848628846654&permissions=3072&scope=bot%20applications.commands" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Add RugKillerAlphaBot</a></li>
                   <li><strong>Telegram:</strong> <a href="https://t.me/rugkilleralphabot" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Contact via bot</a></li>
                 </ul>
               </CardContent>

@@ -47,6 +47,7 @@ const AgedWalletDetectionCard = lazy(() => import("@/components/aged-wallet-dete
 const FundingAnalysisCard = lazy(() => import("@/components/funding-analysis-card").then(m => ({ default: m.FundingAnalysisCard })));
 const CondensedTokenHeader = lazy(() => import("@/components/condensed-token-header").then(m => ({ default: m.CondensedTokenHeader })));
 const CondensedAlerts = lazy(() => import("@/components/condensed-alerts").then(m => ({ default: m.CondensedAlerts })));
+const CascadingAnalysisBars = lazy(() => import("@/components/cascading-analysis-bars").then(m => ({ default: m.CascadingAnalysisBars })));
 
 // Loading fallback component for lazy-loaded components
 const ComponentLoader = () => <Skeleton className="h-48 w-full" />;
@@ -377,77 +378,31 @@ export default function Home() {
                 </TabsList>
 
                 <TabsContent value="analysis" className="space-y-6">
-                  {/* New Condensed Header - Like DeepNets */}
+                  {/* Token Header - Compact Info */}
                   <Suspense fallback={<ComponentLoader />}>
                     <CondensedTokenHeader analysis={analysis} />
                   </Suspense>
 
-                  {/* Condensed Critical Alerts */}
+                  {/* NEW: Cascading Analysis Bars - Primary Results */}
                   <Suspense fallback={<ComponentLoader />}>
-                    <CondensedAlerts redFlags={analysis.redFlags || []} />
+                    <CascadingAnalysisBars analysis={analysis} />
                   </Suspense>
 
-                  {/* Main Content Grid - Fixed Column Layout to Prevent Overlap */}
-                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-0">
-                    {/* Left Column - Detection Results (3/4 width) - Fixed positioning */}
-                    <div className="lg:col-span-3 space-y-4 min-w-0">
-                      
-                      {/* Advanced Detection Grid - Fixed 2-column layout */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-max">{/* Honeypot Detection */}
-                        {analysis.quillcheckData && (
-                          <Suspense fallback={<ComponentLoader />}>
-                            <HoneypotDetectionCard data={analysis.quillcheckData} />
-                          </Suspense>
-                        )}
-
-                        {/* Bundle Detection */}
-                        {analysis.advancedBundleData && (
-                          <Suspense fallback={<ComponentLoader />}>
-                            <BundleDetectionCard data={analysis.advancedBundleData} />
-                          </Suspense>
-                        )}
-
-                        {/* Whale Detection */}
-                        {analysis.whaleDetection && (
-                          <Suspense fallback={<ComponentLoader />}>
-                            <WhaleDetectionCard 
-                              data={analysis.whaleDetection} 
-                              symbol={analysis.metadata?.symbol || 'TOKEN'} 
-                            />
-                          </Suspense>
-                        )}
-
-                        {/* Network Analysis */}
-                        {analysis.networkAnalysis && (
-                          <Suspense fallback={<ComponentLoader />}>
-                            <NetworkAnalysisCard data={analysis.networkAnalysis} />
-                          </Suspense>
-                        )}
-                      </div>
-
-                      {/* Special Detection Results */}
+                  {/* Detailed Charts Section - Collapsible/Below Bars */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+                    {/* Left Column - Detailed Analysis */}
+                    <div className="lg:col-span-2 space-y-4">
+                      {/* Aged Wallet Chart */}
                       {analysis.agedWalletData && (
                         <Suspense fallback={<ComponentLoader />}>
                           <AgedWalletDetectionCard data={analysis.agedWalletData} />
                         </Suspense>
                       )}
 
+                      {/* Funding Analysis */}
                       {analysis.fundingAnalysis && (
                         <Suspense fallback={<ComponentLoader />}>
                           <FundingAnalysisCard fundingData={analysis.fundingAnalysis} />
-                        </Suspense>
-                      )}
-
-                      {/* LP Burn Information */}
-                      {analysis.liquidityPool?.burnPercentage !== undefined && (
-                        <Suspense fallback={<ComponentLoader />}>
-                          <LiquidityBurnCard
-                            burnPercentage={analysis.liquidityPool.burnPercentage}
-                            lpMintAddress={analysis.liquidityPool.lpMintAddress}
-                            lpReserve={analysis.liquidityPool.lpReserve}
-                            actualSupply={analysis.liquidityPool.actualSupply}
-                            isBurned={analysis.liquidityPool.isBurned ?? false}
-                          />
                         </Suspense>
                       )}
 
@@ -465,21 +420,21 @@ export default function Home() {
                           </Suspense>
                         </div>
                       )}
+
+                      {/* Holder Distribution Chart */}
+                      {analysis.topHolders && analysis.topHolders.length > 0 && (
+                        <Suspense fallback={<ComponentLoader />}>
+                          <HolderDistributionChart
+                            holders={analysis.topHolders}
+                            totalConcentration={analysis.topHolderConcentration || 0}
+                          />
+                        </Suspense>
+                      )}
                     </div>
                     
-                    {/* Right Column - FIXED STICKY Sidebar (1/4 width) - NO OVERLAP */}
-                    <div className="sticky top-4 self-start min-w-0 max-w-full">
-                      <div className="space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto pr-1">
-                      {/* Token Info Sidebar with copy-able addresses */}
-                      <Suspense fallback={<ComponentLoader />}>
-                        <TokenInfoSidebar
-                          tokenAddress={analysis.tokenAddress}
-                          mintAuthority={analysis.mintAuthority.hasAuthority ? analysis.mintAuthority.authorityAddress : null}
-                          freezeAuthority={analysis.freezeAuthority.hasAuthority ? analysis.freezeAuthority.authorityAddress : null}
-                          lpAddresses={analysis.liquidityPool?.lpAddresses || []}
-                        />
-                      </Suspense>
-
+                    {/* Right Column - Compact Sidebar */}
+                    <div className="space-y-4">
+                      {/* Token Metadata */}
                       <Suspense fallback={<ComponentLoader />}>
                         <TokenMetadataCard 
                           metadata={analysis.metadata}
@@ -487,29 +442,21 @@ export default function Home() {
                           creationDate={analysis.creationDate}
                         />
                       </Suspense>
-                      
+
+                      {/* Top Holders */}
+                      {analysis.topHolders && analysis.topHolders.length > 0 && (
+                        <Suspense fallback={<ComponentLoader />}>
+                          <TopHoldersTable 
+                            holders={analysis.topHolders}
+                            decimals={analysis.metadata?.decimals || 0}
+                          />
+                        </Suspense>
+                      )}
+
+                      {/* Recent Transactions */}
                       <Suspense fallback={<ComponentLoader />}>
                         <TransactionTimeline transactions={analysis.recentTransactions || []} />
                       </Suspense>
-                      
-                      {analysis.topHolders && analysis.topHolders.length > 0 && (
-                        <>
-                          <Suspense fallback={<ComponentLoader />}>
-                            <TopHoldersTable 
-                              holders={analysis.topHolders}
-                              decimals={analysis.metadata?.decimals || 0}
-                            />
-                          </Suspense>
-
-                          <Suspense fallback={<ComponentLoader />}>
-                            <HolderDistributionChart
-                              holders={analysis.topHolders}
-                              totalConcentration={analysis.topHolderConcentration || 0}
-                            />
-                          </Suspense>
-                        </>
-                      )}
-                      </div>
                     </div>
                   </div>
                 </TabsContent>
