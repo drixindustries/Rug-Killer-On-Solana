@@ -9,6 +9,8 @@ import { Progress } from "@/components/ui/progress";
 import { Copy, Download, AlertCircle, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { Header } from "@/components/header-new";
+import { Footer } from "@/components/footer";
 
 interface VanityEstimate {
   difficulty: number;
@@ -134,8 +136,10 @@ export default function VanityGenerator() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="min-h-screen flex flex-col bg-background">
+      <Header />
+      <main className="flex-1">
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="space-y-6">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -332,7 +336,8 @@ export default function VanityGenerator() {
             </Card>
           )}
         </div>
-      </div>
+      </main>
+      <Footer />
     </div>
   );
 }

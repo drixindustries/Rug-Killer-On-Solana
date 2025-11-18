@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { CheckCircle2, XCircle, Loader2, Zap, Users, Gift } from "lucide-react";
 import { useLocation } from "wouter";
+import { Header } from "@/components/header-new";
+import { Footer } from "@/components/footer";
 
 interface Subscription {
   id: string;
@@ -123,15 +125,21 @@ export default function SubscriptionPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" data-testid="loading-spinner" />
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" data-testid="loading-spinner" />
+        </main>
+        <Footer />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen flex flex-col bg-background">
+      <Header />
+      <main className="flex-1">
+        <div className="max-w-6xl mx-auto p-4 md:p-8">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4" data-testid="heading-subscription">
             Choose Your Plan
@@ -358,7 +366,8 @@ export default function SubscriptionPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </main>
+      <Footer />
     </div>
   );
 }
