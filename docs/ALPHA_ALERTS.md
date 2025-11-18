@@ -48,6 +48,14 @@ On Railway: open your service → Variables → add the same keys/values.
   - Telegram: supply `TELEGRAM_BOT_TOKEN` (or `ALPHA_TELEGRAM_BOT_TOKEN`) and `ALPHA_TELEGRAM_CHAT_ID`.
   - This bypasses the bots and posts straight to the webhook/chat.
 
+### Bot Relay Gating (to avoid duplicates)
+
+- Variable: `ALPHA_ALERTS_BOT_RELAY` (`true`|`false`, default: auto)
+- Behavior:
+  - If `ALPHA_ALERTS_DIRECT_SEND=true` and any of `ALPHA_DISCORD_WEBHOOK` or `ALPHA_TELEGRAM_CHAT_ID` is set, bot relay is automatically disabled to prevent duplicate alerts.
+  - Set `ALPHA_ALERTS_BOT_RELAY=true` to force relay via bots even when direct sends are active.
+  - Set `ALPHA_ALERTS_BOT_RELAY=false` to always disable bot relay.
+
 ## How it Works
 
 - Nansen feed: pulls smart money buy signals and emits `caller_signal` alerts.
