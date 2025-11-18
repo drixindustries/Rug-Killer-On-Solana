@@ -578,7 +578,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const bs58 = await import('bs58');
       
       const connection = new Connection(
-        process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
+        process.env.ANKR_RPC_URL || (process.env.ANKR_API_KEY ? `https://rpc.ankr.com/solana/${process.env.ANKR_API_KEY}` : null) || 'https://api.mainnet-beta.solana.com',
         'confirmed'
       );
 

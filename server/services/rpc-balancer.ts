@@ -27,7 +27,7 @@ function getEnv(key: string): string | undefined {
   return undefined;
 }
 
-// Build a valid Ankr Solana RPC URL from either a full URL or an API key
+// Build Ankr URL from env (PRIMARY RPC PROVIDER)
 function getAnkrUrl(): string | undefined {
   let raw = getEnv('ANKR_RPC_URL')?.trim();
   const apiKey = getEnv('ANKR_API_KEY')?.trim();
@@ -84,14 +84,13 @@ function getAnkrUrl(): string | undefined {
   }
 }
 
-// Build QuickNode URL from env (full endpoint URL)
+// Build QuickNode URL from env (DEPRECATED - Use Ankr instead)
 function getQuickNodeUrl(): string | undefined {
   const url = getEnv('QUICKNODE_RPC_URL')?.trim();
   
-  console.log('[QuickNode Config] QUICKNODE_RPC_URL present:', !!url);
+  console.log('[QuickNode Config] QUICKNODE_RPC_URL present (deprecated):', !!url);
   
   if (!url || url.length === 0) {
-    console.log('[QuickNode Config] No QuickNode URL found');
     return undefined;
   }
 
@@ -134,7 +133,18 @@ function getShyftUrl(): string | undefined {
 }
 
 const RPC_PROVIDERS = [
-  // QuickNode Premium RPC (highest priority if available)
+  // Ankr Premium RPC (PRIMARY - highest priority)
+  { 
+    getUrl: () => `${getAnkrUrl() || ""}`,
+    weight: 100, 
+    name: "Ankr-Premium",
+    tier: "premium" as const,
+    requiresKey: true,
+    hasKey: () => !!getAnkrUrl(),
+    rateLimit: 1500,
+    rateLimitWindow: 60000
+  },
+  // QuickNode Premium RPC (Secondary fallback)
   { 
     getUrl: () => `${getQuickNodeUrl() || ""}`,
     weight: 60, 
@@ -145,7 +155,7 @@ const RPC_PROVIDERS = [
     rateLimit: 1000,
     rateLimitWindow: 60000
   },
-  // Shyft Premium RPC
+  // Shyft Premium RPC (Tertiary fallback)
   { 
     getUrl: () => `${getShyftUrl() || ""}`,
     weight: 55, 
@@ -156,21 +166,10 @@ const RPC_PROVIDERS = [
     rateLimit: 500,
     rateLimitWindow: 60000
   },
-  // Ankr Premium RPC
-  { 
-    getUrl: () => `${getAnkrUrl() || ""}`,
-    weight: 50, 
-    name: "Ankr-Premium",
-    tier: "premium" as const,
-    requiresKey: true,
-    hasKey: () => !!getAnkrUrl(),
-    rateLimit: 500,
-    rateLimitWindow: 60000
-  },
-  // Fallback to public Solana RPC
+  // Fallback to public Solana RPC (Last resort)
   { 
     getUrl: () => "https://api.mainnet-beta.solana.com",
-    weight: 50, 
+    weight: 30, 
     name: "Solana-Public",
     tier: "fallback" as const,
     rateLimit: 40,

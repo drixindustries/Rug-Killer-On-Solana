@@ -20,13 +20,14 @@ class FastRPCService {
   private cooldowns: Map<number, number> = new Map();
 
   constructor() {
-    // Use multiple high-performance RPC endpoints
+    // Use Ankr (primary), Shyft, and Solana public RPC endpoints
+    const ankrUrl = process.env.ANKR_RPC_URL || (process.env.ANKR_API_KEY ? `https://rpc.ankr.com/solana/${process.env.ANKR_API_KEY}` : null);
+    const shyftUrl = process.env.SHYFT_KEY ? `https://rpc.shyft.to?api_key=${process.env.SHYFT_KEY}` : null;
+    
     const endpoints = [
-      process.env.QUICKNODE_RPC_URL || 'https://api.mainnet-beta.solana.com',
-      'https://solana-api.projectserum.com',
-      'https://rpc.ankr.com/solana',
-      'https://solana.drpc.org',
-      'https://solana.api.pocket.network/',
+      ankrUrl,
+      shyftUrl,
+      'https://api.mainnet-beta.solana.com',
     ].filter(Boolean);
     this.endpoints = endpoints as string[];
 
