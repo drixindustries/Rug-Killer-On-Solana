@@ -11,7 +11,7 @@
 import { getWalletDiscoveryService } from './services/wallet-discovery';
 import { getExternalWalletService } from './services/external-wallet-sources';
 import { db } from './db';
-import { kolWallets } from './shared/schema';
+import { kolWallets } from '../shared/schema';
 import { and, eq, or, lt, lte } from 'drizzle-orm';
 
 export class WalletDiscoveryScheduler {
