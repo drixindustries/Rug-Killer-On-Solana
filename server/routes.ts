@@ -2833,12 +2833,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   if (process.env.TELEGRAM_WEBHOOK_URL) {
     app.post('/telegram-webhook', async (req, res) => {
       try {
-        const { getTelegramWebhookHandler } = await import('./telegram-bot.ts');
-        const handler = getTelegramWebhookHandler();
-        return handler(req, res);
+        const { getTelegramBot } = await import('./telegram-bot.ts');
+        const bot = getTelegramBot();
+        
+        if (!bot) {
+          console.error('Telegram webhook called but bot not initialized');
+          return res.status(503).send('Bot not ready');
+        }
+        
+        // Handle the update manually
+        await bot.handleUpdate(req.body, res);
       } catch (error: any) {
         console.error('Telegram webhook error:', error);
-        res.status(500).send('Webhook handler not initialized');
+        res.status(500).send('Internal error');
       }
     });
     console.log('✅ Telegram webhook endpoint registered at /telegram-webhook');
