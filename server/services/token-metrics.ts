@@ -1,5 +1,6 @@
 import { tokenAnalyzer } from '../solana-analyzer.ts';
 import { streamMetrics } from './stream-metrics.ts';
+import { RugcheckService } from '../rugcheck-service.ts';
 
 export interface FullTokenMetrics {
   mint: string;
@@ -24,6 +25,8 @@ export interface FullTokenMetrics {
       url?: string;
     }> | null;
     poolSharePercentApprox: number | null;
+    lpBurnPercent?: number | null;
+    lpLockedUsd?: number | null;
   };
   market: {
     priceUsd: number | null;
@@ -52,9 +55,13 @@ export interface FullTokenMetrics {
 }
 
 export class TokenMetricsService {
+  private rug = new RugcheckService();
   async getFullMetrics(mint: string): Promise<FullTokenMetrics> {
-    const analysis = await tokenAnalyzer.analyzeToken(mint);
-    const stream = streamMetrics.getTokenSummary(mint);
+    const [analysis, stream, rug] = await Promise.all([
+      tokenAnalyzer.analyzeToken(mint),
+      Promise.resolve(streamMetrics.getTokenSummary(mint)),
+      this.rug.getTokenReport(mint).catch(() => null),
+    ]);
 
     const pair = (analysis as any)?.dexScreenerData?.pairs?.[0];
     const liqUsd = pair?.liquidity?.usd ?? null;
@@ -95,6 +102,16 @@ export class TokenMetricsService {
           url: p.url,
         })) || null,
         poolSharePercentApprox,
+        lpBurnPercent: (() => {
+          const lpVals = rug?.markets?.map((m: any) => m.lpBurn).filter((v: any) => typeof v === 'number');
+          if (!lpVals || lpVals.length === 0) return null;
+          return Math.max(...lpVals);
+        })(),
+        lpLockedUsd: (() => {
+          const liqVals = rug?.markets?.map((m: any) => m.liquidity).filter((v: any) => typeof v === 'number');
+          if (!liqVals || liqVals.length === 0) return null;
+          return Math.max(...liqVals);
+        })(),
       },
       market: {
         priceUsd: (analysis as any)?.marketData?.priceUsd ?? null,
@@ -114,7 +131,7 @@ export class TokenMetricsService {
         flags: (analysis as any)?.redFlags || [],
       },
       links,
-      sources: this.collectSources(analysis),
+      sources: this.collectSources(analysis, !!rug),
     };
   }
 
@@ -130,12 +147,13 @@ export class TokenMetricsService {
     return links;
   }
 
-  private collectSources(analysis: any): string[] {
+  private collectSources(analysis: any, hasRugcheck: boolean): string[] {
     const sources = new Set<string>();
     if (analysis?.dexScreenerData) sources.add('dexscreener');
     if (analysis?.holderCount !== undefined) sources.add('holders');
     if (analysis?.marketData) sources.add('market');
     if (analysis?.riskLevel) sources.add('risk');
+    if (hasRugcheck) sources.add('rugcheck');
     return Array.from(sources);
   }
 }
