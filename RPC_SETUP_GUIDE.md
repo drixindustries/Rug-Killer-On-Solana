@@ -6,12 +6,13 @@ Your RPC balancer is **already implemented and working**! The system automatical
 
 ## What's Currently Configured
 
-- ✅ **Ankr RPC** (PRIMARY) - Premium multichain endpoint (Weight: 100, Rate limit: 1500 req/min)
-- ✅ **Shyft RPC** (Secondary fallback) - High-speed RPC (Weight: 55, Rate limit: 500 req/min)
-- ✅ **Solana Public RPC** (Tertiary fallback) - Free public endpoint (Weight: 30, Rate limit: 40 req/min)
+- ✅ **QuickNode RPC** (PRIMARY) - Premium Solana RPC (Weight: 90, Rate limit: 1000 req/min)
+- ✅ **Shyft RPC** (Secondary) - High-speed RPC (Weight: 60, Rate limit: 500 req/min)
+- ✅ **Helius RPC** (Tertiary) - Premium RPC provider (Weight: 50, Rate limit: 1000 req/min)
+- ✅ **Solana Public RPC** (Fallback) - Free public endpoint (Weight: 30, Rate limit: 40 req/min)
 
 ### ⚠️ DEPRECATED PROVIDERS (DO NOT USE)
-- ❌ **Helius** - Causing 401 errors (removed from codebase)
+- ❌ **Ankr** - Multichain endpoint doesn't properly support Solana (removed from codebase)
 - ❌ **Alchemy** - Inconsistent for Solana (removed from codebase)
 - ❌ **Project Serum** - Deprecated/shutdown
 - ❌ **GenesysGo** - Deprecated/shutdown
@@ -20,31 +21,26 @@ Your RPC balancer is **already implemented and working**! The system automatical
 
 The balancer uses **weighted random selection** with health scoring:
 
-1. **Automatic Rotation**: Selects providers based on weight (Ankr gets selected most often as PRIMARY)
+1. **Automatic Rotation**: Selects providers based on weight and health scores
 2. **Health Monitoring**: Pings all providers every 20 seconds
-3. **Smart Failover**: If Ankr fails, automatically switches to Shyft → Public
+3. **Smart Failover**: Automatically switches to healthy providers
 4. **Auto-Recovery**: Providers automatically recover as health improves
 5. **Retry Logic**: 3 attempts with exponential backoff before giving up
 
 ## Get Free API Keys (5 minutes)
 
-### 1. Ankr (PRIMARY - Recommended) 🔥
+### 1. QuickNode (PRIMARY - Recommended) 🔥
 
-**Free Tier:** Generous rate limits perfect for production
+**Free Tier:** 50 million compute units/month
 
-1. Go to https://www.ankr.com/rpc/
+1. Go to https://www.quicknode.com/
 2. Sign up with email or GitHub
-3. Enable **"Advanced API"** checkbox
-4. Enable **"Solana mainnet"** under blockchain options
-5. Copy your API key (64-character string)
+3. Create a new endpoint → Select "Solana" → "Mainnet"
+4. Copy your HTTPS endpoint URL
 
 **Setup:**
 ```bash
-# Option 1: Just the API key (recommended - server constructs URL)
-ANKR_API_KEY=380a1e0b86b7763334f51e2b3d44fe3ea694299cc8f8b373cad0243eea4bd6ea
-
-# Option 2: Full URL format
-ANKR_RPC_URL=https://rpc.ankr.com/multichain/YOUR_API_KEY_HERE
+QUICKNODE_RPC_URL=https://your-endpoint.solana-mainnet.quiknode.pro/YOUR_API_KEY/
 ```
 
 ### 2. Shyft (SECONDARY - Optional but Recommended) 
@@ -67,22 +63,28 @@ SHYFT_KEY=your_shyft_api_key_here
 ### For Railway Deployment:
 
 ```powershell
-# Set Ankr (PRIMARY - required)
-railway variables --set ANKR_API_KEY=your_ankr_api_key_here
+# Set QuickNode (PRIMARY - recommended)
+railway variables --set QUICKNODE_RPC_URL=https://your-endpoint.solana-mainnet.quiknode.pro/YOUR_KEY/
 
 # Set Shyft (SECONDARY - recommended)
 railway variables --set SHYFT_KEY=your_shyft_api_key_here
+
+# Set Helius (TERTIARY - optional)
+railway variables --set HELIUS_API_KEY=your_helius_api_key_here
 ```
 
 ### For Local Development:
 
 Add to `server/.env`:
 ```bash
-# Ankr RPC (PRIMARY)
-ANKR_API_KEY=your_ankr_api_key_here
+# QuickNode RPC (PRIMARY)
+QUICKNODE_RPC_URL=https://your-endpoint.solana-mainnet.quiknode.pro/YOUR_KEY/
 
 # Shyft RPC (SECONDARY - optional)
 SHYFT_KEY=your_shyft_api_key_here
+
+# Helius RPC (TERTIARY - optional)
+HELIUS_API_KEY=your_helius_api_key_here
 
 # Solana Public RPC (automatically used as fallback, no key needed)
 ```
@@ -99,9 +101,9 @@ railway logs --tail 50 | Select-String "RPC"
 
 You should see:
 ```
-[RPC Balancer] Selected provider: Helius (score: 100)
-[RPC Balancer] Selected provider: Alchemy (score: 95)
-[RPC Balancer] Selected provider: Public (score: 100)
+[RPC Balancer] Selected QuickNode (premium) - score: 100
+[RPC Balancer] Selected Shyft (premium) - score: 95
+[RPC Balancer] Selected Solana-Public (fallback) - score: 100
 ```
 
 ## Current Behavior (Without API Keys)

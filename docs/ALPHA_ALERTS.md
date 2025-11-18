@@ -21,16 +21,16 @@ Recommended configuration (either provider works):
   - `ALPHA_WS_RPC`: WSS endpoint for WebSocket subscriptions
 - Helius (auto-fills HTTP+WS)
   - `HELIUS_API_KEY`: Your Helius API key
-- Ankr
-  - `ANKR_API_KEY` or `ANKR_RPC_URL`: HTTP
-  - Optionally `ANKR_WS_URL`; otherwise WS is derived automatically
+- QuickNode (premium Solana RPC)
+  - `QUICKNODE_RPC_URL`: HTTP endpoint
+  - Optionally `QUICKNODE_WS_URL`; otherwise WS is derived automatically
 
 Examples (PowerShell):
 
 ```powershell
 # Explicit HTTP + WS (recommended)
-railway variables --set ALPHA_HTTP_RPC=https://rpc.ankr.com/premium-http/solana_mainnet/<API_KEY>
-railway variables --set ALPHA_WS_RPC=wss://rpc.ankr.com/premium-ws/solana_mainnet/<API_KEY>
+railway variables --set ALPHA_HTTP_RPC=https://your-endpoint.solana-mainnet.quiknode.pro/YOUR_KEY/
+railway variables --set ALPHA_WS_RPC=wss://your-endpoint.solana-mainnet.quiknode.pro/YOUR_KEY/
 
 # Or use Helius (auto-config HTTP+WS)
 railway variables --set HELIUS_API_KEY=<YOUR_HELIUS_KEY>

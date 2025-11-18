@@ -1,6 +1,6 @@
 /**
  * Bot Command Testing Script
- * Tests all bot commands with a real pump.fun token to verify Ankr RPC integration
+ * Tests all bot commands with a real pump.fun token to verify RPC integration
  */
 
 import { tokenAnalyzer } from './server/solana-analyzer.ts';
@@ -9,7 +9,7 @@ import { rpcBalancer } from './server/services/rpc-balancer.ts';
 // Example pump.fun token (replace with current active token)
 const TEST_TOKEN = 'CzLSujWBLFsSjncfkh59rUFqvafWcY5tzedWJSuypump';
 
-console.log('🧪 Testing Bot Commands with Ankr RPC Integration\n');
+console.log('🧪 Testing Bot Commands with RPC Integration\n');
 console.log('=' .repeat(60));
 
 // Test 1: RPC Health Check
