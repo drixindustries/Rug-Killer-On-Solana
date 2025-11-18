@@ -425,9 +425,10 @@ export class AlphaAlertService {
       message = `🚨 **SMART MONEY BUY: ${alert.source}**\n\n${summaryLines.join('\n')}`;
     }
     
-    const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+    const DIRECT = process.env.ALPHA_ALERTS_DIRECT_SEND === 'true';
+    const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.ALPHA_TELEGRAM_BOT_TOKEN;
     const TELEGRAM_CHAT = process.env.ALPHA_TELEGRAM_CHAT_ID;
-    if (TELEGRAM_TOKEN && TELEGRAM_CHAT) {
+    if (DIRECT && TELEGRAM_TOKEN && TELEGRAM_CHAT) {
       try {
         const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
         await fetch(url, {
@@ -550,8 +551,9 @@ export class AlphaAlertService {
       `✅ Quality filters active (RugCheck > 85, No honeypots, Liquidity > $5K)\n\n` +
       `Contract: \`2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt\``;
     
+    const DIRECT = process.env.ALPHA_ALERTS_DIRECT_SEND === 'true';
     const DISCORD_WEBHOOK = process.env.ALPHA_DISCORD_WEBHOOK;
-    if (DISCORD_WEBHOOK) {
+    if (DIRECT && DISCORD_WEBHOOK) {
       try {
         await fetch(DISCORD_WEBHOOK, {
           method: 'POST',
@@ -566,9 +568,9 @@ export class AlphaAlertService {
       }
     }
 
-    const TELEGRAM_TOKEN = process.env.ALPHA_TELEGRAM_BOT_TOKEN;
+    const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.ALPHA_TELEGRAM_BOT_TOKEN;
     const TELEGRAM_CHAT = process.env.ALPHA_TELEGRAM_CHAT_ID;
-    if (TELEGRAM_TOKEN && TELEGRAM_CHAT) {
+    if (DIRECT && TELEGRAM_TOKEN && TELEGRAM_CHAT) {
       try {
         const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
         await fetch(url, {
