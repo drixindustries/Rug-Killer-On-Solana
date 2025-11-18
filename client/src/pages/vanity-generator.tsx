@@ -336,6 +336,8 @@ export default function VanityGenerator() {
             </Card>
           )}
         </div>
+        {/* Close page container */}
+        </div>
       </main>
       <Footer />
     </div>
