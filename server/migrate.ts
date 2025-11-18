@@ -1,8 +1,12 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const { Pool } = pg;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function runMigration() {
   if (!process.env.DATABASE_URL) {
@@ -20,10 +24,22 @@ async function runMigration() {
   const db = drizzle(pool);
 
   try {
-    // Import and push schema using drizzle-kit programmatically
-    const { sql } = await import("drizzle-orm");
+    // Read and execute SQL migration files
+    const migrationsDir = path.join(__dirname, "..", "migrations");
+    const migrationFiles = fs.readdirSync(migrationsDir)
+      .filter(file => file.endsWith(".sql"))
+      .sort();
     
-    console.log("✅ Database schema is ready");
+    console.log(`📁 Found ${migrationFiles.length} migration files`);
+    
+    for (const file of migrationFiles) {
+      console.log(`⚙️  Running migration: ${file}`);
+      const sqlContent = fs.readFileSync(path.join(migrationsDir, file), "utf-8");
+      await pool.query(sqlContent);
+      console.log(`✅ Completed: ${file}`);
+    }
+    
+    console.log("✅ All migrations completed successfully");
     await pool.end();
     process.exit(0);
   } catch (error) {
