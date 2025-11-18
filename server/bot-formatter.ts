@@ -101,7 +101,14 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   const riskScore = `🎯 **Risk Score:** ${analysis.riskScore}/100 (${analysis.riskLevel})\n_0 = Do Not Buy • 100 = Strong Buy_`;
   
   // SECURITY
+  const mintStatus = analysis.mintAuthority?.hasAuthority ? '❌ Active' : '✅ Revoked';
   const freezeStatus = analysis.freezeAuthority?.hasAuthority ? '❌ Active' : '✅ Revoked';
+  
+  // LP BURN
+  const burnPercent = analysis.liquidityPool?.burnPercentage ?? 0;
+  const burnEmoji = burnPercent > 95 ? '🔥' : burnPercent > 50 ? '⚠️' : '❌';
+  const burnText = `${burnPercent.toFixed(1)}%`;
+  
   const security = `🔐 **Security**\n• Mint: ${mintStatus}\n• Freeze: ${freezeStatus}\n• LP Burn: ${burnEmoji} ${burnText}`;
   
   // HOLDERS
