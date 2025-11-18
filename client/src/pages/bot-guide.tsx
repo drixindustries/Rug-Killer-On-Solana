@@ -588,7 +588,6 @@ export default function BotGuide() {
     </div>
   );
 }
-                    <Badge variant="secondary">Welcome</Badge>
                   </div>
                   <CardDescription>Display welcome message and available commands</CardDescription>
                 </CardHeader>
