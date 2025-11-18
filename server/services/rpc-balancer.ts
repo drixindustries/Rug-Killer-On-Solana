@@ -27,68 +27,11 @@ function getEnv(key: string): string | undefined {
   return undefined;
 }
 
-// Build Ankr URL from env (PRIMARY RPC PROVIDER)
-function getAnkrUrl(): string | undefined {
-  let raw = getEnv('ANKR_RPC_URL')?.trim();
-  const apiKey = getEnv('ANKR_API_KEY')?.trim();
-
-  console.log('[Ankr Config] ANKR_RPC_URL present:', !!raw);
-  console.log('[Ankr Config] ANKR_API_KEY present:', !!apiKey);
-
-  // If only API key is provided or URL missing, construct the URL
-  if ((!raw || raw.length === 0) && apiKey) {
-    raw = `https://rpc.ankr.com/multichain/${apiKey.replace(/^\"|\"$/g, '')}`;
-    console.log('[Ankr Config] Constructed URL from API key');
-  }
-
-  if (!raw) {
-    console.log('[Ankr Config] No Ankr credentials found');
-    return undefined;
-  }
-
-  // Strip accidental quotes and whitespace
-  const cleaned = raw.replace(/^\"|\"$/g, '').trim();
-
-  // If it looks like just a key, construct URL
-  if (!cleaned.startsWith('http')) {
-    return `https://rpc.ankr.com/multichain/${cleaned}`;
-  }
-
-  // Validate URL format and ensure https scheme
-  try {
-    const u = new URL(cleaned);
-    if (u.protocol !== 'https:') {
-      u.protocol = 'https:';
-    }
-
-    // If user pasted a multichain URL, it's already correct
-    if (u.hostname.endsWith('rpc.ankr.com') && u.pathname.startsWith('/multichain/')) {
-      const parts = u.pathname.split('/').filter(Boolean);
-      const last = parts[parts.length - 1];
-      if (last && last.length > 16) {
-        // Already in correct format
-        return u.toString();
-      } else if (apiKey) {
-        u.pathname = `/solana/${apiKey.replace(/^\"|\"$/g, '')}`;
-      } else {
-        // If we cannot confidently extract a key, fail to undefined
-        return undefined;
-      }
-    }
-    const finalUrl = u.toString();
-    console.log('[Ankr Config] Final Ankr URL configured:', finalUrl.substring(0, 40) + '...');
-    return finalUrl;
-  } catch (err) {
-    console.error('[Ankr Config] Error parsing Ankr URL:', err);
-    return undefined;
-  }
-}
-
-// Build QuickNode URL from env (DEPRECATED - Use Ankr instead)
+// Build QuickNode URL from env (PRIMARY RPC PROVIDER)
 function getQuickNodeUrl(): string | undefined {
   const url = getEnv('QUICKNODE_RPC_URL')?.trim();
   
-  console.log('[QuickNode Config] QUICKNODE_RPC_URL present (deprecated):', !!url);
+  console.log('[QuickNode Config] QUICKNODE_RPC_URL present:', !!url);
   
   if (!url || url.length === 0) {
     return undefined;
@@ -153,7 +96,29 @@ function getHeliusUrl(): string | undefined {
 }
 
 const RPC_PROVIDERS = [
-  // Helius Premium RPC (50% weight)
+  // QuickNode Premium RPC (PRIMARY - 90% weight)
+  { 
+    getUrl: () => `${getQuickNodeUrl() || ""}`,
+    weight: 90, 
+    name: "QuickNode",
+    tier: "premium" as const,
+    requiresKey: true,
+    hasKey: () => !!getQuickNodeUrl(),
+    rateLimit: 1000,
+    rateLimitWindow: 60000
+  },
+  // Shyft Premium RPC (Secondary - 60% weight)
+  { 
+    getUrl: () => `${getShyftUrl() || ""}`,
+    weight: 60, 
+    name: "Shyft",
+    tier: "premium" as const,
+    requiresKey: true,
+    hasKey: () => !!getShyftUrl(),
+    rateLimit: 500,
+    rateLimitWindow: 60000
+  },
+  // Helius Premium RPC (Tertiary - 50% weight)
   { 
     getUrl: () => `${getHeliusUrl() || ""}`,
     weight: 50, 
@@ -162,39 +127,6 @@ const RPC_PROVIDERS = [
     requiresKey: true,
     hasKey: () => !!getHeliusUrl(),
     rateLimit: 1000,
-    rateLimitWindow: 60000
-  },
-  // Ankr Premium RPC (PRIMARY - highest priority)
-  { 
-    getUrl: () => `${getAnkrUrl() || ""}`,
-    weight: 100, 
-    name: "Ankr-Premium",
-    tier: "premium" as const,
-    requiresKey: true,
-    hasKey: () => !!getAnkrUrl(),
-    rateLimit: 1500,
-    rateLimitWindow: 60000
-  },
-  // QuickNode Premium RPC (Secondary fallback)
-  { 
-    getUrl: () => `${getQuickNodeUrl() || ""}`,
-    weight: 60, 
-    name: "QuickNode",
-    tier: "premium" as const,
-    requiresKey: true,
-    hasKey: () => !!getQuickNodeUrl(),
-    rateLimit: 1000,
-    rateLimitWindow: 60000
-  },
-  // Shyft Premium RPC (Tertiary fallback)
-  { 
-    getUrl: () => `${getShyftUrl() || ""}`,
-    weight: 55, 
-    name: "Shyft",
-    tier: "premium" as const,
-    requiresKey: true,
-    hasKey: () => !!getShyftUrl(),
-    rateLimit: 500,
     rateLimitWindow: 60000
   },
   // Fallback to public Solana RPC (Last resort)
