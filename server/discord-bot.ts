@@ -1792,18 +1792,47 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       return;
     }
     
-    // Handle $symbol mentions using cached address (based on prior analyses)
+    // Handle $symbol mentions (cashtag injection like Rick bot)
+    // Triggers on messages like "$ZKSL is moving" or "$BONK to the moon"
     const symbolMatch = text.match(/\$([A-Za-z0-9]{2,15})/);
     if (symbolMatch) {
-      const sym = symbolMatch[1];
-      const resolved = nameCache.resolve(sym);
-      if (resolved) {
-        const throttleKey = `${message.channelId}:${sym.toLowerCase()}`;
-        const now = Date.now();
-        const last = lastResponded.get(throttleKey) || 0;
-        if (now - last < 15_000) {
-          return; // prevent spam within 15s for same symbol in channel
+      const sym = symbolMatch[1].toUpperCase();
+      
+      // Throttle to prevent spam (15 seconds per symbol per channel)
+      const throttleKey = `${message.channelId}:${sym.toLowerCase()}`;
+      const now = Date.now();
+      const last = lastResponded.get(throttleKey) || 0;
+      if (now - last < 15_000) {
+        return; // prevent spam within 15s for same symbol in channel
+      }
+      
+      // Try to resolve from cache first
+      let resolved = nameCache.resolve(sym);
+      
+      // If not cached, search DexScreener for the symbol
+      if (!resolved) {
+        try {
+          const searchUrl = `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(sym)}`;
+          const searchRes = await fetch(searchUrl, { signal: AbortSignal.timeout(5000) });
+          if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            const solanaPair = searchData.pairs?.find((p: any) => 
+              p.chainId === 'solana' && 
+              (p.baseToken?.symbol?.toLowerCase() === sym.toLowerCase() ||
+               p.quoteToken?.symbol?.toLowerCase() === sym.toLowerCase())
+            );
+            if (solanaPair) {
+              resolved = solanaPair.baseToken.symbol.toLowerCase() === sym.toLowerCase() 
+                ? solanaPair.baseToken.address 
+                : solanaPair.quoteToken.address;
+            }
+          }
+        } catch (searchErr) {
+          // Silently fail search - just won't respond to uncached symbols
         }
+      }
+      
+      if (resolved) {
         lastResponded.set(throttleKey, now);
         try {
           await message.channel.sendTyping();
@@ -1813,13 +1842,11 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           await message.reply({ embeds: [embed] });
           return;
         } catch (err) {
-          await message.reply(`Could not fetch analysis for $${sym}. Try using /execute with the contract address.`);
+          // Silently fail - don't spam errors for cashtag mentions
           return;
         }
-      } else {
-        await message.reply(`I don't recognize $${sym} yet. Run /execute with its contract address once, then you can use $${sym}.`);
-        return;
       }
+      // If symbol not found, silently ignore (don't spam "not recognized" messages)
     }
 
     // Check if it's a Solana address (base58, 32-44 chars, no spaces)
