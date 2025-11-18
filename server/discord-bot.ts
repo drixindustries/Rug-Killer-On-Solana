@@ -1423,7 +1423,15 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         await interaction.reply({ embeds: [embed], ephemeral: true });
       } else if (interaction.commandName === 'chart') {
         const tokenAddress = interaction.options.getString('address', true);
-        await interaction.reply({ content: `📈 Chart links for \`${formatAddress(tokenAddress)}\`\n• DexScreener: https://dexscreener.com/solana/${tokenAddress}\n• GMGN: https://gmgn.ai/sol/token/${tokenAddress}`, ephemeral: false });
+        const embed = new EmbedBuilder()
+          .setColor(0x1abc9c)
+          .setTitle('📈 Price Chart')
+          .setURL(`https://dexscreener.com/solana/${tokenAddress}`)
+          .setDescription(`[View on DexScreener](https://dexscreener.com/solana/${tokenAddress})`)
+          .setImage(`https://dd.dexscreener.com/ds-data/tokens/solana/${tokenAddress}.png?size=lg&t=${Date.now()}`)
+          .setFooter({ text: `Token: ${formatAddress(tokenAddress)}` })
+          .setTimestamp();
+        await interaction.reply({ embeds: [embed], ephemeral: false });
       } else if (interaction.commandName === 'smartwallet') {
         const sc = interaction.options.getSubcommand();
         const member = interaction.member as any;
