@@ -1864,7 +1864,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           .addFields(
             { name: '📊 GMGN.ai', value: `[View on GMGN](https://gmgn.ai/sol/token/${text})`, inline: true },
             { name: '🎯 Padre', value: `[View on Padre](https://padre.fun/token/${text})`, inline: true },
-            { name: '📈 Axiom', value: `[View on Axiom](https://axiom.trade/token/${text})`, inline: true },
+            { name: '📈 Axiom', value: `[View on Axiom](https://axiom.trade/sol/token/${text})`, inline: true },
             { name: '🔍 Solscan', value: `[View on Solscan](https://solscan.io/token/${text})`, inline: true }
           )
           .setFooter({ text: `💡 Use /execute ${text.slice(0, 8)}... or !scan ${text.slice(0, 8)}... for full rug analysis` })
