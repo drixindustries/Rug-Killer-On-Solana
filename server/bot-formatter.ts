@@ -117,11 +117,18 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   
   const security = `🔐 **Security**\n• Mint: ${mintStatus}\n• Freeze: ${freezeStatus}\n• LP Burn: ${burnEmoji} ${burnText}`;
   
-  // HOLDERS
+  // HOLDERS (with shareable links)
   const holderCount = analysis.holderCount ?? 0;
   const topHolderConc = analysis.topHolderConcentration ?? 0;
   const supply = analysis.metadata?.supply ?? 0;
-  const holders = `👥 **Holders**\n• Total: ${holderCount}\n• Top 10: ${topHolderConc.toFixed(1)}%\n• Supply: ${formatNumber(supply)}`;
+  
+  // Get deployment URL from environment (Railway provides PUBLIC_URL or RAILWAY_PUBLIC_DOMAIN)
+  const baseUrl = process.env.PUBLIC_URL || 
+                  (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '') ||
+                  'https://rugkiller.app';
+  
+  const holderCountText = holderCount > 0 ? `${holderCount}` : '0 (fetching...)';
+  const holders = `👥 **Holders**\n• Total: ${holderCountText}\n• Top 10: ${topHolderConc.toFixed(1)}%\n• Supply: ${formatNumber(supply)}\n• [View Top 20](${baseUrl}/api/holders/${analysis.tokenAddress}/top20)\n• [View All Holders](${baseUrl}/api/holders/${analysis.tokenAddress})`;
   
   // MARKET DATA
   let market: string | undefined;

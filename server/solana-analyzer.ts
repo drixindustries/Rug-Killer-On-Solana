@@ -18,6 +18,7 @@ import type {
 import { DexScreenerService } from "./dexscreener-service.ts";
 import { rpcBalancer } from "./services/rpc-balancer.ts";
 import { checkPumpFun } from "./services/pumpfun-api.ts";
+import { holderAnalysis } from "./services/holder-analysis.ts";
 
 export class SolanaTokenAnalyzer {
   private dexScreener: DexScreenerService;
@@ -42,16 +43,18 @@ export class SolanaTokenAnalyzer {
         throw new Error("Invalid token address format");
       }
 
-      // Fetch data in parallel - DexScreener, on-chain data, and pump.fun check
-      const [dexData, onChainData, creationDateData, pumpFunData] = await Promise.allSettled([
+      // Fetch data in parallel - DexScreener, on-chain data, holder analysis, and pump.fun check
+      const [dexData, onChainData, holderData, creationDateData, pumpFunData] = await Promise.allSettled([
         options.skipExternal ? null : this.dexScreener.getTokenData(tokenMintAddress),
         options.skipOnChain ? null : this.getOnChainData(tokenAddress),
+        options.skipExternal ? null : holderAnalysis.analyzeHolders(tokenMintAddress),
         options.skipOnChain ? null : this.getTokenCreationDate(tokenAddress),
         options.skipExternal ? null : checkPumpFun(tokenMintAddress),
       ]);
 
       const dex = dexData.status === 'fulfilled' ? dexData.value : null;
       const onChain = onChainData.status === 'fulfilled' ? onChainData.value : null;
+      const holders = holderData.status === 'fulfilled' ? holderData.value : null;
       const creationDate = creationDateData.status === 'fulfilled' ? creationDateData.value : undefined;
       const pumpFun = pumpFunData.status === 'fulfilled' ? pumpFunData.value : null;
 
@@ -84,10 +87,14 @@ export class SolanaTokenAnalyzer {
           isMutable: false,
         },
         
-        // Holder analysis
-        holderCount: onChain?.holderCount || 0,
-        topHolders: onChain?.topHolders || [],
-        topHolderConcentration: onChain?.top10Concentration || 0,
+        // Holder analysis - now using comprehensive holder service
+        holderCount: holders?.holderCount || 0,
+        topHolders: holders?.top20Holders?.map(h => ({
+          address: h.address,
+          balance: h.balance,
+          percentage: h.percentage,
+        })) || [],
+        topHolderConcentration: holders?.topHolderConcentration || 0,
         holderFiltering: {
           totals: {
             lp: 0,
@@ -302,75 +309,8 @@ export class SolanaTokenAnalyzer {
         TOKEN_2022_PROGRAM_ID
       ));
 
-      // Fetch holder data using getTokenLargestAccounts
-      // Note: This requires index RPC methods - Shyft free plan doesn't support it
-      let holderCount = null;
-      let top10Concentration = null;
-      let topHolders: any[] = [];
-
-      try {
-        // Try to get holder data - will fail on Shyft free plan
-        const largestAccounts = await connection.getTokenLargestAccounts(tokenAddress, 'confirmed');
-        const validAccounts = largestAccounts.value.filter(acc => Number(acc.amount) > 0);
-        
-        holderCount = validAccounts.length;
-        
-        if (validAccounts.length > 0) {
-          const totalSupply = Number(mintInfo.supply);
-          let top10Supply = 0;
-          
-          validAccounts.slice(0, 10).forEach(acc => {
-            const amount = Number(acc.amount) / Math.pow(10, mintInfo.decimals);
-            top10Supply += Number(acc.amount);
-            topHolders.push({
-              address: acc.address.toBase58(),
-              balance: amount,
-              percentage: (Number(acc.amount) / totalSupply) * 100
-            });
-          });
-          
-          top10Concentration = (top10Supply / totalSupply) * 100;
-        }
-      } catch (holderError: any) {
-        // If index methods not supported, try with a different connection
-        if (holderError.message?.includes('IndexNotAllowedOnFreePlan') || holderError.message?.includes('403')) {
-          try {
-            // Fallback to public Solana RPC for holder data
-            const fallbackConnection = new (await import('@solana/web3.js')).Connection(
-              'https://api.mainnet-beta.solana.com',
-              'confirmed'
-            );
-            const largestAccounts = await fallbackConnection.getTokenLargestAccounts(tokenAddress, 'confirmed');
-            const validAccounts = largestAccounts.value.filter(acc => Number(acc.amount) > 0);
-            
-            holderCount = validAccounts.length;
-            
-            if (validAccounts.length > 0) {
-              const totalSupply = Number(mintInfo.supply);
-              let top10Supply = 0;
-              
-              validAccounts.slice(0, 10).forEach(acc => {
-                const amount = Number(acc.amount) / Math.pow(10, mintInfo.decimals);
-                top10Supply += Number(acc.amount);
-                topHolders.push({
-                  address: acc.address.toBase58(),
-                  balance: amount,
-                  percentage: (Number(acc.amount) / totalSupply) * 100
-                });
-              });
-              
-              top10Concentration = (top10Supply / totalSupply) * 100;
-            }
-            console.log(`✅ [Analyzer] Used fallback RPC for holder data`);
-          } catch (fallbackError: any) {
-            console.warn(`⚠️ [Analyzer] Fallback holder fetch also failed:`, fallbackError.message);
-            // Continue with null holder data
-          }
-        } else {
-          console.warn(`⚠️ [Analyzer] Holder data fetch failed:`, holderError.message);
-        }
-      }
-
+      // Holder data is now fetched via HolderAnalysisService in parallel
+      // This method only handles mint metadata and authorities
       return {
         decimals: mintInfo.decimals,
         supply: Number(mintInfo.supply) / Math.pow(10, mintInfo.decimals),
@@ -381,9 +321,6 @@ export class SolanaTokenAnalyzer {
           freezeDisabled: !mintInfo.freezeAuthority,
         },
         metadata: null,
-        holderCount,
-        top10Concentration,
-        topHolders,
       };
     } catch (error: any) {
       console.warn(`⚠️ [Analyzer] On-chain data fetch failed:`, error.message);

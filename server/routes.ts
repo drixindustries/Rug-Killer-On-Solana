@@ -17,6 +17,7 @@ import { VanityAddressGenerator } from "./vanity-generator.ts";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import { rpcBalancer } from "./services/rpc-balancer.ts";
+import { holderAnalysis } from "./services/holder-analysis.ts";
 
 // Stub authentication for Railway deployment (no Replit OIDC)
 const setupAuth = async (app: Express) => {
@@ -1140,6 +1141,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error getting top flagged wallets:", error);
       res.status(500).json({ message: "Error getting top flagged wallets: " + error.message });
+    }
+  });
+  
+  // ============================================================================
+  // HOLDER ANALYSIS ROUTES
+  // ============================================================================
+  
+  // GET /api/holders/:tokenAddress - Get comprehensive holder analysis
+  app.get('/api/holders/:tokenAddress', async (req, res) => {
+    try {
+      const { tokenAddress } = req.params;
+      
+      if (!tokenAddress || tokenAddress.length < 32) {
+        return res.status(400).json({ error: 'Invalid token address' });
+      }
+
+      const analysis = await holderAnalysis.analyzeHolders(tokenAddress);
+      
+      res.json({
+        success: true,
+        data: {
+          tokenAddress: analysis.tokenAddress,
+          holderCount: analysis.holderCount,
+          topHolderConcentration: analysis.topHolderConcentration,
+          exchangeHolderCount: analysis.exchangeHolderCount,
+          exchangeSupplyPercent: analysis.exchangeSupplyPercent,
+          lpSupplyPercent: analysis.lpSupplyPercent,
+          top20Holders: analysis.top20Holders,
+          source: analysis.source,
+          cachedAt: analysis.cachedAt,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error fetching holder data:', error);
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to fetch holder data',
+        message: error.message,
+      });
+    }
+  });
+  
+  // GET /api/holders/:tokenAddress/top20 - Get top 20 holders with details
+  app.get('/api/holders/:tokenAddress/top20', async (req, res) => {
+    try {
+      const { tokenAddress } = req.params;
+      
+      if (!tokenAddress || tokenAddress.length < 32) {
+        return res.status(400).json({ error: 'Invalid token address' });
+      }
+
+      const analysis = await holderAnalysis.analyzeHolders(tokenAddress);
+      
+      res.json({
+        success: true,
+        data: {
+          tokenAddress: analysis.tokenAddress,
+          topHolderConcentration: analysis.topHolderConcentration,
+          top20Holders: analysis.top20Holders.map((holder, index) => ({
+            rank: index + 1,
+            address: holder.address,
+            balance: holder.balance,
+            percentage: holder.percentage,
+            label: holder.label,
+            flags: {
+              isExchange: holder.isExchange || false,
+              isLP: holder.isLP || false,
+              isCreator: holder.isCreator || false,
+              isBundled: holder.isBundled || false,
+              isSniper: holder.isSniper || false,
+              isInsider: holder.isInsider || false,
+            },
+          })),
+          source: analysis.source,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error fetching top 20 holders:', error);
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to fetch top 20 holders',
+        message: error.message,
+      });
+    }
+  });
+  
+  // GET /api/holders/:tokenAddress/summary - Quick holder summary (used by bots)
+  app.get('/api/holders/:tokenAddress/summary', async (req, res) => {
+    try {
+      const { tokenAddress } = req.params;
+      
+      if (!tokenAddress || tokenAddress.length < 32) {
+        return res.status(400).json({ error: 'Invalid token address' });
+      }
+
+      const summary = await holderAnalysis.getQuickSummary(tokenAddress);
+      
+      res.json({
+        success: true,
+        data: summary,
+      });
+    } catch (error: any) {
+      console.error('Error fetching holder summary:', error);
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to fetch holder summary',
+        message: error.message,
+      });
     }
   });
   
