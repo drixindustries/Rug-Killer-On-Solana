@@ -336,6 +336,7 @@ const commands = [
     .addSubcommand(sc => sc.setName('status').setDescription('Show alpha service status'))
     .addSubcommand(sc => sc.setName('start').setDescription('Start alpha monitoring'))
     .addSubcommand(sc => sc.setName('stop').setDescription('Stop alpha monitoring'))
+    .addSubcommand(sc => sc.setName('debug').setDescription('Show admin detection and permission info (ephemeral)'))
     .addSubcommand(sc => sc.setName('setchannel')
       .setDescription('Set this server\'s alpha alert channel')
       .addChannelOption(o => o
@@ -1313,7 +1314,9 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       } else if (interaction.commandName === 'alpha') {
         const sub = interaction.options.getSubcommand(true);
         const alpha = getAlphaAlertService();
-        if (!canAdmin('alpha')) {
+        // Allow debug subcommand even if admin check fails, so user can see diagnostics
+        const isDebug = sub === 'debug';
+        if (!isDebug && !canAdmin('alpha')) {
           await interaction.reply({ content: '⛔ Admins only.', ephemeral: true });
           return;
         }
@@ -1327,6 +1330,20 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         } else if (sub === 'stop') {
           await alpha.stop();
           await interaction.editReply({ content: '🛑 Alpha monitoring stopped.' });
+        } else if (sub === 'debug') {
+          const envMap = Object.fromEntries(
+            Array.from(adminAllowlist.values()).map(v => [v, true])
+          );
+          const lines = [
+            `userId: ${interaction.user.id}`,
+            `guildId: ${interaction.guildId || 'DM'}`,
+            `hasGuildPerms: ${hasGuildPerms}`,
+            `isAdminEnv: ${isAdminEnv}`,
+            `adminAllowlistSize: ${adminAllowlist.size}`,
+            `inAllowlist: ${adminAllowlist.has(interaction.user.id)}`,
+            `relayDisabled: ${process.env.ALPHA_ALERTS_DIRECT_SEND === 'true'}`
+          ];
+          await interaction.editReply({ content: 'Alpha Debug:\n' + lines.join('\n') });
         } else if (sub === 'setchannel') {
           if (!interaction.guildId) {
             await interaction.editReply({ content: '❌ This command must be used in a server.' });
