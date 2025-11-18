@@ -358,10 +358,9 @@ export default function Terms() {
                   If you have any questions about these Terms of Service, please contact us:
                 </p>
                 <ul className="space-y-2">
-                  <li><strong>Email:</strong> legal@yourwebsite.com</li>
-                  <li><strong>Discord:</strong> Join our community server</li>
-                  <li><strong>Telegram:</strong> Contact via our bot</li>
-                  <li><strong>GitHub:</strong> https://github.com/drixindustries/Rug-Killer-On-Solana</li>
+                  <li><strong>GitHub Issues:</strong> <a href="https://github.com/drixindustries/Rug-Killer-On-Solana/issues" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Report legal concerns</a></li>
+                  <li><strong>Discord:</strong> <a href="https://discord.gg/8xvBYhE9mK" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Join our community</a></li>
+                  <li><strong>Telegram:</strong> <a href="https://t.me/rugkilleralphabot" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Contact via bot</a></li>
                 </ul>
               </CardContent>
             </Card>

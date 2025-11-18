@@ -204,7 +204,7 @@ export default function Privacy() {
 
                 <h3 className="font-semibold text-foreground mt-4">7.4 How to Exercise Your Rights</h3>
                 <p>
-                  To exercise any of these rights, contact us at privacy@yourwebsite.com. We will respond 
+                  To exercise any of these rights, contact us via <a href="https://github.com/drixindustries/Rug-Killer-On-Solana/issues" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">GitHub Issues</a> or our community channels. We will respond 
                   within 30 days.
                 </p>
               </CardContent>
@@ -270,8 +270,8 @@ export default function Privacy() {
                   <li>Right to non-discrimination for exercising your privacy rights</li>
                 </ul>
                 <p>
-                  To exercise these rights, contact us at privacy@yourwebsite.com with "CCPA Request" in 
-                  the subject line.
+                  To exercise these rights, <a href="https://github.com/drixindustries/Rug-Killer-On-Solana/issues" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">open a GitHub issue</a> with "CCPA Request" in 
+                  the title.
                 </p>
               </CardContent>
             </Card>
@@ -343,11 +343,9 @@ export default function Privacy() {
                   please contact us:
                 </p>
                 <ul className="space-y-2">
-                  <li><strong>Email:</strong> privacy@yourwebsite.com</li>
-                  <li><strong>Legal Inquiries:</strong> legal@yourwebsite.com</li>
-                  <li><strong>Discord:</strong> Join our community server</li>
-                  <li><strong>Telegram:</strong> Contact via our bot</li>
-                  <li><strong>GitHub:</strong> https://github.com/drixindustries/Rug-Killer-On-Solana/issues</li>
+                  <li><strong>GitHub Issues:</strong> <a href="https://github.com/drixindustries/Rug-Killer-On-Solana/issues" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Report privacy concerns</a></li>
+                  <li><strong>Discord:</strong> <a href="https://discord.gg/8xvBYhE9mK" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Join our community</a></li>
+                  <li><strong>Telegram:</strong> <a href="https://t.me/rugkilleralphabot" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Contact via bot</a></li>
                 </ul>
               </CardContent>
             </Card>
