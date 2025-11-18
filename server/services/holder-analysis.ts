@@ -25,6 +25,7 @@ import { GMGNService } from './gmgn-service.js';
 import { rpcBalancer } from './rpc-balancer.js';
 import { EXCHANGE_WALLETS, isExchangeWallet } from '../exchange-whitelist.js';
 import { getKnownAddressInfo } from '../known-addresses.js';
+import bs58 from 'bs58';
 
 export interface HolderDetail {
   address: string;
@@ -87,6 +88,13 @@ export class HolderAnalysisService {
           return heliusResult;
         }
 
+        // Try direct on-chain scan via getProgramAccounts (works on standard RPC)
+        const programScan = await this.fetchFromProgramAccounts(tokenAddress);
+        if (programScan && (programScan.holderCount > 0 || programScan.top20Holders.length > 0)) {
+          console.log(`[HolderAnalysis] Used on-chain programAccounts scan for ${tokenAddress}`);
+          return programScan;
+        }
+
         // Fallback to basic RPC (top 20 only, no total count)
         const rpcResult = await this.fetchFromRPC(tokenAddress);
         console.log(`[HolderAnalysis] Used RPC fallback for ${tokenAddress} (limited data)`);
@@ -94,6 +102,126 @@ export class HolderAnalysisService {
       },
       this.CACHE_TTL
     );
+  }
+
+  /**
+   * On-chain scan using getProgramAccounts filtered by mint
+   * Pros: No indexer required, works on QuickNode/public RPC
+   * Cons: Can be heavy for very popular tokens; we add safety caps
+   */
+  private async fetchFromProgramAccounts(tokenAddress: string): Promise<HolderAnalysisResult | null> {
+    try {
+      const connection = rpcBalancer.getConnection();
+      const mintPubkey = new PublicKey(tokenAddress);
+
+      // Fetch mint info for decimals and supply
+      const mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID)
+        .catch(() => getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID));
+
+      const totalSupplyRaw = BigInt(mintInfo.supply.toString());
+      const decimals = mintInfo.decimals;
+
+      // Helper to scan a token program (classic and 2022)
+      const scanProgram = async (programId: PublicKey) => {
+        // Request minimal bytes (0..80) to read mint, owner, amount
+        const accounts = await connection.getProgramAccounts(programId, {
+          commitment: 'confirmed',
+          filters: [
+            { memcmp: { offset: 0, bytes: mintPubkey.toBase58() } },
+          ],
+          dataSlice: { offset: 0, length: 80 },
+        });
+        return accounts;
+      };
+
+      const classic = await scanProgram(TOKEN_PROGRAM_ID).catch(() => [] as any[]);
+      const t2022 = await scanProgram(TOKEN_2022_PROGRAM_ID).catch(() => [] as any[]);
+      const all = [...classic, ...t2022];
+
+      if (all.length === 0) {
+        return null;
+      }
+
+      // Safety cap: if result is extremely large, bail to avoid overload
+      const MAX_ACCOUNTS = 15000;
+      if (all.length > MAX_ACCOUNTS) {
+        console.warn(`[HolderAnalysis] programAccounts returned ${all.length} accounts, over cap ${MAX_ACCOUNTS}`);
+        // We still return null so other fallbacks can try
+        return null;
+      }
+
+      type RawHolder = { address: string; amountRaw: bigint };
+      const holders: RawHolder[] = [];
+
+      for (const acc of all) {
+        const data: Buffer = acc.account.data as unknown as Buffer;
+        if (!data || data.length < 72) continue;
+        // Amount at offset 64 (u64 little-endian)
+        const amountRaw = data.readBigUInt64LE(64);
+        if (amountRaw === 0n) continue;
+        // Owner at offset 32..64 (32 bytes)
+        const ownerBytes = data.subarray(32, 64);
+        const owner = bs58.encode(ownerBytes);
+        holders.push({ address: owner, amountRaw });
+      }
+
+      if (holders.length === 0) {
+        return {
+          tokenAddress,
+          holderCount: 0,
+          top20Holders: [],
+          topHolderConcentration: 0,
+          exchangeHolderCount: 0,
+          exchangeSupplyPercent: 0,
+          lpSupplyPercent: 0,
+          source: 'rpc',
+          cachedAt: Date.now(),
+        };
+      }
+
+      // Aggregate by owner (some wallets may hold multiple token accounts)
+      const byOwner = new Map<string, bigint>();
+      for (const h of holders) {
+        byOwner.set(h.address, (byOwner.get(h.address) || 0n) + h.amountRaw);
+      }
+
+      // Build holder list and sort by balance desc
+      const list = Array.from(byOwner.entries()).map(([address, amountRaw]) => {
+        const percentage = Number(amountRaw) / Number(totalSupplyRaw) * 100;
+        const balance = Number(amountRaw) / Math.pow(10, decimals);
+        const labeled = this.labelWallet(address, percentage);
+        return {
+          address,
+          balance,
+          percentage,
+          uiAmount: balance,
+          label: labeled.label,
+          isExchange: labeled.isExchange,
+          isLP: labeled.isLP,
+          isCreator: labeled.isCreator,
+        } as HolderDetail;
+      }).sort((a, b) => b.balance - a.balance);
+
+      const top20 = list.slice(0, 20);
+      const top10Concentration = top20.slice(0, 10).reduce((sum, h) => sum + h.percentage, 0);
+      const exchangeHolders = top20.filter(h => h.isExchange);
+      const lpHolders = top20.filter(h => h.isLP);
+
+      return {
+        tokenAddress,
+        holderCount: list.length,
+        top20Holders: top20,
+        topHolderConcentration: top10Concentration,
+        exchangeHolderCount: exchangeHolders.length,
+        exchangeSupplyPercent: exchangeHolders.reduce((sum, h) => sum + h.percentage, 0),
+        lpSupplyPercent: lpHolders.reduce((sum, h) => sum + h.percentage, 0),
+        source: 'rpc',
+        cachedAt: Date.now(),
+      };
+    } catch (error) {
+      console.error('[HolderAnalysis] programAccounts scan failed:', error);
+      return null;
+    }
   }
 
   /**
