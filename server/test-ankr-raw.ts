@@ -1,6 +1,11 @@
 // Raw HTTP test for Ankr API - bypassing Solana web3.js library
-const ANKR_API_KEY = "380a1e0b86b7763334f51e2b3d44fe3ea694299cc8f8b373cad0243eea4bd6ea";
+const ANKR_API_KEY = process.env.ANKR_API_KEY || "";
 const ANKR_URL = `https://rpc.ankr.com/solana/${ANKR_API_KEY}`;
+
+if (!ANKR_API_KEY) {
+  console.error("❌ ANKR_API_KEY not set in environment variables");
+  process.exit(1);
+}
 
 async function testRawAnkrRequest() {
   console.log("🔍 Testing raw Ankr API request...\n");

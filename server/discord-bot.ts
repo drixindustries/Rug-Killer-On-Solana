@@ -72,7 +72,7 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   
   const embed = new EmbedBuilder()
     .setColor(color)
-    .setTitle(messageData.header)
+    .setTitle(`${messageData.header} ⚠️ ${messageData.age}`)
     .setDescription(`**Safety Score: ${analysis.riskScore}/100** (${analysis.riskLevel})\n_100 = Strong Buy • 0 = Do Not Buy_`)
     .setFooter({ text: `Contract: ${analysis.tokenAddress}` })
     .setTimestamp();
@@ -113,6 +113,15 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
       name: '🎯 Pump.fun',
       value: messageData.pumpFun.split('\n').slice(1).join('\n'), // Remove header
       inline: true
+    });
+  }
+  
+  // WALLET AGES - Prominent section for wallet age analysis
+  if (messageData.walletAges) {
+    embed.addFields({
+      name: '⏰ Wallet Ages',
+      value: messageData.walletAges.replace(/\*\*/g, ''),
+      inline: false
     });
   }
   

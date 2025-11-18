@@ -45,6 +45,7 @@ export function getRiskEmoji(riskLevel: string): string {
 
 export interface CompactMessageData {
   header: string;
+  age: string;
   riskScore: string;
   aiVerdict?: string;
   security: string;
@@ -60,6 +61,7 @@ export interface CompactMessageData {
   liquidity?: string;
   holderActivity?: string;
   agedWallets?: string;
+  walletAges?: string;
   gmgn?: string;
   alerts: string[];
   links: string;
@@ -77,27 +79,34 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   const isNewToken = tokenAge !== null && tokenAge < 30;
   const isVeryNewToken = tokenAge !== null && tokenAge < 7;
   
+  let ageString = '❓ Unknown';
+  if (tokenAge !== null) {
+    if (tokenAge < 1) {
+      const hours = Math.floor((Date.now() - analysis.creationDate) / (1000 * 60 * 60));
+      ageString = `${hours}h OLD`;
+    } else {
+      ageString = `${tokenAge}d OLD`;
+    }
+  }
+
   // HEADER with age warning
   let header = `${emoji} ${analysis.metadata.name} (${analysis.metadata.symbol})`;
   if (isVeryNewToken) {
-    header += ` ⚠️ ${tokenAge}d OLD`;
+    header += ` ⚠️`;
   } else if (isNewToken) {
-    header += ` 🆕 ${tokenAge}d old`;
+    header += ` 🆕`;
   }
   
   // RISK SCORE
   const riskScore = `🎯 **Risk Score:** ${analysis.riskScore}/100 (${analysis.riskLevel})\n_0 = Do Not Buy • 100 = Strong Buy_`;
   
-  // AI VERDICT (Professional recommendation with age context)
-  const aiVerdict = analysis.aiVerdict 
-    ? `🤖 **AI Analysis**\n**Rating:** ${analysis.aiVerdict.rating}\n**Recommendation:** ${analysis.aiVerdict.verdict}`
-    : undefined;
-  
-  // SECURITY
-  const burnPct = analysis.liquidityPool?.burnPercentage ?? null;
-  const burnEmoji = burnPct !== null ? (burnPct >= 99.99 ? '✅' : burnPct >= 50 ? '⚠️' : '❌') : '❓';
-  const burnText = burnPct !== null ? `${burnPct.toFixed(1)}%` : 'No Data';
-  const mintStatus = analysis.mintAuthority?.hasAuthority ? '❌ Active' : '✅ Revoked';
+  // Return structured data
+  return {
+    header,
+    age: ageString,
+    riskScore,
+    aiVerdict,
+    security,
   const freezeStatus = analysis.freezeAuthority?.hasAuthority ? '❌ Active' : '✅ Revoked';
   const security = `🔐 **Security**\n• Mint: ${mintStatus}\n• Freeze: ${freezeStatus}\n• LP Burn: ${burnEmoji} ${burnText}`;
   
@@ -253,6 +262,64 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     }
   }
   
+  // WALLET AGES - Dedicated 0-100 Score Section
+  let walletAges: string | undefined;
+  if (analysis.agedWalletData) {
+    const aw = analysis.agedWalletData;
+    
+    // Calculate Wallet Ages Safety Score (0-100, where 100 = best)
+    // Start with base score of 100 and subtract based on risk factors
+    let walletAgesScore = 100;
+    
+    // Penalize based on the existing risk score (invert it)
+    walletAgesScore -= aw.riskScore;
+    
+    // Extra penalty for new tokens with aged wallets (this is a major red flag)
+    if (isNewToken && aw.agedWalletCount > 0) {
+      const newTokenPenalty = Math.min(30, aw.agedWalletCount * 3); // Up to -30 for new tokens
+      walletAgesScore -= newTokenPenalty;
+    }
+    
+    // Extra penalty for high fake volume percentage
+    if (aw.totalFakeVolumePercent > 50) {
+      walletAgesScore -= 10;
+    }
+    
+    // Ensure score stays within 0-100 range
+    walletAgesScore = Math.max(0, Math.min(100, walletAgesScore));
+    
+    // Determine grade emoji and status
+    let gradeEmoji = '';
+    let gradeStatus = '';
+    if (walletAgesScore >= 80) {
+      gradeEmoji = '✅';
+      gradeStatus = 'EXCELLENT';
+    } else if (walletAgesScore >= 60) {
+      gradeEmoji = '🟢';
+      gradeStatus = 'GOOD';
+    } else if (walletAgesScore >= 40) {
+      gradeEmoji = '🟡';
+      gradeStatus = 'FAIR';
+    } else if (walletAgesScore >= 20) {
+      gradeEmoji = '🟠';
+      gradeStatus = 'POOR';
+    } else {
+      gradeEmoji = '🔴';
+      gradeStatus = 'CRITICAL';
+    }
+    
+    walletAges = `${gradeEmoji} **WALLET AGES** (${gradeStatus})\n`;
+    walletAges += `• Safety Score: **${walletAgesScore}/100**\n`;
+    walletAges += `• Aged Wallets: ${aw.agedWalletCount}\n`;
+    walletAges += `• Fake Volume: ${aw.totalFakeVolumePercent.toFixed(1)}%\n`;
+    
+    if (isNewToken && aw.agedWalletCount > 0) {
+      walletAges += `⚠️ **WARNING**: Token <30d old with aged wallets!\n`;
+    }
+    
+    walletAges += `🔗 [Detailed Analysis](https://solscan.io/token/${analysis.tokenAddress}#holders)`;
+  }
+  
   // GMGN DATA
   let gmgn: string | undefined;
   if (analysis.gmgnData?.isBundled) {
@@ -277,6 +344,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   
   return {
     header,
+    age: ageString,
     riskScore,
     aiVerdict,
     security,
@@ -293,6 +361,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     liquidity,
     holderActivity,
     agedWallets,
+    walletAges,
     gmgn,
     alerts,
     links
@@ -304,7 +373,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
  */
 export function toPlainText(data: CompactMessageData): string {
   let message = `━━━━━━━━━━━━━━━━━━━━━━\n`;
-  message += `${data.header}\n`;
+  message += `${data.header} ⚠️ ${data.age}\n`;
   message += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   
   message += `${data.riskScore}\n\n`;
@@ -358,6 +427,10 @@ export function toPlainText(data: CompactMessageData): string {
   
   if (data.agedWallets) {
     message += `${data.agedWallets}\n\n`;
+  }
+  
+  if (data.walletAges) {
+    message += `${data.walletAges}\n\n`;
   }
   
   if (data.gmgn) {
