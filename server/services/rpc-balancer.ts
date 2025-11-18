@@ -37,7 +37,7 @@ function getAnkrUrl(): string | undefined {
 
   // If only API key is provided or URL missing, construct the URL
   if ((!raw || raw.length === 0) && apiKey) {
-    raw = `https://rpc.ankr.com/solana/${apiKey.replace(/^\"|\"$/g, '')}`;
+    raw = `https://rpc.ankr.com/multichain/${apiKey.replace(/^\"|\"$/g, '')}`;
     console.log('[Ankr Config] Constructed URL from API key');
   }
 
@@ -51,7 +51,7 @@ function getAnkrUrl(): string | undefined {
 
   // If it looks like just a key, construct URL
   if (!cleaned.startsWith('http')) {
-    return `https://rpc.ankr.com/solana/${cleaned}`;
+    return `https://rpc.ankr.com/multichain/${cleaned}`;
   }
 
   // Validate URL format and ensure https scheme
@@ -61,13 +61,13 @@ function getAnkrUrl(): string | undefined {
       u.protocol = 'https:';
     }
 
-    // If user pasted a multichain URL, rewrite to Solana-specific path
-    // Example: https://rpc.ankr.com/multichain/<KEY> -> https://rpc.ankr.com/solana/<KEY>
+    // If user pasted a multichain URL, it's already correct
     if (u.hostname.endsWith('rpc.ankr.com') && u.pathname.startsWith('/multichain/')) {
       const parts = u.pathname.split('/').filter(Boolean);
       const last = parts[parts.length - 1];
       if (last && last.length > 16) {
-        u.pathname = `/solana/${last}`;
+        // Already in correct format
+        return u.toString();
       } else if (apiKey) {
         u.pathname = `/solana/${apiKey.replace(/^\"|\"$/g, '')}`;
       } else {

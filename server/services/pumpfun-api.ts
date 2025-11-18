@@ -108,7 +108,7 @@ export async function checkPumpFun(tokenAddress: string): Promise<PumpFunInfo> {
     console.log(`[Pump.fun] Checking mint authority pattern for ${tokenAddress}...`);
     
     // Use Ankr RPC for better reliability
-    const ankrUrl = process.env.ANKR_RPC_URL || (process.env.ANKR_API_KEY ? `https://rpc.ankr.com/solana/${process.env.ANKR_API_KEY}` : 'https://api.mainnet-beta.solana.com');
+    const ankrUrl = process.env.ANKR_RPC_URL || (process.env.ANKR_API_KEY ? `https://rpc.ankr.com/premium-http/solana_mainnet/${process.env.ANKR_API_KEY}` : 'https://api.mainnet-beta.solana.com');
     const rpcResponse = await axios.post(ankrUrl, {
       jsonrpc: '2.0',
       id: 1,

@@ -21,7 +21,7 @@ class FastRPCService {
 
   constructor() {
     // Use Ankr (primary), Shyft, and Solana public RPC endpoints
-    const ankrUrl = process.env.ANKR_RPC_URL || (process.env.ANKR_API_KEY ? `https://rpc.ankr.com/solana/${process.env.ANKR_API_KEY}` : null);
+    const ankrUrl = process.env.ANKR_RPC_URL || (process.env.ANKR_API_KEY ? `https://rpc.ankr.com/multichain/${process.env.ANKR_API_KEY}` : null);
     const shyftUrl = process.env.SHYFT_KEY ? `https://rpc.shyft.to?api_key=${process.env.SHYFT_KEY}` : null;
     
     const endpoints = [

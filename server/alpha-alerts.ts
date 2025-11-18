@@ -35,7 +35,7 @@ export class AlphaAlertService {
   private gmgn = new GMGNService();
 
   constructor(rpcUrl?: string, customCallers?: AlphaCallerConfig[]) {
-    const ankrUrl = process.env.ANKR_RPC_URL || (process.env.ANKR_API_KEY ? `https://rpc.ankr.com/solana/${process.env.ANKR_API_KEY}` : null);
+    const ankrUrl = process.env.ANKR_RPC_URL || (process.env.ANKR_API_KEY ? `https://rpc.ankr.com/premium-http/solana_mainnet/${process.env.ANKR_API_KEY}` : null);
     this.connection = new Connection(ankrUrl || rpcUrl || 'https://api.mainnet-beta.solana.com', 'confirmed');
     this.alphaCallers = customCallers || DEFAULT_ALPHA_CALLERS;
   }

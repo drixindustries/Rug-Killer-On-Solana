@@ -1,7 +1,7 @@
 import { Keypair, Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import bs58 from 'bs58';
 
-const SOLANA_RPC_URL = process.env.ANKR_RPC_URL || (process.env.ANKR_API_KEY ? `https://rpc.ankr.com/solana/${process.env.ANKR_API_KEY}` : null) || 'https://api.mainnet-beta.solana.com';
+const SOLANA_RPC_URL = process.env.ANKR_RPC_URL || (process.env.ANKR_API_KEY ? `https://rpc.ankr.com/premium-http/solana_mainnet/${process.env.ANKR_API_KEY}` : null) || 'https://api.mainnet-beta.solana.com';
 
 export class CreatorWalletService {
   private static instance: CreatorWalletService;

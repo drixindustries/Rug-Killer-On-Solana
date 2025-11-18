@@ -100,13 +100,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   // RISK SCORE
   const riskScore = `🎯 **Risk Score:** ${analysis.riskScore}/100 (${analysis.riskLevel})\n_0 = Do Not Buy • 100 = Strong Buy_`;
   
-  // Return structured data
-  return {
-    header,
-    age: ageString,
-    riskScore,
-    aiVerdict,
-    security,
+  // SECURITY
   const freezeStatus = analysis.freezeAuthority?.hasAuthority ? '❌ Active' : '✅ Revoked';
   const security = `🔐 **Security**\n• Mint: ${mintStatus}\n• Freeze: ${freezeStatus}\n• LP Burn: ${burnEmoji} ${burnText}`;
   

@@ -28,7 +28,7 @@ const getSolanaConnection = () => {
   //   ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
   //   : "https://api.mainnet-beta.solana.com";
   
-  const rpcUrl = process.env.ANKR_RPC_URL || (process.env.ANKR_API_KEY ? `https://rpc.ankr.com/solana/${process.env.ANKR_API_KEY}` : null) || "https://api.mainnet-beta.solana.com";
+  const rpcUrl = process.env.ANKR_RPC_URL || (process.env.ANKR_API_KEY ? `https://rpc.ankr.com/premium-http/solana_mainnet/${process.env.ANKR_API_KEY}` : null) || "https://api.mainnet-beta.solana.com";
   
   return new Connection(rpcUrl, "confirmed");
 };
