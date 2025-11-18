@@ -41,22 +41,6 @@ export function Footer() {
             <p className="text-xs sm:text-sm text-muted-foreground mb-4">
               Protecting Solana investors from rug pulls since 2025
             </p>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Official Token:</span>
-                <span className="text-base sm:text-lg font-bold text-primary">$ANTIRUG</span>
-              </div>
-              <div 
-                className="flex items-center gap-1 bg-muted px-2 py-1.5 rounded group cursor-pointer hover:bg-muted/80 transition-colors" 
-                onClick={copyCA}
-                data-testid="button-copy-ca-footer"
-              >
-                <code className="font-mono text-[10px] sm:text-xs flex-1 truncate text-muted-foreground">
-                  {CONTRACT_ADDRESS}
-                </code>
-                <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-              </div>
-            </div>
           </div>
           
           {/* Resources */}
