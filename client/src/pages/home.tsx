@@ -267,7 +267,7 @@ export default function Home() {
 
   const analyzeMutation = useMutation({
     mutationFn: async (tokenAddress: string) => {
-      const response = await apiRequest("POST", "/api/analyze-token", { tokenAddress });
+      const response = await apiRequest("POST", "/api/analyze", { tokenAddress });
       return await response.json() as TokenAnalysisResponse;
     },
     onSuccess: (data) => {
@@ -278,7 +278,7 @@ export default function Home() {
       toast({
         variant: "destructive",
         title: "Analysis Failed",
-        description: error.message || "Failed to analyze token. Please try again.",
+        description: error.message || "Failed to fetch",
       });
     },
   });
