@@ -4,6 +4,7 @@ import { db } from './db';
 import { kolWallets, smartWallets, smartSignals } from '../shared/schema.ts';
 import { gte, and, eq } from 'drizzle-orm';
 import { GMGNService } from './services/gmgn-service.ts';
+import { NansenService, type NansenSmartMoneyTrade } from './services/nansen-service.ts';
 
 interface AlphaAlert {
   type: 'new_token' | 'whale_buy' | 'caller_signal';
@@ -33,6 +34,12 @@ export class AlphaAlertService {
   private alphaCallers: AlphaCallerConfig[];
   private autoRefreshInterval: NodeJS.Timeout | null = null;
   private gmgn = new GMGNService();
+  private nansen = new NansenService();
+  private nansenInterval: NodeJS.Timeout | null = null;
+  private nansenCursor: string | null = null;
+  private nansenSeenTransactions = new Set<string>();
+  private nansenLastTimestamp = 0;
+  private nansenPolling = false;
 
   constructor(rpcUrl?: string, customCallers?: AlphaCallerConfig[]) {
     // Resolve separate HTTP and WS endpoints to ensure subscriptions work reliably
@@ -44,18 +51,8 @@ export class AlphaAlertService {
     const heliusHttp = heliusKey ? `https://mainnet.helius-rpc.com/?api-key=${heliusKey}` : null;
     const heliusWs = heliusKey ? `wss://atlas-mainnet.helius-rpc.com/?api-key=${heliusKey}` : null;
 
-    // Ankr endpoints (explicit override wins)
-    const ankrHttp = process.env.ANKR_RPC_URL?.trim() || (process.env.ANKR_API_KEY ? `https://rpc.ankr.com/premium-http/solana_mainnet/${process.env.ANKR_API_KEY}` : null);
-    const ankrWsExplicit = process.env.ANKR_WS_URL?.trim();
-    // Derive an Ankr WS URL from HTTP if possible
-    const ankrWsDerived = ankrHttp
-      ? ankrHttp
-          .replace('https://', 'wss://')
-          .replace('/premium-http/', '/premium-ws/')
-      : null;
-
-    const httpEndpoint = explicitHttp || heliusHttp || ankrHttp || rpcUrl || 'https://api.mainnet-beta.solana.com';
-    const wsEndpoint = explicitWs || heliusWs || ankrWsExplicit || ankrWsDerived || undefined;
+    const httpEndpoint = explicitHttp || heliusHttp || rpcUrl || 'https://api.mainnet-beta.solana.com';
+    const wsEndpoint = explicitWs || heliusWs || undefined;
 
     this.connection = new Connection(httpEndpoint, { commitment: 'confirmed', wsEndpoint });
     this.alphaCallers = customCallers || DEFAULT_ALPHA_CALLERS;
@@ -130,6 +127,162 @@ export class AlphaAlertService {
     }
   }
 
+  private startNansenWatcher(): void {
+    if (!this.nansen.isEnabled()) {
+      console.log('[Alpha Alerts] Nansen smart money watcher disabled (missing API key)');
+      return;
+    }
+
+    const lookbackMinutes = Number(process.env.NANSEN_LOOKBACK_MINUTES || 15);
+    if (!this.nansenLastTimestamp) {
+      const windowMs = Math.max(1, lookbackMinutes) * 60 * 1000;
+      this.nansenLastTimestamp = Date.now() - windowMs;
+    }
+
+    const poll = async () => {
+      if (this.nansenPolling) {
+        return;
+      }
+      this.nansenPolling = true;
+      try {
+        const { trades, nextCursor } = await this.nansen.fetchSmartMoneyBuys({
+          since: this.nansenLastTimestamp,
+          cursor: this.nansenCursor,
+        });
+
+        if (nextCursor) {
+          this.nansenCursor = nextCursor;
+        }
+
+        for (const trade of trades) {
+          if (!trade.txHash || this.nansenSeenTransactions.has(trade.txHash)) {
+            continue;
+          }
+
+          this.nansenSeenTransactions.add(trade.txHash);
+          if (trade.timestamp && trade.timestamp > this.nansenLastTimestamp) {
+            this.nansenLastTimestamp = trade.timestamp;
+          }
+
+          await this.handleNansenTrade(trade);
+        }
+
+        if (this.nansenSeenTransactions.size > 500) {
+          const recent = Array.from(this.nansenSeenTransactions).slice(-400);
+          this.nansenSeenTransactions = new Set(recent);
+        }
+      } catch (error) {
+        console.error('[Alpha Alerts] Nansen watcher error:', error);
+      } finally {
+        this.nansenPolling = false;
+      }
+    };
+
+    void poll();
+
+    if (this.nansenInterval) {
+      clearInterval(this.nansenInterval);
+    }
+
+    this.nansenInterval = setInterval(() => {
+      void poll();
+    }, this.nansen.getPollingInterval());
+  }
+
+  private stopNansenWatcher(): void {
+    if (this.nansenInterval) {
+      clearInterval(this.nansenInterval);
+      this.nansenInterval = null;
+    }
+    this.nansenPolling = false;
+  }
+
+  private async handleNansenTrade(trade: NansenSmartMoneyTrade): Promise<void> {
+    try {
+      if (!trade.tokenAddress || trade.tokenAddress.length < 32) {
+        return;
+      }
+
+      const isQuality = await this.isQualityToken(trade.tokenAddress);
+      if (!isQuality) {
+        return;
+      }
+
+      const timestamp = trade.timestamp || Date.now();
+      const shortWallet = `${trade.walletAddress.slice(0, 4)}...${trade.walletAddress.slice(-4)}`;
+      const walletLabel = trade.walletLabel?.trim() || `Smart Wallet ${shortWallet}`;
+      const influenceRaw = trade.confidence !== undefined ? Math.round(trade.confidence) : 80;
+      const influenceScore = Math.min(100, Math.max(40, influenceRaw));
+
+      try {
+        await db
+          .insert(smartWallets)
+          .values({
+            walletAddress: trade.walletAddress,
+            displayName: walletLabel,
+            source: 'nansen',
+            influenceScore,
+            isActive: true,
+            lastActiveAt: new Date(timestamp),
+            notes: 'Imported via Nansen smart money feed',
+          })
+          .onConflictDoUpdate({
+            target: smartWallets.walletAddress,
+            set: {
+              displayName: walletLabel,
+              source: 'nansen',
+              influenceScore,
+              isActive: true,
+              lastActiveAt: new Date(timestamp),
+              updatedAt: new Date(),
+            },
+          });
+      } catch (error) {
+        console.error('[Alpha Alerts] Failed to upsert Nansen smart wallet:', error);
+      }
+
+      try {
+        await db
+          .insert(smartSignals)
+          .values({
+            walletAddress: trade.walletAddress,
+            tokenAddress: trade.tokenAddress,
+            action: 'buy',
+            amountTokens: trade.amountToken !== undefined ? String(trade.amountToken) : undefined,
+            priceUsd: trade.amountUsd !== undefined ? String(trade.amountUsd) : undefined,
+            txSignature: trade.txHash,
+            confidence: Number.isFinite(trade.confidence) ? Math.round(trade.confidence as number) : undefined,
+            source: 'nansen',
+            detectedAt: new Date(timestamp),
+          })
+          .onConflictDoNothing({ target: smartSignals.txSignature });
+      } catch (error) {
+        console.error('[Alpha Alerts] Failed to log Nansen smart signal:', error);
+      }
+
+      await this.sendAlert({
+        type: 'caller_signal',
+        mint: trade.tokenAddress,
+        source: walletLabel,
+        timestamp,
+        data: {
+          wallet: trade.walletAddress,
+          tokenSymbol: trade.tokenSymbol,
+          tokenName: trade.tokenName,
+          amountUsd: trade.amountUsd,
+          amountToken: trade.amountToken,
+          txHash: trade.txHash,
+          source: 'nansen',
+          provider: 'Nansen',
+          sourceUrl: trade.sourceUrl,
+          confidence: influenceScore,
+        },
+      });
+    } catch (error) {
+      console.error('[Alpha Alerts] Error handling Nansen trade:', error);
+    }
+  }
+
   // Register callback for alerts; includes formatted message for convenience
   onAlert(callback: (alert: AlphaAlert, message: string) => void): void {
     this.alertCallbacks.push(callback);
@@ -167,44 +320,89 @@ export class AlphaAlertService {
           source: 'alpha-alerts',
           detectedAt: new Date(),
         });
-      } catch {}
+          if (alert.type === 'caller_signal') {
+            let gmgnLines = '';
+            try {
+              const gmgnData = await this.gmgn.getTokenAnalysis(alert.mint);
+              if (gmgnData) {
+                const bundle = this.gmgn.extractBundleInfo(gmgnData);
+                const smart = this.gmgn.hasSmartMoneyActivity(gmgnData);
+                const smartDegen = gmgnData.data.smart_degen;
+                const parts: string[] = [];
+                if (smart && smartDegen) {
+                  parts.push(`🧠 Smart traders: ${smartDegen.count} (avg cost ${smartDegen.avg_cost?.toFixed?.(2) ?? smartDegen.avg_cost})`);
+                }
+                if (bundle) {
+                  parts.push(`🧩 Bundle: ${bundle.isBundled ? 'yes' : 'no'} (wallets ${bundle.bundleWalletCount}, conf ${bundle.confidence}%)`);
+                  if (bundle.insiderCount) parts.push(`🕵️ Insiders: ${bundle.insiderCount}`);
+                  if (bundle.sniperCount) parts.push(`🎯 Snipers: ${bundle.sniperCount}`);
+                }
+                if (parts.length > 0) {
+                  gmgnLines = parts.join('\n');
+                }
+              }
+            } catch {}
 
-      message = `🚨 **SMART MONEY BUY: ${alert.source}**\n\n` +
-        `📍 CA: \`${alert.mint}\`\n` +
-        `👤 Wallet: ${alert.source}${gmgnLines}\n` +
-        `🔗 https://pump.fun/${alert.mint}\n` +
-        `💎 https://dexscreener.com/solana/${alert.mint}`;
-    } else if (alert.type === 'new_token') {
-      message = `🔥 **NEW GEM DETECTED**\n\n` +
-        `📍 CA: \`${alert.mint}\`\n` +
-        `📊 Source: ${alert.source}\n` +
-        `${alert.data?.name ? `🏷️ ${alert.data.name} (${alert.data.symbol})\n` : ''}` +
-        `${alert.data?.marketCap ? `💰 MC: $${alert.data.marketCap.toLocaleString()}\n` : ''}` +
-        `🔗 https://pump.fun/${alert.mint}`;
-    } else {
-      message = `⚡ **ALPHA ALERT**\n\n${alert.mint}\nSource: ${alert.source}`;
-    }
+            if (alert.data?.source !== 'nansen') {
+              try {
+                await db.insert(smartSignals).values({
+                  walletAddress: alert.data?.wallet || alert.source,
+                  tokenAddress: alert.mint,
+                  action: 'buy',
+                  source: 'alpha-alerts',
+                  detectedAt: new Date(),
+                });
+              } catch {}
+            }
 
-    // Send to Discord webhook
-    const DISCORD_WEBHOOK = process.env.ALPHA_DISCORD_WEBHOOK;
-    if (DISCORD_WEBHOOK) {
-      try {
-        await fetch(DISCORD_WEBHOOK, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: `@everyone ${message}`,
-            username: 'RugKiller Alpha Alerts',
-            avatar_url: 'https://i.imgur.com/rugkiller-icon.png',
-          }),
-        });
-      } catch (error) {
-        console.error('[ALPHA ALERT] Discord notification failed:', error);
-      }
-    }
+            const walletAddress = typeof alert.data?.wallet === 'string' ? alert.data.wallet : undefined;
+            const shortWallet = walletAddress ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}` : null;
+            const providerLabel = typeof alert.data?.provider === 'string' ? alert.data.provider : 'Alpha Alerts';
+            const tokenSymbol = alert.data?.tokenSymbol || alert.data?.tokenName;
+            const tokenName = alert.data?.tokenName && alert.data?.tokenName !== tokenSymbol ? alert.data?.tokenName : undefined;
+            const amountToken = Number(alert.data?.amountToken);
+            const amountUsd = Number(alert.data?.amountUsd);
+            const txHash = typeof alert.data?.txHash === 'string' ? alert.data.txHash : undefined;
+            const sourceUrl = typeof alert.data?.sourceUrl === 'string' ? alert.data.sourceUrl : undefined;
 
-    // Send to Telegram
-    const TELEGRAM_TOKEN = process.env.ALPHA_TELEGRAM_BOT_TOKEN;
+            const formatValue = (value: number, fraction: number) => {
+              if (!Number.isFinite(value) || value <= 0) return undefined;
+              return value.toLocaleString(undefined, { maximumFractionDigits: fraction });
+            };
+
+            const summaryLines: string[] = [];
+            summaryLines.push(`📍 CA: \`${alert.mint}\``);
+            summaryLines.push(`👤 Wallet: ${alert.source}${shortWallet ? ` (${shortWallet})` : ''}`);
+            if (providerLabel) {
+              summaryLines.push(`📡 Source: ${providerLabel}`);
+            }
+            if (walletAddress) {
+              summaryLines.push(`🔑 Address: \`${walletAddress}\``);
+            }
+            if (tokenSymbol) {
+              summaryLines.push(`🏷️ Token: ${tokenSymbol}${tokenName ? ` (${tokenName})` : ''}`);
+            }
+            const formattedSize = formatValue(amountToken, amountToken > 1 ? 2 : 4);
+            if (formattedSize) {
+              summaryLines.push(`🪙 Size: ${formattedSize} tokens`);
+            }
+            const formattedUsd = formatValue(amountUsd, amountUsd > 1000 ? 0 : 2);
+            if (formattedUsd) {
+              summaryLines.push(`💵 USD: $${formattedUsd}`);
+            }
+            if (gmgnLines) {
+              summaryLines.push(gmgnLines);
+            }
+            if (txHash) {
+              summaryLines.push(`🧾 Tx: \`${txHash}\``);
+            }
+            summaryLines.push(`🔗 https://pump.fun/${alert.mint}`);
+            summaryLines.push(`💎 https://dexscreener.com/solana/${alert.mint}`);
+            if (sourceUrl) {
+              summaryLines.push(`🛰️ Trace: ${sourceUrl}`);
+            }
+
+            message = `🚨 **SMART MONEY BUY: ${alert.source}**\n\n${summaryLines.join('\n')}`;
     const TELEGRAM_CHAT = process.env.ALPHA_TELEGRAM_CHAT_ID;
     if (TELEGRAM_TOKEN && TELEGRAM_CHAT) {
       try {
@@ -250,44 +448,91 @@ export class AlphaAlertService {
     } catch (error) {
       console.error('[ALPHA ALERT] Quality check error:', error);
       return false;
-    }
-  }
+      if (alert.type === 'caller_signal') {
+        // Enrich with GMGN bundle/smart trader context
+        let gmgnLines = '';
+        try {
+          const gmgnData = await this.gmgn.getTokenAnalysis(alert.mint);
+          if (gmgnData) {
+            const bundle = this.gmgn.extractBundleInfo(gmgnData);
+            const smart = this.gmgn.hasSmartMoneyActivity(gmgnData);
+            const smartDegen = gmgnData.data.smart_degen;
+            const parts: string[] = [];
+            if (smart && smartDegen) {
+              parts.push(`🧠 Smart traders: ${smartDegen.count} (avg cost ${smartDegen.avg_cost?.toFixed?.(2) ?? smartDegen.avg_cost})`);
+            }
+            if (bundle) {
+              parts.push(`🧩 Bundle: ${bundle.isBundled ? 'yes' : 'no'} (wallets ${bundle.bundleWalletCount}, conf ${bundle.confidence}%)`);
+              if (bundle.insiderCount) parts.push(`🕵️ Insiders: ${bundle.insiderCount}`);
+              if (bundle.sniperCount) parts.push(`🎯 Snipers: ${bundle.sniperCount}`);
+            }
+            if (parts.length > 0) {
+              gmgnLines = parts.join('\n');
+            }
+          }
+        } catch {}
 
-  // Monitor alpha caller wallets for transactions
-  private monitorAlphaCaller(caller: AlphaCallerConfig): void {
-    if (!caller.enabled) return;
-
-    try {
-      const publicKey = new PublicKey(caller.wallet);
-      
-      const listenerId = this.connection.onLogs(
-        publicKey,
-        async (logs) => {
+        if (alert.data?.source !== 'nansen') {
           try {
-            // Look for token interactions in logs
-            const buyPattern = /buy|swap|purchase/i;
-            const mintPattern = /[1-9A-HJ-NP-Za-km-z]{32,44}/; // Solana address pattern
-            
-            for (const log of logs.logs) {
-              if (buyPattern.test(log)) {
-                const matches = log.match(mintPattern);
-                if (matches && matches[0]) {
-                  const mint = matches[0];
-                  
-                  // Basic validation and quality check
-                  if (await this.isQualityToken(mint)) {
-                    await this.sendAlert({
-                      type: 'caller_signal',
-                      mint,
-                      source: caller.name,
-                      timestamp: Date.now(),
-                      data: {
-                        wallet: caller.wallet,
-                        transactionType: 'buy',
-                      }
-                    });
-                  }
-                }
+            await db.insert(smartSignals).values({
+              walletAddress: alert.data?.wallet || alert.source,
+              tokenAddress: alert.mint,
+              action: 'buy',
+              source: 'alpha-alerts',
+              detectedAt: new Date(),
+            });
+          } catch {}
+        }
+
+        const walletAddress: string | undefined = alert.data?.wallet;
+        const shortWallet = walletAddress ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}` : null;
+        const providerLabel = alert.data?.provider || 'Alpha Alerts';
+        const tokenSymbol = alert.data?.tokenSymbol || alert.data?.tokenName;
+        const tokenName = alert.data?.tokenName && alert.data?.tokenName !== tokenSymbol ? alert.data?.tokenName : undefined;
+        const amountTokenRaw = Number(alert.data?.amountToken);
+        const amountUsdRaw = Number(alert.data?.amountUsd);
+        const txHash = alert.data?.txHash;
+        const sourceUrl = alert.data?.sourceUrl;
+
+        const formatValue = (value: number, fraction: number) => {
+          return Number.isFinite(value)
+            ? value.toLocaleString(undefined, { maximumFractionDigits: fraction })
+            : undefined;
+        };
+
+        const summaryLines: string[] = [];
+        summaryLines.push(`📍 CA: \`${alert.mint}\``);
+        summaryLines.push(`👤 Wallet: ${alert.source}${shortWallet ? ` (${shortWallet})` : ''}`);
+        if (providerLabel) {
+          summaryLines.push(`📡 Source: ${providerLabel}`);
+        }
+        if (walletAddress) {
+          summaryLines.push(`🔑 Address: \`${walletAddress}\``);
+        }
+        if (tokenSymbol) {
+          summaryLines.push(`🏷️ Token: ${tokenSymbol}${tokenName ? ` (${tokenName})` : ''}`);
+        }
+        const formattedSize = formatValue(amountTokenRaw, amountTokenRaw > 1 ? 2 : 4);
+        if (formattedSize) {
+          summaryLines.push(`🪙 Size: ${formattedSize} tokens`);
+        }
+        const formattedUsd = formatValue(amountUsdRaw, amountUsdRaw > 1000 ? 0 : 2);
+        if (formattedUsd) {
+          summaryLines.push(`💵 USD: $${formattedUsd}`);
+        }
+        if (gmgnLines) {
+          summaryLines.push(gmgnLines);
+        }
+        if (txHash) {
+          summaryLines.push(`🧾 Tx: \`${txHash}\``);
+        }
+        summaryLines.push(`🔗 https://pump.fun/${alert.mint}`);
+        summaryLines.push(`💎 https://dexscreener.com/solana/${alert.mint}`);
+        if (sourceUrl) {
+          summaryLines.push(`🛰️ Trace: ${sourceUrl}`);
+        }
+
+        message = `🚨 **SMART MONEY BUY: ${alert.source}**\n\n${summaryLines.join('\n')}`;
               }
             }
           } catch (error) {
@@ -369,6 +614,7 @@ export class AlphaAlertService {
     }
 
     this.startPumpFunMonitor();
+    this.startNansenWatcher();
     this.startAutoRefresh();
     
     // Send startup notification directly (not through sendAlert to avoid fake links)
@@ -419,6 +665,8 @@ export class AlphaAlertService {
     this.isRunning = false;
 
     this.stopAutoRefresh();
+    this.stopNansenWatcher();
+    this.nansenSeenTransactions.clear();
 
     // Remove wallet listeners
     for (const [wallet, listenerId] of Array.from(this.listeners.entries())) {

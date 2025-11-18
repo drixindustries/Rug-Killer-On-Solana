@@ -250,7 +250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const data = await response.json() as { ip: string };
       res.json({ 
         publicIP: data.ip,
-        note: "Add this IP to your Ankr whitelist"
+        note: "Railway outbound IP for RPC whitelisting"
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch IP" });
@@ -617,7 +617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const bs58 = await import('bs58');
       
       const connection = new Connection(
-        process.env.ANKR_RPC_URL || (process.env.ANKR_API_KEY ? `https://rpc.ankr.com/premium-http/solana_mainnet/${process.env.ANKR_API_KEY}` : null) || 'https://api.mainnet-beta.solana.com',
+        process.env.SHYFT_KEY ? `https://rpc.shyft.to?api_key=${process.env.SHYFT_KEY}` : 'https://api.mainnet-beta.solana.com',
         'confirmed'
       );
 
