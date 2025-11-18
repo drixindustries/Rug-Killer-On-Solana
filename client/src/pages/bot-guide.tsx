@@ -157,7 +157,6 @@ export default function BotGuide() {
                   </Button>
                 </CardContent>
               </Card>
-              </Card>
 
               {/* Command Reference */}
               <div className="space-y-4">
