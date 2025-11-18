@@ -302,6 +302,38 @@ export class SolanaTokenAnalyzer {
         TOKEN_2022_PROGRAM_ID
       ));
 
+      // Fetch holder data using getTokenLargestAccounts
+      let holderCount = null;
+      let top10Concentration = null;
+      let topHolders: any[] = [];
+
+      try {
+        const largestAccounts = await connection.getTokenLargestAccounts(tokenAddress, 'confirmed');
+        const validAccounts = largestAccounts.value.filter(acc => Number(acc.amount) > 0);
+        
+        holderCount = validAccounts.length;
+        
+        if (validAccounts.length > 0) {
+          const totalSupply = Number(mintInfo.supply);
+          let top10Supply = 0;
+          
+          validAccounts.slice(0, 10).forEach(acc => {
+            const amount = Number(acc.amount) / Math.pow(10, mintInfo.decimals);
+            top10Supply += Number(acc.amount);
+            topHolders.push({
+              address: acc.address.toBase58(),
+              balance: amount,
+              percentage: (Number(acc.amount) / totalSupply) * 100
+            });
+          });
+          
+          top10Concentration = (top10Supply / totalSupply) * 100;
+        }
+      } catch (holderError: any) {
+        console.warn(`⚠️ [Analyzer] Holder data fetch failed:`, holderError.message);
+        // Continue with null holder data
+      }
+
       return {
         decimals: mintInfo.decimals,
         supply: Number(mintInfo.supply) / Math.pow(10, mintInfo.decimals),
@@ -312,9 +344,9 @@ export class SolanaTokenAnalyzer {
           freezeDisabled: !mintInfo.freezeAuthority,
         },
         metadata: null,
-        holderCount: null,
-        top10Concentration: null,
-        topHolders: [],
+        holderCount,
+        top10Concentration,
+        topHolders,
       };
     } catch (error: any) {
       console.warn(`⚠️ [Analyzer] On-chain data fetch failed:`, error.message);
