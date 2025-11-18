@@ -1940,34 +1940,42 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     console.log(`✅ Discord bot logged in as ${client.user?.tag}`);
     registerCommands();
     
-    // Register alpha alert callback to send alerts to configured Discord channels
+    // Register alpha alert callback to send alerts to configured Discord channels (gated)
     const alphaService = getAlphaAlertService();
-    alphaService.onAlert(async (alert, message) => {
-      try {
-        // Get all alpha alert targets and filter for Discord
-        const allTargets = await storage.getAlphaTargets();
-        const discordTargets = allTargets.filter(t => t.platform === 'discord');
-        
-        for (const target of discordTargets) {
-          try {
-            const channel = await client.channels.fetch(target.channelId);
-            if (channel && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement)) {
-              // Send the alpha alert message
-              await (channel as any).send({
-                content: `@everyone\n\n${message}`,
-                allowedMentions: { parse: ['everyone'] }
-              });
+    const relayEnv = (process.env.ALPHA_ALERTS_BOT_RELAY || '').toLowerCase();
+    const direct = process.env.ALPHA_ALERTS_DIRECT_SEND === 'true';
+    const hasDirectTargets = Boolean(process.env.ALPHA_DISCORD_WEBHOOK || process.env.ALPHA_TELEGRAM_CHAT_ID);
+    const botRelay = relayEnv === 'true' ? true : (relayEnv === 'false' ? false : !(direct && hasDirectTargets));
+
+    if (!botRelay) {
+      console.log('⏭️ Skipping Discord alpha alert bot relay (direct send active)');
+    } else {
+      alphaService.onAlert(async (alert, message) => {
+        try {
+          // Get all alpha alert targets and filter for Discord
+          const allTargets = await storage.getAlphaTargets();
+          const discordTargets = allTargets.filter(t => t.platform === 'discord');
+          
+          for (const target of discordTargets) {
+            try {
+              const channel = await client.channels.fetch(target.channelId);
+              if (channel && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement)) {
+                // Send the alpha alert message
+                await (channel as any).send({
+                  content: `@everyone\n\n${message}`,
+                  allowedMentions: { parse: ['everyone'] }
+                });
+              }
+            } catch (channelError) {
+              console.error(`[Discord Bot] Failed to send alpha alert to channel ${target.channelId}:`, channelError);
             }
-          } catch (channelError) {
-            console.error(`[Discord Bot] Failed to send alpha alert to channel ${target.channelId}:`, channelError);
           }
+        } catch (error) {
+          console.error('[Discord Bot] Error handling alpha alert:', error);
         }
-      } catch (error) {
-        console.error('[Discord Bot] Error handling alpha alert:', error);
-      }
-    });
-    
-    console.log('✅ Alpha alert callback registered for Discord');
+      });
+      console.log('✅ Alpha alert callback registered for Discord');
+    }
   });
   
   return client;

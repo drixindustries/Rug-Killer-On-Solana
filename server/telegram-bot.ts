@@ -1407,31 +1407,39 @@ export async function startTelegramBot() {
   try {
     botInstance = createTelegramBot(BOT_TOKEN);
     
-    // Register alpha alert callback to send alerts to configured Telegram chats
+    // Register alpha alert callback to send alerts to configured Telegram chats (gated)
     const { getAlphaAlertService } = await import('./alpha-alerts');
     const alphaService = getAlphaAlertService();
-    alphaService.onAlert(async (alert, message) => {
-      try {
-        // Get all alpha alert targets and filter for Telegram
-        const allTargets = await storage.getAlphaTargets();
-        const telegramTargets = allTargets.filter(t => t.platform === 'telegram');
-        
-        for (const target of telegramTargets) {
-          try {
-            await botInstance!.telegram.sendMessage(target.channelId, message, { 
-              parse_mode: 'Markdown',
-              disable_web_page_preview: false
-            });
-          } catch (chatError) {
-            console.error(`[Telegram Bot] Failed to send alpha alert to chat ${target.channelId}:`, chatError);
+    const relayEnv = (process.env.ALPHA_ALERTS_BOT_RELAY || '').toLowerCase();
+    const direct = process.env.ALPHA_ALERTS_DIRECT_SEND === 'true';
+    const hasDirectTargets = Boolean(process.env.ALPHA_DISCORD_WEBHOOK || process.env.ALPHA_TELEGRAM_CHAT_ID);
+    const botRelay = relayEnv === 'true' ? true : (relayEnv === 'false' ? false : !(direct && hasDirectTargets));
+
+    if (!botRelay) {
+      console.log('⏭️ Skipping Telegram alpha alert bot relay (direct send active)');
+    } else {
+      alphaService.onAlert(async (alert, message) => {
+        try {
+          // Get all alpha alert targets and filter for Telegram
+          const allTargets = await storage.getAlphaTargets();
+          const telegramTargets = allTargets.filter(t => t.platform === 'telegram');
+          
+          for (const target of telegramTargets) {
+            try {
+              await botInstance!.telegram.sendMessage(target.channelId, message, { 
+                parse_mode: 'Markdown',
+                disable_web_page_preview: false
+              });
+            } catch (chatError) {
+              console.error(`[Telegram Bot] Failed to send alpha alert to chat ${target.channelId}:`, chatError);
+            }
           }
+        } catch (error) {
+          console.error('[Telegram Bot] Error handling alpha alert:', error);
         }
-      } catch (error) {
-        console.error('[Telegram Bot] Error handling alpha alert:', error);
-      }
-    });
-    
-    console.log('✅ Alpha alert callback registered for Telegram');
+      });
+      console.log('✅ Alpha alert callback registered for Telegram');
+    }
     
     // Clear any pending updates from previous instance to avoid 409 conflicts
     await botInstance.launch({
