@@ -8,6 +8,7 @@ Set the following envs on your deployment:
 
 - `ENABLE_SOLANA_STREAM_WEBHOOK=true`
 - `SOLANA_STREAM_WEBHOOK_SECRET=<your-shared-secret>`
+- `SOLANA_STREAM_VERIFY_HMAC=true` (default true)
 
 Endpoint to receive events:
 
@@ -30,7 +31,7 @@ Metrics endpoints:
    - Header: `x-stream-secret: <your-shared-secret>`
 3. Choose filters (e.g., program IDs, accounts, or all transactions) appropriate to your needs.
 
-Notes: QuickNode also sends a `X-Quicknode-Signature` header (HMAC). This implementation accepts a shared secret via `x-stream-secret`. If you need HMAC verification, open an issue and we can wire raw-body HMAC validation.
+Notes: QuickNode/Helius send HMAC headers (`X-Quicknode-Signature`, `X-Helius-Signature`). We verify an HMAC-SHA256 over the raw request body using `SOLANA_STREAM_WEBHOOK_SECRET`. We accept `sha256=<hex>`, `<hex>`, or base64 signatures. You can still use `x-stream-secret` if HMAC is unavailable.
 
 ### Helius Webhooks
 
@@ -52,7 +53,15 @@ It’s an approximation of Geyser-style counts via webhook-compatible providers.
 
 - Payload shapes vary; normalization is best-effort and focuses on transactions and token transfers.
 - For high-volume global streams, ensure your deployment scales and use provider-side filters to reduce noise.
-- HMAC signature verification (provider-native) can be added if needed; currently a shared secret header is supported.
+- HMAC signature verification is enabled by default; disable by setting `SOLANA_STREAM_VERIFY_HMAC=false` (not recommended).
+
+## Filter Recommendations
+
+To control volume and costs, configure provider-side filters:
+
+- Start with transaction-level streams filtered to relevant programs (e.g., SPL Token, major DEXes) or specific token mints you monitor.
+- Add account-level streams only if you need state diffs; transaction streams are usually sufficient for activity metrics.
+- Prefer program/account selectors over global streams. Verify your metrics endpoints show growth as you widen filters.
 
 ## Troubleshooting
 
