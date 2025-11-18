@@ -3,7 +3,7 @@ param(
   [switch]$DryRun
 )
 
-Write-Host "🔧 Loading env from $EnvFile"
+Write-Host "Loading env from $EnvFile"
 if (!(Test-Path $EnvFile)) { Write-Error "Env file not found: $EnvFile"; exit 1 }
 
 # Parse .env (KEY=VALUE), ignore comments/blank lines
@@ -49,4 +49,4 @@ foreach ($k in $keys) {
   }
 }
 
-Write-Host "✅ Done. Variables updated in current Railway service context."
+Write-Host "Done. Variables updated in current Railway service context."
