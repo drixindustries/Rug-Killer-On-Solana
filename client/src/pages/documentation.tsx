@@ -457,25 +457,23 @@ export default function Documentation() {
           <div className="text-center mb-12">
             <div className="flex items-center justify-center gap-3 mb-4">
               <Shield className="h-12 w-12 text-primary" />
-              <h1 className="text-4xl font-bold">Complete Documentation</h1>
+              <h1 className="text-4xl font-bold">Documentation</h1>
             </div>
-            <p className="text-lg text-muted-foreground mb-6">
-              Everything you need to know about Rug Killer Alpha Bot - comprehensive guide with PDF download
+            <p className="text-lg text-muted-foreground max-w-3xl mx-auto mb-6">
+              Complete guide to using Rug Killer Alpha Bot's token analysis platform, Discord/Telegram bots, and API
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-              <PDFDownloadLink
-                document={<DocumentationPDF />}
-                fileName="solana-rug-killer-documentation.pdf"
-              >
-                {({ loading }) => (
-                  <Button size="lg" variant="outline" disabled={loading} data-testid="button-download-pdf">
-                    <Download className="h-4 w-4 mr-2" />
-                    {loading ? 'Preparing PDF...' : 'Download PDF Guide'}
-                  </Button>
-                )}
-              </PDFDownloadLink>
-            </div>
+            <PDFDownloadLink
+              document={<DocumentationPDF />}
+              fileName="rug-killer-alpha-bot-documentation.pdf"
+            >
+              {({ loading }) => (
+                <Button size="lg" variant="outline" disabled={loading} data-testid="button-download-pdf">
+                  <Download className="h-4 w-4 mr-2" />
+                  {loading ? 'Generating PDF...' : 'Download PDF'}
+                </Button>
+              )}
+            </PDFDownloadLink>
           </div>
 
           {/* Overview Section */}
@@ -483,20 +481,18 @@ export default function Documentation() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="h-5 w-5" />
-                Overview
+                Platform Overview
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-muted-foreground">
-                Rug Killer Alpha Bot is a comprehensive web application designed to analyze Solana SPL tokens 
-                for potential rug pull risks. It provides real-time analysis by aggregating data from multiple 
-                trusted sources and applying AI-powered detection algorithms to identify common indicators such 
-                as mint/freeze authority, holder concentration, liquidity pool status, and suspicious transaction patterns.
+            <CardContent className="space-y-3">
+              <p className="text-muted-foreground leading-relaxed">
+                Advanced Solana token security platform that analyzes SPL tokens for rug pull risks using 
+                multi-source blockchain intelligence and AI-powered detection algorithms.
               </p>
-              <p className="text-muted-foreground">
-                Our platform leverages advanced analytics and AI-driven insights to protect users from 
-                fraudulent schemes in the Solana ecosystem, combining data from Rugcheck, GoPlus Security, 
-                DexScreener, and Jupiter Aggregator to give you the most accurate risk assessment possible.
+              <p className="text-muted-foreground leading-relaxed">
+                Combines data from Rugcheck, GoPlus Security, DexScreener, and Jupiter to deliver comprehensive 
+                risk assessments covering mint/freeze authority, holder concentration, liquidity depth, and 
+                transaction patterns.
               </p>
             </CardContent>
           </Card>
@@ -507,38 +503,38 @@ export default function Documentation() {
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <Database className="h-5 w-5 text-primary" />
-                  <CardTitle>Multi-Source Analysis</CardTitle>
+                  <CardTitle>Data Sources</CardTitle>
                 </div>
-                <CardDescription>Aggregates data from four major blockchain intelligence sources</CardDescription>
+                <CardDescription>Multi-source blockchain intelligence aggregation</CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-3 text-sm">
-                  <li className="flex items-start gap-2">
+                  <li className="flex items-start gap-3">
                     <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                     <div>
-                      <strong>Rugcheck.xyz</strong>
-                      <p className="text-muted-foreground text-xs">Community-driven risk scores and liquidity analysis</p>
+                      <strong className="text-sm">Rugcheck.xyz</strong>
+                      <p className="text-muted-foreground text-xs mt-0.5">Risk scores & liquidity analysis</p>
                     </div>
                   </li>
-                  <li className="flex items-start gap-2">
+                  <li className="flex items-start gap-3">
                     <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                     <div>
-                      <strong>GoPlus Security</strong>
-                      <p className="text-muted-foreground text-xs">Honeypot detection, contract security scanning, scam detection flags</p>
+                      <strong className="text-sm">GoPlus Security</strong>
+                      <p className="text-muted-foreground text-xs mt-0.5">Honeypot detection & contract scanning</p>
                     </div>
                   </li>
-                  <li className="flex items-start gap-2">
+                  <li className="flex items-start gap-3">
                     <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                     <div>
-                      <strong>DexScreener</strong>
-                      <p className="text-muted-foreground text-xs">Real-time market data (price, volume, liquidity, market cap)</p>
+                      <strong className="text-sm">DexScreener</strong>
+                      <p className="text-muted-foreground text-xs mt-0.5">Real-time market data & charts</p>
                     </div>
                   </li>
-                  <li className="flex items-start gap-2">
+                  <li className="flex items-start gap-3">
                     <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                     <div>
-                      <strong>Jupiter Aggregator</strong>
-                      <p className="text-muted-foreground text-xs">Price verification and liquidity aggregation across Solana DEXs</p>
+                      <strong className="text-sm">Jupiter Aggregator</strong>
+                      <p className="text-muted-foreground text-xs mt-0.5">Price verification & DEX aggregation</p>
                     </div>
                   </li>
                 </ul>
@@ -549,39 +545,39 @@ export default function Documentation() {
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <Zap className="h-5 w-5 text-primary" />
-                  <CardTitle>Token Analysis Features</CardTitle>
+                  <CardTitle>Analysis Features</CardTitle>
                 </div>
-                <CardDescription>Comprehensive risk assessment across multiple dimensions</CardDescription>
+                <CardDescription>Comprehensive risk assessment metrics</CardDescription>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2 text-sm">
+                <ul className="space-y-2.5 text-sm">
                   <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span><strong>Authority checks</strong> - Detects if mint or freeze authority is enabled</span>
+                    <span className="text-primary mt-0.5">•</span>
+                    <span><strong>Authority checks</strong> – Mint & freeze authority detection</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span><strong>Holder analysis</strong> - Top 20 holders with concentration percentage</span>
+                    <span className="text-primary mt-0.5">•</span>
+                    <span><strong>Holder analysis</strong> – Top 20 holders & concentration %</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span><strong>Liquidity assessment</strong> - Checks for locked liquidity and pool depth</span>
+                    <span className="text-primary mt-0.5">•</span>
+                    <span><strong>Liquidity assessment</strong> – Pool depth & LP burn status</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span><strong>Risk scoring</strong> - 0-100 score with detailed red flag breakdown</span>
+                    <span className="text-primary mt-0.5">•</span>
+                    <span><strong>Risk scoring</strong> – 0-100 score with red flags</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span><strong>BubbleMaps</strong> - Interactive visual holder distribution maps</span>
+                    <span className="text-primary mt-0.5">•</span>
+                    <span><strong>Holder maps</strong> – Visual distribution via BubbleMaps</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span><strong>Transaction history</strong> - Recent significant transactions and patterns</span>
+                    <span className="text-primary mt-0.5">•</span>
+                    <span><strong>Transaction history</strong> – Recent activity patterns</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span><strong>AI blacklist checks</strong> - Automatic flagging of suspicious wallets</span>
+                    <span className="text-primary mt-0.5">•</span>
+                    <span><strong>AI blacklist</strong> – Automated wallet flagging</span>
                   </li>
                 </ul>
               </CardContent>
@@ -591,13 +587,13 @@ export default function Documentation() {
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <Bot className="h-5 w-5 text-primary" />
-                  <CardTitle>Telegram & Discord Bots</CardTitle>
+                  <CardTitle>Discord & Telegram Bots</CardTitle>
                 </div>
-                <CardDescription>Instant analysis in your messaging apps with color-coded risk indicators</CardDescription>
+                <CardDescription>Instant analysis with color-coded risk indicators</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3 text-sm">
-                  <Badge variant="secondary" className="mb-2">Currently Ungated - Public Access</Badge>
+                  <Badge variant="secondary" className="mb-2">Public Access</Badge>
                   <div>
                     <p className="font-semibold mb-2">Available Commands:</p>
                     <ul className="space-y-2">
