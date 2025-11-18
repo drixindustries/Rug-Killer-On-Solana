@@ -426,7 +426,7 @@ export default function Home() {
                       </div>
 
                       {/* Special Detection Results */}
-                      {analysis.agedWalletData && analysis.agedWalletData.agedWalletCount > 0 && (
+                      {analysis.agedWalletData && (
                         <Suspense fallback={<ComponentLoader />}>
                           <AgedWalletDetectionCard data={analysis.agedWalletData} />
                         </Suspense>

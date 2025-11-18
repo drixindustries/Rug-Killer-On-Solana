@@ -275,7 +275,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     holderActivity = `📉 **COORDINATED SELLOFF**\n• Sellers: ${cs.sellersCount}\n• Combined Supply: ${cs.combinedSupplyPercent.toFixed(1)}%\n• ${cs.description}`;
   }
   
-  // AGED WALLETS (CRITICAL FOR NEW TOKENS)
+  // AGED WALLETS (CRITICAL FOR NEW TOKENS) - Show warnings only if significant risk
   let agedWallets: string | undefined;
   if (analysis.agedWalletData && analysis.agedWalletData.riskScore >= 35) {
     const aw = analysis.agedWalletData;

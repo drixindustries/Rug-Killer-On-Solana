@@ -9,17 +9,23 @@ interface AgedWalletDetectionCardProps {
 }
 
 export function AgedWalletDetectionCard({ data }: AgedWalletDetectionCardProps) {
-  const getRiskColor = (score: number) => {
-    if (score >= 70) return "text-red-500";
-    if (score >= 40) return "text-orange-500";
-    return "text-yellow-500";
+  // Calculate Safety Score (100 = safe/good, 0 = risky/bad) - inverse of risk score
+  const safetyScore = Math.max(0, Math.min(100, 100 - data.riskScore));
+  
+  const getSafetyColor = (score: number) => {
+    if (score >= 80) return "text-green-500";
+    if (score >= 60) return "text-lime-500";
+    if (score >= 40) return "text-yellow-500";
+    if (score >= 20) return "text-orange-500";
+    return "text-red-500";
   };
 
-  const getRiskBadge = (score: number) => {
-    if (score >= 70) return <Badge variant="destructive">Critical Risk</Badge>;
-    if (score >= 40) return <Badge className="bg-orange-500">High Risk</Badge>;
-    if (score > 0) return <Badge variant="secondary">Moderate Risk</Badge>;
-    return <Badge variant="outline">Clean</Badge>;
+  const getSafetyBadge = (score: number) => {
+    if (score >= 80) return <Badge className="bg-green-500">Excellent</Badge>;
+    if (score >= 60) return <Badge className="bg-lime-500">Good</Badge>;
+    if (score >= 40) return <Badge variant="secondary">Fair</Badge>;
+    if (score >= 20) return <Badge className="bg-orange-500">Poor</Badge>;
+    return <Badge variant="destructive">Critical</Badge>;
   };
 
   // Prepare pie chart data
@@ -46,16 +52,19 @@ export function AgedWalletDetectionCard({ data }: AgedWalletDetectionCardProps) 
               Detects fake volume from pre-aged wallets
             </CardDescription>
           </div>
-          {getRiskBadge(data.riskScore)}
+          {getSafetyBadge(safetyScore)}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Risk Score */}
+        {/* Safety Score */}
         <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-          <span className="text-sm font-medium">Fake Volume Risk Score</span>
-          <span className={`text-2xl font-bold ${getRiskColor(data.riskScore)}`}>
-            {data.riskScore}/100
+          <span className="text-sm font-medium">Wallet Ages Safety Score</span>
+          <span className={`text-2xl font-bold ${getSafetyColor(safetyScore)}`}>
+            {safetyScore}/100
           </span>
+        </div>
+        <div className="text-xs text-muted-foreground text-center -mt-2">
+          100 = Safe (no aged wallets) • 0 = Critical (high fake volume)
         </div>
 
         {/* Statistics Grid */}
@@ -193,10 +202,15 @@ export function AgedWalletDetectionCard({ data }: AgedWalletDetectionCardProps) 
         )}
 
         {/* What This Means */}
-        <div className="p-3 bg-blue-500/10 rounded border border-blue-500/20">
-          <div className="text-sm font-medium text-blue-400 mb-1">What This Means:</div>
+        <div className={`p-3 rounded border ${safetyScore >= 80 ? 'bg-green-500/10 border-green-500/20' : 'bg-blue-500/10 border-blue-500/20'}`}>
+          <div className={`text-sm font-medium mb-1 ${safetyScore >= 80 ? 'text-green-400' : 'text-blue-400'}`}>
+            {safetyScore >= 80 ? '✅ Good News:' : 'What This Means:'}
+          </div>
           <p className="text-xs text-muted-foreground">
-            Scammers create wallets months in advance, give them transaction history, then use them to buy their own token. This creates fake volume and tricks traders into thinking there's genuine interest. These aged wallets rarely sell.
+            {safetyScore >= 80 
+              ? 'No aged wallet manipulation detected. The token\'s volume appears to be from legitimate traders with natural wallet ages.'
+              : 'Scammers create wallets months in advance, give them transaction history, then use them to buy their own token. This creates fake volume and tricks traders into thinking there\'s genuine interest. These aged wallets rarely sell.'
+            }
           </p>
         </div>
       </CardContent>
