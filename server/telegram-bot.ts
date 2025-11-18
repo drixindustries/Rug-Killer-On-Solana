@@ -8,6 +8,7 @@ import { getAlphaAlertService } from './alpha-alerts';
 import { checkBlacklist, reportWallet, getBlacklistStats, getTopFlaggedWallets } from './ai-blacklist';
 import { getExchangeStats } from './exchange-whitelist';
 import { nameCache } from './name-cache';
+import { rally } from './bot-personality';
 
 // Bot instance - only created when startTelegramBot() is called
 let botInstance: Telegraf | null = null;
@@ -88,14 +89,14 @@ function createTelegramBot(botToken: string): Telegraf {
   
   // /start command
   bot.command('start', async (ctx) => {
-    await ctx.reply(
-      'ðŸ”¥ **RUG KILLER ALPHA BOT**\n\n' +
-      '**Core Commands:**\n' +
+    const help = rally.getHelpMessage();
+    await ctx.reply(help.message + '\n\n' +
+      '**Commands:**\n' +
       '/execute <address> - Full scan\n' +
       '/holders <address> [n] - Top N holders\n' +
       '/devaudit <address> - Dev wallet history\n' +
       '/blacklist <wallet> - Check if wallet is flagged\n\n' +
-      '**Group Tier Commands:**\n' +
+      '**Premium Commands:**\n' +
       '/whaletrack <address> - Smart money tracking\n' +
       '/kol <wallet> - Check if wallet is KOL\n\n' +
       '**Quick Commands:**\n' +
@@ -1201,12 +1202,49 @@ function createTelegramBot(botToken: string): Telegraf {
   // Handle mentions with personality
   bot.on(message('text'), async (ctx) => {
     const text = ctx.message.text.trim();
+    const lowerText = text.toLowerCase();
     const botUsername = ctx.botInfo.username;
+    const userId = ctx.from?.id.toString() || 'unknown';
     
     // Check if bot is mentioned
-    if (text.includes(`@${botUsername}`) || (ctx.message.reply_to_message && ctx.message.reply_to_message.from?.is_bot)) {
-      const randomQuote = personalityQuotes[Math.floor(Math.random() * personalityQuotes.length)];
-      await ctx.reply(randomQuote, { parse_mode: 'Markdown' });
+    const isMentioned = text.includes(`@${botUsername}`);
+    const isReply = ctx.message.reply_to_message && ctx.message.reply_to_message.from?.is_bot;
+    
+    if (isMentioned || isReply) {
+      // Handle greetings
+      if (lowerText.match(/\b(hi|hey|hello|sup|yo|gm|gn|wassup|what'?s up)\b/)) {
+        const timeOfDay = rally.getTimeOfDay();
+        const greeting = lowerText.includes('gm') ? rally.getGreeting(userId, 'morning') :
+                        lowerText.includes('gn') ? rally.getFarewell(userId) :
+                        rally.getGreeting(userId, timeOfDay);
+        await ctx.reply(greeting.message);
+        return;
+      }
+      
+      // Handle thanks
+      if (lowerText.match(/\b(thanks|thank you|thx|ty|appreciate)\b/)) {
+        const thanks = rally.respondToThanks(ctx.from?.username);
+        await ctx.reply(thanks.message);
+        return;
+      }
+      
+      // Handle help requests
+      if (lowerText.match(/\b(help|commands|how|what can you do)\b/)) {
+        const help = rally.getHelpMessage();
+        await ctx.reply(help.message);
+        return;
+      }
+      
+      // Try small talk response
+      const smallTalk = rally.respondToSmallTalk(text);
+      if (smallTalk) {
+        await ctx.reply(smallTalk.message);
+        return;
+      }
+      
+      // Default personality response when mentioned
+      const defaultGreeting = rally.getGreeting(userId);
+      await ctx.reply(defaultGreeting.message);
       return;
     }
     
@@ -1269,17 +1307,15 @@ function createTelegramBot(botToken: string): Telegraf {
     // Auto-detect token addresses in messages
     if (text.length >= 32 && text.length <= 44 && !/\s/.test(text)) {
       try {
-        const quickReplies = [
-          'ðŸ” Ooh, a shiny new token! Let me check if it\'s a gem or a trap...',
-          'ðŸ’£ ANALYZING! If this is a rug I\'m gonna be SO disappointed...',
-          'ðŸŽª Time for the Harley Rug Test! Let\'s see what we got here...',
-          'ðŸ”¨ Hold tight puddin\', running diagnostics on this bad boy...',
-        ];
-        await ctx.reply(quickReplies[Math.floor(Math.random() * quickReplies.length)]);
+        const intro = rally.getAnalysisIntro('this token', true);
+        await ctx.reply(intro.message);
         
         const analysis = await tokenAnalyzer.analyzeToken(text);
         const message = formatAnalysis(analysis, true);
-        await ctx.reply(message, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } });
+        
+        // Add Rally's risk commentary
+        const riskComment = rally.getRiskCommentary(analysis.riskScore, analysis.riskLevel);
+        await ctx.reply(`${riskComment.message}\n\n${message}`, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } });
       } catch (error) {
       }
     }
@@ -1384,12 +1420,12 @@ export async function startTelegramBotWebhook(webhookUrl: string) {
   const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
   
   if (!BOT_TOKEN || BOT_TOKEN === 'PLACEHOLDER_TOKEN') {
-    console.log('âš ï¸  Telegram bot token not configured');
+    console.log('ï¿½ ï¿½  Telegram bot token not configured');
     return null;
   }
   
   if (botInstance) {
-    console.log('âš ï¸  Telegram bot already running');
+    console.log('ï¿½ ï¿½  Telegram bot already running');
     return botInstance;
   }
   

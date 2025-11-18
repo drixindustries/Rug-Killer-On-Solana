@@ -7,6 +7,7 @@ import { getAlphaAlertService } from './alpha-alerts';
 import { checkBlacklist, reportWallet, getBlacklistStats, getTopFlaggedWallets } from './ai-blacklist';
 import { getExchangeStats } from './exchange-whitelist';
 import { nameCache } from './name-cache';
+import { rally } from './bot-personality';
 
 // Client instance - only created when startDiscordBot() is called
 let clientInstance: Client | null = null;
@@ -1719,18 +1720,6 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     }
   });
   
-  // Fun personality responses when mentioned
-  const personalityQuotes = [
-    "🎭 Hiya puddin'! Need me to sniff out some rugs? Just drop that contract address and watch me work!",
-    "💣 BOOM! Someone called? Drop a token address and I'll tell ya if it's a keeper or a rug-pullin' disaster!",
-    "🔨 Harley's Rug Detector at your service! Toss me a contract and I'll smash through the BS faster than you can say 'diamond hands'!",
-    "🎪 Oh oh oh! You rang? I LOVE exposing scammers! Give me a token address and I'll tear it apart... in the fun way!",
-    "💥 Well well well, what do we have here? Another ape lookin' for alpha? Drop that CA and let's see if it's legit or just another honeypot!",
-    "🃏 Miss me? Course ya did! I'm the only bot crazy enough to actually ENJOY hunting rugs. Try me with a token address!",
-    "🎯 YOOHOO! Ready to blow up some scammer's plans? Hand over that contract address and watch the fireworks!",
-    "🦇 Batsy wouldn't approve of my methods but WHO CARES! Drop a token and I'll go full detective mode on those devs!",
-  ];
-
   // Handle direct messages and mentions
   const lastResponded: Map<string, number> = new Map(); // key: channelId:symbol
   client.on('messageCreate', async message => {
@@ -1741,6 +1730,49 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     if (!message.content) return;
     
     const text = message.content.trim();
+    const lowerText = text.toLowerCase();
+    
+    // Check if bot is mentioned or replied to
+    const isMentioned = message.mentions.has(client.user!.id);
+    const isReply = !!message.reference?.messageId;
+    
+    // Handle greetings
+    if (isMentioned || isReply) {
+      if (lowerText.match(/\b(hi|hey|hello|sup|yo|gm|gn|wassup|what'?s up)\b/)) {
+        const timeOfDay = rally.getTimeOfDay();
+        const greeting = lowerText.includes('gm') ? rally.getGreeting(message.author.id, 'morning') :
+                        lowerText.includes('gn') ? rally.getFarewell(message.author.id) :
+                        rally.getGreeting(message.author.id, timeOfDay);
+        await message.reply(greeting.message);
+        return;
+      }
+      
+      // Handle thanks
+      if (lowerText.match(/\b(thanks|thank you|thx|ty|appreciate)\b/)) {
+        const thanks = rally.respondToThanks(message.author.username);
+        await message.reply(thanks.message);
+        return;
+      }
+      
+      // Handle help requests
+      if (lowerText.match(/\b(help|commands|how|what can you do)\b/)) {
+        const help = rally.getHelpMessage();
+        await message.reply(help.message);
+        return;
+      }
+      
+      // Try small talk response
+      const smallTalk = rally.respondToSmallTalk(text);
+      if (smallTalk) {
+        await message.reply(smallTalk.message);
+        return;
+      }
+      
+      // Default personality response when mentioned
+      const defaultGreeting = rally.getGreeting(message.author.id);
+      await message.reply(defaultGreeting.message);
+      return;
+    }
     
     // Handle plain text commands for Android users (!scan or !execute)
     // Support both "!scan ADDRESS" and "!scan\nADDRESS" (newline) formats
@@ -1748,6 +1780,11 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     if (scanMatch) {
       const tokenAddress = scanMatch[1];
       console.log(`[Discord !scan] User ${message.author.tag} scanning: ${tokenAddress}`);
+      
+      // Rally's scan intro
+      const intro = rally.getAnalysisIntro('this token', true);
+      const loadingMsg = await message.reply(intro.message);
+      
       try {
         await message.channel.sendTyping();
         
@@ -1762,34 +1799,27 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         
         try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
         const embed = createAnalysisEmbed(analysis);
-        await message.reply({ embeds: [embed] });
+        
+        // Add Rally's commentary
+        const riskComment = rally.getRiskCommentary(analysis.riskScore, analysis.riskLevel);
+        
+        await loadingMsg.edit({ content: riskComment.message, embeds: [embed] });
         console.log(`[Discord !scan] Reply sent for ${tokenAddress}`);
         return;
       } catch (error: any) {
         console.error(`[Discord !scan] Error for ${tokenAddress}:`, error.message);
-        const errorEmbed = new EmbedBuilder()
-          .setColor(0xff0000)
-          .setTitle('❌ Analysis Failed')
-          .setDescription(
-            `Failed to analyze token: \`${tokenAddress.slice(0, 8)}...${tokenAddress.slice(-8)}\`\n\n` +
-            `**Error:** ${error?.message || 'Unknown error'}\n\n` +
-            `This could be due to:\n` +
-            `• Invalid token address\n` +
-            `• RPC connection issues\n` +
-            `• Token data not available\n\n` +
-            `Please verify the address and try again.`
-          )
-          .setTimestamp();
-        await message.reply({ embeds: [errorEmbed] });
+        
+        // Rally's error response
+        let errorType: 'invalid_address' | 'not_found' | 'network_error' | 'rate_limit' | 'generic' = 'generic';
+        if (error.message.includes('Invalid') || error.message.includes('not valid')) errorType = 'invalid_address';
+        else if (error.message.includes('not found')) errorType = 'not_found';
+        else if (error.message.includes('timeout') || error.message.includes('network')) errorType = 'network_error';
+        else if (error.message.includes('rate limit')) errorType = 'rate_limit';
+        
+        const errorResponse = rally.getErrorResponse(errorType);
+        await loadingMsg.edit({ content: errorResponse.message });
         return;
       }
-    }
-    
-    // Check if bot is mentioned
-    if (message.mentions.has(client.user!.id) || message.reference?.messageId) {
-      const randomQuote = personalityQuotes[Math.floor(Math.random() * personalityQuotes.length)];
-      await message.reply(randomQuote);
-      return;
     }
     
     // Handle $symbol mentions (cashtag injection like Rick bot)
