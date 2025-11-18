@@ -455,6 +455,56 @@ export class AlphaAlertService {
     }
   }
 
+  // Public: trigger a synthetic alert for testing delivery
+  async triggerTestAlert(mint?: string, source?: string): Promise<void> {
+    const testMint = (mint && mint.length >= 32) ? mint : 'So11111111111111111111111111111111111111112';
+    const testSource = source || 'Test Wallet';
+    await this.sendAlert({
+      type: 'caller_signal',
+      mint: testMint,
+      source: testSource,
+      timestamp: Date.now(),
+      data: { provider: 'Test', amountToken: 1, amountUsd: 1 }
+    });
+  }
+
+  // Public: send the startup message again to verify direct-send wiring
+  async sendStartupTest(messageOverride?: string): Promise<void> {
+    const startupMessage = messageOverride || (
+      '🧪 **ALPHA ALERTS TEST**\n\n' +
+      'This is a test message confirming direct sends are configured.\n' +
+      'If you see this in Discord/Telegram, delivery works.'
+    );
+    const DIRECT = process.env.ALPHA_ALERTS_DIRECT_SEND === 'true';
+    const DISCORD_WEBHOOK = process.env.ALPHA_DISCORD_WEBHOOK;
+    if (DIRECT && DISCORD_WEBHOOK) {
+      try {
+        await fetch(DISCORD_WEBHOOK, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: startupMessage, username: 'RugKiller Alpha Alerts' }),
+        });
+      } catch (error) {
+        console.error('[ALPHA ALERT] Discord test send failed:', error);
+      }
+    }
+
+    const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.ALPHA_TELEGRAM_BOT_TOKEN;
+    const TELEGRAM_CHAT = process.env.ALPHA_TELEGRAM_CHAT_ID;
+    if (DIRECT && TELEGRAM_TOKEN && TELEGRAM_CHAT) {
+      try {
+        const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
+        await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: TELEGRAM_CHAT, text: startupMessage, parse_mode: 'Markdown' }),
+        });
+      } catch (error) {
+        console.error('[ALPHA ALERT] Telegram test send failed:', error);
+      }
+    }
+  }
+
   // Check if token passes basic quality filters
   private async isQualityToken(mint: string): Promise<boolean> {
     try {
