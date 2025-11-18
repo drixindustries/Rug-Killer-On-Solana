@@ -365,7 +365,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   
   // QUICK LINKS
   const links = `🔗 [Solscan](https://solscan.io/token/${analysis.tokenAddress}) • [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress}) • [Rugcheck](https://rugcheck.xyz/tokens/${analysis.tokenAddress})
-[GMGN](https://gmgn.ai/sol/token/${analysis.tokenAddress}) • [Birdeye](https://birdeye.so/token/${analysis.tokenAddress}?chain=solana) • [Padre](https://t.me/padre_tg_bot?start=${analysis.tokenAddress})`;
+[GMGN](https://gmgn.ai/sol/token/${analysis.tokenAddress}) • [Birdeye](https://birdeye.so/token/${analysis.tokenAddress}?chain=solana) • [Axiom](https://axiom.trade/token/${analysis.tokenAddress}) • [Padre](https://t.me/padre_tg_bot?start=${analysis.tokenAddress})`;
   
   return {
     header,
