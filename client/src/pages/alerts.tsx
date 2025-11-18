@@ -13,6 +13,8 @@ import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2, Bell, BellOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { PriceAlert } from "@shared/schema";
+import { Header } from "@/components/header-new";
+import { Footer } from "@/components/footer";
 
 export default function Alerts() {
   const { toast } = useToast();
@@ -156,10 +158,15 @@ export default function Alerts() {
   const triggeredCount = alerts.filter(a => a.triggeredAt).length;
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="min-h-screen flex flex-col bg-background">
+      <Header />
+      <main className="flex-1">
+        <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold" data-testid="title-alerts">Price Alerts</h1>
+          </div>
+        </main>
+        <Footer />
+      </div>
           <p className="text-muted-foreground">Get notified when token prices hit your targets</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>

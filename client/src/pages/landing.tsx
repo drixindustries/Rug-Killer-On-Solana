@@ -3,37 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BotShowcase } from "@/components/bot-showcase";
 import { ContractAddress } from "@/components/contract-address";
+import { Header } from "@/components/header-new";
+import { Footer } from "@/components/footer";
 
 export default function Landing() {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background">
       {/* Mascot background */}
       <div className="mascot-background" />
-      
-      <header className="border-b">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Shield className="w-6 h-6 text-primary" />
-            <span className="font-semibold text-xl">Rug Killer Alpha Bot</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button 
-              variant="outline"
-              size="sm"
-              onClick={() => window.location.href = '/bot-guide'}
-            >
-              <Bot className="w-4 h-4 mr-2" />
-              Join Bots
-            </Button>
-            <Button 
-              onClick={() => window.location.href = '/'}
-              data-testid="button-get-started-header"
-            >
-              Analyze Tokens
-            </Button>
-          </div>
-        </div>
-      </header>
+
+      <Header />
 
       <main className="flex-1">
         <section className="container mx-auto px-4 py-24 md:py-32">
@@ -316,11 +295,7 @@ export default function Landing() {
         </section>
       </main>
 
-      <footer className="border-t py-6">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>Rug Killer Alpha Bot - Protect your investments</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

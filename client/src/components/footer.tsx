@@ -39,7 +39,7 @@ export function Footer() {
               <span className="text-sm font-semibold">Rug Killer Alpha Bot</span>
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground mb-4">
-              Protecting Solana investors from rug pulls since 2025
+              Made by trenchers; for trenchers.
             </p>
           </div>
           

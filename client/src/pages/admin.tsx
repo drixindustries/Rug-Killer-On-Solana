@@ -2,10 +2,15 @@ import { Link } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Wallet, Rocket, Shield } from 'lucide-react';
+import { Header } from "@/components/header-new";
+import { Footer } from "@/components/footer";
 
 export default function Admin() {
   return (
-    <div className="container mx-auto p-6 max-w-5xl">
+    <div className="min-h-screen flex flex-col bg-background">
+      <Header />
+      <main className="flex-1">
+        <div className="container mx-auto p-6 max-w-5xl">
       <div className="mb-8">
         <h1 className="text-4xl font-bold flex items-center gap-3" data-testid="heading-admin">
           <Shield className="h-10 w-10" />
@@ -103,6 +108,9 @@ export default function Admin() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      </main>
+      <Footer />
     </div>
   );
 }

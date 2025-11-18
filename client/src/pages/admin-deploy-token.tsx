@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle2, Copy, Rocket, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Header } from "@/components/header-new";
+import { Footer } from "@/components/footer";
 
 interface DeploymentResult {
   success: boolean;
@@ -79,7 +81,10 @@ export default function AdminDeployToken() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
+    <div className="min-h-screen flex flex-col bg-background">
+      <Header />
+      <main className="flex-1">
+        <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-6">
         <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="heading-deploy-token">
           <Rocket className="h-8 w-8" />
@@ -360,6 +365,9 @@ export default function AdminDeployToken() {
           )}
         </div>
       )}
+        </div>
+      </main>
+      <Footer />
     </div>
   );
 }

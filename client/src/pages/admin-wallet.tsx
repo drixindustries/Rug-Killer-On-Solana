@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle2, Copy, ExternalLink, Wallet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Header } from "@/components/header-new";
+import { Footer } from "@/components/footer";
 
 interface CreatorWalletInfo {
   publicKey: string;
@@ -63,17 +65,26 @@ export default function AdminWallet() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 max-w-4xl">
-        <div className="animate-pulse">
-          <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
-          <div className="h-64 bg-muted rounded"></div>
-        </div>
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-1">
+          <div className="container mx-auto p-6 max-w-4xl">
+            <div className="animate-pulse">
+              <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
+              <div className="h-64 bg-muted rounded"></div>
+            </div>
+          </div>
+        </main>
+        <Footer />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
+    <div className="min-h-screen flex flex-col bg-background">
+      <Header />
+      <main className="flex-1">
+        <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-6">
         <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="heading-admin-wallet">
           <Wallet className="h-8 w-8" />
@@ -279,6 +290,9 @@ export default function AdminWallet() {
           </div>
         </CardContent>
       </Card>
+        </div>
+      </main>
+      <Footer />
     </div>
   );
 }
