@@ -1593,6 +1593,37 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     
     const text = message.content.trim();
     
+    // Handle plain text commands for Android users (!scan or !execute)
+    const scanMatch = text.match(/^!(?:scan|execute)\s+([1-9A-HJ-NP-Za-km-z]{32,44})$/i);
+    if (scanMatch) {
+      const tokenAddress = scanMatch[1];
+      try {
+        await message.channel.sendTyping();
+        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
+        const embed = createAnalysisEmbed(analysis);
+        await message.reply({ embeds: [embed] });
+        return;
+      } catch (error: any) {
+        console.error('Discord !scan command error:', error);
+        const errorEmbed = new EmbedBuilder()
+          .setColor(0xff0000)
+          .setTitle('❌ Analysis Failed')
+          .setDescription(
+            `Failed to analyze token: \`${tokenAddress.slice(0, 8)}...${tokenAddress.slice(-8)}\`\n\n` +
+            `**Error:** ${error?.message || 'Unknown error'}\n\n` +
+            `This could be due to:\n` +
+            `• Invalid token address\n` +
+            `• RPC connection issues\n` +
+            `• Token data not available\n\n` +
+            `Please verify the address and try again.`
+          )
+          .setTimestamp();
+        await message.reply({ embeds: [errorEmbed] });
+        return;
+      }
+    }
+    
     // Check if bot is mentioned
     if (message.mentions.has(client.user!.id) || message.reference?.messageId) {
       const randomQuote = personalityQuotes[Math.floor(Math.random() * personalityQuotes.length)];
@@ -1648,7 +1679,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             { name: '📈 Axiom.trade', value: `[View on Axiom](https://axiom.trade/token/${text})`, inline: true },
             { name: '🔍 Solscan', value: `[View on Solscan](https://solscan.io/token/${text})`, inline: true }
           )
-          .setFooter({ text: `💡 Use /execute ${text.slice(0, 8)}... for full rug analysis` })
+          .setFooter({ text: `💡 Use /execute ${text.slice(0, 8)}... or !scan ${text.slice(0, 8)}... for full rug analysis` })
           .setTimestamp();
         
         await message.reply({ embeds: [linksEmbed] });
