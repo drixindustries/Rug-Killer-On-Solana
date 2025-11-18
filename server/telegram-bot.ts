@@ -1210,18 +1210,47 @@ function createTelegramBot(botToken: string): Telegraf {
       return;
     }
     
-    // $SYMBOL quick analysis via cache (seeded by prior /execute)
+    // $SYMBOL cashtag injection - auto-search and analyze
+    // Triggers on messages like "$ZKSL is moving" or "$BONK to the moon"
     const symMatch = text.match(/\$([A-Za-z0-9]{2,15})/);
     if (symMatch) {
-      const sym = symMatch[1];
-      const resolved = nameCache.resolve(sym);
-      if (resolved) {
-        const throttleKey = `${ctx.chat?.id}:${sym.toLowerCase()}`;
-        const now = Date.now();
-        const last = lastResponded.get(throttleKey) || 0;
-        if (now - last < 15000) {
-          return; // prevent spam within 15s for same symbol in chat
+      const sym = symMatch[1].toUpperCase();
+      
+      // Throttle to prevent spam (15 seconds per symbol per chat)
+      const throttleKey = `${ctx.chat?.id}:${sym.toLowerCase()}`;
+      const now = Date.now();
+      const last = lastResponded.get(throttleKey) || 0;
+      if (now - last < 15000) {
+        return; // prevent spam within 15s for same symbol in chat
+      }
+      
+      // Try to resolve from cache first
+      let resolved = nameCache.resolve(sym);
+      
+      // If not cached, search DexScreener for the symbol
+      if (!resolved) {
+        try {
+          const searchUrl = `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(sym)}`;
+          const searchRes = await fetch(searchUrl, { signal: AbortSignal.timeout(5000) });
+          if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            const solanaPair = searchData.pairs?.find((p: any) => 
+              p.chainId === 'solana' && 
+              (p.baseToken?.symbol?.toLowerCase() === sym.toLowerCase() ||
+               p.quoteToken?.symbol?.toLowerCase() === sym.toLowerCase())
+            );
+            if (solanaPair) {
+              resolved = solanaPair.baseToken.symbol.toLowerCase() === sym.toLowerCase() 
+                ? solanaPair.baseToken.address 
+                : solanaPair.quoteToken.address;
+            }
+          }
+        } catch (searchErr) {
+          // Silently fail search - just won't respond to uncached symbols
         }
+      }
+      
+      if (resolved) {
         lastResponded.set(throttleKey, now);
         try {
           const analysis = await tokenAnalyzer.analyzeToken(resolved);
@@ -1230,13 +1259,11 @@ function createTelegramBot(botToken: string): Telegraf {
           await ctx.reply(msg, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } });
           return;
         } catch (err) {
-          await ctx.reply(`Couldn't fetch analysis for $${sym}. Use /execute with the contract address once.`);
+          // Silently fail - don't spam errors for cashtag mentions
           return;
         }
-      } else {
-        await ctx.reply(`I don't recognize $${sym} yet. Run /execute with its contract address first.`);
-        return;
       }
+      // If symbol not found, silently ignore (don't spam "not recognized" messages)
     }
 
     // Auto-detect token addresses in messages
