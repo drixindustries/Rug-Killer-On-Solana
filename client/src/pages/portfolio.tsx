@@ -528,7 +528,7 @@ export default function Portfolio() {
                       })}
                     </TableBody>
                   </Table>
-                )}
+                ))}
             </CardContent>
           </Card>
 
