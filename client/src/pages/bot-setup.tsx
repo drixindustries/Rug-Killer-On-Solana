@@ -366,6 +366,8 @@ export default function BotSetup() {
           </CardContent>
         </Card>
         </div>
+        {/* Close page container */}
+        </div>
       </main>
       <Footer />
     </div>
