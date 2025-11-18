@@ -77,7 +77,7 @@ Visit \http://localhost:5173\
 1. Fork this repository
 2. Create a new project on [Railway](https://railway.app)
 3. Connect your GitHub repository
-4. Add environment variables (see \RAILWAY_ENV_SETUP.md\)
+4. Add environment variables (see [RPC_SETUP_GUIDE.md](RPC_SETUP_GUIDE.md) and [DEPLOYMENT.md](DEPLOYMENT.md))
 5. Deploy! 
 
 ---
@@ -88,7 +88,9 @@ Visit \http://localhost:5173\
 - [API Reference](docs/API.md)
 - [Advanced Rug Detection](docs/ADVANCED_RUG_DETECTION.md)
 - [Pump.fun Integration](docs/QUICKSTART_PUMPFUN.md)
-- [Railway Deployment](RAILWAY_ENV_SETUP.md)
+- [Railway Deployment](DEPLOYMENT.md)
+- [RPC Setup Guide](RPC_SETUP_GUIDE.md)
+- [Discord Bot Setup](DISCORD_BOT_SETUP.md)
 
 ---
 
