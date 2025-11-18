@@ -1073,42 +1073,54 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         
         embed.addFields({ name: '🛡️ Risk Score', value: riskComparison });
         
-        if (pair1 && pair2) {
-          const betterVol = (pair1.volume?.h24 ?? 0) > (pair2.volume?.h24 ?? 0) ? 'A' : 'B';
-          let priceVol = `A: $${parseFloat(pair1.priceUsd || '0').toFixed(8)} | Vol: $${formatNumber(pair1.volume?.h24 ?? 0)}\n`;
-          priceVol += `B: $${parseFloat(pair2.priceUsd || '0').toFixed(8)} | Vol: $${formatNumber(pair2.volume?.h24 ?? 0)}\n`;
+        // Market data
+        const price1 = pair1?.priceUsd ? parseFloat(pair1.priceUsd) : 0;
+        const price2 = pair2?.priceUsd ? parseFloat(pair2.priceUsd) : 0;
+        const vol1 = pair1?.volume?.h24 ?? 0;
+        const vol2 = pair2?.volume?.h24 ?? 0;
+        const mcap1 = pair1?.marketCap ?? 0;
+        const mcap2 = pair2?.marketCap ?? 0;
+        const liq1 = pair1?.liquidity?.usd ?? 0;
+        const liq2 = pair2?.liquidity?.usd ?? 0;
+        
+        if (price1 > 0 || price2 > 0) {
+          const betterVol = vol1 > vol2 ? 'A' : 'B';
+          let priceVol = `A: $${price1.toFixed(price1 < 0.01 ? 8 : 4)} | Vol: $${formatNumber(vol1)}\n`;
+          priceVol += `B: $${price2.toFixed(price2 < 0.01 ? 8 : 4)} | Vol: $${formatNumber(vol2)}\n`;
           priceVol += `👑 Higher Volume: Token ${betterVol}`;
-          
           embed.addFields({ name: '💰 Price & Volume', value: priceVol });
-          
-          if (pair1.marketCap && pair2.marketCap) {
-            const betterMcap = pair1.marketCap > pair2.marketCap ? 'A' : 'B';
-            let mcapComparison = `A: $${formatNumber(pair1.marketCap)}\n`;
-            mcapComparison += `B: $${formatNumber(pair2.marketCap)}\n`;
-            mcapComparison += `👑 Larger: Token ${betterMcap}`;
-            
-            embed.addFields({ name: '📊 Market Cap', value: mcapComparison });
-          }
-          
-          const betterLiq = (pair1.liquidity?.usd || 0) > (pair2.liquidity?.usd || 0) ? 'A' : 'B';
-          let liqComparison = `A: $${formatNumber(pair1.liquidity?.usd || 0)}\n`;
-          liqComparison += `B: $${formatNumber(pair2.liquidity?.usd || 0)}\n`;
-          liqComparison += `👑 Better: Token ${betterLiq}`;
-          
-          embed.addFields({ name: '💧 Liquidity', value: liqComparison });
         }
         
-        const betterDist = analysis1.topHolderConcentration < analysis2.topHolderConcentration ? 'A' : 'B';
-        let holderComparison = `A: ${analysis1.topHolderConcentration.toFixed(1)}% (${analysis1.holderCount} holders)\n`;
-        holderComparison += `B: ${analysis2.topHolderConcentration.toFixed(1)}% (${analysis2.holderCount} holders)\n`;
+        if (mcap1 > 0 || mcap2 > 0) {
+          const betterMcap = mcap1 > mcap2 ? 'A' : 'B';
+          let mcapComparison = `A: $${formatNumber(mcap1)}\n`;
+          mcapComparison += `B: $${formatNumber(mcap2)}\n`;
+          mcapComparison += `👑 Larger: Token ${betterMcap}`;
+          embed.addFields({ name: '📊 Market Cap', value: mcapComparison });
+        }
+        
+        if (liq1 > 0 || liq2 > 0) {
+          const betterLiq = liq1 > liq2 ? 'A' : 'B';
+          let liqComparison = `A: $${formatNumber(liq1)}\n`;
+          liqComparison += `B: $${formatNumber(liq2)}\n`;
+          liqComparison += `👑 Better: Token ${betterLiq}`;
+          embed.addFields({ name: '💧 Liquidity', value: liqComparison });
+        } else {
+          embed.addFields({ name: '⚠️ Market Data', value: 'No trading data available for these tokens' });
+        }
+        
+        const betterDist = (analysis1.topHolderConcentration ?? 100) < (analysis2.topHolderConcentration ?? 100) ? 'A' : 'B';
+        let holderComparison = `A: ${(analysis1.topHolderConcentration ?? 0).toFixed(1)}% (${analysis1.holderCount ?? 0} holders)\n`;
+        holderComparison += `B: ${(analysis2.topHolderConcentration ?? 0).toFixed(1)}% (${analysis2.holderCount ?? 0} holders)\n`;
         holderComparison += `👑 Better Distribution: Token ${betterDist}`;
         
         embed.addFields({ name: '👥 Holder Distribution', value: holderComparison });
 
-        const a_mint = analysis1.mintAuthority?.hasAuthority ? '❌' : '✅';
-        const b_mint = analysis2.mintAuthority?.hasAuthority ? '❌' : '✅';
-        const a_freeze = analysis1.freezeAuthority?.hasAuthority ? '❌' : '✅';
-        const b_freeze = analysis2.freezeAuthority?.hasAuthority ? '❌' : '✅';        let security = `Mint Revoked: A ${a_mint} | B ${b_mint}\n`;
+        const a_mint = analysis1.mintAuthority?.hasAuthority && !analysis1.mintAuthority?.isRevoked ? '❌' : '✅';
+        const b_mint = analysis2.mintAuthority?.hasAuthority && !analysis2.mintAuthority?.isRevoked ? '❌' : '✅';
+        const a_freeze = analysis1.freezeAuthority?.hasAuthority && !analysis1.freezeAuthority?.isRevoked ? '❌' : '✅';
+        const b_freeze = analysis2.freezeAuthority?.hasAuthority && !analysis2.freezeAuthority?.isRevoked ? '❌' : '✅';
+        let security = `Mint Revoked: A ${a_mint} | B ${b_mint}\n`;
         security += `Freeze Revoked: A ${a_freeze} | B ${b_freeze}`;
         
         embed.addFields({ name: '🔐 Security', value: security });
@@ -1117,9 +1129,9 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         let bScore = 0;
         
         if (analysis1.riskScore > analysis2.riskScore) aScore++; else bScore++;
-        if ((pair1?.volume.h24 || 0) > (pair2?.volume.h24 || 0)) aScore++; else bScore++;
-        if ((pair1?.liquidity?.usd || 0) > (pair2?.liquidity?.usd || 0)) aScore++; else bScore++;
-        if (analysis1.topHolderConcentration < analysis2.topHolderConcentration) aScore++; else bScore++;
+        if (vol1 > vol2) aScore++; else bScore++;
+        if (liq1 > liq2) aScore++; else bScore++;
+        if ((analysis1.topHolderConcentration ?? 100) < (analysis2.topHolderConcentration ?? 100)) aScore++; else bScore++;
         
         let verdict = '';
         if (aScore > bScore) {
