@@ -303,11 +303,13 @@ export class SolanaTokenAnalyzer {
       ));
 
       // Fetch holder data using getTokenLargestAccounts
+      // Note: This requires index RPC methods - Shyft free plan doesn't support it
       let holderCount = null;
       let top10Concentration = null;
       let topHolders: any[] = [];
 
       try {
+        // Try to get holder data - will fail on Shyft free plan
         const largestAccounts = await connection.getTokenLargestAccounts(tokenAddress, 'confirmed');
         const validAccounts = largestAccounts.value.filter(acc => Number(acc.amount) > 0);
         
@@ -330,8 +332,43 @@ export class SolanaTokenAnalyzer {
           top10Concentration = (top10Supply / totalSupply) * 100;
         }
       } catch (holderError: any) {
-        console.warn(`⚠️ [Analyzer] Holder data fetch failed:`, holderError.message);
-        // Continue with null holder data
+        // If index methods not supported, try with a different connection
+        if (holderError.message?.includes('IndexNotAllowedOnFreePlan') || holderError.message?.includes('403')) {
+          try {
+            // Fallback to public Solana RPC for holder data
+            const fallbackConnection = new (await import('@solana/web3.js')).Connection(
+              'https://api.mainnet-beta.solana.com',
+              'confirmed'
+            );
+            const largestAccounts = await fallbackConnection.getTokenLargestAccounts(tokenAddress, 'confirmed');
+            const validAccounts = largestAccounts.value.filter(acc => Number(acc.amount) > 0);
+            
+            holderCount = validAccounts.length;
+            
+            if (validAccounts.length > 0) {
+              const totalSupply = Number(mintInfo.supply);
+              let top10Supply = 0;
+              
+              validAccounts.slice(0, 10).forEach(acc => {
+                const amount = Number(acc.amount) / Math.pow(10, mintInfo.decimals);
+                top10Supply += Number(acc.amount);
+                topHolders.push({
+                  address: acc.address.toBase58(),
+                  balance: amount,
+                  percentage: (Number(acc.amount) / totalSupply) * 100
+                });
+              });
+              
+              top10Concentration = (top10Supply / totalSupply) * 100;
+            }
+            console.log(`✅ [Analyzer] Used fallback RPC for holder data`);
+          } catch (fallbackError: any) {
+            console.warn(`⚠️ [Analyzer] Fallback holder fetch also failed:`, fallbackError.message);
+            // Continue with null holder data
+          }
+        } else {
+          console.warn(`⚠️ [Analyzer] Holder data fetch failed:`, holderError.message);
+        }
       }
 
       return {
