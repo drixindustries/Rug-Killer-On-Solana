@@ -8,6 +8,7 @@
     "build": "echo 'No build needed - using tsx runtime'",
     "start": "tsx index.ts",
     "migrate": "tsx migrate.ts",
+    "seed:social": "tsx seed-demo-profiles.ts",
     "test": "tsx tests/run-tests.ts"
   },
   "dependencies": {
