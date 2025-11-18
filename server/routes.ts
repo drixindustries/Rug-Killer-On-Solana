@@ -257,6 +257,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Aged Wallet Detection Endpoint
+  app.post("/api/aged-wallets", async (req, res) => {
+    try {
+      const result = analyzeTokenSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          message: "Invalid request format",
+          errors: result.error.issues,
+        });
+      }
+
+      const { tokenAddress } = result.data;
+      const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+
+      if (!analysis) {
+        return res.status(404).json({
+          message: "Token not found or analysis failed",
+        });
+      }
+
+      res.json({
+        tokenAddress: analysis.tokenAddress,
+        metadata: analysis.metadata,
+        agedWalletData: analysis.agedWalletData || null,
+        risks: analysis.redFlags?.filter(f => f.category === 'aged_wallets') || [],
+      });
+    } catch (error: any) {
+      console.error("Aged wallet API error:", error);
+      res.status(500).json({
+        message: "Internal server error",
+        error: "Failed to process aged wallet detection request."
+      });
+    }
+  });
+
   // Token Analysis Endpoint with Rate Limit Handling
   app.post("/api/analyze", async (req, res) => {
     try {

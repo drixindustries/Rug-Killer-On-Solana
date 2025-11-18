@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Calendar, DollarSign, Users, TrendingUp } from "lucide-react";
+import { AlertTriangle, Calendar, DollarSign, Users, TrendingUp, PieChart as PieChartIcon } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import type { AgedWalletData } from "@shared/schema";
 
 interface AgedWalletDetectionCardProps {
@@ -20,6 +21,17 @@ export function AgedWalletDetectionCard({ data }: AgedWalletDetectionCardProps) 
     if (score > 0) return <Badge variant="secondary">Moderate Risk</Badge>;
     return <Badge variant="outline">Clean</Badge>;
   };
+
+  // Prepare pie chart data
+  const fakeVolumePercent = Math.min(data.totalFakeVolumePercent, 100);
+  const legitimateVolumePercent = Math.max(100 - fakeVolumePercent, 0);
+  
+  const pieData = [
+    { name: 'Fake Volume (Aged Wallets)', value: fakeVolumePercent, color: '#ef4444' },
+    { name: 'Legitimate Volume', value: legitimateVolumePercent, color: '#22c55e' },
+  ];
+
+  const COLORS = ['#ef4444', '#22c55e'];
 
   return (
     <Card className="border-orange-500/20">
@@ -64,6 +76,48 @@ export function AgedWalletDetectionCard({ data }: AgedWalletDetectionCardProps) 
             <div className="text-xl font-bold">{data.totalFakeVolumePercent.toFixed(1)}%</div>
           </div>
         </div>
+
+        {/* Volume Distribution Pie Chart */}
+        {fakeVolumePercent > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <PieChartIcon className="w-4 h-4 text-orange-500" />
+              Volume Distribution
+            </div>
+            <div className="bg-muted/30 rounded-lg p-4">
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                    outerRadius={60}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--popover))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '6px'
+                    }}
+                    formatter={(value: number) => `${value.toFixed(1)}%`}
+                  />
+                  <Legend 
+                    wrapperStyle={{ fontSize: '12px' }}
+                    iconType="circle"
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* Pattern Detection */}
         {(data.patterns.sameFundingSource || data.patterns.similarAges || data.patterns.coordinatedBuys || data.patterns.noSells) && (
