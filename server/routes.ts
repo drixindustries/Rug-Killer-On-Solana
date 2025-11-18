@@ -1432,6 +1432,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+    // GET /api/portfolio/live/:walletAddress - Get live wallet holdings
+    app.get('/api/portfolio/live/:walletAddress', async (req, res) => {
+      try {
+        const { walletAddress } = req.params;
+      
+        if (!walletAddress || walletAddress.length < 32 || walletAddress.length > 44) {
+          return res.status(400).json({ message: "Invalid wallet address" });
+        }
+
+        const { Connection, PublicKey } = await import('@solana/web3.js');
+        const { rpcBalancer } = await import('./services/rpc-balancer.ts');
+        const { priceService } = await import('./services/price-service.ts');
+        const { dexscreenerService } = await import('./dexscreener-service.ts');
+      
+        const connection = rpcBalancer.getConnection();
+        const publicKey = new PublicKey(walletAddress);
+      
+        // Get all token accounts for this wallet
+        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
+          programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+        });
+      
+        const holdings = await Promise.all(
+          tokenAccounts.value
+            .filter(account => {
+              const amount = account.account.data.parsed.info.tokenAmount.uiAmount;
+              return amount && amount > 0;
+            })
+            .map(async (account) => {
+              const tokenAddress = account.account.data.parsed.info.mint;
+              const balance = account.account.data.parsed.info.tokenAmount.uiAmount;
+              const decimals = account.account.data.parsed.info.tokenAmount.decimals;
+            
+              // Get price data
+              let priceUsd = null;
+              let valueUsd = null;
+              let change24h = null;
+              let symbol = 'Unknown';
+              let name = 'Unknown Token';
+              let logo = null;
+            
+              try {
+                const priceData = await priceService.getPrice(tokenAddress);
+                if (priceData?.priceUsd) {
+                  priceUsd = priceData.priceUsd;
+                  valueUsd = balance * priceUsd;
+                }
+              
+                const dexData = await dexscreenerService.getTokenData(tokenAddress);
+                if (dexData) {
+                  symbol = dexData.baseToken?.symbol || symbol;
+                  name = dexData.baseToken?.name || name;
+                  change24h = dexData.priceChange?.h24 || null;
+                  if (dexData.info?.imageUrl) {
+                    logo = dexData.info.imageUrl;
+                  }
+                }
+              } catch (err) {
+                console.log(`Failed to get price for ${tokenAddress}:`, err);
+              }
+            
+              return {
+                tokenAddress,
+                symbol,
+                name,
+                balance,
+                decimals,
+                priceUsd,
+                valueUsd,
+                change24h,
+                logo
+              };
+            })
+        );
+      
+        // Sort by value descending
+        holdings.sort((a, b) => (b.valueUsd || 0) - (a.valueUsd || 0));
+      
+        res.json(holdings);
+      } catch (error: any) {
+        console.error("Error fetching live wallet holdings:", error);
+        res.status(500).json({ message: "Failed to fetch wallet holdings: " + error.message });
+      }
+    });
+  
   // ============================================================================
   // PRICE ALERTS ROUTES
   // ============================================================================
