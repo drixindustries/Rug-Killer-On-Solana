@@ -273,7 +273,7 @@ export default function Pricing() {
               </CardHeader>
               <CardContent className="space-y-4 text-left">
                 <div>
-                  <h3 className="font-semibold mb-1">How do I become a $ANTIRUG holder?</h3>
+                  <h3 className="font-semibold mb-1">How do I become an $ANTIRUG holder?</h3>
                   <p className="text-sm text-muted-foreground">
                     Purchase 10M+ $ANTIRUG tokens and connect your wallet to automatically unlock lifetime access to all premium features.
                   </p>
