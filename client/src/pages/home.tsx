@@ -324,7 +324,7 @@ export default function Home() {
                 <div className="space-y-3">
                   <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">Rug Killer Alpha Bot</h1>
                   <p className="text-base sm:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
-                    Advanced Solana token security platform with 99%+ rug detection
+                    Made by trenchers, for trenchers.
                   </p>
                 </div>
                 </div>
