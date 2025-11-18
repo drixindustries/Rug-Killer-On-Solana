@@ -522,12 +522,31 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         
         await interaction.deferReply();
         
-        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
-        // Remember symbol/name mapping for quick $symbol lookups later
-        try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
-        const embed = createAnalysisEmbed(analysis);
-        
-        await interaction.editReply({ embeds: [embed] });
+        try {
+          const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+          // Remember symbol/name mapping for quick $symbol lookups later
+          try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
+          const embed = createAnalysisEmbed(analysis);
+          
+          await interaction.editReply({ embeds: [embed] });
+        } catch (error: any) {
+          console.error('Discord execute command error:', error);
+          const errorEmbed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('❌ Analysis Failed')
+            .setDescription(
+              `Failed to analyze token: \`${tokenAddress.slice(0, 8)}...${tokenAddress.slice(-8)}\`\n\n` +
+              `**Error:** ${error?.message || 'Unknown error'}\n\n` +
+              `This could be due to:\n` +
+              `• Invalid token address\n` +
+              `• RPC connection issues\n` +
+              `• Token data not available\n\n` +
+              `Please verify the address and try again.`
+            )
+            .setTimestamp();
+          
+          await interaction.editReply({ embeds: [errorEmbed] });
+        }
         
       } else if (interaction.commandName === 'first20') {
         const tokenAddress = interaction.options.getString('address', true);
