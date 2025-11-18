@@ -10,91 +10,121 @@ import { CONTRACT_ADDRESS } from "@/constants";
 // PDF Document Component with comprehensive content
 const pdfStyles = StyleSheet.create({
   page: {
-    padding: 40,
-    fontSize: 11,
+    padding: 50,
+    fontSize: 10,
     fontFamily: 'Helvetica',
+    backgroundColor: '#0a0a0a',
+    color: '#e0e0e0',
   },
   title: {
-    fontSize: 24,
-    marginBottom: 20,
-    fontWeight: 'bold',
-  },
-  section: {
-    marginBottom: 12,
-  },
-  heading: {
-    fontSize: 16,
+    fontSize: 28,
     marginBottom: 8,
     fontWeight: 'bold',
-    color: '#1a1a1a',
+    color: '#00ff88',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  subtitle: {
+    fontSize: 11,
+    marginBottom: 25,
+    color: '#888888',
+    fontFamily: 'Courier',
+  },
+  section: {
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottom: '1px solid #222222',
+  },
+  heading: {
+    fontSize: 14,
+    marginBottom: 10,
+    fontWeight: 'bold',
+    color: '#00ff88',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   subheading: {
-    fontSize: 13,
-    marginBottom: 6,
+    fontSize: 12,
+    marginBottom: 8,
     fontWeight: 'bold',
-    color: '#2a2a2a',
+    color: '#00ccff',
+    fontFamily: 'Courier',
   },
   text: {
-    marginBottom: 4,
-    lineHeight: 1.4,
+    marginBottom: 5,
+    lineHeight: 1.6,
+    color: '#cccccc',
   },
   list: {
-    marginLeft: 15,
-    marginBottom: 4,
+    marginLeft: 20,
+    marginBottom: 6,
   },
   code: {
     fontFamily: 'Courier',
-    fontSize: 10,
-    backgroundColor: '#f5f5f5',
-    padding: 2,
+    fontSize: 9,
+    backgroundColor: '#1a1a1a',
+    padding: 8,
+    color: '#00ff88',
+    border: '1px solid #333333',
+    marginTop: 4,
+    marginBottom: 4,
   },
   footer: {
     position: 'absolute',
     bottom: 30,
-    left: 40,
-    right: 40,
+    left: 50,
+    right: 50,
     textAlign: 'center',
-    fontSize: 9,
-    color: 'gray',
+    fontSize: 8,
+    color: '#555555',
+    borderTop: '1px solid #222222',
+    paddingTop: 10,
+  },
+  highlight: {
+    color: '#00ccff',
+    fontWeight: 'bold',
+  },
+  warning: {
+    color: '#ff6b6b',
+    fontWeight: 'bold',
   },
 });
 
 const DocumentationPDF = () => (
   <Document>
     <Page size="A4" style={pdfStyles.page}>
-      <Text style={pdfStyles.title}>Rug Killer Alpha Bot - Complete Documentation</Text>
+      <Text style={pdfStyles.title}>RUG KILLER ALPHA BOT</Text>
+      <Text style={pdfStyles.subtitle}>TECHNICAL DOCUMENTATION v2.0 | SOLANA BLOCKCHAIN SECURITY PLATFORM</Text>
       
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>Overview</Text>
+        <Text style={pdfStyles.heading}>SYSTEM OVERVIEW</Text>
         <Text style={pdfStyles.text}>
-          Solana Rug Killer is a comprehensive web application designed to analyze Solana SPL tokens 
-          for potential rug pull risks. It provides real-time analysis by aggregating data from multiple 
-          trusted sources and applying AI-powered detection algorithms to identify common indicators such 
-          as mint/freeze authority, holder concentration, liquidity pool status, and suspicious transaction patterns.
+          Advanced Solana SPL token analysis platform leveraging multi-source blockchain intelligence, 
+          real-time risk assessment algorithms, and AI-powered pattern recognition to detect rug pull 
+          indicators including: mint/freeze authority exploitation, suspicious holder concentration, 
+          liquidity pool manipulation, and anomalous transaction patterns.
         </Text>
       </View>
 
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>Project Information</Text>
-        <Text style={pdfStyles.subheading}>Official Contract Address</Text>
+        <Text style={pdfStyles.heading}>PROJECT IDENTIFIER</Text>
+        <Text style={pdfStyles.subheading}>Contract Address (CA)</Text>
         <Text style={pdfStyles.code}>{CONTRACT_ADDRESS}</Text>
         <Text style={pdfStyles.text}>
-          This is the official vanity Solana address generated for the Rug Killer Alpha Bot project. 
-          The address features the suffix "rtek" and serves as the project's official contract identifier 
-          on the Solana blockchain.
+          Official vanity Solana address | Suffix: "rtek" | Blockchain-verified project identifier
         </Text>
       </View>
 
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>Multi-Source Analysis</Text>
+        <Text style={pdfStyles.heading}>DATA AGGREGATION ARCHITECTURE</Text>
         <Text style={pdfStyles.text}>
-          Our platform aggregates data from four major blockchain intelligence sources:
+          Multi-layer blockchain intelligence system integrating four primary data sources:
         </Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Rugcheck.xyz - Community-driven risk scores and liquidity analysis</Text>
-          <Text style={pdfStyles.text}>• GoPlus Security - Honeypot detection, contract security scanning, scam flags</Text>
-          <Text style={pdfStyles.text}>• DexScreener - Real-time market data (price, volume, liquidity, market cap)</Text>
-          <Text style={pdfStyles.text}>• Jupiter Aggregator - Price verification and liquidity aggregation</Text>
+          <Text style={pdfStyles.text}>→ RUGCHECK.XYZ - Community risk scoring, liquidity metrics</Text>
+          <Text style={pdfStyles.text}>→ GOPLUS SECURITY - Honeypot detection, contract vulnerability scanning</Text>
+          <Text style={pdfStyles.text}>→ DEXSCREENER - Real-time market data (price, volume, liquidity, mcap)</Text>
+          <Text style={pdfStyles.text}>→ JUPITER PROTOCOL - Price verification, liquidity aggregation layer</Text>
         </View>
       </View>
 
