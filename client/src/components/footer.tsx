@@ -126,25 +126,6 @@ export function Footer() {
                   </Button>
                 )}
               </div>
-              
-              {/* Main Website Link */}
-              <div className="space-y-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  asChild
-                  className="w-full text-xs"
-                  data-testid="footer-button-main-website"
-                >
-                  <a 
-                    href="/"
-                    rel="noopener noreferrer"
-                  >
-                    <Shield className="h-3.5 w-3.5 mr-2" />
-                    Main Website
-                  </a>
-                </Button>
-              </div>
             </div>
           </div>
         </div>
