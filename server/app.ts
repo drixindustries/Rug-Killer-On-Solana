@@ -220,53 +220,9 @@ async function startServices() {
         console.error('❌ Alpha alerts failed:', err);
       });
 
-      // Broadcast alpha alerts to configured bot destinations
-      alphaService.onAlert(async (alert, message) => {
-        try {
-          const targets = await storage.getAlphaTargets();
-          const smartTargets = alert.type === 'caller_signal' ? await storage.getSmartTargets() : [];
-
-          if (targets.length === 0 && smartTargets.length === 0) return;
-
-          // Lazy import to avoid circular deps at module load
-          let discordClient: import('discord.js').Client | null = null;
-          let telegramBot: any = null;
-          try {
-            const { getDiscordClient } = await import('./discord-bot.ts');
-            discordClient = getDiscordClient();
-          } catch {}
-          try {
-            const { getTelegramBot } = await import('./telegram-bot.ts');
-            telegramBot = getTelegramBot();
-          } catch {}
-
-          const all = [...targets, ...smartTargets];
-          for (const t of all) {
-            if (t.platform === 'discord' && discordClient) {
-              try {
-                const ch = await discordClient.channels.fetch(t.channelId);
-                // @ts-ignore - send exists on text-based channels
-                if (ch && 'send' in ch) {
-                  // Prepend @everyone for ping
-                  // @ts-ignore
-                  await ch.send(`@everyone ${message}`);
-                }
-              } catch (e) {
-                console.warn('⚠️ Failed to send Discord alert to channel', t.channelId, e);
-              }
-            }
-            if (t.platform === 'telegram' && telegramBot) {
-              try {
-                await telegramBot.telegram.sendMessage(t.channelId, message, { parse_mode: 'Markdown' });
-              } catch (e) {
-                console.warn('⚠️ Failed to send Telegram alert to chat', t.channelId, e);
-              }
-            }
-          }
-        } catch (err) {
-          console.warn('⚠️ Alpha alert broadcast error:', (err as any)?.message || err);
-        }
-      });
+      // Note: Alpha alert callbacks are now registered in discord-bot.ts and telegram-bot.ts
+      // Each bot handles its own platform's alert delivery when it's ready
+      console.log('✅ Alpha alerts service started - callbacks handled by individual bots');
 
       const { initializeWalletDiscovery } = await import('./wallet-scheduler.ts');
       initializeWalletDiscovery();

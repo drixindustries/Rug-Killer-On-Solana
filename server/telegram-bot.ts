@@ -1407,6 +1407,32 @@ export async function startTelegramBot() {
   try {
     botInstance = createTelegramBot(BOT_TOKEN);
     
+    // Register alpha alert callback to send alerts to configured Telegram chats
+    const { getAlphaAlertService } = await import('./alpha-alerts');
+    const alphaService = getAlphaAlertService();
+    alphaService.onAlert(async (alert, message) => {
+      try {
+        // Get all alpha alert targets and filter for Telegram
+        const allTargets = await storage.getAlphaTargets();
+        const telegramTargets = allTargets.filter(t => t.platform === 'telegram');
+        
+        for (const target of telegramTargets) {
+          try {
+            await botInstance!.telegram.sendMessage(target.channelId, message, { 
+              parse_mode: 'Markdown',
+              disable_web_page_preview: false
+            });
+          } catch (chatError) {
+            console.error(`[Telegram Bot] Failed to send alpha alert to chat ${target.channelId}:`, chatError);
+          }
+        }
+      } catch (error) {
+        console.error('[Telegram Bot] Error handling alpha alert:', error);
+      }
+    });
+    
+    console.log('✅ Alpha alert callback registered for Telegram');
+    
     // Clear any pending updates from previous instance to avoid 409 conflicts
     await botInstance.launch({
       dropPendingUpdates: true

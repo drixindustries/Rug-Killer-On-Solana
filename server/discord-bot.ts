@@ -1939,6 +1939,35 @@ function createDiscordClient(botToken: string, clientId: string): Client {
   client.once('clientReady' as any, () => {
     console.log(`✅ Discord bot logged in as ${client.user?.tag}`);
     registerCommands();
+    
+    // Register alpha alert callback to send alerts to configured Discord channels
+    const alphaService = getAlphaAlertService();
+    alphaService.onAlert(async (alert, message) => {
+      try {
+        // Get all alpha alert targets and filter for Discord
+        const allTargets = await storage.getAlphaTargets();
+        const discordTargets = allTargets.filter(t => t.platform === 'discord');
+        
+        for (const target of discordTargets) {
+          try {
+            const channel = await client.channels.fetch(target.channelId);
+            if (channel && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement)) {
+              // Send the alpha alert message
+              await (channel as any).send({
+                content: `@everyone\n\n${message}`,
+                allowedMentions: { parse: ['everyone'] }
+              });
+            }
+          } catch (channelError) {
+            console.error(`[Discord Bot] Failed to send alpha alert to channel ${target.channelId}:`, channelError);
+          }
+        }
+      } catch (error) {
+        console.error('[Discord Bot] Error handling alpha alert:', error);
+      }
+    });
+    
+    console.log('✅ Alpha alert callback registered for Discord');
   });
   
   return client;
