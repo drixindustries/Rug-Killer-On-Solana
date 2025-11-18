@@ -391,6 +391,9 @@ const commands = [
     .setDescription('Show top flagged wallets')
     .addIntegerOption(option => option.setName('limit').setDescription('How many to show (max 50)').setMinValue(1).setMaxValue(50)),
   new SlashCommandBuilder()
+    .setName('reload')
+    .setDescription('Check if bot is responsive'),
+  new SlashCommandBuilder()
     .setName('chart')
     .setDescription('Show a quick chart link')
     .addStringOption(option => option.setName('address').setDescription('Token address').setRequired(true)),
@@ -1407,6 +1410,17 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           .setDescription(top.length ? top.map((w, i) => `${i + 1}. \`${formatAddress(w.walletAddress)}\` — sev ${w.severity}, rugs ${w.rugCount}`).join('\n') : 'No data')
           .setTimestamp();
         await interaction.editReply({ embeds: [embed] });
+      } else if (interaction.commandName === 'reload') {
+        const embed = new EmbedBuilder()
+          .setColor(0x00ff00)
+          .setTitle('✅ Bot is Online')
+          .setDescription('All systems operational!')
+          .addFields(
+            { name: 'Response Time', value: `${Date.now() - interaction.createdTimestamp}ms`, inline: true },
+            { name: 'Uptime', value: `${Math.floor(process.uptime() / 60)} minutes`, inline: true }
+          )
+          .setTimestamp();
+        await interaction.reply({ embeds: [embed], ephemeral: true });
       } else if (interaction.commandName === 'chart') {
         const tokenAddress = interaction.options.getString('address', true);
         await interaction.reply({ content: `📈 Chart links for \`${formatAddress(tokenAddress)}\`\n• DexScreener: https://dexscreener.com/solana/${tokenAddress}\n• GMGN: https://gmgn.ai/sol/token/${tokenAddress}`, ephemeral: false });
