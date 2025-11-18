@@ -2205,7 +2205,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const limit = parseInt(req.query.limit as string) || 50;
       const users = await storage.getTopUsers(limit);
       res.json(users);
-    } catch (error) {
+    } catch (error: any) {
+      const message: string = error?.message || '';
+      const code: string | undefined = error?.code;
+      // If the table doesn't exist yet (e.g., migrations not applied), return empty list gracefully
+      if (code === '42P01' || message.toLowerCase().includes('user_profiles')) {
+        return res.json([]);
+      }
       console.error('Error fetching leaderboard:', error);
       res.status(500).json({ message: 'Failed to fetch leaderboard' });
     }
