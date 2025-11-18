@@ -1372,22 +1372,31 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         await interaction.editReply({ embeds: [embed] });
       } else if (interaction.commandName === 'blackliststats') {
         await interaction.deferReply();
-        const s = await getBlacklistStats();
-        const embed = new EmbedBuilder()
-          .setColor(0x8888ff)
-          .setTitle('📛 Blacklist Statistics')
-          .addFields(
-            { name: 'Total Labels', value: String((s as any).total || 0), inline: true },
-            { name: 'Active', value: String((s as any).active || 0), inline: true },
-            { name: 'Avg Severity', value: ((s as any).avgSeverity || 0).toFixed(1), inline: true },
-          )
-          .addFields(
-            { name: 'Ruggers', value: String((s as any).ruggers || 0), inline: true },
-            { name: 'Scammers', value: String((s as any).scammers || 0), inline: true },
-            { name: 'Honeypots', value: String((s as any).honeypots || 0), inline: true },
-          )
-          .setTimestamp();
-        await interaction.editReply({ embeds: [embed] });
+        try {
+          const statsPromise = getBlacklistStats();
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout')), 5000)
+          );
+          const s = await Promise.race([statsPromise, timeoutPromise]) as any;
+          
+          const embed = new EmbedBuilder()
+            .setColor(0x8888ff)
+            .setTitle('📛 Blacklist Statistics')
+            .addFields(
+              { name: 'Total Labels', value: String(s.total || 0), inline: true },
+              { name: 'Active', value: String(s.active || 0), inline: true },
+              { name: 'Avg Severity', value: (s.avgSeverity || 0).toFixed(1), inline: true },
+            )
+            .addFields(
+              { name: 'Ruggers', value: String(s.ruggers || 0), inline: true },
+              { name: 'Scammers', value: String(s.scammers || 0), inline: true },
+              { name: 'Honeypots', value: String(s.honeypots || 0), inline: true },
+            )
+            .setTimestamp();
+          await interaction.editReply({ embeds: [embed] });
+        } catch (error) {
+          await interaction.editReply({ content: '❌ Database not available in in-memory mode. Set up PostgreSQL to enable blacklist features.' });
+        }
       } else if (interaction.commandName === 'blacklisttop') {
         const limit = interaction.options.getInteger('limit') ?? 10;
         await interaction.deferReply();
