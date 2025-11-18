@@ -1878,8 +1878,8 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     }
   });
   
-  // Ready event
-  client.once('ready', () => {
+  // Ready event (using clientReady for Discord.js v14+)
+  client.once('clientReady' as any, () => {
     console.log(`✅ Discord bot logged in as ${client.user?.tag}`);
     registerCommands();
   });

@@ -3,6 +3,15 @@
  * Production-ready, no Vite dependencies
  */
 
+// Suppress noisy crypto library warnings
+process.removeAllListeners('warning');
+process.on('warning', (warning) => {
+  // Only show important warnings, filter out known harmless ones
+  if (warning.message.includes('bigint: Failed to load bindings')) return;
+  if (warning.message.includes('DeprecationWarning')) return;
+  console.warn(warning.name, warning.message);
+});
+
 console.log('========================================');
 console.log('🚀 SERVER STARTING - index.ts loaded');
 console.log('Node version:', process.version);
