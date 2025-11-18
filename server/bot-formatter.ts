@@ -100,6 +100,12 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   // RISK SCORE
   const riskScore = `🎯 **Risk Score:** ${analysis.riskScore}/100 (${analysis.riskLevel})\n_0 = Do Not Buy • 100 = Strong Buy_`;
   
+  // AI VERDICT
+  let aiVerdict: string | undefined;
+  if (analysis.aiVerdict) {
+    aiVerdict = `🤖 **${analysis.aiVerdict.rating}**\n${analysis.aiVerdict.verdict}`;
+  }
+  
   // SECURITY
   const mintStatus = analysis.mintAuthority?.hasAuthority ? '❌ Active' : '✅ Revoked';
   const freezeStatus = analysis.freezeAuthority?.hasAuthority ? '❌ Active' : '✅ Revoked';
