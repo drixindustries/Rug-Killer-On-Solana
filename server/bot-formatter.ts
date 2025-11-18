@@ -134,12 +134,30 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     market = `💰 **Market**\n• Price: $${price.toFixed(8)}\n• MCap: $${formatNumber(pair.marketCap || 0)}\n• 24h Vol: $${formatNumber(vol24h)}\n• 24h: ${priceChange} ${h24Change.toFixed(1)}%`;
   }
   
-  // PUMP.FUN
+  // PUMP.FUN (Enhanced with detailed stats)
   let pumpFun: string | undefined;
   if (analysis.pumpFunData?.isPumpFun) {
     const devBought = analysis.pumpFunData.devBought ?? 0;
     const bondingCurve = analysis.pumpFunData.bondingCurve ?? 0;
-    pumpFun = `🎯 **Pump.fun**\n• Dev Bought: ${devBought.toFixed(1)}%\n• Bonding Curve: ${bondingCurve.toFixed(1)}%`;
+    const graduated = analysis.pumpFunData.mayhemMode || bondingCurve >= 99;
+    
+    // Bonding curve emoji based on progress
+    let curveEmoji = '📊';
+    if (bondingCurve >= 99) curveEmoji = '🔥';
+    else if (bondingCurve >= 75) curveEmoji = '🚀';
+    else if (bondingCurve >= 50) curveEmoji = '📈';
+    
+    // Dev bought warning
+    const devEmoji = devBought > 10 ? '⚠️' : devBought > 5 ? '⚠️' : '';
+    
+    pumpFun = `🎯 **Pump.fun Token**\n`;
+    pumpFun += `${curveEmoji} Bonding: ${bondingCurve.toFixed(1)}% ${graduated ? '✅ Graduated' : ''}\n`;
+    if (devBought > 0) {
+      pumpFun += `${devEmoji} Dev: ${devBought.toFixed(1)}%${devBought > 5 ? ' 🚨' : ''}\n`;
+    }
+    if (analysis.pumpFunData.king) {
+      pumpFun += `👑 King: ${formatAddress(analysis.pumpFunData.king.address)} (${analysis.pumpFunData.king.percentage.toFixed(1)}%)`;
+    }
   }
   
     // FLOOR DETECTION

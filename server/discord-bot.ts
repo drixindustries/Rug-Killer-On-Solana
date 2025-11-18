@@ -75,7 +75,8 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
     .setTitle(`${messageData.header} ⚠️ ${messageData.age}`)
     .setDescription(`**Safety Score: ${analysis.riskScore}/100** (${analysis.riskLevel})\n_100 = Strong Buy • 0 = Do Not Buy_`)
     .setFooter({ text: `Contract: ${analysis.tokenAddress}` })
-    .setTimestamp();
+    .setTimestamp()
+    .setImage(`https://dd.dexscreener.com/ds-data/tokens/solana/${analysis.tokenAddress}.png?size=lg&t=${Date.now()}`);
   
   // AI VERDICT
   if (messageData.aiVerdict) {
@@ -1386,24 +1387,162 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       } else if (interaction.commandName === 'pumpfun') {
         const tokenAddress = interaction.options.getString('address', true);
         await interaction.deferReply();
-        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
-        try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
-        const pf = analysis.pumpFunData;
-        const embed = new EmbedBuilder()
-          .setColor(0xff66aa)
-          .setTitle(`🎯 Pump.fun View - ${analysis.metadata.symbol}`)
-          .setTimestamp();
-        if (pf?.isPumpFun) {
-          let body = `• Bonding: ${((pf.bondingCurve || 0) * 100).toFixed(0)}% complete\n`;
-          if (pf.devBought) body += `• Dev Bought: ${pf.devBought}%\n`;
-          if (pf.mayhemMode) body += `• Mayhem Mode active\n`;
-          if (pf.king) body += `• King: \`${formatAddress(pf.king.address)}\` (${pf.king.percentage.toFixed(2)}%)\n`;
-          body += `\nLinks: [pump.fun](https://pump.fun/${tokenAddress}) • [gmgn](https://gmgn.ai/sol/token/${tokenAddress})`;
-          embed.setDescription(body);
-        } else {
-          embed.setDescription('Not identified as a pump.fun token.');
+        
+        try {
+          const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+          try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
+          const pf = analysis.pumpFunData;
+          const pair = analysis.dexscreenerData?.pairs?.[0];
+          
+          if (!pf?.isPumpFun) {
+            const embed = new EmbedBuilder()
+              .setColor(0xff0000)
+              .setTitle('❌ Not a Pump.fun Token')
+              .setDescription(`\`${formatAddress(tokenAddress)}\` is not identified as a pump.fun token.\n\nUse \`/execute\` for full analysis.`);
+            await interaction.editReply({ embeds: [embed] });
+            return;
+          }
+          
+          // Build enhanced pump.fun embed
+          const bondingCurve = pf.bondingCurve ?? 0;
+          const devBought = pf.devBought ?? 0;
+          const graduated = pf.mayhemMode || bondingCurve >= 99;
+          
+          // Risk assessment
+          const riskEmoji = getRiskEmoji(analysis.riskLevel);
+          const safetyScore = analysis.riskScore;
+          
+          // Price info
+          const price = pair?.priceUsd ? parseFloat(pair.priceUsd) : 0;
+          const priceChange = pair?.priceChange?.h24 ?? 0;
+          const priceEmoji = priceChange >= 0 ? '📈' : '📉';
+          
+          // Market stats
+          const fdv = pair?.fdv ?? pair?.marketCap ?? 0;
+          const volume = pair?.volume?.h24 ?? 0;
+          const liquidity = pair?.liquidity?.usd ?? 0;
+          
+          // Txn stats
+          const buys = pair?.txns?.h24?.buys ?? 0;
+          const sells = pair?.txns?.h24?.sells ?? 0;
+          const buyRatio = buys + sells > 0 ? (buys / (buys + sells)) * 100 : 0;
+          
+          // Holder stats
+          const holders = analysis.holderCount ?? 0;
+          const top10 = analysis.topHolderConcentration ?? 0;
+          
+          // Token age
+          const ageMs = analysis.creationDate ? Date.now() - analysis.creationDate : 0;
+          const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+          const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+          const ageStr = ageDays > 0 ? `${ageDays}d` : `${ageHours}h`;
+          
+          const embed = new EmbedBuilder()
+            .setColor(graduated ? 0x00ff00 : bondingCurve >= 75 ? 0xffa500 : 0x3498db)
+            .setTitle(`${riskEmoji} ${analysis.metadata.name} - $${analysis.metadata.symbol}`)
+            .setURL(`https://pump.fun/${tokenAddress}`)
+            .setImage(`https://dd.dexscreener.com/ds-data/tokens/solana/${tokenAddress}.png?size=lg&t=${Date.now()}`)
+            .addFields(
+              {
+                name: '💰 Price',
+                value: price > 0 
+                  ? `$${price.toFixed(price < 0.0001 ? 8 : 6)}\n${priceEmoji} ${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(1)}% [24h]`
+                  : 'N/A',
+                inline: true
+              },
+              {
+                name: '📊 FDV',
+                value: `$${formatNumber(fdv)}`,
+                inline: true
+              },
+              {
+                name: '🔥 Vol [24h]',
+                value: `$${formatNumber(volume)}`,
+                inline: true
+              },
+              {
+                name: '🎯 Bonding Progress',
+                value: bondingCurve >= 99 
+                  ? `✅ ${bondingCurve.toFixed(1)}% - **GRADUATED**`
+                  : `${bondingCurve.toFixed(1)}%${bondingCurve >= 75 ? ' 🚀' : bondingCurve >= 50 ? ' 📈' : ''}`,
+                inline: true
+              },
+              {
+                name: '💧 Liquidity',
+                value: `$${formatNumber(liquidity)}`,
+                inline: true
+              },
+              {
+                name: '⏱️ Age',
+                value: ageStr,
+                inline: true
+              },
+              {
+                name: '🔄 Txns [24h]',
+                value: `🟢 ${buys} / 🔴 ${sells}\n${buyRatio >= 60 ? '🔥' : buyRatio <= 40 ? '⚠️' : '📊'} ${buyRatio.toFixed(0)}% buys`,
+                inline: true
+              },
+              {
+                name: '👥 Holders',
+                value: `${holders}\nTop 10: ${top10.toFixed(1)}%`,
+                inline: true
+              },
+              {
+                name: '🎯 Safety',
+                value: `${safetyScore}/100 (${analysis.riskLevel})`,
+                inline: true
+              }
+            );
+          
+          // Add dev bought warning if > 0
+          if (devBought > 0) {
+            embed.addFields({
+              name: devBought > 5 ? '🚨 Dev Holdings' : '⚠️ Dev Holdings',
+              value: `${devBought.toFixed(1)}%${devBought > 10 ? ' - **HIGH RISK**' : devBought > 5 ? ' - Moderate Risk' : ''}`,
+              inline: false
+            });
+          }
+          
+          // Add king data if exists
+          if (pf.king) {
+            embed.addFields({
+              name: '👑 King of the Hill',
+              value: `${formatAddress(pf.king.address)} holds ${pf.king.percentage.toFixed(1)}%`,
+              inline: false
+            });
+          }
+          
+          // Security info
+          const mintRevoked = analysis.mintAuthority?.isRevoked ?? false;
+          const freezeRevoked = analysis.freezeAuthority?.isRevoked ?? false;
+          embed.addFields({
+            name: '🔐 Security',
+            value: `Mint: ${mintRevoked ? '✅' : '❌'} | Freeze: ${freezeRevoked ? '✅' : '❌'}`,
+            inline: false
+          });
+          
+          // Quick links
+          const links = [
+            `[Pump.fun](https://pump.fun/${tokenAddress})`,
+            `[GMGN](https://gmgn.ai/sol/token/${tokenAddress})`,
+            `[Padre](https://padre.fun/token/${tokenAddress})`,
+            `[DexScreener](https://dexscreener.com/solana/${tokenAddress})`,
+            `[Solscan](https://solscan.io/token/${tokenAddress})`
+          ].join(' • ');
+          
+          embed.setFooter({ text: `Contract: ${tokenAddress}` });
+          embed.setDescription(links);
+          embed.setTimestamp();
+          
+          await interaction.editReply({ embeds: [embed] });
+        } catch (error: any) {
+          console.error('Pumpfun command error:', error);
+          const errorEmbed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('❌ Analysis Failed')
+            .setDescription(`Failed to analyze token.\n\n**Error:** ${error?.message || 'Unknown error'}`);
+          await interaction.editReply({ embeds: [errorEmbed] });
         }
-        await interaction.editReply({ embeds: [embed] });
       } else if (interaction.commandName === 'blackliststats') {
         await interaction.deferReply();
         try {
