@@ -1352,7 +1352,48 @@ export async function startTelegramBot() {
   }
 }
 
+// Webhook mode for Railway/production
+export async function startTelegramBotWebhook(webhookUrl: string) {
+  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+  
+  if (!BOT_TOKEN || BOT_TOKEN === 'PLACEHOLDER_TOKEN') {
+    console.log('âš ï¸  Telegram bot token not configured');
+    return null;
+  }
+  
+  if (botInstance) {
+    console.log('âš ï¸  Telegram bot already running');
+    return botInstance;
+  }
+  
+  try {
+    botInstance = createTelegramBot(BOT_TOKEN);
+    
+    // Set webhook
+    await botInstance.telegram.setWebhook(webhookUrl, {
+      drop_pending_updates: true,
+      allowed_updates: ['message', 'callback_query', 'inline_query']
+    });
+    
+    console.log('âœ… Telegram webhook configured:', webhookUrl);
+    return botInstance;
+  } catch (error: any) {
+    console.error('Error setting Telegram webhook:', error);
+    botInstance = null;
+    throw error;
+  }
+}
+
+// Export webhook handler for Express
+export function getTelegramWebhookHandler() {
+  if (!botInstance) {
+    throw new Error('Telegram bot not initialized');
+  }
+  return botInstance.webhookCallback('/telegram-webhook');
+}
+
 // Optional: Export getter for bot instance (returns null until started)
 export function getTelegramBot(): Telegraf | null {
   return botInstance;
 }
+

@@ -160,10 +160,19 @@ async function startServices() {
     process.env.TELEGRAM_BOT_TOKEN !== 'PLACEHOLDER_TOKEN'
   ) {
     try {
-      const { startTelegramBot } = await import('./telegram-bot.ts');
-      startTelegramBot().catch((err: any) => {
-        console.warn('⚠️ Telegram bot unavailable (silenced):', err?.message || String(err));
-      });
+      // Use webhook mode if URL is configured (for Railway)
+      if (process.env.TELEGRAM_WEBHOOK_URL) {
+        console.log('🔗 Starting Telegram bot in webhook mode');
+        const { startTelegramBotWebhook } = await import('./telegram-bot.ts');
+        await startTelegramBotWebhook(process.env.TELEGRAM_WEBHOOK_URL);
+      } else {
+        // Use polling mode (for local development)
+        console.log('📡 Starting Telegram bot in polling mode');
+        const { startTelegramBot } = await import('./telegram-bot.ts');
+        startTelegramBot().catch((err: any) => {
+          console.warn('⚠️ Telegram bot unavailable (silenced):', err?.message || String(err));
+        });
+      }
     } catch (err: any) {
       console.warn('⚠️ Telegram bot not loaded (silenced):', err?.message || String(err));
     }

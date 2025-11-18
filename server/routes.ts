@@ -2829,6 +2829,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Telegram webhook endpoint (for Railway compatibility)
+  if (process.env.TELEGRAM_WEBHOOK_URL) {
+    app.post('/telegram-webhook', async (req, res) => {
+      try {
+        const { getTelegramWebhookHandler } = await import('./telegram-bot.ts');
+        const handler = getTelegramWebhookHandler();
+        return handler(req, res);
+      } catch (error: any) {
+        console.error('Telegram webhook error:', error);
+        res.status(500).send('Webhook handler not initialized');
+      }
+    });
+    console.log('✅ Telegram webhook endpoint registered at /telegram-webhook');
+  }
+
   const httpServer = createServer(app);
   
   // Initialize WebSocket for live scans (optional)
