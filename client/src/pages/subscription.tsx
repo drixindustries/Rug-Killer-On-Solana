@@ -366,6 +366,8 @@ export default function SubscriptionPage() {
             </CardContent>
           </Card>
         </div>
+        {/* Close page container */}
+        </div>
       </main>
       <Footer />
     </div>
