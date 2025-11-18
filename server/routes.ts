@@ -15,6 +15,7 @@ import {
 } from "./whop-client.ts";
 import { VanityAddressGenerator } from "./vanity-generator.ts";
 import { z } from "zod";
+import { nanoid } from "nanoid";
 import { rpcBalancer } from "./services/rpc-balancer.ts";
 
 // Stub authentication for Railway deployment (no Replit OIDC)
@@ -56,6 +57,44 @@ const isAdmin = async (req: any, res: any, next: any) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Helper to allow anonymous sessions for lightweight features (e.g., watchlist)
+  const withUser = async (req: any, _res: any, next: any) => {
+    try {
+      // If already authenticated via session login, pass through
+      if (req.session?.userId) {
+        req.user = { claims: { sub: req.session.userId, email: req.session.userEmail } };
+        req.isAuthenticated = () => true;
+        return next();
+      }
+
+      // Create or reuse an anonymous user bound to the session
+      if (!req.session) {
+        // Should not happen with express-session enabled, but guard just in case
+        return next(new Error('Session unavailable'));
+      }
+
+      const anonKey = 'anonUserId';
+      let anonUserId = req.session[anonKey];
+      if (!anonUserId) {
+        anonUserId = `guest_${nanoid(16)}`;
+        try {
+          await storage.upsertUser({ id: anonUserId });
+        } catch (e) {
+          // If upsert fails for any reason, generate a fallback one
+          anonUserId = `guest_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+          await storage.upsertUser({ id: anonUserId });
+        }
+        req.session[anonKey] = anonUserId;
+      }
+
+      req.user = { claims: { sub: anonUserId, email: undefined } };
+      req.isAuthenticated = () => true;
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+
   const enableDebug = process.env.ENABLE_DEBUG_ENDPOINTS === 'true';
   if (enableDebug) {
     // Optional header-based protection for debug endpoints
@@ -1019,7 +1058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================================
   
   // GET /api/watchlist - Get user's watchlist
-  app.get('/api/watchlist', isAuthenticated, async (req: any, res) => {
+  app.get('/api/watchlist', withUser, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const watchlist = await storage.getWatchlist(userId);
@@ -1031,7 +1070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // POST /api/watchlist - Add token to watchlist
-  app.post('/api/watchlist', isAuthenticated, async (req: any, res) => {
+  app.post('/api/watchlist', withUser, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       
@@ -1070,7 +1109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // DELETE /api/watchlist/:tokenAddress - Remove token from watchlist
-  app.delete('/api/watchlist/:tokenAddress', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/watchlist/:tokenAddress', withUser, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { tokenAddress } = req.params;
