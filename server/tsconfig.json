@@ -9,6 +9,7 @@
     "strict": false,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": true,
     "outDir": "dist",
     "baseUrl": "./",
     "paths": {

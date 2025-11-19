@@ -39,7 +39,7 @@ const TokenInfoSidebar = lazy(() => import("@/components/token-info-sidebar").th
 const LiquidityBurnCard = lazy(() => import("@/components/liquidity-burn-card").then(m => ({ default: m.LiquidityBurnCard })));
 const HolderFilteringCard = lazy(() => import("@/components/holder-filtering-card").then(m => ({ default: m.HolderFilteringCard })));
 const BundleVisualizationChart = lazy(() => import("@/components/bundle-visualization-chart").then(m => ({ default: m.BundleVisualizationChart })));
-const HoneypotDetectionCard = lazy(() => import("@/components/honeypot-detection-card").then(m => ({ default: m.HoneypotDetectionCard })));
+const HoneypotCard = lazy(() => import("@/components/honeypot-card").then(m => ({ default: m.HoneypotCard })));
 const BundleDetectionCard = lazy(() => import("@/components/bundle-detection-card").then(m => ({ default: m.BundleDetectionCard })));
 const NetworkAnalysisCard = lazy(() => import("@/components/network-analysis-card").then(m => ({ default: m.NetworkAnalysisCard })));
 const WhaleDetectionCard = lazy(() => import("@/components/whale-detection-card").then(m => ({ default: m.WhaleDetectionCard })));
@@ -312,9 +312,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* Mascot background - only show on landing page */}
-      {!analysis && <div className="mascot-background" />}
-      
       <Header onNewAnalysis={analysis ? handleNewAnalysis : undefined} />
       
       <main className="flex-1 relative">
@@ -396,6 +393,13 @@ export default function Home() {
                       {analysis.agedWalletData && (
                         <Suspense fallback={<ComponentLoader />}>
                           <AgedWalletDetectionCard data={analysis.agedWalletData} />
+                        </Suspense>
+                      )}
+
+                      {/* Honeypot Detection Card */}
+                      {analysis.honeypotDetection && (
+                        <Suspense fallback={<ComponentLoader />}>
+                          <HoneypotCard data={analysis.honeypotDetection} />
                         </Suspense>
                       )}
 

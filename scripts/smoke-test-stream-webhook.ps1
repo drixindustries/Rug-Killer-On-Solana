@@ -34,7 +34,8 @@ $payload = @{
 $headers = @{}
 if ($UseHmac -and $Secret) {
   $raw = [Text.Encoding]::UTF8.GetBytes($payload)
-  $h = New-Object System.Security.Cryptography.HMACSHA256 ([Text.Encoding]::UTF8.GetBytes($Secret))
+  $key = [Text.Encoding]::UTF8.GetBytes($Secret)
+  $h = [System.Security.Cryptography.HMACSHA256]::new($key)
   $hex = ($h.ComputeHash($raw) | ForEach-Object { $_.ToString('x2') }) -join ''
   $headers["X-Quicknode-Signature"] = "sha256=$hex"
 } elseif ($Secret) {

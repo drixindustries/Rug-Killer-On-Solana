@@ -21,6 +21,7 @@ import { holderAnalysis } from "./services/holder-analysis.ts";
 import { streamMetrics, normalizeSolanaWebhook } from "./services/stream-metrics.ts";
 import crypto from 'crypto';
 import { tokenMetrics } from './services/token-metrics.ts';
+import getRawBody from 'raw-body';
 
 // Stub authentication for Railway deployment (no Replit OIDC)
 const setupAuth = async (app: Express) => {
@@ -446,14 +447,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Solana Streams Webhook Receiver (Helius/QuickNode-compatible)
   if (process.env.ENABLE_SOLANA_STREAM_WEBHOOK === 'true') {
-    app.post('/api/webhooks/solana/stream/:provider?', async (req: any, res) => {
+    // Middleware to capture raw body for HMAC verification
+    const captureRawBody = (req: any, res: any, next: any) => {
+      // For streaming webhooks, we need the raw body to verify the signature.
+      // The `express.json()` middleware would consume the stream otherwise.
+      if (req.is('application/json')) {
+        getRawBody(req, {
+          length: req.headers['content-length'],
+          limit: '5mb', // Adjust limit as needed
+          encoding: 'utf-8',
+        }, (err, string) => {
+          if (err) return next(err);
+          req.rawBody = Buffer.from(string, 'utf-8');
+          try {
+            req.body = JSON.parse(string);
+          } catch (e) {
+            return next(new Error('Invalid JSON body'));
+          }
+          next();
+        });
+      } else {
+        next();
+      }
+    };
+
+    app.post('/api/webhooks/solana/stream/:provider?', captureRawBody, async (req: any, res) => {
       try {
         const provider = (req.params.provider || req.header('x-provider') || 'unknown').toString().toLowerCase();
         const sharedSecret = process.env.SOLANA_STREAM_WEBHOOK_SECRET?.trim();
 
         // 1) HMAC verification (optional, enabled if env set)
         const verifyHmac = (process.env.SOLANA_STREAM_VERIFY_HMAC || 'true').toLowerCase() === 'true';
-        const rawBody: Buffer | undefined = req.rawBody as Buffer | undefined;
+        const rawBody: Buffer | undefined = req.rawBody;
         const headerCandidates: string[] = [
           req.header('x-quicknode-signature'),
           req.header('x-helius-signature'),
@@ -497,6 +522,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(500).json({ ok: false, error: err?.message || 'Webhook error' });
       }
     });
+
+    // Pump.fun webhook receiver
+    const pumpFunSecret = process.env.PUMPFUN_WEBHOOK_SECRET;
+    if (pumpFunSecret) {
+      app.post('/api/webhooks/pumpfun', async (req: any, res) => {
+        try {
+          const signature = req.header('x-pump-signature');
+          const rawBody: Buffer = req.rawBody;
+
+          // 1) HMAC verification
+          const computedHmac = crypto.createHmac('sha256', pumpFunSecret).update(rawBody).digest('hex');
+          if (signature !== computedHmac) {
+            console.warn('Pump.fun webhook signature mismatch');
+            return res.status(401).json({ ok: false, error: 'Invalid signature' });
+          }
+
+          // 2) Process the valid webhook payload
+          const event = req.body;
+          // Handle specific event types as needed
+          // For now, just log the received event
+          console.log('Received Pump.fun event:', event);
+
+          res.json({ ok: true });
+        } catch (err: any) {
+          console.error('[PumpfunWebhook] Error:', err);
+          res.status(500).json({ ok: false, error: err?.message || 'Webhook error' });
+        }
+      });
+    } else {
+      console.log('ℹ️ Pump.fun webhook disabled (set ENABLE_PUMPFUN_WEBHOOK=true to enable)');
+    }
 
     // Stream metrics endpoints
     app.get('/api/metrics/stream/summary', (_req, res) => {

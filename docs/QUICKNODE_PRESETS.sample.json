@@ -1,0 +1,78 @@
+[
+  {
+    "name": "Minimal SPL Token (by mint)",
+    "description": "Low-volume stream for specific token mints; validates pipeline end-to-end.",
+    "delivery": {
+      "type": "webhook",
+      "url": "https://<your-domain>/api/webhooks/solana/stream/quicknode",
+      "headers": { "x-stream-secret": "<your-shared-secret>" },
+      "requestSigning": true
+    },
+    "filters": {
+      "programIds": [
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+      ],
+      "accounts": {
+        "mints": [
+          "<MINT_1>",
+          "<MINT_2>"
+        ]
+      }
+    },
+    "options": {
+      "batchSize": 25,
+      "retries": 3,
+      "backoffMs": 1000
+    }
+  },
+  {
+    "name": "DEX-focused (Raydium/Orca)",
+    "description": "Moderate volume: SPL Token + major DEX programs. Add/remove mints to tune volume.",
+    "delivery": {
+      "type": "webhook",
+      "url": "https://<your-domain>/api/webhooks/solana/stream/quicknode",
+      "headers": { "x-stream-secret": "<your-shared-secret>" },
+      "requestSigning": true
+    },
+    "filters": {
+      "programIds": [
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "<RAYDIUM_AMM_PROGRAM_ID>",
+        "<ORCA_WHIRLPOOL_PROGRAM_ID>"
+      ],
+      "accounts": {
+        "mints": [
+          "<OPTIONAL_TRACKED_MINT>"
+        ]
+      }
+    },
+    "options": {
+      "batchSize": 25,
+      "retries": 3,
+      "backoffMs": 1000
+    }
+  },
+  {
+    "name": "Broad discovery (high volume)",
+    "description": "High-volume: SPL Token + DEX programs, no mint filters. Use with caution.",
+    "delivery": {
+      "type": "webhook",
+      "url": "https://<your-domain>/api/webhooks/solana/stream/quicknode",
+      "headers": { "x-stream-secret": "<your-shared-secret>" },
+      "requestSigning": true
+    },
+    "filters": {
+      "programIds": [
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "<RAYDIUM_AMM_PROGRAM_ID>",
+        "<ORCA_WHIRLPOOL_PROGRAM_ID>",
+        "<OPTIONAL_METEORA_PROGRAM_ID>"
+      ]
+    },
+    "options": {
+      "batchSize": 50,
+      "retries": 3,
+      "backoffMs": 1000
+    }
+  }
+]

@@ -115,13 +115,37 @@ export function CondensedTokenHeader({ analysis }: CondensedTokenHeaderProps) {
       </div>
 
       {/* Key Metrics Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
         <div className="text-center">
           <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
             <Users className="h-4 w-4" />
             <span className="text-xs font-medium">HOLDERS</span>
           </div>
-          <div className="text-lg font-semibold">{analysis.holderCount.toLocaleString()}</div>
+          <a 
+            href={`https://solscan.io/token/${analysis.tokenAddress}#holders`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-lg font-semibold hover:text-primary transition-colors inline-flex items-center gap-1"
+          >
+            {analysis.holderCount.toLocaleString()}
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
+        
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
+            <TrendingUp className="h-4 w-4" />
+            <span className="text-xs font-medium">TOP 20</span>
+          </div>
+          <a 
+            href={`https://solscan.io/token/${analysis.tokenAddress}#holders`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-lg font-semibold hover:text-primary transition-colors inline-flex items-center gap-1"
+          >
+            {(analysis.topHolders || []).slice(0, 20).reduce((sum, h) => sum + (h.percentage || 0), 0).toFixed(1)}%
+            <ExternalLink className="h-3 w-3" />
+          </a>
         </div>
         
         <div className="text-center">
@@ -167,31 +191,6 @@ export function CondensedTokenHeader({ analysis }: CondensedTokenHeaderProps) {
             {analysis.creationDate ? getTimeAgo(analysis.creationDate) : "Unknown"}
           </div>
         </div>
-      </div>
-
-      {/* Authority Status Row - Fixed Grid Layout */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Mint Authority:</span>
-          <Badge variant={analysis.mintAuthority.hasAuthority ? "destructive" : "secondary"} className="shrink-0">
-            {analysis.mintAuthority.hasAuthority ? "Enabled" : "Disabled"}
-          </Badge>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Freeze Authority:</span>
-          <Badge variant={analysis.freezeAuthority.hasAuthority ? "destructive" : "secondary"} className="shrink-0">
-            {analysis.freezeAuthority.hasAuthority ? "Enabled" : "Disabled"}
-          </Badge>
-        </div>
-        
-        {analysis.liquidityPool?.isBurned && (
-          <div className="flex items-center">
-            <Badge variant="secondary" className="text-green-600 bg-green-50 border-green-200 shrink-0">
-              LP Burned
-            </Badge>
-          </div>
-        )}
       </div>
 
       {/* Quick Access Addresses */}

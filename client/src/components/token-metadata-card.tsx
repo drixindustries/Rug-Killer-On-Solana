@@ -116,9 +116,18 @@ export function TokenMetadataCard({ metadata, tokenAddress, creationDate }: Toke
               
               {metadata?.isMutable && (
                 <div className="flex items-center justify-start min-w-0">
-                  <Badge variant="outline" className="gap-1 text-yellow-600 border-yellow-600 shrink-0">
+                  <Badge variant="outline" className="gap-1 text-yellow-600 border-yellow-600 shrink-0" title="Dev can change name/symbol/image anytime. Rug risk: swap branding after pump.">
                     <AlertCircle className="h-3 w-3" />
-                    Mutable
+                    Metadata Mutable
+                  </Badge>
+                </div>
+              )}
+              
+              {metadata?.isMutable === false && (
+                <div className="flex items-center justify-start min-w-0">
+                  <Badge variant="secondary" className="gap-1 text-green-600 border-green-600 shrink-0" title="Update authority revoked. Token identity locked permanently.">
+                    <CheckCircle className="h-3 w-3" />
+                    Metadata Locked
                   </Badge>
                 </div>
               )}

@@ -1,30 +1,49 @@
-# Rug Killer Mascot Setup
+# Rally - Official Rug Killer Mascot 🎀
 
-## Instructions
-Save the mascot image (the evil smiley character with orange/coral glow and dashboard elements) as:
+## Meet Rally!
+Rally is the vibrant, energetic mascot of Rug Killer Alpha Bot - an anime-style character with colorful dual-tone hair (pink and blue) who represents our mission to protect the Solana community from rug pulls!
 
-**Filename**: `rug-killer-mascot.png`
+## Image Files
 
-**Location**: `/client/public/images/rug-killer-mascot.png`
-
-## Image Specifications
+### Main Mascot
+**Filename**: `rally-mascot.png`
+**Location**: `/client/public/images/rally-mascot.png`
+**Specifications**:
 - Format: PNG with transparency
-- Recommended size: 1000x1000px or larger
-- The image will be displayed at 500x500px
-- Opacity: 15% (automatically applied via CSS)
-- Position: Bottom left corner, slightly off-screen (-5% left, -5% bottom)
-- Effect: Subtle blur + floating animation
+- Source: Anime-style character with dual-tone pigtails
+- Display size: 500x500px
+- Opacity: 18% (automatically applied via CSS)
+- Position: Bottom left corner
+- Effect: Gentle floating animation
+
+### Favicon
+**Filename**: `rally-favicon.png`
+**Location**: `/client/public/rally-favicon.png`
+**Specifications**:
+- Format: PNG
+- Recommended size: 512x512px (will be scaled down by browser)
+- Used as browser tab icon
 
 ## Current Implementation
-The mascot has been integrated into:
-- ✅ Main home page (`/`)
-- ✅ Landing page (`/landing`)
+Rally has been integrated into:
+- ✅ Main home page (`/`) - floating in bottom left
+- ✅ Landing page (`/landing`) - floating in bottom left
+- ✅ Browser favicon (tab icon)
 - ✅ CSS animations (gentle floating effect)
-- ✅ Positioned to not overpower content
+- ✅ Positioned to enhance, not overpower content
 
-## How to Add Image
-1. Save the mascot image you provided as `rug-killer-mascot.png`
-2. Place it in: `client/public/images/rug-killer-mascot.png`
-3. The CSS will automatically apply the faded, floating effect
+## Character Design
+- **Hair**: Dark base with bright pink and blue dual-tone pigtails
+- **Eyes**: Vibrant pink/magenta
+- **Outfit**: Purple crop top, black jacket
+- **Style**: Modern anime aesthetic with energetic personality
+- **Vibe**: Protective, vigilant, community-focused
 
-The image will appear faded in the bottom left corner with a gentle floating animation!
+## How It Works
+1. The mascot image is referenced in CSS via `.mascot-background` class
+2. Automatically applies faded appearance (18% opacity)
+3. Floating animation runs continuously
+4. Appears on landing/home pages when no token analysis is shown
+5. Favicon appears in all browser tabs
+
+Rally represents our commitment to keeping the Solana community safe! 💜🔐

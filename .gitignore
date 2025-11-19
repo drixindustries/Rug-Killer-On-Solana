@@ -73,3 +73,4 @@ attached_assets/
 *.zip
 *.tar
 *.gz
+docs/QUICKNODE_PRESETS.*.local.json

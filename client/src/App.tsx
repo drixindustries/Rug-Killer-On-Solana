@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import Home from "@/pages/home";
-import Landing from "@/pages/landing";
 import Subscription from "@/pages/subscription";
 import Pricing from "@/pages/pricing";
 import Features from "@/pages/features";
@@ -35,7 +34,6 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
-      <Route path="/landing" component={Landing} />
       <Route path="/subscription" component={Subscription} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/features" component={Features} />

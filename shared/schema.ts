@@ -315,6 +315,51 @@ export interface QuillCheckData {
   risks: string[];
 }
 
+// Comprehensive Honeypot Detection (2025 Advanced Methods)
+export interface HoneypotDetectionResult {
+  grade: "SAFE" | "CAUTION" | "WARNING" | "DANGER" | "CRITICAL"; // A/B/C/D/F grading
+  score: number; // 0-100 (0=safe, 100=definite honeypot)
+  canBuy: boolean;
+  canSell: boolean;
+  canTransfer: boolean;
+  
+  // Tax Analysis
+  taxes: {
+    buyTax: number;
+    sellTax: number;
+    transferTax: number;
+    isVariable: boolean; // Changes based on amount/time
+    maxObservedTax: number;
+  };
+  
+  // Detection Methods Passed/Failed
+  detectionMethods: {
+    basicSimulation: "PASS" | "FAIL" | "UNKNOWN";
+    swapReversal: "PASS" | "FAIL" | "UNKNOWN";
+    transferTest: "PASS" | "FAIL" | "UNKNOWN";
+    multiRouterTest: "PASS" | "FAIL" | "UNKNOWN";
+    timeLockTest: "PASS" | "FAIL" | "UNKNOWN";
+    balanceThresholdTest: "PASS" | "FAIL" | "UNKNOWN";
+    bundleTest: "PASS" | "FAIL" | "UNKNOWN";
+  };
+  
+  // Detected Evasion Techniques
+  evasionTechniques: Array<{
+    id: number; // 1-20 from the list
+    name: string;
+    description: string;
+    severity: "low" | "medium" | "high" | "critical";
+  }>;
+  
+  // Specific Risks Found
+  risks: string[];
+  warnings: string[];
+  
+  // Metadata
+  lastChecked: number;
+  confidence: number; // 0-100 (how sure we are)
+}
+
 // Advanced Bundle Detection Data (Jito Timing Analysis)
 export interface BundleDetectionData {
   bundleScore: number; // 0-100
@@ -506,6 +551,51 @@ export interface FundingAnalysisData {
   risks: string[];
 }
 
+// Detailed Rug Score Breakdown (professional-grade like Rugcheck.xyz)
+export interface RugScoreBreakdown {
+  totalScore: number; // 0-100+ (lower = safer, higher = more dangerous)
+  classification: "SAFE" | "WARNING" | "DANGER"; // <10 = Safe, 10-50 = Warning, >50 = Danger
+  components: {
+    authorities: {
+      score: number;
+      mintAuthority: number; // 0-80 points
+      freezeAuthority: number; // 0-40 points
+      metadataMutable: number; // 0-30 points
+      permanentDelegate: number; // 0-15 points
+    };
+    holderDistribution: {
+      score: number;
+      topHolderPercent: number; // 0-80 points (scaled by %)
+      top10Concentration: number; // 0-90 points
+      top100Concentration: number; // 0-20 points
+      holderCount: number; // 0-10 points (inverse: fewer = worse)
+    };
+    liquidity: {
+      score: number;
+      lpLocked: number; // 0-40 points (unlocked = full)
+      lpAmount: number; // 0-30 points (low liq = high score)
+      lpOwnership: number; // 0-15 points (dev owns LP)
+    };
+    taxesAndFees: {
+      score: number;
+      buyTax: number; // 0-20 points
+      sellTax: number; // 0-20 points
+      honeypot: number; // 0-50 points (can't sell = max)
+    };
+    marketActivity: {
+      score: number;
+      washTrading: number; // 0-15 points (extreme vol/MC)
+      sellPressure: number; // 0-10 points (>70% sells)
+      lowHoldersForMC: number; // 0-10 points
+    };
+    tokenAge: {
+      score: number;
+      ageBonus: number; // 0-10 points (very new = penalty)
+    };
+  };
+  breakdown: string[]; // Human-readable list of issues
+}
+
 export interface TokenAnalysisResponse {
   tokenAddress: string;
   riskScore: number;
@@ -537,6 +627,7 @@ export interface TokenAnalysisResponse {
   
   // Risk assessment
   redFlags: RiskFlag[];
+  rugScoreBreakdown?: RugScoreBreakdown; // NEW: Detailed rug score like Rugcheck.xyz
   
   // Creation info
   creationDate?: number;
@@ -555,6 +646,7 @@ export interface TokenAnalysisResponse {
   
   // Advanced rug detection (2025)
   quillcheckData?: QuillCheckData;
+  honeypotDetection?: HoneypotDetectionResult; // NEW: Comprehensive honeypot grading system
   advancedBundleData?: BundleDetectionData;
   networkAnalysis?: NetworkAnalysisData;
   whaleDetection?: WhaleDetectionData;
