@@ -1200,14 +1200,190 @@ function createTelegramBot(botToken: string): Telegraf {
     "🦇 Batsy wouldn't approve of my methods but WHO CARES! Drop a token and I'll go full detective mode on those devs!",
   ];
 
-  // Handle mentions with personality
+  // Handle ALL text messages - commands, mentions, and auto-detection
   bot.on(message('text'), async (ctx) => {
     const text = ctx.message.text.trim();
     const lowerText = text.toLowerCase();
     const botUsername = ctx.botInfo.username;
     const userId = ctx.from?.id.toString() || 'unknown';
     
-    // Check if bot is mentioned
+    // ===================================================================
+    // PRIORITY 1: Handle ! prefix commands FIRST (for Android users)
+    // ===================================================================
+    
+    // !help command
+    if (text === '!help') {
+      const help = rally.getHelpMessage();
+      await ctx.reply(help.message + '\n\n' +
+        '**Text Commands (use ! instead of /):**\n' +
+        '!scan <address> - Full 52-metric scan\n' +
+        '!execute <address> - Same as !scan\n' +
+        '!first20 <address> - Top 20 holders\n' +
+        '!devaudit <address> - Dev wallet audit\n' +
+        '!blacklist <wallet> - Check if flagged\n' +
+        '!whaletrack <address> - Smart money\n' +
+        '!kol <wallet> - Check KOL status\n' +
+        '!price <address> - Quick price\n' +
+        '!rugcheck <address> - Instant scan', 
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+    
+    // Parse !command arguments
+    const cmdMatch = text.match(/^!(\w+)\s+([1-9A-HJ-NP-Za-km-z]{32,44})$/);
+    if (cmdMatch) {
+      const [, command, address] = cmdMatch;
+      
+      // Route to appropriate handler based on command
+      switch (command.toLowerCase()) {
+        case 'scan':
+        case 'execute':
+          const loadingMsg = await ctx.reply('🔍 Scanning token...');
+          try {
+            const analysis = await tokenAnalyzer.analyzeToken(address);
+            try { nameCache.remember(address, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
+            const messageData = buildCompactMessage(analysis);
+            await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, undefined, messageData.header, { parse_mode: 'Markdown' });
+            await ctx.reply(messageData.riskScore + '\n\n' + messageData.security + '\n\n' + messageData.holders + '\n\n' + messageData.links, { parse_mode: 'Markdown' });
+          } catch (error: any) {
+            await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, undefined, `❌ Error: ${error.message}`);
+          }
+          return;
+          
+        case 'first20':
+          try {
+            const holders = await holderAnalysis.analyzeHolders(address);
+            if (!holders || holders.top20Holders.length === 0) {
+              await ctx.reply('⚠️ Could not fetch holder data.');
+              return;
+            }
+            const top20Text = holders.top20Holders.slice(0, 20).map((h, idx) => 
+              `${idx + 1}. \`${h.address.slice(0, 4)}...${h.address.slice(-4)}\` - ${h.percentage.toFixed(2)}%`
+            ).join('\n');
+            await ctx.reply(`🏆 **Top 20 Holders**\nTotal: ${holders.holderCount}\nTop 10: ${holders.topHolderConcentration.toFixed(1)}%\n\n${top20Text}`, { parse_mode: 'Markdown' });
+          } catch (error: any) {
+            await ctx.reply(`❌ Error: ${error.message}`);
+          }
+          return;
+          
+        case 'devaudit':
+          try {
+            const analysis = await tokenAnalyzer.analyzeToken(address);
+            const devWallet = analysis.topHolders?.[0];
+            if (!devWallet) {
+              await ctx.reply('⚠️ Could not identify developer wallet.');
+              return;
+            }
+            await ctx.reply(
+              `🔎 **Dev Wallet Audit**\n` +
+              `Wallet: \`${devWallet.address.slice(0,8)}...${devWallet.address.slice(-8)}\`\n` +
+              `Holdings: ${devWallet.percentage.toFixed(2)}%\n` +
+              `Status: ${devWallet.percentage > 15 ? '⚠️ HIGH' : '✅ Normal'}`,
+              { parse_mode: 'Markdown' }
+            );
+          } catch (error: any) {
+            await ctx.reply(`❌ Error: ${error.message}`);
+          }
+          return;
+          
+        case 'blacklist':
+          try {
+            const isBlacklisted = await creatorWalletService.isWalletBlacklisted(address);
+            await ctx.reply(
+              `${isBlacklisted ? '🚨 **BLACKLISTED WALLET**' : '✅ **Clean Wallet**'}\n` +
+              `Wallet: \`${address.slice(0,8)}...${address.slice(-8)}\`\n` +
+              `Status: ${isBlacklisted ? '⚠️ Flagged for suspicious activity' : '✅ No flags found'}`,
+              { parse_mode: 'Markdown' }
+            );
+          } catch (error: any) {
+            await ctx.reply(`❌ Error: ${error.message}`);
+          }
+          return;
+          
+        case 'whaletrack':
+          try {
+            const analysis = await tokenAnalyzer.analyzeToken(address);
+            const whales = analysis.whaleDetection;
+            if (!whales || whales.whaleCount === 0) {
+              await ctx.reply('📊 No significant whale activity detected.');
+              return;
+            }
+            await ctx.reply(
+              `🐋 **Whale Activity**\n` +
+              `Count: ${whales.whaleCount}\n` +
+              `Total Supply: ${whales.totalWhaleSupplyPercent.toFixed(1)}%\n` +
+              `Avg Buy: ${whales.averageBuySize.toFixed(2)}%`,
+              { parse_mode: 'Markdown' }
+            );
+          } catch (error: any) {
+            await ctx.reply(`❌ Error: ${error.message}`);
+          }
+          return;
+          
+        case 'kol':
+          try {
+            const isKOL = await creatorWalletService.isKnownKOL(address);
+            await ctx.reply(
+              `${isKOL ? '⭐ **Known KOL**' : '👤 **Unknown Wallet**'}\n` +
+              `Wallet: \`${address.slice(0,8)}...${address.slice(-8)}\`\n` +
+              `Status: ${isKOL ? '⭐ Key Opinion Leader' : 'ℹ️ Not a registered KOL'}`,
+              { parse_mode: 'Markdown' }
+            );
+          } catch (error: any) {
+            await ctx.reply(`❌ Error: ${error.message}`);
+          }
+          return;
+          
+        case 'price':
+          try {
+            const dexData = await dexScreener.getTokenData(address);
+            const pair = dexData?.pairs?.[0];
+            if (!pair) {
+              await ctx.reply('⚠️ No price data found.');
+              return;
+            }
+            const price = parseFloat(pair.priceUsd || '0');
+            const priceChange = pair.priceChange?.h24 ?? 0;
+            const emoji = priceChange >= 0 ? '📈' : '📉';
+            await ctx.reply(
+              `💰 **${pair.baseToken?.symbol || 'Token'} Price**\n` +
+              `Price: $${price.toFixed(8)}\n` +
+              `24h: ${emoji} ${priceChange.toFixed(2)}%\n` +
+              `MCap: $${formatNumber(pair.marketCap || 0)}`,
+              { parse_mode: 'Markdown' }
+            );
+          } catch (error: any) {
+            await ctx.reply(`❌ Error: ${error.message}`);
+          }
+          return;
+          
+        case 'rugcheck':
+          try {
+            const analysis = await tokenAnalyzer.analyzeToken(address);
+            let msg = `🛡️ **Quick Rug Scan**\n` +
+              `Risk: ${analysis.riskLevel} (${analysis.riskScore}/100)\n` +
+              `Mint: ${analysis.mintAuthority?.hasAuthority ? '❌ Active' : '✅ Revoked'}\n` +
+              `Freeze: ${analysis.freezeAuthority?.hasAuthority ? '❌ Active' : '✅ Revoked'}`;
+            
+            if (analysis.redFlags && analysis.redFlags.length > 0) {
+              const flags = analysis.redFlags.slice(0, 3).map(f => 
+                `${f.severity === 'critical' ? '🔴' : '🟠'} ${f.title}`
+              ).join('\n');
+              msg += `\n\n⚠️ **Red Flags:**\n${flags}`;
+            }
+            await ctx.reply(msg, { parse_mode: 'Markdown' });
+          } catch (error: any) {
+            await ctx.reply(`❌ Error: ${error.message}`);
+          }
+          return;
+      }
+    }
+    
+    // ===================================================================
+    // PRIORITY 2: Handle bot mentions/replies
+    // ===================================================================
+    
     const isMentioned = text.includes(`@${botUsername}`);
     const isReply = ctx.message.reply_to_message && ctx.message.reply_to_message.from?.is_bot;
     
@@ -1331,29 +1507,12 @@ function createTelegramBot(botToken: string): Telegraf {
       // If symbol not found, silently ignore (don't spam "not recognized" messages)
     }
 
-    // Auto-detect token addresses in messages
-    if (text.length >= 32 && text.length <= 44 && !/\s/.test(text)) {
-      try {
-        const intro = rally.getAnalysisIntro('this token', true);
-        await ctx.reply(intro.message);
-        
-        const analysis = await tokenAnalyzer.analyzeToken(text);
-        const message = formatAnalysis(analysis, true);
-        
-        // Add Rally's risk commentary
-        const riskComment = rally.getRiskCommentary(analysis.riskScore, analysis.riskLevel);
-        await ctx.reply(`${riskComment.message}\n\n${message}`, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } });
-      } catch (error) {
-      }
-    }
-  });
-  
-  // Auto-detect Solana addresses and provide explorer links
-  bot.on(message('text'), async (ctx) => {
-    const text = ctx.message.text.trim();
+    // ===================================================================
+    // PRIORITY 3: Auto-detect Solana addresses (show quick links)
+    // ===================================================================
     
     // Check if it's a Solana address (base58, 32-44 chars, no command prefix)
-    if (text.length >= 32 && text.length <= 44 && !/\s/.test(text) && !text.startsWith('/')) {
+    if (text.length >= 32 && text.length <= 44 && !/\s/.test(text) && !text.startsWith('/') && !text.startsWith('!') && !text.startsWith('@')) {
       try {
         // Validate it looks like a Solana address (base58)
         const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;

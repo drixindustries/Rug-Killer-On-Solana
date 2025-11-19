@@ -75,7 +75,7 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(color)
     .setTitle(`${messageData.header} ⚠️ ${messageData.age}`)
-    .setDescription(`**Safety Score: ${analysis.riskScore}/100** (${analysis.riskLevel})\n_100 = Strong Buy • 0 = Do Not Buy_`)
+    .setDescription(`**Risk Level: ${analysis.riskLevel}** (Score: ${analysis.riskScore}/100)\n_Higher score = Safer token • Lower score = Higher risk_`)
     .setFooter({ text: `Contract: ${analysis.tokenAddress}` })
     .setTimestamp()
     .setImage(`https://dd.dexscreener.com/ds-data/tokens/solana/${analysis.tokenAddress}.png?size=lg&t=${Date.now()}`);
@@ -333,7 +333,10 @@ const commands = [
   new SlashCommandBuilder()
     .setName('alpha')
     .setDescription('Alpha feed controls (admin)')
-    .addSubcommand(sc => sc.setName('status').setDescription('Show alpha service status'))
+    .addSubcommand(sc => sc.setName('status')
+      .setDescription('Show alpha service status')
+      .addBooleanOption(o => o.setName('verbose').setDescription('Show detailed caller list'))
+    )
     .addSubcommand(sc => sc.setName('start').setDescription('Start alpha monitoring'))
     .addSubcommand(sc => sc.setName('stop').setDescription('Stop alpha monitoring'))
     .addSubcommand(sc => sc.setName('debug').setDescription('Show admin detection and permission info (ephemeral)'))
@@ -1312,22 +1315,47 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           await interaction.editReply({ content: `⚠️ Could not create alert: ${e?.message || 'unknown error'}` });
         }
       } else if (interaction.commandName === 'alpha') {
+        console.log(`[Discord /alpha] User ${interaction.user.tag} (ID: ${interaction.user.id}) | Guild: ${interaction.guildId || 'DM'} | Subcommand: ${interaction.options.getSubcommand(true)}`);
         const sub = interaction.options.getSubcommand(true);
         const alpha = getAlphaAlertService();
         // Allow debug subcommand even if admin check fails, so user can see diagnostics
         const isDebug = sub === 'debug';
         if (!isDebug && !canAdmin('alpha')) {
+          console.log(`[Discord /alpha] PERMISSION DENIED for user ${interaction.user.id} | hasGuildPerms: ${hasGuildPerms} | isAdminEnv: ${isAdminEnv}`);
           await interaction.reply({ content: '⛔ Admins only.', ephemeral: true });
           return;
         }
+        console.log(`[Discord /alpha] Permission granted for user ${interaction.user.id} | hasGuildPerms: ${hasGuildPerms} | isAdminEnv: ${isAdminEnv}`);
         await interaction.deferReply({ ephemeral: true });
         if (sub === 'status') {
-          const st = alpha.getStatus();
-          await interaction.editReply({ content: `Alpha Status: running=${st.isRunning}, callers=${st.monitoredCallers}/${st.totalCallers}, listeners=${st.activeListeners}, websockets=${st.activeWebSockets}` });
+          const verbose = interaction.options.getBoolean('verbose') || false;
+          const st = alpha.getStatus(verbose);
+          console.log(`[Discord /alpha status] Service status: ${JSON.stringify(st)}`);
+          
+          let content = `**Alpha Status**\n` +
+            `• Running: ${st.isRunning ? '✅' : '🛑'}\n` +
+            `• Monitored Callers: ${st.monitoredCallers} / ${st.totalCallers}\n` +
+            `• Active Listeners: ${st.activeListeners}\n` +
+            `• WebSockets: ${st.activeWebSockets}`;
+            
+          if (st.message) {
+            content += `\n\n**💡 Suggestion:**\n${st.message}`;
+          }
+          
+          if (verbose && st.callers) {
+            const callerList = st.callers.map(c => `• ${c.name} (${formatAddress(c.wallet)}) - ${c.enabled ? '✅' : '❌'}`).join('\n');
+            content += `\n\n**Configured Callers:**\n${callerList}`;
+          }
+          
+          await interaction.editReply({ content });
         } else if (sub === 'start') {
+          console.log(`[Discord /alpha start] Starting alpha alerts service...`);
           await alpha.start();
+          const st = alpha.getStatus();
+          console.log(`[Discord /alpha start] Service started: ${JSON.stringify(st)}`);
           await interaction.editReply({ content: '✅ Alpha monitoring started.' });
         } else if (sub === 'stop') {
+          console.log(`[Discord /alpha stop] Stopping alpha alerts service...`);
           await alpha.stop();
           await interaction.editReply({ content: '🛑 Alpha monitoring stopped.' });
         } else if (sub === 'debug') {
@@ -1354,7 +1382,10 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             await interaction.editReply({ content: '❌ Please select a text or announcement channel.' });
             return;
           }
+          console.log(`[Discord /alpha setchannel] Setting alpha target - Guild: ${interaction.guildId} | Channel: ${channel.id}`);
           await storage.setAlphaTarget({ platform: 'discord', groupId: interaction.guildId, channelId: channel.id });
+          const saved = await storage.getAlphaTarget('discord', interaction.guildId);
+          console.log(`[Discord /alpha setchannel] Verified saved target: ${JSON.stringify(saved)}`);
           await interaction.editReply({ content: `✅ Alpha alerts will be sent to <#${channel.id}> (@everyone).` });
         } else if (sub === 'clearchannel') {
           if (!interaction.guildId) {
@@ -1369,15 +1400,22 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             return;
           }
           const cfg = await storage.getAlphaTarget('discord', interaction.guildId);
+          console.log(`[Discord /alpha where] Retrieved target for guild ${interaction.guildId}: ${JSON.stringify(cfg)}`);
           await interaction.editReply({ content: cfg ? `📍 Alpha alerts go to <#${cfg.channelId}>` : 'ℹ️ No channel configured for this server.' });
         } else if (sub === 'add') {
           const wallet = interaction.options.getString('wallet', true);
           const name = interaction.options.getString('name', true);
+          console.log(`[Discord /alpha add] Adding alpha caller - Wallet: ${wallet} | Name: ${name}`);
           alpha.addCaller(wallet, name);
+          const st = alpha.getStatus();
+          console.log(`[Discord /alpha add] After add - Total callers: ${st.totalCallers} | Monitored: ${st.monitoredCallers}`);
           await interaction.editReply({ content: `✅ Added alpha caller ${name} (${formatAddress(wallet)})` });
         } else if (sub === 'remove') {
           const wallet = interaction.options.getString('wallet', true);
+          console.log(`[Discord /alpha remove] Removing alpha caller - Wallet: ${wallet}`);
           alpha.removeCaller(wallet);
+          const st = alpha.getStatus();
+          console.log(`[Discord /alpha remove] After remove - Total callers: ${st.totalCallers} | Monitored: ${st.monitoredCallers}`);
           await interaction.editReply({ content: `✅ Removed alpha caller (${formatAddress(wallet)})` });
         }
       } else if (interaction.commandName === 'smart') {
@@ -1758,12 +1796,307 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     const text = message.content.trim();
     const lowerText = text.toLowerCase();
     
-    // Check if bot is mentioned or replied to
+    // ===================================================================
+    // PRIORITY 1: Handle ! prefix commands FIRST (for Android users)
+    // These work WITHOUT requiring bot mention
+    // ===================================================================
+    
+    // !scan or !execute - Full rug detection scan
+    const scanMatch = text.match(/^!(?:scan|execute)[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    if (scanMatch) {
+      const tokenAddress = scanMatch[1];
+      console.log(`[Discord !scan] User ${message.author.tag} scanning: ${tokenAddress}`);
+      
+      const intro = rally.getAnalysisIntro('this token', true);
+      const loadingMsg = await message.reply(intro.message);
+      
+      try {
+        await message.channel.sendTyping();
+        
+        const analysisPromise = tokenAnalyzer.analyzeToken(tokenAddress);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Analysis timeout after 30 seconds')), 30000)
+        );
+        
+        const analysis = await Promise.race([analysisPromise, timeoutPromise]) as any;
+        console.log(`[Discord !scan] Analysis complete for ${tokenAddress}`);
+        
+        try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
+        const embed = createAnalysisEmbed(analysis);
+        
+        const riskComment = rally.getRiskCommentary(analysis.riskScore, analysis.riskLevel);
+        
+        await loadingMsg.edit({ content: riskComment.message, embeds: [embed] });
+        console.log(`[Discord !scan] Reply sent for ${tokenAddress}`);
+        return;
+      } catch (error: any) {
+        console.error(`[Discord !scan] Error for ${tokenAddress}:`, error.message);
+        
+        let errorType: 'invalid_address' | 'not_found' | 'network_error' | 'rate_limit' | 'generic' = 'generic';
+        if (error.message.includes('Invalid') || error.message.includes('not valid')) errorType = 'invalid_address';
+        else if (error.message.includes('not found')) errorType = 'not_found';
+        else if (error.message.includes('timeout') || error.message.includes('network')) errorType = 'network_error';
+        else if (error.message.includes('rate limit')) errorType = 'rate_limit';
+        
+        const errorResponse = rally.getErrorResponse(errorType);
+        await loadingMsg.edit({ content: errorResponse.message });
+        return;
+      }
+    }
+    
+    // !help - Show command list
+    const helpMatch = text.match(/^!help$/i);
+    if (helpMatch) {
+      const helpEmbed = new EmbedBuilder()
+        .setColor('#00FF00')
+        .setTitle('🤖 Rug Killer Alpha Bot - Command Guide')
+        .setDescription('**For Android users:** Use `!command` instead of `/command`\n\n**Available Commands:**')
+        .addFields(
+          { name: '!scan [address]', value: 'Full 52-metric rug detection scan', inline: false },
+          { name: '!execute [address]', value: 'Same as !scan (alias)', inline: false },
+          { name: '!first20 [address]', value: 'Analyze top 20 token holders', inline: false },
+          { name: '!devaudit [address]', value: 'Track developer wallet history', inline: false },
+          { name: '!blacklist [wallet]', value: 'Check if wallet is flagged', inline: false },
+          { name: '!whaletrack [address]', value: 'Track smart money wallets', inline: false },
+          { name: '!kol [wallet]', value: 'Check if wallet is a known KOL', inline: false },
+          { name: '!price [address]', value: 'Quick price lookup', inline: false },
+          { name: '!rugcheck [address]', value: 'Instant rug detection', inline: false }
+        )
+        .setFooter({ text: 'Scan any Solana token for rug pulls in seconds!' });
+      
+      await message.reply({ embeds: [helpEmbed] });
+      return;
+    }
+    
+    // !first20 - Top 20 holders
+    const first20Match = text.match(/^!first20[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    if (first20Match) {
+      const tokenAddress = first20Match[1];
+      const loadingMsg = await message.reply('🔍 Analyzing top 20 holders...');
+      
+      try {
+        await message.channel.sendTyping();
+        const holders = await holderAnalysis.analyzeHolders(tokenAddress);
+        
+        if (!holders || holders.top20Holders.length === 0) {
+          await loadingMsg.edit('⚠️ Could not fetch holder data for this token.');
+          return;
+        }
+        
+        const embed = new EmbedBuilder()
+          .setColor('#3498db')
+          .setTitle(`🏆 Top 20 Holders`)
+          .setDescription(`Total Holders: ${holders.holderCount}\nTop 10 Concentration: ${holders.topHolderConcentration.toFixed(1)}%`)
+          .setFooter({ text: `Token: ${tokenAddress}` });
+        
+        const top20Text = holders.top20Holders.slice(0, 20).map((h, idx) => 
+          `${idx + 1}. ${h.address.slice(0, 4)}...${h.address.slice(-4)} - ${h.percentage.toFixed(2)}%`
+        ).join('\n');
+        
+        embed.addFields({ name: 'Top 20 Holders', value: top20Text || 'No data', inline: false });
+        
+        await loadingMsg.edit({ content: '', embeds: [embed] });
+      } catch (error: any) {
+        await loadingMsg.edit(`❌ Error: ${error.message}`);
+      }
+      return;
+    }
+    
+    // !devaudit - Developer wallet audit
+    const devauditMatch = text.match(/^!devaudit[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    if (devauditMatch) {
+      const tokenAddress = devauditMatch[1];
+      const loadingMsg = await message.reply('🔍 Auditing developer wallet...');
+      
+      try {
+        await message.channel.sendTyping();
+        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        
+        const devWallet = analysis.topHolders?.[0];
+        if (!devWallet) {
+          await loadingMsg.edit('⚠️ Could not identify developer wallet.');
+          return;
+        }
+        
+        const embed = new EmbedBuilder()
+          .setColor('#e74c3c')
+          .setTitle(`🔎 Developer Wallet Audit`)
+          .addFields(
+            { name: 'Dev Wallet', value: `${devWallet.address.slice(0, 8)}...${devWallet.address.slice(-8)}`, inline: false },
+            { name: 'Holdings', value: `${devWallet.percentage.toFixed(2)}%`, inline: true },
+            { name: 'Status', value: devWallet.percentage > 15 ? '⚠️ HIGH' : '✅ Normal', inline: true }
+          )
+          .setFooter({ text: `Token: ${tokenAddress}` });
+        
+        await loadingMsg.edit({ content: '', embeds: [embed] });
+      } catch (error: any) {
+        await loadingMsg.edit(`❌ Error: ${error.message}`);
+      }
+      return;
+    }
+    
+    // !blacklist - Check wallet blacklist
+    const blacklistMatch = text.match(/^!blacklist[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    if (blacklistMatch) {
+      const walletAddress = blacklistMatch[1];
+      const loadingMsg = await message.reply('🔍 Checking blacklist...');
+      
+      try {
+        const isBlacklisted = await creatorWalletService.isWalletBlacklisted(walletAddress);
+        
+        const embed = new EmbedBuilder()
+          .setColor(isBlacklisted ? '#e74c3c' : '#2ecc71')
+          .setTitle(isBlacklisted ? '🚨 BLACKLISTED WALLET' : '✅ Clean Wallet')
+          .setDescription(`Wallet: ${walletAddress.slice(0, 8)}...${walletAddress.slice(-8)}`)
+          .addFields({ 
+            name: 'Status', 
+            value: isBlacklisted ? '⚠️ This wallet is flagged for suspicious activity' : '✅ No flags found', 
+            inline: false 
+          });
+        
+        await loadingMsg.edit({ content: '', embeds: [embed] });
+      } catch (error: any) {
+        await loadingMsg.edit(`❌ Error: ${error.message}`);
+      }
+      return;
+    }
+    
+    // !whaletrack - Track whales
+    const whaletrackMatch = text.match(/^!whaletrack[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    if (whaletrackMatch) {
+      const tokenAddress = whaletrackMatch[1];
+      const loadingMsg = await message.reply('🐋 Tracking smart money...');
+      
+      try {
+        await message.channel.sendTyping();
+        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        
+        const whales = analysis.whaleDetection;
+        if (!whales || whales.whaleCount === 0) {
+          await loadingMsg.edit('📊 No significant whale activity detected.');
+          return;
+        }
+        
+        const embed = new EmbedBuilder()
+          .setColor('#9b59b6')
+          .setTitle(`🐋 Whale Activity`)
+          .addFields(
+            { name: 'Whale Count', value: `${whales.whaleCount}`, inline: true },
+            { name: 'Total Supply', value: `${whales.totalWhaleSupplyPercent.toFixed(1)}%`, inline: true },
+            { name: 'Avg Buy Size', value: `${whales.averageBuySize.toFixed(2)}%`, inline: true }
+          )
+          .setFooter({ text: `Token: ${tokenAddress}` });
+        
+        await loadingMsg.edit({ content: '', embeds: [embed] });
+      } catch (error: any) {
+        await loadingMsg.edit(`❌ Error: ${error.message}`);
+      }
+      return;
+    }
+    
+    // !kol - Check KOL status
+    const kolMatch = text.match(/^!kol[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    if (kolMatch) {
+      const walletAddress = kolMatch[1];
+      const loadingMsg = await message.reply('🔍 Checking KOL status...');
+      
+      try {
+        const isKOL = await creatorWalletService.isKnownKOL(walletAddress);
+        
+        const embed = new EmbedBuilder()
+          .setColor(isKOL ? '#f39c12' : '#95a5a6')
+          .setTitle(isKOL ? '⭐ Known KOL' : '👤 Unknown Wallet')
+          .setDescription(`Wallet: ${walletAddress.slice(0, 8)}...${walletAddress.slice(-8)}`)
+          .addFields({ 
+            name: 'Status', 
+            value: isKOL ? '⭐ This is a known Key Opinion Leader' : 'ℹ️ Not a registered KOL', 
+            inline: false 
+          });
+        
+        await loadingMsg.edit({ content: '', embeds: [embed] });
+      } catch (error: any) {
+        await loadingMsg.edit(`❌ Error: ${error.message}`);
+      }
+      return;
+    }
+    
+    // !price - Quick price check
+    const priceMatch = text.match(/^!price[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    if (priceMatch) {
+      const tokenAddress = priceMatch[1];
+      const loadingMsg = await message.reply('💰 Fetching price...');
+      
+      try {
+        const dexData = await dexScreener.getTokenData(tokenAddress);
+        const pair = dexData?.pairs?.[0];
+        
+        if (!pair) {
+          await loadingMsg.edit('⚠️ No price data found.');
+          return;
+        }
+        
+        const price = parseFloat(pair.priceUsd || '0');
+        const priceChange = pair.priceChange?.h24 ?? 0;
+        const emoji = priceChange >= 0 ? '📈' : '📉';
+        
+        const embed = new EmbedBuilder()
+          .setColor(priceChange >= 0 ? '#2ecc71' : '#e74c3c')
+          .setTitle(`💰 ${pair.baseToken?.symbol || 'Token'} Price`)
+          .addFields(
+            { name: 'Price', value: `$${price.toFixed(8)}`, inline: true },
+            { name: '24h Change', value: `${emoji} ${priceChange.toFixed(2)}%`, inline: true },
+            { name: 'Market Cap', value: `$${formatNumber(pair.marketCap || 0)}`, inline: true }
+          )
+          .setFooter({ text: `Token: ${tokenAddress}` });
+        
+        await loadingMsg.edit({ content: '', embeds: [embed] });
+      } catch (error: any) {
+        await loadingMsg.edit(`❌ Error: ${error.message}`);
+      }
+      return;
+    }
+    
+    // !rugcheck - Quick rug scan
+    const rugcheckMatch = text.match(/^!rugcheck[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    if (rugcheckMatch) {
+      const tokenAddress = rugcheckMatch[1];
+      const loadingMsg = await message.reply('🔍 Running quick rug scan...');
+      
+      try {
+        await message.channel.sendTyping();
+        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        
+        const embed = new EmbedBuilder()
+          .setColor(getRiskColor(analysis.riskLevel))
+          .setTitle(`🛡️ Quick Rug Scan`)
+          .addFields(
+            { name: 'Risk Level', value: `${analysis.riskLevel} (${analysis.riskScore}/100)`, inline: true },
+            { name: 'Mint Authority', value: analysis.mintAuthority?.hasAuthority ? '❌ Active' : '✅ Revoked', inline: true },
+            { name: 'Freeze Authority', value: analysis.freezeAuthority?.hasAuthority ? '❌ Active' : '✅ Revoked', inline: true }
+          )
+          .setFooter({ text: `Token: ${tokenAddress}` });
+        
+        if (analysis.redFlags && analysis.redFlags.length > 0) {
+          const flags = analysis.redFlags.slice(0, 3).map(f => `${f.severity === 'critical' ? '🔴' : '🟠'} ${f.title}`).join('\n');
+          embed.addFields({ name: '⚠️ Red Flags', value: flags, inline: false });
+        }
+        
+        await loadingMsg.edit({ content: '', embeds: [embed] });
+      } catch (error: any) {
+        await loadingMsg.edit(`❌ Error: ${error.message}`);
+      }
+      return;
+    }
+    
+    // ===================================================================
+    // PRIORITY 2: Handle bot mentions/replies (personality responses)
+    // ===================================================================
+    
     const isMentioned = message.mentions.has(client.user!.id);
     const isReply = !!message.reference?.messageId;
     
-    // Handle greetings
     if (isMentioned || isReply) {
+      // Handle greetings
       if (lowerText.match(/\b(hi|hey|hello|sup|yo|gm|gn|wassup|what'?s up)\b/)) {
         const timeOfDay = rally.getTimeOfDay();
         const greeting = lowerText.includes('gm') ? rally.getGreeting(message.author.id, 'morning') :
@@ -1800,53 +2133,9 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       return;
     }
     
-    // Handle plain text commands for Android users (!scan or !execute)
-    // Support both "!scan ADDRESS" and "!scan\nADDRESS" (newline) formats
-    const scanMatch = text.match(/^!(?:scan|execute)[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
-    if (scanMatch) {
-      const tokenAddress = scanMatch[1];
-      console.log(`[Discord !scan] User ${message.author.tag} scanning: ${tokenAddress}`);
-      
-      // Rally's scan intro
-      const intro = rally.getAnalysisIntro('this token', true);
-      const loadingMsg = await message.reply(intro.message);
-      
-      try {
-        await message.channel.sendTyping();
-        
-        // Add timeout to prevent hanging
-        const analysisPromise = tokenAnalyzer.analyzeToken(tokenAddress);
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Analysis timeout after 30 seconds')), 30000)
-        );
-        
-        const analysis = await Promise.race([analysisPromise, timeoutPromise]) as any;
-        console.log(`[Discord !scan] Analysis complete for ${tokenAddress}`);
-        
-        try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
-        const embed = createAnalysisEmbed(analysis);
-        
-        // Add Rally's commentary
-        const riskComment = rally.getRiskCommentary(analysis.riskScore, analysis.riskLevel);
-        
-        await loadingMsg.edit({ content: riskComment.message, embeds: [embed] });
-        console.log(`[Discord !scan] Reply sent for ${tokenAddress}`);
-        return;
-      } catch (error: any) {
-        console.error(`[Discord !scan] Error for ${tokenAddress}:`, error.message);
-        
-        // Rally's error response
-        let errorType: 'invalid_address' | 'not_found' | 'network_error' | 'rate_limit' | 'generic' = 'generic';
-        if (error.message.includes('Invalid') || error.message.includes('not valid')) errorType = 'invalid_address';
-        else if (error.message.includes('not found')) errorType = 'not_found';
-        else if (error.message.includes('timeout') || error.message.includes('network')) errorType = 'network_error';
-        else if (error.message.includes('rate limit')) errorType = 'rate_limit';
-        
-        const errorResponse = rally.getErrorResponse(errorType);
-        await loadingMsg.edit({ content: errorResponse.message });
-        return;
-      }
-    }
+    // ===================================================================
+    // PRIORITY 3: Handle $symbol mentions (cashtag injection)
+    // ===================================================================
     
     // Handle $symbol mentions (cashtag injection like Rick bot)
     // Triggers on messages like "$ZKSL is moving" or "$BONK to the moon"
@@ -1972,17 +2261,27 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     const hasDirectTargets = Boolean(process.env.ALPHA_DISCORD_WEBHOOK || process.env.ALPHA_TELEGRAM_CHAT_ID);
     const botRelay = relayEnv === 'true' ? true : (relayEnv === 'false' ? false : !(direct && hasDirectTargets));
 
+    console.log(`[Discord Bot] Alpha alert relay config - botRelay: ${botRelay} | direct: ${direct} | hasDirectTargets: ${hasDirectTargets} | relayEnv: ${relayEnv}`);
+    
     if (!botRelay) {
       console.log('⏭️ Skipping Discord alpha alert bot relay (direct send active)');
     } else {
       alphaService.onAlert(async (alert, message) => {
         try {
+          console.log(`[Discord Bot] Alpha alert received - Type: ${alert.type} | Mint: ${alert.mint} | Source: ${alert.source}`);
           // Get all alpha alert targets and filter for Discord
           const allTargets = await storage.getAlphaTargets();
+          console.log(`[Discord Bot] Total alpha targets: ${allTargets.length}`);
           const discordTargets = allTargets.filter(t => t.platform === 'discord');
+          console.log(`[Discord Bot] Discord targets: ${discordTargets.length}`);
+          
+          if (discordTargets.length === 0) {
+            console.log(`[Discord Bot] ⚠️ No Discord targets configured. Use /alpha setchannel to configure.`);
+          }
           
           for (const target of discordTargets) {
             try {
+              console.log(`[Discord Bot] Attempting to send to channel ${target.channelId} in guild ${target.groupId}`);
               const channel = await client.channels.fetch(target.channelId);
               if (channel && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement)) {
                 // Send the alpha alert message
@@ -1990,6 +2289,9 @@ function createDiscordClient(botToken: string, clientId: string): Client {
                   content: `@everyone\n\n${message}`,
                   allowedMentions: { parse: ['everyone'] }
                 });
+                console.log(`[Discord Bot] ✅ Alert sent successfully to channel ${target.channelId}`);
+              } else {
+                console.log(`[Discord Bot] ⚠️ Channel ${target.channelId} not found or wrong type`);
               }
             } catch (channelError) {
               console.error(`[Discord Bot] Failed to send alpha alert to channel ${target.channelId}:`, channelError);

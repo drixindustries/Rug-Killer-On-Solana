@@ -19,6 +19,7 @@ import { DexScreenerService } from "./dexscreener-service.ts";
 import { rpcBalancer } from "./services/rpc-balancer.ts";
 import { checkPumpFun } from "./services/pumpfun-api.ts";
 import { holderAnalysis } from "./services/holder-analysis.ts";
+import { quillCheckService } from "./services/quillcheck-service.ts";
 
 export class SolanaTokenAnalyzer {
   private dexScreener: DexScreenerService;
@@ -43,13 +44,15 @@ export class SolanaTokenAnalyzer {
         throw new Error("Invalid token address format");
       }
 
-      // Fetch data in parallel - DexScreener, on-chain data, holder analysis, and pump.fun check
-      const [dexData, onChainData, holderData, creationDateData, pumpFunData] = await Promise.allSettled([
+      // Fetch data in parallel - DexScreener, on-chain data, holder analysis, pump.fun check, and honeypot detection
+      const [dexData, onChainData, holderData, creationDateData, pumpFunData, quillCheckData, honeypotData] = await Promise.allSettled([
         options.skipExternal ? null : this.dexScreener.getTokenData(tokenMintAddress),
         options.skipOnChain ? null : this.getOnChainData(tokenAddress),
         options.skipExternal ? null : holderAnalysis.analyzeHolders(tokenMintAddress),
         options.skipOnChain ? null : this.getTokenCreationDate(tokenAddress),
         options.skipExternal ? null : checkPumpFun(tokenMintAddress),
+        options.skipExternal ? null : quillCheckService.checkToken(tokenMintAddress),
+        options.skipExternal ? null : quillCheckService.getHoneypotDetection(tokenMintAddress),
       ]);
 
       const dex = dexData.status === 'fulfilled' ? dexData.value : null;
@@ -57,8 +60,12 @@ export class SolanaTokenAnalyzer {
       const holders = holderData.status === 'fulfilled' ? holderData.value : null;
       const creationDate = creationDateData.status === 'fulfilled' ? creationDateData.value : undefined;
       const pumpFun = pumpFunData.status === 'fulfilled' ? pumpFunData.value : null;
+      const quillCheck = quillCheckData.status === 'fulfilled' ? quillCheckData.value : null;
+      const honeypotDetection = honeypotData.status === 'fulfilled' ? honeypotData.value : null;
 
       console.log(`✅ [Analyzer] Data fetched in ${Date.now() - startTime}ms`);
+      console.log(`[Analyzer DEBUG] DexScreener data:`, { hasDex: !!dex, pairs: dex?.pairs?.length ?? 0 });
+      console.log(`[Analyzer DEBUG] Pump.fun data:`, { isPumpFun: pumpFun?.isPumpFun, bondingCurve: pumpFun?.bondingCurve });
 
       // Build analysis response
       const response: TokenAnalysisResponse = {
@@ -112,11 +119,8 @@ export class SolanaTokenAnalyzer {
           excluded: [],
         },
         
-        // Liquidity pool
-        liquidityPool: {
-          exists: !!dex?.pairs?.[0]?.liquidity?.usd,
-          status: dex?.pairs?.[0]?.liquidity?.usd && dex.pairs[0].liquidity.usd > 1000 ? 'SAFE' : 'RISKY',
-        },
+        // Liquidity pool - calculate burn percentage
+        liquidityPool: await this.calculateLiquidityPool(dex, pumpFun, tokenMintAddress),
         
         // Market data (normalized structure)
         marketData: dex?.pairs?.[0] ? {
@@ -142,9 +146,10 @@ export class SolanaTokenAnalyzer {
         suspiciousActivityDetected: false,
         
         // Risk assessment
-        riskScore: this.calculateRiskScore(dex, onChain),
-        riskLevel: this.determineRiskLevel(dex, onChain),
-        redFlags: this.generateRiskFlags(dex, onChain),
+        riskScore: this.calculateRiskScore(dex, onChain, holders),
+        riskLevel: this.determineRiskLevel(dex, onChain, holders),
+        redFlags: this.generateRiskFlags(dex, onChain, holders, pumpFun, null),
+        rugScoreBreakdown: this.calculateRugScore(dex, onChain, holders, creationDate),
         
         // Creation info
         creationDate: creationDate,
@@ -163,6 +168,10 @@ export class SolanaTokenAnalyzer {
         
         // External data references
         dexScreenerData: dex,
+        
+        // Advanced rug detection (2025)
+        quillcheckData: quillCheck || undefined,
+        honeypotDetection: honeypotDetection || undefined,
       };
 
       console.log(`✅ [Analyzer] Complete in ${Date.now() - startTime}ms - Risk: ${response.riskLevel}`);
@@ -309,11 +318,56 @@ export class SolanaTokenAnalyzer {
         TOKEN_2022_PROGRAM_ID
       ));
 
+      const totalSupplyRaw = Number(mintInfo.supply);
+      const decimals = mintInfo.decimals;
+      const totalSupply = totalSupplyRaw / Math.pow(10, decimals);
+
+      // Calculate circulating supply by checking for burned tokens
+      // Common burn addresses on Solana
+      const burnAddresses = [
+        '11111111111111111111111111111111', // System Program (common burn destination)
+        'Burn1111111111111111111111111111111111111111', // Explicit burn address
+        '1nc1nerator11111111111111111111111111111111', // Incinerator
+      ];
+
+      let burnedAmount = 0;
+      try {
+        for (const burnAddr of burnAddresses) {
+          try {
+            const burnPubkey = new PublicKey(burnAddr);
+            const burnAccounts = await connection.getTokenAccountsByOwner(
+              burnPubkey,
+              { mint: tokenAddress },
+              'confirmed'
+            );
+            
+            for (const acc of burnAccounts.value) {
+              const data = acc.account.data;
+              if (data.length >= 72) {
+                // Amount is at offset 64 (u64)
+                const amountBuf = data.subarray(64, 72);
+                const amount = amountBuf.readBigUInt64LE(0);
+                burnedAmount += Number(amount);
+              }
+            }
+          } catch (e) {
+            // Skip invalid addresses
+          }
+        }
+      } catch (error) {
+        console.warn(`[Analyzer] Failed to check burned tokens:`, error);
+      }
+
+      const burnedSupply = burnedAmount / Math.pow(10, decimals);
+      const circulatingSupply = Math.max(0, totalSupply - burnedSupply);
+
       // Holder data is now fetched via HolderAnalysisService in parallel
       // This method only handles mint metadata and authorities
       return {
         decimals: mintInfo.decimals,
-        supply: Number(mintInfo.supply) / Math.pow(10, mintInfo.decimals),
+        supply: circulatingSupply, // Use circulating supply (total - burned)
+        totalSupply: totalSupply, // Keep total for reference
+        burnedSupply: burnedSupply,
         authorities: {
           mintAuthority: mintInfo.mintAuthority?.toBase58() || null,
           freezeAuthority: mintInfo.freezeAuthority?.toBase58() || null,
@@ -336,24 +390,66 @@ export class SolanaTokenAnalyzer {
     return price * supply;
   }
 
-  private calculateRiskScore(dex: any, onChain: any): number {
+  private calculateRiskScore(dex: any, onChain: any, holders?: any): number {
     let penalties = 0;
 
-    // Low liquidity penalties
+    // === CRITICAL RED FLAGS (instant rug capability) ===
+    if (onChain?.authorities?.mintAuthority) penalties += 20;
+    if (onChain?.authorities?.freezeAuthority) penalties += 20;
+    
+    // === LIQUIDITY RISK (low liquidity = easy manipulation) ===
     const liquidityUsd = dex?.pairs?.[0]?.liquidity?.usd || 0;
-    if (liquidityUsd < 1000) penalties += 25;
+    const marketCap = dex?.pairs?.[0]?.marketCap || 0;
+    const volume24h = dex?.pairs?.[0]?.volume?.h24 || 0;
+    
+    // Liquidity too low for market cap
+    if (liquidityUsd < 40000 && liquidityUsd > 0) penalties += 15;
+    if (liquidityUsd < 1000) penalties += 30;
     if (liquidityUsd < 100) penalties += 40;
     
-    // Mint/freeze authority still enabled
-    if (onChain?.authorities?.mintAuthority) penalties += 15;
-    if (onChain?.authorities?.freezeAuthority) penalties += 15;
+    // Volume/MC ratio check (wash trading detection)
+    if (marketCap > 0 && volume24h > 0) {
+      const volumeMcRatio = volume24h / marketCap;
+      if (volumeMcRatio > 50) penalties += 15; // Extreme wash trading (>5000% volume)
+      else if (volumeMcRatio > 20) penalties += 10; // Heavy wash trading (>2000%)
+    }
+    
+    // === HOLDER CONCENTRATION (whale/dev control) ===
+    // Filter out LP/exchanges to only penalize actual dev/whale wallets
+    const realWallets = holders?.top20Holders?.filter(h => 
+      !h.isLP && !h.isExchange && h.address !== '11111111111111111111111111111111'
+    ) || [];
+    const topHolderPercent = realWallets[0]?.percentage || 0;
+    const top10Concentration = holders?.topHolderConcentration || 0;
+    
+    if (topHolderPercent >= 20) penalties += 25; // Dev holds >= 20%
+    else if (topHolderPercent >= 15) penalties += 15; // Dev holds >= 15%
+    
+    if (top10Concentration >= 60) penalties += 20; // Top 10 own >= 60%
+    else if (top10Concentration >= 50) penalties += 10; // Top 10 own >= 50%
+    
+    // === HOLDER COUNT vs MARKET CAP (fake volume detection) ===
+    const holderCount = holders?.holderCount || 0;
+    if (marketCap > 500000 && holderCount < 50) penalties += 15; // High MC, low holders = manipulation
+    if (marketCap > 100000 && holderCount < 20) penalties += 10; // Moderate MC, very low holders
+    
+    // === BUY/SELL PRESSURE (dump risk) ===
+    const txns24h = dex?.pairs?.[0]?.txns?.h24;
+    if (txns24h && txns24h.buys > 0 && txns24h.sells > 0) {
+      const sellRatio = txns24h.sells / (txns24h.buys + txns24h.sells);
+      if (sellRatio > 0.7) penalties += 10; // >70% sells = heavy dumping
+      else if (sellRatio > 0.6) penalties += 5; // >60% sells = moderate dumping
+    }
+    
+    // === METADATA & SECURITY ===
+    if (onChain?.metadata?.isMutable !== false) penalties += 5;
 
     // Invert score: 100 = good (no penalties), 0 = bad (max penalties)
     return Math.max(0, 100 - penalties);
   }
 
-  private determineRiskLevel(dex: any, onChain: any): RiskLevel {
-    const score = this.calculateRiskScore(dex, onChain);
+  private determineRiskLevel(dex: any, onChain: any, holders?: any): RiskLevel {
+    const score = this.calculateRiskScore(dex, onChain, holders);
     
     // Inverted: higher score = safer
     if (score >= 80) return "LOW";
@@ -362,39 +458,367 @@ export class SolanaTokenAnalyzer {
     return "EXTREME";
   }
 
-  private generateRiskFlags(dex: any, onChain: any): RiskFlag[] {
+  /**
+   * Calculate comprehensive rug score (0-100+) like Rugcheck.xyz
+   * Lower score = safer | Higher score = more dangerous
+   * <10 = SAFE | 10-50 = WARNING | >50 = DANGER
+   */
+  private calculateRugScore(dex: any, onChain: any, holders?: any, creationDate?: number): import('../shared/schema').RugScoreBreakdown {
+    const breakdown: string[] = [];
+    
+    // === AUTHORITIES (30-40% weight, up to 165 points) ===
+    const mintAuthorityScore = onChain?.authorities?.mintAuthority ? 80 : 0;
+    const freezeAuthorityScore = onChain?.authorities?.freezeAuthority ? 40 : 0;
+    const metadataMutableScore = onChain?.metadata?.isMutable !== false ? 30 : 0;
+    const permanentDelegateScore = 0; // TODO: Check permanent delegate (rare)
+    
+    if (mintAuthorityScore > 0) breakdown.push(`Mint authority active: +${mintAuthorityScore} pts`);
+    if (freezeAuthorityScore > 0) breakdown.push(`Freeze authority active: +${freezeAuthorityScore} pts`);
+    if (metadataMutableScore > 0) breakdown.push(`Metadata mutable: +${metadataMutableScore} pts`);
+    
+    const authoritiesScore = mintAuthorityScore + freezeAuthorityScore + metadataMutableScore + permanentDelegateScore;
+    
+    // === HOLDER DISTRIBUTION (25-35% weight, up to 190 points) ===
+    const realWallets = holders?.top20Holders?.filter((h: any) => 
+      !h.isLP && !h.isExchange && h.address !== '11111111111111111111111111111111'
+    ) || [];
+    const topHolderPercent = realWallets[0]?.percentage || 0;
+    const top10Concentration = holders?.topHolderConcentration || 0;
+    const holderCount = holders?.holderCount || 0;
+    
+    // Top holder: 1 point per % over 10%, max 80
+    const topHolderScore = Math.min(80, Math.max(0, (topHolderPercent - 10) * 1));
+    if (topHolderScore > 0) breakdown.push(`Top holder owns ${topHolderPercent.toFixed(1)}%: +${topHolderScore.toFixed(0)} pts`);
+    
+    // Top 10 concentration: 1 point per % over 30%, max 90
+    const top10Score = Math.min(90, Math.max(0, (top10Concentration - 30) * 1));
+    if (top10Score > 0) breakdown.push(`Top 10 own ${top10Concentration.toFixed(1)}%: +${top10Score.toFixed(0)} pts`);
+    
+    // Low holder count penalty
+    const holderCountScore = holderCount < 100 ? Math.max(0, 10 - (holderCount / 10)) : 0;
+    if (holderCountScore > 0) breakdown.push(`Only ${holderCount} holders: +${holderCountScore.toFixed(0)} pts`);
+    
+    const holderDistributionScore = topHolderScore + top10Score + holderCountScore;
+    
+    // === LIQUIDITY (15-20% weight, up to 85 points) ===
+    const liquidityUsd = dex?.pairs?.[0]?.liquidity?.usd || 0;
+    const burnPercentage = dex?.pairs?.[0]?.liquidity?.burnPercentage || 0;
+    
+    // LP not locked/burned
+    const lpLockedScore = burnPercentage < 50 ? 40 : burnPercentage < 90 ? 20 : 0;
+    if (lpLockedScore > 0) breakdown.push(`LP ${burnPercentage.toFixed(0)}% burned (not fully locked): +${lpLockedScore} pts`);
+    
+    // Low liquidity: more points for lower liquidity
+    let lpAmountScore = 0;
+    if (liquidityUsd < 1000) lpAmountScore = 30;
+    else if (liquidityUsd < 5000) lpAmountScore = 25;
+    else if (liquidityUsd < 10000) lpAmountScore = 20;
+    else if (liquidityUsd < 40000) lpAmountScore = 15;
+    if (lpAmountScore > 0) breakdown.push(`Low liquidity ($${(liquidityUsd/1000).toFixed(1)}k): +${lpAmountScore} pts`);
+    
+    const lpOwnershipScore = 0; // TODO: Check if dev owns LP tokens
+    
+    const liquidityScore = lpLockedScore + lpAmountScore + lpOwnershipScore;
+    
+    // === TAXES & FEES (10-15% weight, up to 90 points) ===
+    // TODO: Simulate buy/sell for tax detection
+    const buyTaxScore = 0;
+    const sellTaxScore = 0;
+    const honeypotScore = 0;
+    const taxesScore = buyTaxScore + sellTaxScore + honeypotScore;
+    
+    // === MARKET ACTIVITY (5-10% weight, up to 35 points) ===
+    const marketCap = dex?.pairs?.[0]?.marketCap || 0;
+    const volume24h = dex?.pairs?.[0]?.volume?.h24 || 0;
+    const txns24h = dex?.pairs?.[0]?.txns?.h24;
+    
+    // Wash trading detection
+    let washTradingScore = 0;
+    if (marketCap > 0 && volume24h > 0) {
+      const volumeMcRatio = volume24h / marketCap;
+      if (volumeMcRatio > 50) {
+        washTradingScore = 15;
+        breakdown.push(`Extreme wash trading (${(volumeMcRatio * 100).toFixed(0)}% vol/MC): +${washTradingScore} pts`);
+      } else if (volumeMcRatio > 20) {
+        washTradingScore = 10;
+        breakdown.push(`Suspected wash trading (${(volumeMcRatio * 100).toFixed(0)}% vol/MC): +${washTradingScore} pts`);
+      }
+    }
+    
+    // Sell pressure
+    let sellPressureScore = 0;
+    if (txns24h && txns24h.buys > 0 && txns24h.sells > 0) {
+      const sellRatio = txns24h.sells / (txns24h.buys + txns24h.sells);
+      if (sellRatio > 0.7) {
+        sellPressureScore = 10;
+        breakdown.push(`Heavy selling (${(sellRatio * 100).toFixed(0)}% sells): +${sellPressureScore} pts`);
+      }
+    }
+    
+    // Low holders for market cap
+    let lowHoldersScore = 0;
+    if (marketCap > 500000 && holderCount < 50) {
+      lowHoldersScore = 10;
+      breakdown.push(`Low holders for $${(marketCap/1000).toFixed(0)}k MC: +${lowHoldersScore} pts`);
+    }
+    
+    const marketActivityScore = washTradingScore + sellPressureScore + lowHoldersScore;
+    
+    // === TOKEN AGE (5% weight, up to 10 points) ===
+    let ageScore = 0;
+    if (creationDate) {
+      const ageMs = Date.now() - creationDate;
+      const ageHours = ageMs / (1000 * 60 * 60);
+      if (ageHours < 1) {
+        ageScore = 10;
+        breakdown.push(`Very new token (<1h old): +${ageScore} pts`);
+      } else if (ageHours < 6) {
+        ageScore = 5;
+        breakdown.push(`New token (<6h old): +${ageScore} pts`);
+      }
+    }
+    
+    // === TOTAL SCORE ===
+    const totalScore = authoritiesScore + holderDistributionScore + liquidityScore + taxesScore + marketActivityScore + ageScore;
+    
+    // Classify: <10 = SAFE, 10-50 = WARNING, >50 = DANGER
+    let classification: "SAFE" | "WARNING" | "DANGER";
+    if (totalScore < 10) classification = "SAFE";
+    else if (totalScore <= 50) classification = "WARNING";
+    else classification = "DANGER";
+    
+    return {
+      totalScore: Math.round(totalScore),
+      classification,
+      components: {
+        authorities: {
+          score: authoritiesScore,
+          mintAuthority: mintAuthorityScore,
+          freezeAuthority: freezeAuthorityScore,
+          metadataMutable: metadataMutableScore,
+          permanentDelegate: permanentDelegateScore,
+        },
+        holderDistribution: {
+          score: holderDistributionScore,
+          topHolderPercent: topHolderScore,
+          top10Concentration: top10Score,
+          top100Concentration: 0,
+          holderCount: holderCountScore,
+        },
+        liquidity: {
+          score: liquidityScore,
+          lpLocked: lpLockedScore,
+          lpAmount: lpAmountScore,
+          lpOwnership: lpOwnershipScore,
+        },
+        taxesAndFees: {
+          score: taxesScore,
+          buyTax: buyTaxScore,
+          sellTax: sellTaxScore,
+          honeypot: honeypotScore,
+        },
+        marketActivity: {
+          score: marketActivityScore,
+          washTrading: washTradingScore,
+          sellPressure: sellPressureScore,
+          lowHoldersForMC: lowHoldersScore,
+        },
+        tokenAge: {
+          score: ageScore,
+          ageBonus: ageScore,
+        },
+      },
+      breakdown,
+    };
+  }
+
+  private generateRiskFlags(dex: any, onChain: any, holders?: any, pumpFun?: any, bundleData?: any): RiskFlag[] {
     const flags: RiskFlag[] = [];
 
-    // Basic checks from on-chain + DexScreener only
-
-    // Authority flags
+    // RED FLAG #2 & #3: Authority flags (CRITICAL - immediate rug risk)
     if (onChain?.authorities?.mintAuthority) {
       flags.push({
         type: "mint_authority",
-        severity: "medium",
-        title: "Mint Authority Active",
-        description: "Token supply can be increased by the owner.",
+        severity: "critical",
+        title: "🚨 Mint Authority NOT Renounced",
+        description: "Dev can mint infinite new tokens anytime. Instant rug capability.",
       });
     }
 
     if (onChain?.authorities?.freezeAuthority) {
       flags.push({
         type: "freeze_authority",
-        severity: "medium",
-        title: "Freeze Authority Active",
-        description: "Token accounts can be frozen by the owner.",
+        severity: "critical",
+        title: "🚨 Freeze Authority NOT Revoked",
+        description: "Dev can freeze your wallet and steal your tokens.",
       });
     }
 
-    // Liquidity flags
+    // RED FLAG #9: Mutable metadata (update authority not revoked)
+    if (onChain?.metadata?.isMutable !== false) {
+      flags.push({
+        type: "mutable_metadata",
+        severity: "high",
+        title: "⚠️ Metadata is Mutable",
+        description: "Dev can edit name/symbol/image/URI anytime via update authority. Common scam: pump with legit branding → swap to fake/misleading metadata → dump tokens. Legit projects revoke update authority (~0.1 SOL) to lock metadata permanently and build trust. Until revoked, dev controls token's identity.",
+      });
+    }
+
+    // RED FLAG #7: Liquidity flags
     const liquidityUsd = dex?.pairs?.[0]?.liquidity?.usd || 0;
-    if (liquidityUsd < 1000) {
+    if (liquidityUsd < 40000 && liquidityUsd > 0) {
       flags.push({
         type: "low_liquidity",
         severity: "high",
-        title: "Very Low Liquidity",
-        description: `Only $${liquidityUsd.toFixed(2)} in liquidity pool.`,
+        title: "⚠️ Low Liquidity (<$40k)",
+        description: `Only $${liquidityUsd.toLocaleString()} in liquidity pool. Easy to manipulate or rug.`,
       });
+    } else if (liquidityUsd < 1000 && liquidityUsd > 0) {
+      flags.push({
+        type: "low_liquidity",
+        severity: "critical",
+        title: "🚨 Extremely Low Liquidity",
+        description: `Only $${liquidityUsd.toFixed(2)} in liquidity pool. Almost guaranteed rug.`,
+      });
+    }
+
+    // RED FLAG #1 & #5: Holder concentration (top holder warnings)
+    // IMPORTANT: Filter out LP pools, exchanges, and burn addresses - only flag actual dev/whale wallets
+    const realWallets = holders?.top20Holders?.filter(h => 
+      !h.isLP && !h.isExchange && h.address !== '11111111111111111111111111111111'
+    ) || [];
+    
+    const topHolderPercent = realWallets[0]?.percentage || 0;
+    const top10Concentration = holders?.topHolderConcentration || 0;
+    
+    // Only warn if actual wallet (not LP/exchange) holds too much
+    if (topHolderPercent >= 20) {
+      flags.push({
+        type: "holder_concentration",
+        severity: "critical",
+        title: "🚨 Dev Holds ≥20% of Supply",
+        description: `Top wallet (${realWallets[0]?.address.slice(0,8)}...) owns ${topHolderPercent.toFixed(1)}%. Can dump instantly with massive slippage.`,
+      });
+    } else if (topHolderPercent >= 15) {
+      flags.push({
+        type: "holder_concentration",
+        severity: "high",
+        title: "⚠️ Dev Holds ≥15% of Supply",
+        description: `Top wallet (${realWallets[0]?.address.slice(0,8)}...) owns ${topHolderPercent.toFixed(1)}%. High risk of coordinated dump.`,
+      });
+    }
+
+    // Top 10 concentration includes LP/exchanges since it's about overall manipulation risk
+    if (top10Concentration >= 60) {
+      flags.push({
+        type: "holder_concentration",
+        severity: "critical",
+        title: `🚨 Top 10 Wallets: ${top10Concentration.toFixed(1)}% (>60% threshold)`,
+        description: "Extremely concentrated ownership. Easy coordinated dump.",
+      });
+    } else if (top10Concentration >= 50) {
+      flags.push({
+        type: "holder_concentration",
+        severity: "high",
+        title: `⚠️ Top 10 Wallets: ${top10Concentration.toFixed(1)}% (>50% threshold)`,
+        description: "High concentration in top 10. Increased manipulation risk.",
+      });
+    }
+
+    // RED FLAG #4: Jito bundle manipulation
+    if (bundleData?.bundleScore >= 70) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "critical",
+        title: "🚨 Heavy Jito Bundle Activity",
+        description: `Bundle score: ${bundleData.bundleScore}/100. Likely insider/dev snipe in first seconds.`,
+      });
+    } else if (bundleData?.bundleScore >= 50) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "high",
+        title: "⚠️ Jito Bundle Detected",
+        description: `Bundle score: ${bundleData.bundleScore}/100. Multiple wallets bought in coordinated bundles.`,
+      });
+    }
+
+    // RED FLAG #8: Dev sold early (check if top holder percentage dropped significantly)
+    // This would need transaction history - placeholder for future implementation
+
+    // RED FLAG #11: Recent token creation (within 24 hours)
+    const tokenAge = onChain?.creationDate ? Date.now() - onChain.creationDate : null;
+    if (tokenAge !== null && tokenAge < 3600000) { // < 1 hour
+      flags.push({
+        type: "recent_creation",
+        severity: "medium",
+        title: "🆕 Token Created <1 Hour Ago",
+        description: "Very new token. Wait for more data and community validation.",
+      });
+    }
+
+    // RED FLAG #13: Hidden bundle buys on pump.fun
+    if (pumpFun?.isPumpFun && bundleData?.bundleScore >= 50) {
+      flags.push({
+        type: "bundle_manipulation",
+        severity: "high",
+        title: "⚠️ Pump.fun Bundle Manipulation",
+        description: "Token launched on pump.fun with suspicious bundle activity. Dev likely bought via Jito bundles.",
+      });
+    }
+
+    // RED FLAG #15: Low holder count for market cap
+    const holderCount = holders?.holderCount || 0;
+    const marketCap = dex?.pairs?.[0]?.marketCap || 0;
+    if (marketCap > 500000 && holderCount < 50) {
+      flags.push({
+        type: "holder_concentration",
+        severity: "high",
+        title: "⚠️ Low Holders for Market Cap",
+        description: `Only ${holderCount} holders for $${(marketCap/1000).toFixed(0)}k market cap. Possible wash trading.`,
+      });
+    }
+    
+    // RED FLAG #16: Wash trading detection (extreme volume/MC ratio)
+    const volume24h = dex?.pairs?.[0]?.volume?.h24 || 0;
+    if (marketCap > 0 && volume24h > 0) {
+      const volumeMcRatio = volume24h / marketCap;
+      if (volumeMcRatio > 50) { // >5000% daily volume vs MC
+        flags.push({
+          type: "suspicious_transactions",
+          severity: "critical",
+          title: "🚨 Extreme Wash Trading Detected",
+          description: `24h volume is ${(volumeMcRatio * 100).toFixed(0)}% of market cap. Likely fake volume via bots.`,
+        });
+      } else if (volumeMcRatio > 20) { // >2000% daily volume vs MC
+        flags.push({
+          type: "suspicious_transactions",
+          severity: "high",
+          title: "⚠️ Suspected Wash Trading",
+          description: `24h volume is ${(volumeMcRatio * 100).toFixed(0)}% of market cap. Unusually high trading activity.`,
+        });
+      }
+    }
+    
+    // RED FLAG #17: Heavy selling pressure (dump in progress)
+    const txns24h = dex?.pairs?.[0]?.txns?.h24;
+    if (txns24h && txns24h.buys > 0 && txns24h.sells > 0) {
+      const totalTxns = txns24h.buys + txns24h.sells;
+      const sellRatio = txns24h.sells / totalTxns;
+      if (sellRatio > 0.7) { // >70% of transactions are sells
+        flags.push({
+          type: "suspicious_transactions",
+          severity: "critical",
+          title: "🚨 Heavy Dumping Detected",
+          description: `${(sellRatio * 100).toFixed(0)}% of recent transactions are sells (${txns24h.sells} sells vs ${txns24h.buys} buys). Active dump.`,
+        });
+      } else if (sellRatio > 0.6) { // >60% sells
+        flags.push({
+          type: "suspicious_transactions",
+          severity: "high",
+          title: "⚠️ High Selling Pressure",
+          description: `${(sellRatio * 100).toFixed(0)}% of recent transactions are sells (${txns24h.sells} sells vs ${txns24h.buys} buys). Caution.`,
+        });
+      }
     }
 
     return flags;
@@ -470,6 +894,142 @@ export class SolanaTokenAnalyzer {
     } catch (error: any) {
       console.warn(`⚠️ [Analyzer] Failed to fetch token creation date:`, error.message);
       return undefined;
+    }
+  }
+
+  /**
+   * Calculate liquidity pool data including burn percentage
+   * For Pump.fun tokens: Check if bonded (100% curve = graduated to Raydium)
+   * For regular tokens: Try to calculate LP burn from on-chain data
+   */
+  private async calculateLiquidityPool(
+    dex: any,
+    pumpFun: any,
+    tokenAddress: string
+  ): Promise<LiquidityPoolStatus> {
+    console.log(`\n[LP Analyzer DEBUG] Starting LP calculation for ${tokenAddress}`);
+    
+    const liquidityUsd = dex?.pairs?.[0]?.liquidity?.usd || 0;
+    const pairAddress = dex?.pairs?.[0]?.pairAddress;
+    
+    console.log(`[LP Analyzer DEBUG] Liquidity USD: $${liquidityUsd}`);
+    console.log(`[LP Analyzer DEBUG] Pair Address: ${pairAddress || 'none'}`);
+    console.log(`[LP Analyzer DEBUG] Is Pump.fun: ${pumpFun?.isPumpFun}`);
+    console.log(`[LP Analyzer DEBUG] Bonding Curve: ${pumpFun?.bondingCurve}%`);
+    
+    // For Pump.fun tokens, check bonding status
+    if (pumpFun?.isPumpFun) {
+      const bondingCurve = pumpFun.bondingCurve ?? 0;
+      const isGraduated = bondingCurve >= 100 || pumpFun.mayhemMode;
+      
+      console.log(`[LP Analyzer DEBUG] Pump.fun token - Graduated: ${isGraduated}`);
+      
+      if (!isGraduated) {
+        // Token hasn't bonded yet - no LP to burn
+        console.log(`[LP Analyzer DEBUG] Not bonded yet - returning no burn data`);
+        return {
+          exists: false,
+          status: 'UNKNOWN' as const,
+          burnPercentage: undefined, // Explicitly undefined - not 0%
+        };
+      }
+      
+      // Token has graduated - check actual LP burn
+      console.log(`[LP Analyzer DEBUG] Token graduated - checking LP burn`);
+      if (pairAddress) {
+        const burnPct = await this.calculateLPBurnPercentage(pairAddress);
+        console.log(`[LP Analyzer DEBUG] Calculated burn percentage: ${burnPct}%`);
+        return {
+          exists: true,
+          status: burnPct >= 90 ? 'SAFE' : 'RISKY',
+          burnPercentage: burnPct,
+          lpMintAddress: pairAddress,
+        };
+      }
+    }
+    
+    // For regular tokens with liquidity pools
+    if (pairAddress && liquidityUsd > 0) {
+      console.log(`[LP Analyzer DEBUG] Regular token with LP - calculating burn`);
+      const burnPct = await this.calculateLPBurnPercentage(pairAddress);
+      console.log(`[LP Analyzer DEBUG] Calculated burn percentage: ${burnPct}%`);
+      
+      return {
+        exists: true,
+        status: liquidityUsd > 1000 && burnPct >= 90 ? 'SAFE' : 'RISKY',
+        burnPercentage: burnPct,
+        lpMintAddress: pairAddress,
+      };
+    }
+    
+    // No liquidity pool found
+    console.log(`[LP Analyzer DEBUG] No LP found - returning no data`);
+    return {
+      exists: !!liquidityUsd,
+      status: liquidityUsd > 1000 ? 'SAFE' : 'RISKY',
+      burnPercentage: undefined,
+    };
+  }
+
+  /**
+   * Calculate LP burn percentage by checking token accounts
+   * Returns percentage of LP tokens burned (sent to dead addresses)
+   */
+  private async calculateLPBurnPercentage(lpMintAddress: string): Promise<number> {
+    console.log(`[LP Burn DEBUG] Calculating burn for LP: ${lpMintAddress}`);
+    
+    try {
+      const connection = rpcBalancer.getConnection();
+      const lpMintPubkey = new PublicKey(lpMintAddress);
+      
+      // Get LP token mint info
+      const mintInfo = await getMint(connection, lpMintPubkey, 'confirmed', TOKEN_PROGRAM_ID)
+        .catch(() => getMint(connection, lpMintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID));
+      
+      const totalSupply = Number(mintInfo.supply);
+      console.log(`[LP Burn DEBUG] Total LP supply: ${totalSupply}`);
+      
+      if (totalSupply === 0) {
+        console.log(`[LP Burn DEBUG] Total supply is 0 - 100% burned`);
+        return 100;
+      }
+      
+      // Get largest LP token holders
+      const largestAccounts = await connection.getTokenLargestAccounts(lpMintPubkey, 'confirmed');
+      console.log(`[LP Burn DEBUG] Found ${largestAccounts.value.length} LP token accounts`);
+      
+      // Known burn addresses on Solana
+      const BURN_ADDRESSES = [
+        '11111111111111111111111111111111', // System program (common burn)
+        'So11111111111111111111111111111111111111112', // Wrapped SOL (sometimes used)
+        'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', // Token program
+      ];
+      
+      let burnedAmount = 0;
+      
+      for (const account of largestAccounts.value) {
+        const owner = account.address.toBase58();
+        const amount = Number(account.amount);
+        
+        // Check if owner is a burn address or the account has 0 balance
+        const isBurned = BURN_ADDRESSES.includes(owner) || amount === 0;
+        
+        if (isBurned) {
+          burnedAmount += amount;
+          console.log(`[LP Burn DEBUG] Burned account found: ${owner.slice(0, 8)}... Amount: ${amount}`);
+        } else {
+          console.log(`[LP Burn DEBUG] Active account: ${owner.slice(0, 8)}... Amount: ${amount}`);
+        }
+      }
+      
+      const burnPercentage = (burnedAmount / totalSupply) * 100;
+      console.log(`[LP Burn DEBUG] Burned: ${burnedAmount} / ${totalSupply} = ${burnPercentage.toFixed(2)}%`);
+      
+      return burnPercentage;
+      
+    } catch (error: any) {
+      console.error(`[LP Burn DEBUG] Error calculating LP burn:`, error.message);
+      return 0; // Return 0% if we can't calculate (safest assumption)
     }
   }
 }

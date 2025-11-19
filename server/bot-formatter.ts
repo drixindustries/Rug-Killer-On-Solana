@@ -47,6 +47,7 @@ export interface CompactMessageData {
   header: string;
   age: string;
   riskScore: string;
+  rugScore?: string;
   aiVerdict?: string;
   security: string;
   holders: string;
@@ -82,8 +83,10 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   let ageString = '❓ Unknown';
   if (tokenAge !== null) {
     if (tokenAge < 1) {
-      const hours = Math.floor((Date.now() - analysis.creationDate) / (1000 * 60 * 60));
-      ageString = `${hours}h OLD`;
+      const ageMs = Date.now() - analysis.creationDate;
+      const hours = Math.floor(ageMs / (1000 * 60 * 60));
+      const minutes = Math.floor((ageMs % (1000 * 60 * 60)) / (1000 * 60));
+      ageString = `${hours}h ${minutes}m OLD`;
     } else {
       ageString = `${tokenAge}d OLD`;
     }
@@ -98,7 +101,20 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   }
   
   // RISK SCORE
-  const riskScore = `🎯 **Risk Score:** ${analysis.riskScore}/100 (${analysis.riskLevel})\n_0 = Do Not Buy • 100 = Strong Buy_`;
+  const riskScore = `🎯 **Risk Level:** ${analysis.riskLevel} (${analysis.riskScore}/100)\n_Higher score = Safer • Lower score = Higher risk_`;
+  
+  // RUG SCORE (Rugcheck-style)
+  let rugScoreText: string | undefined;
+  if (analysis.rugScoreBreakdown) {
+    const rs = analysis.rugScoreBreakdown;
+    const emoji = rs.classification === 'SAFE' ? '✅' : rs.classification === 'WARNING' ? '⚠️' : '🚨';
+    const color = rs.classification === 'SAFE' ? 'green' : rs.classification === 'WARNING' ? 'yellow' : 'red';
+    rugScoreText = `${emoji} **Rug Score:** ${rs.totalScore} (${rs.classification})\n_<10 = Safe | 10-50 = Warning | >50 = Danger_\n\n**Breakdown:**\n` +
+      `• Authorities: ${rs.components.authorities.score} pts\n` +
+      `• Holder Dist: ${rs.components.holderDistribution.score} pts\n` +
+      `• Liquidity: ${rs.components.liquidity.score} pts\n` +
+      `• Market Activity: ${rs.components.marketActivity.score} pts`;
+  }
   
   // AI VERDICT
   let aiVerdict: string | undefined;
@@ -110,24 +126,47 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   const mintStatus = analysis.mintAuthority?.hasAuthority ? '❌ Active' : '✅ Revoked';
   const freezeStatus = analysis.freezeAuthority?.hasAuthority ? '❌ Active' : '✅ Revoked';
   
-  // LP BURN
-  const burnPercent = analysis.liquidityPool?.burnPercentage ?? 0;
-  const burnEmoji = burnPercent > 95 ? '🔥' : burnPercent > 50 ? '⚠️' : '❌';
-  const burnText = `${burnPercent.toFixed(1)}%`;
+  // LP BURN - Check if Pump.fun token is bonded
+  let lpBurnText: string;
+  if (analysis.pumpFunData?.isPumpFun) {
+    // For Pump.fun tokens, check if bonded to Raydium
+    const bondingCurve = analysis.pumpFunData.bondingCurve ?? 0;
+    if (bondingCurve >= 100 || analysis.pumpFunData.mayhemMode) {
+      // Token has graduated/bonded - check actual LP burn
+      const burnPercent = analysis.liquidityPool?.burnPercentage ?? 0;
+      const burnEmoji = burnPercent > 95 ? '🔥' : burnPercent > 50 ? '⚠️' : '❌';
+      lpBurnText = `${burnEmoji} ${burnPercent.toFixed(1)}%`;
+    } else {
+      // Token is still on bonding curve, not bonded yet
+      lpBurnText = `⏳ Not Bonded (${bondingCurve.toFixed(1)}% to Raydium)`;
+    }
+  } else {
+    // Regular token - show burn percentage
+    const burnPercent = analysis.liquidityPool?.burnPercentage ?? 0;
+    const burnEmoji = burnPercent > 95 ? '🔥' : burnPercent > 50 ? '⚠️' : '❌';
+    lpBurnText = `${burnEmoji} ${burnPercent.toFixed(1)}%`;
+  }
   
-  const security = `🔐 **Security**\n• Mint: ${mintStatus}\n• Freeze: ${freezeStatus}\n• LP Burn: ${burnEmoji} ${burnText}`;
+  const security = `🔐 **Security**\n• Mint: ${mintStatus}\n• Freeze: ${freezeStatus}\n• LP Burn: ${lpBurnText}`;
   
   // HOLDERS (with shareable links)
   const holderCount = analysis.holderCount ?? 0;
   const topHolderConc = analysis.topHolderConcentration ?? 0;
   const supply = analysis.metadata?.supply ?? 0;
   
+  console.log(`[BotFormatter DEBUG] Formatting holder data for ${analysis.tokenAddress}:`, {
+    holderCount,
+    topHolderConc: topHolderConc.toFixed(2) + '%',
+    topHoldersLength: analysis.topHolders?.length ?? 0
+  });
+  
   // Get deployment URL from environment (Railway provides PUBLIC_URL or RAILWAY_PUBLIC_DOMAIN)
   const baseUrl = process.env.PUBLIC_URL || 
                   (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '') ||
                   'https://rugkiller.app';
   
-  const holderCountText = holderCount > 0 ? `${holderCount}` : '0 (fetching...)';
+  const holderCountText = holderCount > 0 ? holderCount.toLocaleString() : 'Fetching...';
+  console.log(`[BotFormatter DEBUG] Displaying holder count as: "${holderCountText}"`);
   const holders = `👥 **Holders**\n• Total: ${holderCountText}\n• Top 10: ${topHolderConc.toFixed(1)}%\n• Supply: ${formatNumber(supply)}\n• [View Top 20](${baseUrl}/api/holders/${analysis.tokenAddress}/top20)\n• [View All Holders](${baseUrl}/api/holders/${analysis.tokenAddress})`;
   
   // MARKET DATA
@@ -194,9 +233,59 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
       floorInfo = floorText;
     }
   
-  // HONEYPOT DETECTION
+  // HONEYPOT DETECTION (Enhanced with 2025 grading system)
   let honeypot: string | undefined;
-  if (analysis.quillcheckData) {
+  if (analysis.honeypotDetection) {
+    const hp = analysis.honeypotDetection;
+    
+    // Grade emoji
+    const gradeEmoji = hp.grade === 'CRITICAL' ? '🚨🍯' : 
+                       hp.grade === 'DANGER' ? '⚠️🍯' : 
+                       hp.grade === 'WARNING' ? '⚠️🍯' : 
+                       hp.grade === 'CAUTION' ? '🟡🍯' : 
+                       '✅🍯';
+    
+    // Build honeypot section
+    if (hp.grade === 'CRITICAL' || hp.grade === 'DANGER') {
+      honeypot = `${gradeEmoji} **HONEYPOT ALERT** (Grade: ${hp.grade})\n`;
+      honeypot += `• Risk Score: ${hp.score}/100 (${hp.confidence}% confident)\n`;
+      honeypot += `• Can Sell: ${hp.canSell ? '✅' : '❌'}\n`;
+      if (hp.taxes.sellTax > 0) {
+        honeypot += `• Taxes: Buy ${hp.taxes.buyTax}% / Sell ${hp.taxes.sellTax}%\n`;
+      }
+      
+      // Show detected evasion techniques
+      if (hp.evasionTechniques.length > 0) {
+        honeypot += `\n**🚨 Detected Evasion Techniques:**\n`;
+        hp.evasionTechniques.slice(0, 3).forEach(tech => {
+          const techEmoji = tech.severity === 'critical' ? '🔴' : tech.severity === 'high' ? '🟠' : '🟡';
+          honeypot += `${techEmoji} ${tech.name}\n`;
+        });
+        if (hp.evasionTechniques.length > 3) {
+          honeypot += `... and ${hp.evasionTechniques.length - 3} more`;
+        }
+      }
+      
+      // Show top risks
+      if (hp.risks.length > 0) {
+        honeypot += `\n⚠️ ${hp.risks[0]}`;
+      }
+    } else if (hp.grade === 'WARNING' || hp.grade === 'CAUTION') {
+      honeypot = `${gradeEmoji} **Honeypot Check** (Grade: ${hp.grade})\n`;
+      honeypot += `• Risk Score: ${hp.score}/100\n`;
+      honeypot += `• Taxes: Buy ${hp.taxes.buyTax}% / Sell ${hp.taxes.sellTax}%\n`;
+      if (hp.warnings.length > 0) {
+        honeypot += `⚠️ ${hp.warnings[0]}`;
+      }
+    } else if (hp.grade === 'SAFE') {
+      // Only show if there are notable tax details
+      if (hp.taxes.buyTax > 5 || hp.taxes.sellTax > 5) {
+        honeypot = `${gradeEmoji} **Honeypot Check** (SAFE)\n`;
+        honeypot += `• Taxes: Buy ${hp.taxes.buyTax}% / Sell ${hp.taxes.sellTax}%`;
+      }
+    }
+  } else if (analysis.quillcheckData) {
+    // Fallback to basic QuillCheck data
     const qc = analysis.quillcheckData;
     if (qc.isHoneypot) {
       honeypot = `🍯 **HONEYPOT DETECTED** 🚨\n⛔ Cannot sell tokens!`;
@@ -218,17 +307,18 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     funding = `🚨 **FUNDING ALERT**\n• Suspicious: ${fa.totalSuspiciousPercentage.toFixed(1)}%\n• Sources: ${breakdown}\n⚠️ High-risk funding detected`;
   }
   
-  // BUNDLE DETECTION (Jito Bundle Analysis)
+  // BUNDLE DETECTION (Always show if data exists)
   let bundle: string | undefined;
-  if (analysis.advancedBundleData && analysis.advancedBundleData.bundleScore >= 35) {
+  if (analysis.advancedBundleData) {
     const bd = analysis.advancedBundleData;
-    const bundleEmoji = bd.bundleScore >= 60 ? '🚨📦' : '⚠️📦';
+    const bundleEmoji = bd.bundleScore >= 60 ? '🔴' : bd.bundleScore >= 40 ? '🟠' : bd.bundleScore >= 20 ? '🟡' : '✅';
+    const bundleStatus = bd.bundleScore >= 60 ? 'CRITICAL' : bd.bundleScore >= 40 ? 'HIGH RISK' : bd.bundleScore >= 20 ? 'CAUTION' : 'SAFE';
     const websiteUrl = process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'https://rugkiller.app';
-    bundle = `${bundleEmoji} **BUNDLE DETECTED**\n• Score: ${bd.bundleScore}/100\n• Bundled Supply: ${bd.bundledSupplyPercent.toFixed(1)}%\n• Suspicious Wallets: ${bd.suspiciousWallets.length}`;
+    bundle = `${bundleEmoji} **BUNDLE ANALYSIS** (${bundleStatus})\n• Bundled Supply: ${bd.bundledSupplyPercent.toFixed(1)}%\n• Suspicious Wallets: ${bd.suspiciousWallets.length}`;
     if (bd.earlyBuyCluster) {
-      bundle += `\n• Early Cluster: ${bd.earlyBuyCluster.walletCount} wallets in ${bd.earlyBuyCluster.avgTimingGapMs}ms (Jito)`;
+      bundle += `\n• Early Cluster: ${bd.earlyBuyCluster.walletCount} wallets in ${bd.earlyBuyCluster.avgTimingGapMs}ms`;
     }
-    bundle += `\n📊 [View Bundle Age Chart](${websiteUrl}/?analyze=${analysis.tokenAddress})`;
+    bundle += `\n📊 [View Bundle Chart](${websiteUrl}/?analyze=${analysis.tokenAddress})`;
   }
   
   // NETWORK ANALYSIS
@@ -296,47 +386,30 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     }
   }
   
-  // WALLET AGES - Dedicated 0-100 Score Section
+  // WALLET AGES - Always show if data available (with percentage of old wallets)
   let walletAges: string | undefined;
   if (analysis.agedWalletData) {
     const aw = analysis.agedWalletData;
     
-    // Calculate Wallet Ages Safety Score (0-100, where 100 = best)
-    // Start with base score of 100 and subtract based on risk factors
-    let walletAgesScore = 100;
+    // Calculate percentage of OLD wallets (aged wallets / total holders)
+    const oldWalletPercent = aw.agedWalletCount > 0 && analysis.holderCount ? 
+      ((aw.agedWalletCount / analysis.holderCount) * 100).toFixed(1) : '0.0';
     
-    // Penalize based on the existing risk score (invert it)
-    walletAgesScore -= aw.riskScore;
-    
-    // Extra penalty for new tokens with aged wallets (this is a major red flag)
-    if (isNewToken && aw.agedWalletCount > 0) {
-      const newTokenPenalty = Math.min(30, aw.agedWalletCount * 3); // Up to -30 for new tokens
-      walletAgesScore -= newTokenPenalty;
-    }
-    
-    // Extra penalty for high fake volume percentage
-    if (aw.totalFakeVolumePercent > 50) {
-      walletAgesScore -= 10;
-    }
-    
-    // Ensure score stays within 0-100 range
-    walletAgesScore = Math.max(0, Math.min(100, walletAgesScore));
-    
-    // Determine grade emoji and status
+    // Determine grade emoji based on risk (inverted - lower risk = better)
     let gradeEmoji = '';
     let gradeStatus = '';
-    if (walletAgesScore >= 80) {
+    if (aw.riskScore < 20) {
       gradeEmoji = '✅';
-      gradeStatus = 'EXCELLENT';
-    } else if (walletAgesScore >= 60) {
+      gradeStatus = 'SAFE';
+    } else if (aw.riskScore < 40) {
       gradeEmoji = '🟢';
       gradeStatus = 'GOOD';
-    } else if (walletAgesScore >= 40) {
+    } else if (aw.riskScore < 60) {
       gradeEmoji = '🟡';
-      gradeStatus = 'FAIR';
-    } else if (walletAgesScore >= 20) {
+      gradeStatus = 'CAUTION';
+    } else if (aw.riskScore < 80) {
       gradeEmoji = '🟠';
-      gradeStatus = 'POOR';
+      gradeStatus = 'HIGH RISK';
     } else {
       gradeEmoji = '🔴';
       gradeStatus = 'CRITICAL';
@@ -344,16 +417,15 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     
     const websiteUrl = process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'https://rugkiller.app';
     
-    walletAges = `${gradeEmoji} **WALLET AGES** (${gradeStatus})\n`;
-    walletAges += `• Safety Score: **${walletAgesScore}/100**\n`;
-    walletAges += `• Aged Wallets: ${aw.agedWalletCount}\n`;
+    walletAges = `${gradeEmoji} **AGED WALLETS** (${gradeStatus})\n`;
+    walletAges += `• Old Wallets: ${aw.agedWalletCount} (${oldWalletPercent}%)\n`;
     walletAges += `• Fake Volume: ${aw.totalFakeVolumePercent.toFixed(1)}%\n`;
     
     if (isNewToken && aw.agedWalletCount > 0) {
       walletAges += `⚠️ **WARNING**: Token <30d old with aged wallets!\n`;
     }
     
-    walletAges += `📦 [View Age Distribution Chart](${websiteUrl}/?analyze=${analysis.tokenAddress})`;
+    walletAges += `📊 [View Age Chart](${websiteUrl}/?analyze=${analysis.tokenAddress})`;
   }
   
   // GMGN DATA
@@ -382,6 +454,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     header,
     age: ageString,
     riskScore,
+    rugScore: rugScoreText,
     aiVerdict,
     security,
     holders,
@@ -413,6 +486,10 @@ export function toPlainText(data: CompactMessageData): string {
   message += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   
   message += `${data.riskScore}\n\n`;
+  
+  if (data.rugScore) {
+    message += `${data.rugScore}\n\n`;
+  }
   
   if (data.aiVerdict) {
     message += `${data.aiVerdict}\n\n`;

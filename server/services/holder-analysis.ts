@@ -1,27 +1,24 @@
 /**
  * Centralized Holder Analysis Service
  * 
- * Aggregates holder data from multiple sources with intelligent fallback:
- * 1. Birdeye API (preferred, most accurate)
- * 2. GMGN API (good bundled holder detection)
- * 3. Helius RPC (token holder counts)
- * 4. Solana RPC fallback (getTokenLargestAccounts for top holders only)
+ * Uses ONLY accurate on-chain sources for holder data:
+ * 1. Direct RPC scan via getProgramAccounts (most accurate, gets ALL holders)
+ * 2. Helius RPC (enhanced features with API key)
+ * 3. Standard RPC fallback (top holders only if scan fails)
  * 
  * Features:
- * - Accurate holder counts (not just top 20)
+ * - ACCURATE holder counts from on-chain data
  * - Top 20+ holder breakdown with labels
  * - Exchange/LP wallet filtering
  * - Caching to prevent rate limits
  * - Known wallet labeling (DEX, deployer, etc.)
  * 
- * Created: [Current Date]
+ * Note: Removed Birdeye and GMGN as they provide inaccurate holder counts
  */
 
 import { Connection, PublicKey } from '@solana/web3.js';
 import { getMint, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 import { redisCache } from './redis-cache.js';
-import { getBirdeyeTopHolders } from './birdeye-api.js';
-import { GMGNService } from './gmgn-service.js';
 import { rpcBalancer } from './rpc-balancer.js';
 import { EXCHANGE_WALLETS, isExchangeWallet } from '../exchange-whitelist.js';
 import { getKnownAddressInfo } from '../known-addresses.js';
@@ -54,54 +51,75 @@ export interface HolderAnalysisResult {
 }
 
 export class HolderAnalysisService {
-  private gmgn = new GMGNService();
   private readonly CACHE_TTL = 300; // 5 minutes cache
 
   /**
    * Get comprehensive holder analysis for a token
-   * Tries multiple data sources with intelligent fallback
+   * Uses ONLY accurate on-chain sources (no third-party APIs with inaccurate counts)
    */
   async analyzeHolders(tokenAddress: string): Promise<HolderAnalysisResult> {
-    const cacheKey = `holder-analysis:v2:${tokenAddress}`;
+    const cacheKey = `holder-analysis:v3:${tokenAddress}`;
+    console.log(`\n🔍 [HolderAnalysis DEBUG] Starting analysis for ${tokenAddress}`);
+    console.log(`[HolderAnalysis DEBUG] Cache key: ${cacheKey}`);
 
     return await redisCache.cacheFetch(
       cacheKey,
       async () => {
-        // Try Birdeye first (most reliable)
-        const birdeyeResult = await this.fetchFromBirdeye(tokenAddress);
-        if (birdeyeResult && birdeyeResult.holderCount > 0) {
-          console.log(`[HolderAnalysis] Used Birdeye for ${tokenAddress}`);
-          return birdeyeResult;
-        }
-
-        // Try GMGN second (good for newer tokens)
-        const gmgnResult = await this.fetchFromGMGN(tokenAddress);
-        if (gmgnResult && gmgnResult.holderCount > 0) {
-          console.log(`[HolderAnalysis] Used GMGN for ${tokenAddress}`);
-          return gmgnResult;
-        }
-
-        // Try Helius third (requires API key)
-        const heliusResult = await this.fetchFromHelius(tokenAddress);
-        if (heliusResult && heliusResult.holderCount > 0) {
-          console.log(`[HolderAnalysis] Used Helius for ${tokenAddress}`);
-          return heliusResult;
-        }
-
-        // Try direct on-chain scan via getProgramAccounts (works on standard RPC)
+        console.log(`[HolderAnalysis DEBUG] Cache MISS - fetching fresh data...`);
+        
+        // Try direct on-chain scan via getProgramAccounts FIRST (most accurate)
+        console.log(`[HolderAnalysis DEBUG] Step 1: Attempting on-chain RPC scan via getProgramAccounts...`);
         const programScan = await this.fetchFromProgramAccounts(tokenAddress);
+        console.log(`[HolderAnalysis DEBUG] getProgramAccounts result:`, {
+          success: !!programScan,
+          holderCount: programScan?.holderCount ?? 'null',
+          top20Length: programScan?.top20Holders?.length ?? 0,
+          source: programScan?.source
+        });
+        
         if (programScan && (programScan.holderCount > 0 || programScan.top20Holders.length > 0)) {
-          console.log(`[HolderAnalysis] Used on-chain programAccounts scan for ${tokenAddress}`);
+          console.log(`[HolderAnalysis] ✅ SUCCESS: Used on-chain RPC scan for ${tokenAddress} - ${programScan.holderCount} holders`);
           return programScan;
         }
+        console.log(`[HolderAnalysis DEBUG] ⚠️ getProgramAccounts failed or returned no data, trying fallbacks...`);
 
-        // Fallback to basic RPC (top 20 only, no total count)
+        // Try Helius as backup (requires API key but has accurate counts)
+        console.log(`[HolderAnalysis DEBUG] Step 2: Attempting Helius RPC...`);
+        const heliusResult = await this.fetchFromHelius(tokenAddress);
+        console.log(`[HolderAnalysis DEBUG] Helius result:`, {
+          success: !!heliusResult,
+          holderCount: heliusResult?.holderCount ?? 'null',
+          hasApiKey: !!process.env.HELIUS_API_KEY?.trim()
+        });
+        
+        if (heliusResult && heliusResult.holderCount > 0) {
+          console.log(`[HolderAnalysis] ✅ SUCCESS: Used Helius for ${tokenAddress} - ${heliusResult.holderCount} holders`);
+          return heliusResult;
+        }
+        console.log(`[HolderAnalysis DEBUG] ⚠️ Helius failed or returned no data, using RPC fallback...`);
+
+        // Fallback to basic RPC (top 20 only, limited data but still accurate)
+        console.log(`[HolderAnalysis DEBUG] Step 3: Using basic RPC fallback (getTokenLargestAccounts)...`);
         const rpcResult = await this.fetchFromRPC(tokenAddress);
-        console.log(`[HolderAnalysis] Used RPC fallback for ${tokenAddress} (limited data)`);
+        console.log(`[HolderAnalysis DEBUG] RPC fallback result:`, {
+          holderCount: rpcResult.holderCount,
+          top20Length: rpcResult.top20Holders.length,
+          source: rpcResult.source
+        });
+        console.log(`[HolderAnalysis] ⚠️ FALLBACK: Used RPC fallback for ${tokenAddress} (limited to top 20 holders, holderCount=${rpcResult.holderCount})`);
+        console.log(`[HolderAnalysis DEBUG] === Analysis complete ===\n`);
         return rpcResult;
       },
       this.CACHE_TTL
-    );
+    ).then(result => {
+      console.log(`[HolderAnalysis DEBUG] FINAL RESULT for ${tokenAddress}:`, {
+        holderCount: result.holderCount,
+        top20Length: result.top20Holders.length,
+        source: result.source,
+        fromCache: result.cachedAt < Date.now() - 1000 // Rough check if from cache
+      });
+      return result;
+    });
   }
 
   /**
@@ -111,12 +129,16 @@ export class HolderAnalysisService {
    */
   private async fetchFromProgramAccounts(tokenAddress: string): Promise<HolderAnalysisResult | null> {
     try {
+      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Starting scan for ${tokenAddress}`);
       const connection = rpcBalancer.getConnection();
+      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] RPC endpoint: ${connection.rpcEndpoint}`);
       const mintPubkey = new PublicKey(tokenAddress);
 
       // Fetch mint info for decimals and supply
+      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Fetching mint info...`);
       const mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID)
         .catch(() => getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID));
+      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Mint info received - decimals: ${mintInfo.decimals}, supply: ${mintInfo.supply.toString()}`);
 
       const totalSupplyRaw = BigInt(mintInfo.supply.toString());
       const decimals = mintInfo.decimals;
@@ -134,18 +156,32 @@ export class HolderAnalysisService {
         return accounts;
       };
 
-      const classic = await scanProgram(TOKEN_PROGRAM_ID).catch(() => [] as any[]);
-      const t2022 = await scanProgram(TOKEN_2022_PROGRAM_ID).catch(() => [] as any[]);
+      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Scanning TOKEN_PROGRAM_ID...`);
+      const classic = await scanProgram(TOKEN_PROGRAM_ID).catch((err) => {
+        console.log(`[HolderAnalysis DEBUG - getProgramAccounts] TOKEN_PROGRAM_ID scan error:`, err.message);
+        return [] as any[];
+      });
+      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] TOKEN_PROGRAM_ID found ${classic.length} accounts`);
+      
+      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Scanning TOKEN_2022_PROGRAM_ID...`);
+      const t2022 = await scanProgram(TOKEN_2022_PROGRAM_ID).catch((err) => {
+        console.log(`[HolderAnalysis DEBUG - getProgramAccounts] TOKEN_2022_PROGRAM_ID scan error:`, err.message);
+        return [] as any[];
+      });
+      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] TOKEN_2022_PROGRAM_ID found ${t2022.length} accounts`);
+      
       const all = [...classic, ...t2022];
+      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Total accounts found: ${all.length}`);
 
       if (all.length === 0) {
+        console.log(`[HolderAnalysis DEBUG - getProgramAccounts] ❌ No accounts found, returning null`);
         return null;
       }
 
       // Safety cap: if result is extremely large, bail to avoid overload
       const MAX_ACCOUNTS = 15000;
       if (all.length > MAX_ACCOUNTS) {
-        console.warn(`[HolderAnalysis] programAccounts returned ${all.length} accounts, over cap ${MAX_ACCOUNTS}`);
+        console.warn(`[HolderAnalysis DEBUG - getProgramAccounts] ⚠️ Account count ${all.length} exceeds cap ${MAX_ACCOUNTS}, returning null`);
         // We still return null so other fallbacks can try
         return null;
       }
@@ -179,11 +215,14 @@ export class HolderAnalysisService {
         };
       }
 
+      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Parsed ${holders.length} non-zero token accounts`);
+      
       // Aggregate by owner (some wallets may hold multiple token accounts)
       const byOwner = new Map<string, bigint>();
       for (const h of holders) {
         byOwner.set(h.address, (byOwner.get(h.address) || 0n) + h.amountRaw);
       }
+      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Aggregated to ${byOwner.size} unique holders`);
 
       // Build holder list and sort by balance desc
       const list = Array.from(byOwner.entries()).map(([address, amountRaw]) => {
@@ -207,7 +246,7 @@ export class HolderAnalysisService {
       const exchangeHolders = top20.filter(h => h.isExchange);
       const lpHolders = top20.filter(h => h.isLP);
 
-      return {
+      const result = {
         tokenAddress,
         holderCount: list.length,
         top20Holders: top20,
@@ -215,117 +254,22 @@ export class HolderAnalysisService {
         exchangeHolderCount: exchangeHolders.length,
         exchangeSupplyPercent: exchangeHolders.reduce((sum, h) => sum + h.percentage, 0),
         lpSupplyPercent: lpHolders.reduce((sum, h) => sum + h.percentage, 0),
-        source: 'rpc',
+        source: 'rpc' as const,
         cachedAt: Date.now(),
       };
-    } catch (error) {
-      console.error('[HolderAnalysis] programAccounts scan failed:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Fetch holder data from Birdeye API
-   */
-  private async fetchFromBirdeye(tokenAddress: string): Promise<HolderAnalysisResult | null> {
-    try {
-      const holders = await getBirdeyeTopHolders(tokenAddress);
-      if (!holders || holders.length === 0) {
-        return null;
-      }
-
-      // Birdeye provides percentage directly
-      const top20 = holders.slice(0, 20).map(h => {
-        const labeled = this.labelWallet(h.owner, h.percentage);
-        return {
-          address: h.owner,
-          balance: h.uiAmount,
-          percentage: h.percentage,
-          uiAmount: h.uiAmount,
-          label: labeled.label || h.tag,
-          isExchange: labeled.isExchange,
-          isLP: labeled.isLP,
-          isCreator: labeled.isCreator,
-        };
-      });
-
-      const top10Concentration = top20.slice(0, 10).reduce((sum, h) => sum + h.percentage, 0);
-      const exchangeHolders = top20.filter(h => h.isExchange);
-      const lpHolders = top20.filter(h => h.isLP);
-
-      // Birdeye doesn't always provide total holder count, estimate if needed
-      // If we don't have it, we can't provide accurate count
-      const holderCount = holders.length >= 20 ? 20 : holders.length; // Conservative estimate
-
-      return {
-        tokenAddress,
-        holderCount,
-        top20Holders: top20,
-        topHolderConcentration: top10Concentration,
-        exchangeHolderCount: exchangeHolders.length,
-        exchangeSupplyPercent: exchangeHolders.reduce((sum, h) => sum + h.percentage, 0),
-        lpSupplyPercent: lpHolders.reduce((sum, h) => sum + h.percentage, 0),
-        source: 'birdeye',
-        cachedAt: Date.now(),
-      };
-    } catch (error) {
-      console.error('[HolderAnalysis] Birdeye fetch failed:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Fetch holder data from GMGN API
-   */
-  private async fetchFromGMGN(tokenAddress: string): Promise<HolderAnalysisResult | null> {
-    try {
-      const gmgnData = await this.gmgn.getTokenAnalysis(tokenAddress);
-      if (!gmgnData?.data) {
-        return null;
-      }
-
-      const { data } = gmgnData;
-      const topHolders = data.top_holders || [];
       
-      if (topHolders.length === 0) {
-        return null;
-      }
-
-      const top20 = topHolders.slice(0, 20).map(h => {
-        const balance = parseFloat(h.balance);
-        const labeled = this.labelWallet(h.address, h.percentage);
-        return {
-          address: h.address,
-          balance,
-          percentage: h.percentage,
-          uiAmount: balance,
-          label: labeled.label,
-          isExchange: labeled.isExchange,
-          isLP: labeled.isLP,
-          isCreator: labeled.isCreator,
-          isBundled: h.is_bundle,
-          isSniper: h.is_sniper,
-          isInsider: h.is_insider,
-        };
+      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] ✅ SUCCESS - Returning result:`, {
+        holderCount: result.holderCount,
+        top20Length: result.top20Holders.length,
+        topHolderConc: result.topHolderConcentration.toFixed(2) + '%',
+        exchanges: result.exchangeHolderCount,
+        source: result.source
       });
-
-      const top10Concentration = top20.slice(0, 10).reduce((sum, h) => sum + h.percentage, 0);
-      const exchangeHolders = top20.filter(h => h.isExchange);
-      const lpHolders = top20.filter(h => h.isLP);
-
-      return {
-        tokenAddress,
-        holderCount: data.token.holder_count || topHolders.length,
-        top20Holders: top20,
-        topHolderConcentration: top10Concentration,
-        exchangeHolderCount: exchangeHolders.length,
-        exchangeSupplyPercent: exchangeHolders.reduce((sum, h) => sum + h.percentage, 0),
-        lpSupplyPercent: lpHolders.reduce((sum, h) => sum + h.percentage, 0),
-        source: 'gmgn',
-        cachedAt: Date.now(),
-      };
-    } catch (error) {
-      console.error('[HolderAnalysis] GMGN fetch failed:', error);
+      
+      return result;
+    } catch (error: any) {
+      console.error('[HolderAnalysis DEBUG - getProgramAccounts] ❌ EXCEPTION:', error.message);
+      console.error('[HolderAnalysis DEBUG - getProgramAccounts] Stack:', error.stack);
       return null;
     }
   }

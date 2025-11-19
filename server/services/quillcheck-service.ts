@@ -1,7 +1,9 @@
-import type { QuillCheckData } from '../../shared/schema';
+import type { QuillCheckData, HoneypotDetectionResult } from '../../shared/schema';
+import { HoneypotDetector } from '../honeypot-detector';
 
 interface QuillCacheEntry {
   data: QuillCheckData | null;
+  honeypotDetection: HoneypotDetectionResult | null;
   fetchedAt: number;
 }
 
@@ -66,13 +68,25 @@ export class QuillCheckService {
       clearTimeout(timeout);
       if (!res.ok) {
         console.warn(`[QuillCheck] API error ${res.status} - ${res.statusText}`);
-        const entry: QuillCacheEntry = { data: null, fetchedAt: now };
+        const entry: QuillCacheEntry = { data: null, honeypotDetection: null, fetchedAt: now };
         CACHE.set(tokenAddress, entry);
         return null;
       }
       const raw = await res.json();
       const normalized = this.normalize(raw);
-      CACHE.set(tokenAddress, { data: normalized, fetchedAt: now });
+      
+      // Create enhanced honeypot detection from QuillCheck data
+      let honeypotDetection: HoneypotDetectionResult | null = null;
+      if (normalized) {
+        honeypotDetection = HoneypotDetector.createQuickResult(
+          normalized.isHoneypot,
+          normalized.buyTax,
+          normalized.sellTax,
+          normalized.canSell
+        );
+      }
+      
+      CACHE.set(tokenAddress, { data: normalized, honeypotDetection, fetchedAt: now });
       return normalized;
     } catch (err) {
       if ((err as any).name === 'AbortError') {
@@ -80,9 +94,27 @@ export class QuillCheckService {
       } else {
         console.error('[QuillCheck] Fetch failed:', err);
       }
-      CACHE.set(tokenAddress, { data: null, fetchedAt: now });
+      CACHE.set(tokenAddress, { data: null, honeypotDetection: null, fetchedAt: now });
       return null;
     }
+  }
+  
+  /**
+   * Get cached honeypot detection result
+   */
+  async getHoneypotDetection(tokenAddress: string): Promise<HoneypotDetectionResult | null> {
+    const now = Date.now();
+    const cached = CACHE.get(tokenAddress);
+    
+    // If cached and fresh, return honeypot detection
+    if (cached && (now - cached.fetchedAt) < this.ttlMs && cached.honeypotDetection) {
+      return cached.honeypotDetection;
+    }
+    
+    // Otherwise fetch fresh data
+    const quillData = await this.checkToken(tokenAddress);
+    const refreshedCache = CACHE.get(tokenAddress);
+    return refreshedCache?.honeypotDetection || null;
   }
 }
 

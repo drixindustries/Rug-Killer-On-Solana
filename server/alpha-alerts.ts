@@ -340,6 +340,8 @@ export class AlphaAlertService {
   }
 
   private async sendAlert(alert: AlphaAlert): Promise<void> {
+    console.log(`[ALPHA ALERTS] Sending alert - Type: ${alert.type} | Mint: ${alert.mint} | Source: ${alert.source}`);
+    
     let message = '';
     if (alert.type === 'caller_signal') {
       // Try to enrich with GMGN smart/bundle info
@@ -446,9 +448,11 @@ export class AlphaAlertService {
     }
     
     // Also trigger callbacks for extensibility
+    console.log(`[ALPHA ALERTS] Triggering ${this.alertCallbacks.length} callback(s)`);
     for (const callback of this.alertCallbacks) {
       try {
         await callback(alert, message);
+        console.log(`[ALPHA ALERTS] ✅ Callback executed successfully`);
       } catch (error) {
         console.error('[ALPHA ALERT] Callback error:', error);
       }
@@ -578,21 +582,27 @@ export class AlphaAlertService {
   // Start all monitoring
   async start(): Promise<void> {
     if (this.isRunning) {
+      console.log('[ALPHA ALERTS] Service already running');
       return;
     }
 
+    console.log('[ALPHA ALERTS] Starting service...');
     this.isRunning = true;
 
     // Load wallets from database first
     await this.loadWalletsFromDatabase();
+    console.log(`[ALPHA ALERTS] Loaded ${this.alphaCallers.length} callers from database`);
 
     for (const caller of this.alphaCallers) {
+      console.log(`[ALPHA ALERTS] Monitoring caller: ${caller.name} (${caller.wallet}) - Enabled: ${caller.enabled}`);
       this.monitorAlphaCaller(caller);
     }
 
     this.startPumpFunMonitor();
     this.startNansenWatcher();
     this.startAutoRefresh();
+    
+    console.log(`[ALPHA ALERTS] Service started - Total callers: ${this.alphaCallers.length} | Alert callbacks: ${this.alertCallbacks.length}`);
     
     // Send startup notification directly (not through sendAlert to avoid fake links)
     const startupMessage = '🤖 **ANTIRUGILLER ALPHA ALERTS ONLINE**\n\n' +
@@ -668,15 +678,33 @@ export class AlphaAlertService {
   }
 
   // Get current monitoring status
-  getStatus() {
-    return {
+  getStatus(verbose: boolean = false) {
+    const status = {
       isRunning: this.isRunning,
       monitoredCallers: this.alphaCallers.filter(c => c.enabled).length,
       totalCallers: this.alphaCallers.length,
       activeListeners: this.listeners.size,
       activeWebSockets: this.wsConnections.length,
-      callers: this.alphaCallers,
+      callers: verbose ? this.alphaCallers : undefined,
     };
+    
+    // If not running and no callers, it's likely unconfigured
+    if (!status.isRunning && status.totalCallers === 0) {
+      return {
+        ...status,
+        message: "Service is stopped and no alpha callers are configured. Use `/alpha add` to add wallets to monitor, then `/alpha start`."
+      };
+    }
+    
+    // If running but no callers, it's running empty
+    if (status.isRunning && status.totalCallers === 0) {
+      return {
+        ...status,
+        message: "Service is running but no alpha callers are configured. Use `/alpha add` to add wallets to monitor."
+      };
+    }
+    
+    return status;
   }
 
   // Add custom alpha caller
