@@ -27,6 +27,14 @@ export interface FullTokenMetrics {
     poolSharePercentApprox: number | null;
     lpBurnPercent?: number | null;
     lpLockedUsd?: number | null;
+    lpDetail?: {
+      mint?: string | null;
+      totalSupply?: number | null;
+      burnedPercent?: number | null;
+      lockedPercent?: number | null;
+      lockedUsd?: number | null;
+      lockers?: string[] | null;
+    } | null;
   };
   market: {
     priceUsd: number | null;
@@ -71,6 +79,28 @@ export class TokenMetricsService {
 
     const links = this.buildLinks(mint);
 
+    const lpDetail = (() => {
+      const best = Array.isArray(rug?.markets) && rug!.markets.length > 0
+        ? rug!.markets.reduce((a: any, b: any) => ((a?.liquidity || 0) >= (b?.liquidity || 0) ? a : b))
+        : null;
+      const lp = best?.lp;
+      if (!lp) return null;
+      const lockers: string[] = [];
+      if (Array.isArray(lp.lockedBy)) {
+        for (const l of lp.lockedBy) if (typeof l === 'string') lockers.push(l);
+      } else if (typeof lp.locker === 'string') {
+        lockers.push(lp.locker);
+      }
+      return {
+        mint: lp.lpMint || lp.mint || null,
+        totalSupply: (typeof lp.lpTotalSupply === 'number' ? lp.lpTotalSupply : (typeof lp.totalSupply === 'number' ? lp.totalSupply : null)) as number | null,
+        burnedPercent: (typeof lp.lpBurn === 'number' ? lp.lpBurn : (typeof lp.burnPercent === 'number' ? lp.burnPercent : null)) as number | null,
+        lockedPercent: (typeof lp.lpLockedPercent === 'number' ? lp.lpLockedPercent : (typeof lp.lockedPercent === 'number' ? lp.lockedPercent : null)) as number | null,
+        lockedUsd: (typeof lp.lpLockedUSD === 'number' ? lp.lpLockedUSD : (typeof lp.lockedUsd === 'number' ? lp.lockedUsd : null)) as number | null,
+        lockers: lockers.length ? lockers : null,
+      };
+    })();
+
     return {
       mint,
       analyzedAt: Date.now(),
@@ -112,6 +142,7 @@ export class TokenMetricsService {
           if (!liqVals || liqVals.length === 0) return null;
           return Math.max(...liqVals);
         })(),
+        lpDetail,
       },
       market: {
         priceUsd: (analysis as any)?.marketData?.priceUsd ?? null,
