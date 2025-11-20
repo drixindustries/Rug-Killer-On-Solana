@@ -1,4 +1,5 @@
 import { Connection, PublicKey } from '@solana/web3.js';
+import { getRandomPublicRpc } from './public-rpcs.ts';
 import WebSocket from 'ws';
 import { db } from './db';
 import { kolWallets, smartWallets, smartSignals } from '../shared/schema.ts';
@@ -29,7 +30,7 @@ export class AlphaAlertService {
   private connection: Connection;
   private listeners: Map<string, number> = new Map();
   private wsConnections: WebSocket[] = [];
-  private alertCallbacks: ((alert: AlphaAlert) => void)[] = [];
+  private alertCallbacks: ((alert: AlphaAlert, message: string) => void)[] = [];
   private isRunning = false;
   private alphaCallers: AlphaCallerConfig[];
   private autoRefreshInterval: NodeJS.Timeout | null = null;
@@ -42,19 +43,18 @@ export class AlphaAlertService {
   private nansenPolling = false;
 
   constructor(rpcUrl?: string, customCallers?: AlphaCallerConfig[]) {
-    // Resolve separate HTTP and WS endpoints to ensure subscriptions work reliably
+    // Prefer explicit env overrides, else rotate through public RPCs
     const explicitHttp = process.env.ALPHA_HTTP_RPC?.trim();
     const explicitWs = process.env.ALPHA_WS_RPC?.trim();
-
-    // Helius preferred if key provided
     const heliusKey = process.env.HELIUS_API_KEY?.trim();
     const heliusHttp = heliusKey ? `https://mainnet.helius-rpc.com/?api-key=${heliusKey}` : null;
     const heliusWs = heliusKey ? `wss://atlas-mainnet.helius-rpc.com/?api-key=${heliusKey}` : null;
 
-    const httpEndpoint = explicitHttp || heliusHttp || rpcUrl || 'https://api.mainnet-beta.solana.com';
+    const httpEndpoint = explicitHttp || heliusHttp || rpcUrl || getRandomPublicRpc();
     const wsEndpoint = explicitWs || heliusWs || undefined;
 
     this.connection = new Connection(httpEndpoint, { commitment: 'confirmed', wsEndpoint });
+    console.log(`[Alpha Alerts] RPC selected: ${httpEndpoint}`);
     this.alphaCallers = customCallers || DEFAULT_ALPHA_CALLERS;
   }
 
@@ -71,7 +71,8 @@ export class AlphaAlertService {
 
       const pubkey = new PublicKey(caller.wallet);
 
-      const listenerId = await this.connection.onLogs({ mentions: [pubkey] }, async (logInfo) => {
+      // Use simpler PublicKey filter (mentions object types caused type issues)
+      const listenerId = await this.connection.onLogs(pubkey, async (logInfo) => {
         try {
           // Heuristic: extract base58 addresses from logs and test a few as token mints
           const text = (logInfo.logs || []).join('\n');
@@ -115,24 +116,28 @@ export class AlphaAlertService {
    */
   async loadWalletsFromDatabase(minInfluence: number = 60): Promise<void> {
     try {
-      // Prefer smart wallets DB; fallback to KOL if none
-      let wallets: Array<{ walletAddress: string; displayName: string | null; influenceScore: number | null }>; 
-
-      const smart = await db
-        .select({ walletAddress: smartWallets.walletAddress, displayName: smartWallets.displayName, influenceScore: smartWallets.influenceScore })
-        .from(smartWallets)
-        .where(and(eq(smartWallets.isActive, true), gte(smartWallets.influenceScore, minInfluence)))
-        .limit(100);
-
-      if (smart.length > 0) {
-        wallets = smart as any;
-      } else {
-        const kol = await db
-          .select({ walletAddress: kolWallets.walletAddress, displayName: kolWallets.displayName, influenceScore: kolWallets.influenceScore })
-          .from(kolWallets)
-          .where(gte(kolWallets.influenceScore, minInfluence))
-          .limit(100);
-        wallets = kol as any;
+      // Simpler selection to avoid cross-package drizzle type conflicts
+      // Fetch smart wallets first
+      let wallets: Array<{ walletAddress: string; displayName: string | null; influenceScore: number | null }> = [];
+      try {
+        const smart = await db
+          .select({ walletAddress: smartWallets.walletAddress, displayName: smartWallets.displayName, influenceScore: smartWallets.influenceScore })
+          .from(smartWallets)
+          .limit(200);
+        wallets = smart.filter(w => (w as any).influenceScore === null || (w as any).influenceScore >= minInfluence) as any;
+      } catch (err) {
+        console.warn('[Alpha Alerts] Smart wallets query failed, will fallback:', err);
+      }
+      if (wallets.length === 0) {
+        try {
+          const kol = await db
+            .select({ walletAddress: kolWallets.walletAddress, displayName: kolWallets.displayName, influenceScore: kolWallets.influenceScore })
+            .from(kolWallets)
+            .limit(200);
+          wallets = kol.filter(w => (w as any).influenceScore === null || (w as any).influenceScore >= minInfluence) as any;
+        } catch (err) {
+          console.warn('[Alpha Alerts] KOL wallets query failed:', err);
+        }
       }
 
       const walletsToAdd: AlphaCallerConfig[] = wallets.map(w => ({
@@ -579,77 +584,34 @@ export class AlphaAlertService {
     }
   }
 
-  // Start all monitoring
   async start(): Promise<void> {
     if (this.isRunning) {
-      console.log('[ALPHA ALERTS] Service already running');
+      console.log('[Alpha Alerts] Service already running.');
       return;
     }
-
-    console.log('[ALPHA ALERTS] Starting service...');
+    console.log('[Alpha Alerts] Starting service...');
     this.isRunning = true;
 
-    // Load wallets from database first
+    // Load initial wallets from DB
     await this.loadWalletsFromDatabase();
-    console.log(`[ALPHA ALERTS] Loaded ${this.alphaCallers.length} callers from database`);
 
+    // Start monitoring each configured caller
     for (const caller of this.alphaCallers) {
-      console.log(`[ALPHA ALERTS] Monitoring caller: ${caller.name} (${caller.wallet}) - Enabled: ${caller.enabled}`);
       this.monitorAlphaCaller(caller);
     }
 
-    this.startPumpFunMonitor();
-    this.startNansenWatcher();
+    // Start auto-refreshing the wallet list
     this.startAutoRefresh();
-    
-    console.log(`[ALPHA ALERTS] Service started - Total callers: ${this.alphaCallers.length} | Alert callbacks: ${this.alertCallbacks.length}`);
-    
-    // Send startup notification directly (not through sendAlert to avoid fake links)
-    const startupMessage = '🤖 **ANTIRUGILLER ALPHA ALERTS ONLINE**\n\n' +
-      `✅ Monitoring ${this.alphaCallers.filter(c => c.enabled).length} top alpha callers\n` +
-      `✅ Connected to pump.fun live feed\n` +
-      `✅ Quality filters active (RugCheck > 85, No honeypots, Liquidity > $5K)\n\n` +
-      `Contract: \`2rvVzKqwW7yeF8vbyVgvo7hEqaPvFx7fZudyLcRMxmNt\``;
-    
-    const DIRECT = process.env.ALPHA_ALERTS_DIRECT_SEND === 'true';
-    const DISCORD_WEBHOOK = process.env.ALPHA_DISCORD_WEBHOOK;
-    if (DIRECT && DISCORD_WEBHOOK) {
-      try {
-        await fetch(DISCORD_WEBHOOK, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: startupMessage,
-            username: 'RugKiller Alpha Alerts',
-          }),
-        });
-      } catch (error) {
-        console.error('[ALPHA ALERT] Discord startup notification failed:', error);
-      }
-    }
 
-    const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.ALPHA_TELEGRAM_BOT_TOKEN;
-    const TELEGRAM_CHAT = process.env.ALPHA_TELEGRAM_CHAT_ID;
-    if (DIRECT && TELEGRAM_TOKEN && TELEGRAM_CHAT) {
-      try {
-        const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
-        await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: TELEGRAM_CHAT,
-            text: startupMessage,
-            parse_mode: 'Markdown',
-          }),
-        });
-      } catch (error) {
-        console.error('[ALPHA ALERT] Telegram startup notification failed:', error);
-      }
-    }
+    // Start Nansen watcher if enabled
+    this.startNansenWatcher();
+
+    console.log(`[Alpha Alerts] Service started. Monitoring ${this.listeners.size} of ${this.alphaCallers.length} callers.`);
   }
 
-  // Stop all monitoring
-  async stop(): Promise<void> {
+  stop(): void {
+    if (!this.isRunning) return;
+    console.log('[Alpha Alerts] Stopping service...');
     this.isRunning = false;
 
     this.stopAutoRefresh();
@@ -659,7 +621,7 @@ export class AlphaAlertService {
     // Remove wallet listeners
     for (const [wallet, listenerId] of Array.from(this.listeners.entries())) {
       try {
-        await this.connection.removeOnLogsListener(listenerId);
+        this.connection.removeOnLogsListener(listenerId);
       } catch (error) {
         console.error(`[ALPHA ALERT] Error removing listener for ${wallet}:`, error);
       }
@@ -744,11 +706,14 @@ export class AlphaAlertService {
 }
 
 // Singleton instance
-let alphaAlertInstance: AlphaAlertService | null = null;
+let alphaAlertService: AlphaAlertService | null = null;
 
 export function getAlphaAlertService(): AlphaAlertService {
-  if (!alphaAlertInstance) {
-    alphaAlertInstance = new AlphaAlertService();
+  if (!alphaAlertService) {
+    alphaAlertService = new AlphaAlertService();
+    if (process.env.ALPHA_ALERTS_AUTOSTART === 'true') {
+      alphaAlertService.start().catch(err => console.error('[Alpha Alerts] Autostart failed:', err));
+    }
   }
-  return alphaAlertInstance;
+  return alphaAlertService;
 }
