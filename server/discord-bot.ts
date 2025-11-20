@@ -1384,26 +1384,41 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             await interaction.editReply({ content: '❌ Please select a text or announcement channel.' });
             return;
           }
-          console.log(`[Discord /alpha setchannel] Setting alpha target - Guild: ${interaction.guildId} | Channel: ${channel.id}`);
-          await storage.setAlphaTarget({ platform: 'discord', groupId: interaction.guildId, channelId: channel.id });
-          const saved = await storage.getAlphaTarget('discord', interaction.guildId);
-          console.log(`[Discord /alpha setchannel] Verified saved target: ${JSON.stringify(saved)}`);
-          await interaction.editReply({ content: `✅ Alpha alerts will be sent to <#${channel.id}> (@everyone).` });
+          try {
+            console.log(`[Discord /alpha setchannel] Setting alpha target - Guild: ${interaction.guildId} | Channel: ${channel.id}`);
+            await storage.setAlphaTarget({ platform: 'discord', groupId: interaction.guildId, channelId: channel.id });
+            const saved = await storage.getAlphaTarget('discord', interaction.guildId);
+            console.log(`[Discord /alpha setchannel] Verified saved target: ${JSON.stringify(saved)}`);
+            await interaction.editReply({ content: `✅ Alpha alerts will be sent to <#${channel.id}> (@everyone).` });
+          } catch (err: any) {
+            console.error(`[Discord /alpha setchannel] Error:`, err);
+            await interaction.editReply({ content: `❌ Failed to set channel: ${err?.message || 'Unknown error'}` });
+          }
         } else if (sub === 'clearchannel') {
           if (!interaction.guildId) {
             await interaction.editReply({ content: '❌ This command must be used in a server.' });
             return;
           }
-          await storage.clearAlphaTarget('discord', interaction.guildId);
-          await interaction.editReply({ content: '🧹 Cleared this server\'s alpha alert channel.' });
+          try {
+            await storage.clearAlphaTarget('discord', interaction.guildId);
+            await interaction.editReply({ content: '🧹 Cleared this server\'s alpha alert channel.' });
+          } catch (err: any) {
+            console.error(`[Discord /alpha clearchannel] Error:`, err);
+            await interaction.editReply({ content: `❌ Failed to clear channel: ${err?.message || 'Unknown error'}` });
+          }
         } else if (sub === 'where') {
           if (!interaction.guildId) {
             await interaction.editReply({ content: '❌ This command must be used in a server.' });
             return;
           }
-          const cfg = await storage.getAlphaTarget('discord', interaction.guildId);
-          console.log(`[Discord /alpha where] Retrieved target for guild ${interaction.guildId}: ${JSON.stringify(cfg)}`);
-          await interaction.editReply({ content: cfg ? `📍 Alpha alerts go to <#${cfg.channelId}>` : 'ℹ️ No channel configured for this server.' });
+          try {
+            const cfg = await storage.getAlphaTarget('discord', interaction.guildId);
+            console.log(`[Discord /alpha where] Retrieved target for guild ${interaction.guildId}: ${JSON.stringify(cfg)}`);
+            await interaction.editReply({ content: cfg ? `📍 Alpha alerts go to <#${cfg.channelId}>` : 'ℹ️ No channel configured for this server.' });
+          } catch (err: any) {
+            console.error(`[Discord /alpha where] Error:`, err);
+            await interaction.editReply({ content: `❌ Failed to get channel: ${err?.message || 'Unknown error'}` });
+          }
         } else if (sub === 'add') {
           const wallet = interaction.options.getString('wallet', true);
           const name = interaction.options.getString('name', true);
