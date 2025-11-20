@@ -272,6 +272,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ providers: stats });
   });
 
+  // Alpha Alerts Health
+  app.get('/api/alpha/health', (req, res) => {
+    try {
+      const { getAlphaAlertService } = require('./alpha-alerts.ts');
+      const svc = getAlphaAlertService();
+      res.json(svc.getHealth());
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Alpha health error' });
+    }
+  });
+
   // Get server's public IP (for Railway IP whitelisting)
   app.get("/api/server-ip", async (req, res) => {
     try {

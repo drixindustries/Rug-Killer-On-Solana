@@ -41,6 +41,13 @@ export class AlphaAlertService {
   private nansenSeenTransactions = new Set<string>();
   private nansenLastTimestamp = 0;
   private nansenPolling = false;
+  // Reliability tracking
+  private currentRpc: string = '';
+  private consecutiveFailures = 0;
+  private lastSuccessAt = 0;
+  private lastFailureAt = 0;
+  private lastLogAt = 0;
+  private heartbeatInterval: NodeJS.Timeout | null = null;
 
   constructor(rpcUrl?: string, customCallers?: AlphaCallerConfig[]) {
     // Prefer explicit env overrides, else rotate through public RPCs
@@ -53,8 +60,9 @@ export class AlphaAlertService {
     const httpEndpoint = explicitHttp || heliusHttp || rpcUrl || getRandomPublicRpc();
     const wsEndpoint = explicitWs || heliusWs || undefined;
 
-    this.connection = new Connection(httpEndpoint, { commitment: 'confirmed', wsEndpoint });
-    console.log(`[Alpha Alerts] RPC selected: ${httpEndpoint}`);
+    this.currentRpc = httpEndpoint;
+    this.connection = new Connection(this.currentRpc, { commitment: 'confirmed', wsEndpoint });
+    console.log(`[Alpha Alerts] RPC selected: ${this.currentRpc}`);
     this.alphaCallers = customCallers || DEFAULT_ALPHA_CALLERS;
   }
 
@@ -73,6 +81,7 @@ export class AlphaAlertService {
 
       // Use simpler PublicKey filter (mentions object types caused type issues)
       const listenerId = await this.connection.onLogs(pubkey, async (logInfo) => {
+        this.lastLogAt = Date.now();
         try {
           // Heuristic: extract base58 addresses from logs and test a few as token mints
           const text = (logInfo.logs || []).join('\n');
@@ -595,6 +604,9 @@ export class AlphaAlertService {
     // Load initial wallets from DB
     await this.loadWalletsFromDatabase();
 
+    // Establish initial RPC connectivity and test it
+    await this.establishConnection();
+
     // Start monitoring each configured caller
     for (const caller of this.alphaCallers) {
       this.monitorAlphaCaller(caller);
@@ -605,6 +617,9 @@ export class AlphaAlertService {
 
     // Start Nansen watcher if enabled
     this.startNansenWatcher();
+
+    // Begin heartbeat loop
+    this.startHeartbeat();
 
     console.log(`[Alpha Alerts] Service started. Monitoring ${this.listeners.size} of ${this.alphaCallers.length} callers.`);
   }
@@ -617,6 +632,10 @@ export class AlphaAlertService {
     this.stopAutoRefresh();
     this.stopNansenWatcher();
     this.nansenSeenTransactions.clear();
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
 
     // Remove wallet listeners
     for (const [wallet, listenerId] of Array.from(this.listeners.entries())) {
@@ -702,6 +721,78 @@ export class AlphaAlertService {
         this.listeners.delete(wallet);
       }
     }
+  }
+
+  // Connection helpers / reliability ---------------------------------
+  private async establishConnection(): Promise<void> {
+    try {
+      this.connection = new Connection(this.currentRpc, { commitment: 'confirmed' });
+      await this.connection.getVersion();
+      this.lastSuccessAt = Date.now();
+      this.consecutiveFailures = 0;
+      console.log('[Alpha Alerts] Connection healthy:', this.currentRpc);
+    } catch (err: any) {
+      this.lastFailureAt = Date.now();
+      this.consecutiveFailures++;
+      console.error('[Alpha Alerts] Connection failed:', err?.message || String(err));
+      await this.scheduleReconnect();
+    }
+  }
+
+  private async scheduleReconnect(): Promise<void> {
+    if (!this.isRunning) return;
+    const base = 1000; // 1s
+    const cap = 30000; // 30s
+    const attempt = this.consecutiveFailures;
+    const raw = Math.min(cap, base * 2 ** attempt);
+    const delay = Math.round(raw * (0.8 + Math.random() * 0.4));
+    console.log(`[Alpha Alerts] Reconnect scheduled in ${delay}ms (attempt ${attempt})`);
+    setTimeout(async () => {
+      if (attempt >= 1 && !process.env.ALPHA_HTTP_RPC && !process.env.HELIUS_API_KEY) {
+        this.currentRpc = getRandomPublicRpc();
+        console.log('[Alpha Alerts] Rotating RPC to', this.currentRpc);
+      }
+      await this.establishConnection();
+      if (this.consecutiveFailures === 0) {
+        for (const caller of this.alphaCallers) {
+          if (!this.listeners.has(caller.wallet)) {
+            this.monitorAlphaCaller(caller);
+          }
+        }
+      }
+    }, delay);
+  }
+
+  private startHeartbeat(): void {
+    const SILENCE_THRESHOLD_MS = 120000; // 2 minutes
+    if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+    this.heartbeatInterval = setInterval(() => {
+      if (!this.isRunning) return;
+      if (!this.lastLogAt) return;
+      const silentMs = Date.now() - this.lastLogAt;
+      if (silentMs > SILENCE_THRESHOLD_MS) {
+        console.warn(`[Alpha Alerts] Log silence ${Math.round(silentMs/1000)}s > threshold; reconnecting.`);
+        this.consecutiveFailures++;
+        this.scheduleReconnect();
+        this.lastLogAt = Date.now();
+      }
+    }, 30000);
+  }
+
+  getHealth() {
+    const now = Date.now();
+    return {
+      running: this.isRunning,
+      currentRpc: this.currentRpc,
+      consecutiveFailures: this.consecutiveFailures,
+      lastSuccessAt: this.lastSuccessAt ? new Date(this.lastSuccessAt).toISOString() : null,
+      lastFailureAt: this.lastFailureAt ? new Date(this.lastFailureAt).toISOString() : null,
+      lastLogAt: this.lastLogAt ? new Date(this.lastLogAt).toISOString() : null,
+      secondsSinceLastLog: this.lastLogAt ? Math.round((now - this.lastLogAt)/1000) : null,
+      monitoredWallets: this.alphaCallers.filter(c => c.enabled).length,
+      activeListeners: this.listeners.size,
+      status: !this.isRunning ? 'stopped' : (this.consecutiveFailures > 3 ? 'degraded' : 'healthy')
+    };
   }
 }
 
