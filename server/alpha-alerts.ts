@@ -6,6 +6,7 @@ import { kolWallets, smartWallets, smartSignals } from '../shared/schema.ts';
 import { gte, and, eq } from 'drizzle-orm';
 import { GMGNService } from './services/gmgn-service.ts';
 import { NansenService, type NansenSmartMoneyTrade } from './services/nansen-service.ts';
+import { storage } from './storage.ts';
 
 interface AlphaAlert {
   type: 'new_token' | 'whale_buy' | 'caller_signal';
@@ -127,13 +128,17 @@ export class AlphaAlertService {
     try {
       // Simpler selection to avoid cross-package drizzle type conflicts
       // Fetch smart wallets first
-      let wallets: Array<{ walletAddress: string; displayName: string | null; influenceScore: number | null }> = [];
+      type WalletRow = { walletAddress: string; displayName: string | null; influenceScore: number | null };
+      const meetsInfluenceThreshold = (row: WalletRow) => row.influenceScore === null || row.influenceScore >= minInfluence;
+
+      let wallets: WalletRow[] = [];
       try {
         const smart = await db
           .select({ walletAddress: smartWallets.walletAddress, displayName: smartWallets.displayName, influenceScore: smartWallets.influenceScore })
           .from(smartWallets)
+          .where(eq(smartWallets.isActive, true))
           .limit(200);
-        wallets = smart.filter(w => (w as any).influenceScore === null || (w as any).influenceScore >= minInfluence) as any;
+        wallets = smart.filter(meetsInfluenceThreshold);
       } catch (err) {
         console.warn('[Alpha Alerts] Smart wallets query failed, will fallback:', err);
       }
@@ -143,7 +148,7 @@ export class AlphaAlertService {
             .select({ walletAddress: kolWallets.walletAddress, displayName: kolWallets.displayName, influenceScore: kolWallets.influenceScore })
             .from(kolWallets)
             .limit(200);
-          wallets = kol.filter(w => (w as any).influenceScore === null || (w as any).influenceScore >= minInfluence) as any;
+          wallets = kol.filter(meetsInfluenceThreshold);
         } catch (err) {
           console.warn('[Alpha Alerts] KOL wallets query failed:', err);
         }
@@ -693,6 +698,7 @@ export class AlphaAlertService {
     if (!this.alphaCallers.find(c => c.wallet === wallet)) {
       const caller = { wallet, name, enabled: true };
       this.alphaCallers.push(caller);
+      this.persistCaller(caller);
       
       if (this.isRunning) {
         this.monitorAlphaCaller(caller);
@@ -714,6 +720,7 @@ export class AlphaAlertService {
     if (index !== -1) {
       const caller = this.alphaCallers[index];
       this.alphaCallers.splice(index, 1);
+      this.deactivatePersistedCaller(wallet);
       
       const listenerId = this.listeners.get(wallet);
       if (listenerId !== undefined) {
@@ -721,6 +728,26 @@ export class AlphaAlertService {
         this.listeners.delete(wallet);
       }
     }
+  }
+
+  private persistCaller(caller: AlphaCallerConfig): void {
+    const influenceScore = Number.isFinite(caller.influenceScore) ? Number(caller.influenceScore) : 80;
+    void storage.upsertSmartWallet({
+      walletAddress: caller.wallet,
+      displayName: caller.name,
+      source: 'manual-alpha',
+      influenceScore: Math.max(60, influenceScore),
+      isActive: true,
+      notes: 'Added via alpha alerts admin command',
+    }).catch(error => {
+      console.error('[Alpha Alerts] Failed to persist alpha caller:', error);
+    });
+  }
+
+  private deactivatePersistedCaller(wallet: string): void {
+    void storage.setSmartWalletActive(wallet, false).catch(error => {
+      console.error('[Alpha Alerts] Failed to deactivate alpha caller:', error);
+    });
   }
 
   // Connection helpers / reliability ---------------------------------

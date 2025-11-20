@@ -399,7 +399,8 @@ const commands = [
     .addIntegerOption(option => option.setName('limit').setDescription('How many to show (max 50)').setMinValue(1).setMaxValue(50)),
   new SlashCommandBuilder()
     .setName('reload')
-    .setDescription('Check if bot is responsive'),
+    .setDescription('Restart the bot process (admin)')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder()
     .setName('chart')
     .setDescription('Show a quick chart link')
@@ -444,6 +445,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       GatewayIntentBits.MessageContent,
     ],
   });
+  let restartScheduled = false;
   
   // Register slash commands
   const registerCommands = async () => {
@@ -1656,16 +1658,25 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           .setTimestamp();
         await interaction.editReply({ embeds: [embed] });
       } else if (interaction.commandName === 'reload') {
-        const embed = new EmbedBuilder()
-          .setColor(0x00ff00)
-          .setTitle('✅ Bot is Online')
-          .setDescription('All systems operational!')
-          .addFields(
-            { name: 'Response Time', value: `${Date.now() - interaction.createdTimestamp}ms`, inline: true },
-            { name: 'Uptime', value: `${Math.floor(process.uptime() / 60)} minutes`, inline: true }
-          )
-          .setTimestamp();
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        if (!canAdmin('reload')) {
+          await interaction.reply({ content: '⛔ Admins only.', ephemeral: true });
+          return;
+        }
+        if (restartScheduled) {
+          await interaction.reply({ content: '⏳ Restart already in progress. Stand by…', ephemeral: true });
+          return;
+        }
+        restartScheduled = true;
+        await interaction.reply({ content: '♻️ Restarting bot… back in a few seconds.', ephemeral: true });
+        console.log(`[Discord /reload] Restart requested by ${interaction.user.tag} (${interaction.user.id})`);
+        setTimeout(() => {
+          try {
+            client.destroy();
+          } catch (err) {
+            console.error('[Discord /reload] Error during client destroy:', err);
+          }
+          process.exit(0);
+        }, 1500);
       } else if (interaction.commandName === 'chart') {
         const tokenAddress = interaction.options.getString('address', true);
         const embed = new EmbedBuilder()
