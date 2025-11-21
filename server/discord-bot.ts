@@ -1315,123 +1315,117 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           await interaction.editReply({ content: `⚠️ Could not create alert: ${e?.message || 'unknown error'}` });
         }
       } else if (interaction.commandName === 'alpha') {
-        console.log(`[Discord /alpha] User ${interaction.user.tag} (ID: ${interaction.user.id}) | Guild: ${interaction.guildId || 'DM'} | Subcommand: ${interaction.options.getSubcommand(true)}`);
-        const sub = interaction.options.getSubcommand(true);
-        const alpha = getAlphaAlertService();
-        // Allow debug subcommand even if admin check fails, so user can see diagnostics
-        const isDebug = sub === 'debug';
-        if (!isDebug && !canAdmin('alpha')) {
-          console.log(`[Discord /alpha] PERMISSION DENIED for user ${interaction.user.id} | hasGuildPerms: ${hasGuildPerms} | isAdminEnv: ${isAdminEnv}`);
-          await interaction.reply({ content: '⛔ Admins only.', ephemeral: true });
-          return;
-        }
-        console.log(`[Discord /alpha] Permission granted for user ${interaction.user.id} | hasGuildPerms: ${hasGuildPerms} | isAdminEnv: ${isAdminEnv}`);
-        await interaction.deferReply({ ephemeral: true });
-        if (sub === 'status') {
-          const verbose = interaction.options.getBoolean('verbose') || false;
-          const st = alpha.getStatus(verbose);
-          console.log(`[Discord /alpha status] Service status: ${JSON.stringify(st)}`);
-          
-          let content = `**Alpha Status**\n` +
-            `• Running: ${st.isRunning ? '✅' : '🛑'}\n` +
-            `• Monitored Callers: ${st.monitoredCallers} / ${st.totalCallers}\n` +
-            `• Active Listeners: ${st.activeListeners}\n` +
-            `• WebSockets: ${st.activeWebSockets}`;
-            
-          if (st.message) {
-            content += `\n\n**💡 Suggestion:**\n${st.message}`;
-          }
-          
-          if (verbose && st.callers) {
-            const callerList = st.callers.map(c => `• ${c.name} (${formatAddress(c.wallet)}) - ${c.enabled ? '✅' : '❌'}`).join('\n');
-            content += `\n\n**Configured Callers:**\n${callerList}`;
-          }
-          
-          await interaction.editReply({ content });
-        } else if (sub === 'start') {
-          console.log(`[Discord /alpha start] Starting alpha alerts service...`);
-          await alpha.start();
-          const st = alpha.getStatus();
-          console.log(`[Discord /alpha start] Service started: ${JSON.stringify(st)}`);
-          await interaction.editReply({ content: '✅ Alpha monitoring started.' });
-        } else if (sub === 'stop') {
-          console.log(`[Discord /alpha stop] Stopping alpha alerts service...`);
-          await alpha.stop();
-          await interaction.editReply({ content: '🛑 Alpha monitoring stopped.' });
-        } else if (sub === 'debug') {
-          const envMap = Object.fromEntries(
-            Array.from(adminAllowlist.values()).map(v => [v, true])
-          );
-          const lines = [
-            `userId: ${interaction.user.id}`,
-            `guildId: ${interaction.guildId || 'DM'}`,
-            `hasGuildPerms: ${hasGuildPerms}`,
-            `isAdminEnv: ${isAdminEnv}`,
-            `adminAllowlistSize: ${adminAllowlist.size}`,
-            `inAllowlist: ${adminAllowlist.has(interaction.user.id)}`,
-            `relayDisabled: ${process.env.ALPHA_ALERTS_DIRECT_SEND === 'true'}`
-          ];
-          await interaction.editReply({ content: 'Alpha Debug:\n' + lines.join('\n') });
-        } else if (sub === 'setchannel') {
-          if (!interaction.guildId) {
-            await interaction.editReply({ content: '❌ This command must be used in a server.' });
+        // Wrap alpha command handling in try/catch so any error still yields a Discord response
+        try {
+          let sub: string;
+            try {
+              sub = interaction.options.getSubcommand(false) || 'status';
+            } catch {
+              sub = 'status';
+            }
+          console.log(`[Discord /alpha] User ${interaction.user.tag} (ID: ${interaction.user.id}) | Guild: ${interaction.guildId || 'DM'} | Subcommand: ${sub}`);
+          const alpha = getAlphaAlertService();
+          const isDebug = sub === 'debug';
+          if (!isDebug && !canAdmin('alpha')) {
+            console.log(`[Discord /alpha] PERMISSION DENIED for user ${interaction.user.id} | hasGuildPerms: ${hasGuildPerms} | isAdminEnv: ${isAdminEnv}`);
+            await interaction.reply({ content: '⛔ Admins only.', ephemeral: true });
             return;
           }
-          const channel = interaction.options.getChannel('channel') || interaction.channel;
-          if (!channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)) {
-            await interaction.editReply({ content: '❌ Please select a text or announcement channel.' });
-            return;
+          console.log(`[Discord /alpha] Permission granted for user ${interaction.user.id} | hasGuildPerms: ${hasGuildPerms} | isAdminEnv: ${isAdminEnv}`);
+          await interaction.deferReply({ ephemeral: true });
+          if (sub === 'status') {
+            const verbose = interaction.options.getBoolean('verbose') || false;
+            const st = alpha.getStatus(verbose);
+            console.log(`[Discord /alpha status] Service status: ${JSON.stringify(st)}`);
+            let content = `**Alpha Status**\n` +
+              `• Running: ${st.isRunning ? '✅' : '🛑'}\n` +
+              `• Monitored Callers: ${st.monitoredCallers} / ${st.totalCallers}\n` +
+              `• Active Listeners: ${st.activeListeners}\n` +
+              `• WebSockets: ${st.activeWebSockets}`;
+            if (st.message) content += `\n\n**💡 Suggestion:**\n${st.message}`;
+            if (verbose && st.callers) {
+              const callerList = st.callers.map(c => `• ${c.name} (${formatAddress(c.wallet)}) - ${c.enabled ? '✅' : '❌'}`).join('\n');
+              content += `\n\n**Configured Callers:**\n${callerList}`;
+            }
+            await interaction.editReply({ content });
+          } else if (sub === 'start') {
+            console.log('[Discord /alpha start] Starting alpha alerts service...');
+            await alpha.start();
+            await interaction.editReply({ content: '✅ Alpha monitoring started.' });
+          } else if (sub === 'stop') {
+            console.log('[Discord /alpha stop] Stopping alpha alerts service...');
+            await alpha.stop();
+            await interaction.editReply({ content: '🛑 Alpha monitoring stopped.' });
+          } else if (sub === 'debug') {
+            const lines = [
+              `userId: ${interaction.user.id}`,
+              `guildId: ${interaction.guildId || 'DM'}`,
+              `hasGuildPerms: ${hasGuildPerms}`,
+              `isAdminEnv: ${isAdminEnv}`,
+              `adminAllowlistSize: ${adminAllowlist.size}`,
+              `inAllowlist: ${adminAllowlist.has(interaction.user.id)}`,
+              `relayDisabled: ${process.env.ALPHA_ALERTS_DIRECT_SEND === 'true'}`
+            ];
+            await interaction.editReply({ content: 'Alpha Debug:\n' + lines.join('\n') });
+          } else if (sub === 'setchannel') {
+            if (!interaction.guildId) { await interaction.editReply({ content: '❌ This command must be used in a server.' }); return; }
+            const channel = interaction.options.getChannel('channel') || interaction.channel;
+            if (!channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)) {
+              await interaction.editReply({ content: '❌ Please select a text or announcement channel.' });
+              return;
+            }
+            try {
+              console.log(`[Discord /alpha setchannel] Setting alpha target - Guild: ${interaction.guildId} | Channel: ${channel.id}`);
+              await storage.setAlphaTarget({ platform: 'discord', groupId: interaction.guildId, channelId: channel.id });
+              await interaction.editReply({ content: `✅ Alpha alerts will be sent to <#${channel.id}> (@everyone).` });
+            } catch (err: any) {
+              console.error('[Discord /alpha setchannel] Error:', err);
+              await interaction.editReply({ content: `❌ Failed to set channel: ${err?.message || 'Unknown error'}` });
+            }
+          } else if (sub === 'clearchannel') {
+            if (!interaction.guildId) { await interaction.editReply({ content: '❌ This command must be used in a server.' }); return; }
+            try {
+              await storage.clearAlphaTarget('discord', interaction.guildId);
+              await interaction.editReply({ content: '🧹 Cleared this server\'s alpha alert channel.' });
+            } catch (err: any) {
+              console.error('[Discord /alpha clearchannel] Error:', err);
+              await interaction.editReply({ content: `❌ Failed to clear channel: ${err?.message || 'Unknown error'}` });
+            }
+          } else if (sub === 'where') {
+            if (!interaction.guildId) { await interaction.editReply({ content: '❌ This command must be used in a server.' }); return; }
+            try {
+              const cfg = await storage.getAlphaTarget('discord', interaction.guildId);
+              console.log(`[Discord /alpha where] Retrieved target for guild ${interaction.guildId}: ${JSON.stringify(cfg)}`);
+              await interaction.editReply({ content: cfg ? `📍 Alpha alerts go to <#${cfg.channelId}>` : 'ℹ️ No channel configured for this server.' });
+            } catch (err: any) {
+              console.error('[Discord /alpha where] Error:', err);
+              await interaction.editReply({ content: `❌ Failed to get channel: ${err?.message || 'Unknown error'}` });
+            }
+          } else if (sub === 'add') {
+            const wallet = interaction.options.getString('wallet', true);
+            const name = interaction.options.getString('name', true);
+            console.log(`[Discord /alpha add] Adding alpha caller - Wallet: ${wallet} | Name: ${name}`);
+            alpha.addCaller(wallet, name);
+            await interaction.editReply({ content: `✅ Added alpha caller ${name} (${formatAddress(wallet)})` });
+          } else if (sub === 'remove') {
+            const wallet = interaction.options.getString('wallet', true);
+            console.log(`[Discord /alpha remove] Removing alpha caller - Wallet: ${wallet}`);
+            alpha.removeCaller(wallet);
+            await interaction.editReply({ content: `✅ Removed alpha caller (${formatAddress(wallet)})` });
+          } else {
+            await interaction.editReply({ content: '⚠️ Unknown subcommand. Try `/alpha status`.' });
           }
+        } catch (err: any) {
+          console.error('[Discord /alpha] Unhandled error:', err);
           try {
-            console.log(`[Discord /alpha setchannel] Setting alpha target - Guild: ${interaction.guildId} | Channel: ${channel.id}`);
-            await storage.setAlphaTarget({ platform: 'discord', groupId: interaction.guildId, channelId: channel.id });
-            const saved = await storage.getAlphaTarget('discord', interaction.guildId);
-            console.log(`[Discord /alpha setchannel] Verified saved target: ${JSON.stringify(saved)}`);
-            await interaction.editReply({ content: `✅ Alpha alerts will be sent to <#${channel.id}> (@everyone).` });
-          } catch (err: any) {
-            console.error(`[Discord /alpha setchannel] Error:`, err);
-            await interaction.editReply({ content: `❌ Failed to set channel: ${err?.message || 'Unknown error'}` });
+            if (!interaction.deferred && !interaction.replied) {
+              await interaction.reply({ content: `❌ Alpha command failed: ${err?.message || 'Unknown error'}`, ephemeral: true });
+            } else {
+              await interaction.editReply({ content: `❌ Alpha command failed: ${err?.message || 'Unknown error'}` });
+            }
+          } catch (inner) {
+            console.error('[Discord /alpha] Failed sending error response:', inner);
           }
-        } else if (sub === 'clearchannel') {
-          if (!interaction.guildId) {
-            await interaction.editReply({ content: '❌ This command must be used in a server.' });
-            return;
-          }
-          try {
-            await storage.clearAlphaTarget('discord', interaction.guildId);
-            await interaction.editReply({ content: '🧹 Cleared this server\'s alpha alert channel.' });
-          } catch (err: any) {
-            console.error(`[Discord /alpha clearchannel] Error:`, err);
-            await interaction.editReply({ content: `❌ Failed to clear channel: ${err?.message || 'Unknown error'}` });
-          }
-        } else if (sub === 'where') {
-          if (!interaction.guildId) {
-            await interaction.editReply({ content: '❌ This command must be used in a server.' });
-            return;
-          }
-          try {
-            const cfg = await storage.getAlphaTarget('discord', interaction.guildId);
-            console.log(`[Discord /alpha where] Retrieved target for guild ${interaction.guildId}: ${JSON.stringify(cfg)}`);
-            await interaction.editReply({ content: cfg ? `📍 Alpha alerts go to <#${cfg.channelId}>` : 'ℹ️ No channel configured for this server.' });
-          } catch (err: any) {
-            console.error(`[Discord /alpha where] Error:`, err);
-            await interaction.editReply({ content: `❌ Failed to get channel: ${err?.message || 'Unknown error'}` });
-          }
-        } else if (sub === 'add') {
-          const wallet = interaction.options.getString('wallet', true);
-          const name = interaction.options.getString('name', true);
-          console.log(`[Discord /alpha add] Adding alpha caller - Wallet: ${wallet} | Name: ${name}`);
-          alpha.addCaller(wallet, name);
-          const st = alpha.getStatus();
-          console.log(`[Discord /alpha add] After add - Total callers: ${st.totalCallers} | Monitored: ${st.monitoredCallers}`);
-          await interaction.editReply({ content: `✅ Added alpha caller ${name} (${formatAddress(wallet)})` });
-        } else if (sub === 'remove') {
-          const wallet = interaction.options.getString('wallet', true);
-          console.log(`[Discord /alpha remove] Removing alpha caller - Wallet: ${wallet}`);
-          alpha.removeCaller(wallet);
-          const st = alpha.getStatus();
-          console.log(`[Discord /alpha remove] After remove - Total callers: ${st.totalCallers} | Monitored: ${st.monitoredCallers}`);
-          await interaction.editReply({ content: `✅ Removed alpha caller (${formatAddress(wallet)})` });
         }
       } else if (interaction.commandName === 'smart') {
         const sub = interaction.options.getSubcommand(true);
