@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { analyzeTokenSchema, insertWatchlistSchema } from "../shared/schema.ts";
+import { analyzeTokenSchema, insertWatchlistSchema, smartSignals } from "../shared/schema.ts";
 import { tokenAnalyzer } from "./solana-analyzer.ts";
 import { nameCache } from "./name-cache.ts";
 // import { setupAuth, isAuthenticated } from "./replitAuth"; // Disabled for non-Replit deployments
@@ -22,6 +22,7 @@ import { streamMetrics, normalizeSolanaWebhook } from "./services/stream-metrics
 import crypto from 'crypto';
 import { tokenMetrics } from './services/token-metrics.ts';
 import getRawBody from 'raw-body';
+import { gte, sql } from "drizzle-orm";
 
 // Stub authentication for Railway deployment (no Replit OIDC)
 const setupAuth = async (app: Express) => {
@@ -216,9 +217,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const latencies = results.map(r => r.latencyMs);
-        const avg = Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length);
-        const min = Math.min(...latencies);
-        const max = Math.max(...latencies);
+        const avg = latencies.length > 0 ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : 0;
+        const min = latencies.length > 0 ? Math.min(...latencies) : 0;
+        const max = latencies.length > 0 ? Math.max(...latencies) : 0;
 
         return res.json({
           provider: provider.name,
@@ -280,6 +281,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(svc.getHealth());
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Alpha health error' });
+    }
+  });
+
+  // Alpha hero metrics used on the marketing hero + mascot sections
+  app.get('/api/alpha/hero-stats', async (_req, res) => {
+    try {
+      const { getAlphaAlertService } = await import('./alpha-alerts.ts');
+      const svc = getAlphaAlertService();
+      const health = svc.getHealth();
+
+      const { db } = await import('./db.ts');
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const [weeklySignals] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(smartSignals)
+        .where(gte(smartSignals.detectedAt, sevenDaysAgo));
+
+      const totalSignals7d = weeklySignals?.count ?? 0;
+
+      const [latencyStats] = await db
+        .select({
+          avgRelayLatencyMs: sql<number>`coalesce(avg(extract(epoch from (${smartSignals.createdAt} - ${smartSignals.detectedAt})) * 1000), 0)::int`,
+          maxRelayLatencyMs: sql<number>`coalesce(max(extract(epoch from (${smartSignals.createdAt} - ${smartSignals.detectedAt})) * 1000), 0)::int`,
+        })
+        .from(smartSignals)
+        .where(gte(smartSignals.detectedAt, sevenDaysAgo));
+
+      const alphaTargets = await storage.getAlphaTargets();
+      const discordDestinations = alphaTargets.filter(target => target.platform === 'discord').length;
+      const telegramDestinations = alphaTargets.filter(target => target.platform === 'telegram').length;
+      const discordRelayPings7d = totalSignals7d * discordDestinations;
+      const telegramRelayPings7d = totalSignals7d * telegramDestinations;
+
+      res.json({
+        walletsGuarded: health.monitoredWallets ?? 0,
+        alphaPings7d: totalSignals7d,
+        relayDestinations: alphaTargets.length,
+        discordDestinations,
+        telegramDestinations,
+        discordRelayPings7d,
+        telegramRelayPings7d,
+        avgRelayLatencyMs: latencyStats?.avgRelayLatencyMs ?? 0,
+        maxRelayLatencyMs: latencyStats?.maxRelayLatencyMs ?? 0,
+        running: health.running,
+        lastAlertAt: health.lastLogAt,
+      });
+    } catch (error) {
+      console.error('[Alpha Hero Stats] Failed to fetch mascot metrics:', error);
+      res.status(500).json({ message: 'Failed to fetch alpha hero stats' });
     }
   });
 
@@ -352,7 +402,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tokenAddress: analysis.tokenAddress,
         metadata: analysis.metadata,
         agedWalletData: analysis.agedWalletData || null,
-        risks: analysis.redFlags?.filter(f => f.category === 'aged_wallets') || [],
+        // RiskFlag interface uses `type`, not `category`
+        risks: analysis.redFlags?.filter(f => f.type === 'recent_creation' || f.type === 'holder_concentration') || [],
       });
     } catch (error: any) {
       console.error("Aged wallet API error:", error);
@@ -382,11 +433,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if client is rate limited (simple in-memory store)
       const now = Date.now();
-      if (!global.rateLimitStore) {
-        global.rateLimitStore = new Map();
+      const g: any = globalThis as any;
+      if (!g.rateLimitStore) {
+        g.rateLimitStore = new Map();
       }
       
-      const clientData = global.rateLimitStore.get(rateLimitKey) || { count: 0, resetTime: now + 60000 };
+      const clientData = g.rateLimitStore.get(rateLimitKey) || { count: 0, resetTime: now + 60000 };
       
       if (now > clientData.resetTime) {
         clientData.count = 0;
@@ -402,7 +454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       clientData.count++;
-      global.rateLimitStore.set(rateLimitKey, clientData);
+      g.rateLimitStore.set(rateLimitKey, clientData);
 
       console.log(`[API] Analyzing token: ${tokenAddress} for IP: ${clientIP} (${clientData.count}/10)`);
 
@@ -1838,7 +1890,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { Connection, PublicKey } = await import('@solana/web3.js');
         const { rpcBalancer } = await import('./services/rpc-balancer.ts');
         const { priceService } = await import('./services/price-service.ts');
-        const { dexscreenerService } = await import('./dexscreener-service.ts');
+        const { DexScreenerService } = await import('./dexscreener-service.ts');
       
         const connection = rpcBalancer.getConnection();
         const publicKey = new PublicKey(walletAddress);
@@ -1874,14 +1926,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   valueUsd = balance * priceUsd;
                 }
               
-                const dexData = await dexscreenerService.getTokenData(tokenAddress);
-                if (dexData) {
-                  symbol = dexData.baseToken?.symbol || symbol;
-                  name = dexData.baseToken?.name || name;
-                  change24h = dexData.priceChange?.h24 || null;
-                  if (dexData.info?.imageUrl) {
-                    logo = dexData.info.imageUrl;
-                  }
+                const dexData = await new DexScreenerService().getTokenData(tokenAddress);
+                if (dexData?.pairs?.[0]) {
+                  const pair = dexData.pairs[0];
+                  symbol = pair.baseToken?.symbol || symbol;
+                  name = pair.baseToken?.name || name;
+                  change24h = pair.priceChange?.h24 || null;
+                  // DexScreener normalized object may not have image; keep logo null
                 }
               } catch (err) {
                 console.log(`Failed to get price for ${tokenAddress}:`, err);
@@ -2033,16 +2084,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Check if mint/freeze authority is blacklisted
-      const mintAuthority = analysis.authorities?.mintAuthority;
-      const freezeAuthority = analysis.authorities?.freezeAuthority;
+      const mintAuthority = analysis.mintAuthority;
+      const freezeAuthority = analysis.freezeAuthority;
       
       const blacklistChecks = await Promise.all([
-        mintAuthority 
-          ? blacklist.checkBlacklist(mintAuthority)
-          : Promise.resolve({ isBlacklisted: false, severity: 0, labels: [], warnings: [] }),
-        freezeAuthority
-          ? blacklist.checkBlacklist(freezeAuthority)
-          : Promise.resolve({ isBlacklisted: false, severity: 0, labels: [], warnings: [] }),
+        mintAuthority?.authorityAddress
+          ? blacklist.checkBlacklist(mintAuthority.authorityAddress)
+          : Promise.resolve({ isBlacklisted: false, severity: 0, labels: [], warnings: [], skipped: true }),
+        freezeAuthority?.authorityAddress
+          ? blacklist.checkBlacklist(freezeAuthority.authorityAddress)
+          : Promise.resolve({ isBlacklisted: false, severity: 0, labels: [], warnings: [], skipped: true }),
         blacklist.checkBlacklist(tokenAddress),
       ]);
       

@@ -102,8 +102,14 @@ export class PumpFunWebhookService extends EventEmitter {
    * Handle incoming messages
    */
   private async onMessage(data: WebSocket.Data): Promise<void> {
+    let message: PumpFunWebSocketMessage;
     try {
-      const message: PumpFunWebSocketMessage = JSON.parse(data.toString());
+      message = JSON.parse(data.toString());
+    } catch (parseError) {
+      console.error('[PumpFun] Invalid JSON received:', parseError);
+      return;
+    }
+    try {
 
       // Handle new token event
       if (message.event === 'new_token' || message.event === 'tokenCreate') {

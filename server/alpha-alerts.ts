@@ -571,8 +571,14 @@ export class AlphaAlertService {
       });
 
       ws.on('message', async (data: WebSocket.Data) => {
+        let msg: any;
         try {
-          const msg = JSON.parse(data.toString());
+          msg = JSON.parse(data.toString());
+        } catch (parseError) {
+          console.error('[Alpha Alerts] Invalid WebSocket JSON:', parseError);
+          return;
+        }
+        try {
           
           if (msg.mint && msg.mint.length === 44) {
             // Check quality before alerting
@@ -590,8 +596,8 @@ export class AlphaAlertService {
               });
             }
           }
-        } catch (error) {
-          console.error('[ALPHA ALERT] pump.fun message error:', error);
+        } catch (err: any) {
+          console.error('[Alpha Alerts] Error processing token from pump.fun feed:', err?.message || err);
         }
       });
 
@@ -695,6 +701,7 @@ export class AlphaAlertService {
       activeListeners: this.listeners.size,
       activeWebSockets: this.wsConnections.length,
       callers: verbose ? this.alphaCallers : undefined,
+      message: undefined as string | undefined,
     };
     
     // If not running and no callers, it's likely unconfigured

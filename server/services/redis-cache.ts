@@ -25,24 +25,20 @@ class RedisCache {
     const redisUrl = process.env.REDIS_URL || process.env.REDISCLOUD_URL || 'redis://localhost:6379';
     
     this.isEnabled = true;
-    this.redis = new Redis(redisUrl, {
+    this.redis = new Redis(redisUrl as string, {
       maxRetriesPerRequest: 1,
-      retryDelayOnFailover: 100,
       lazyConnect: true,
-      keepAlive: 30000,
       connectTimeout: 3000,
-      commandTimeout: 2000,
       enableOfflineQueue: false,
-      // Don't retry failed connections indefinitely
-      retryStrategy: (times) => {
+      retryStrategy: (times: number) => {
         if (times > 3) {
           console.log('[Redis] Max retry attempts reached - caching disabled');
           this.isEnabled = false;
-          return null; // Stop retrying
+          return null;
         }
         return Math.min(times * 100, 2000);
       },
-    });
+    } as any); // Cast to any to ignore unsupported option warnings
 
     this.setupEventHandlers();
   }
@@ -110,7 +106,12 @@ class RedisCache {
       // Try to get cached value
       const cached = await this.redis.get(key);
       if (cached) {
-        return JSON.parse(cached);
+        try {
+          return JSON.parse(cached);
+        } catch (parseError) {
+          // Malformed cache data - delete and refetch
+          await this.redis.del(key).catch(() => {});
+        }
       }
     } catch (cacheError) {
       // Cache read failed - continue to fetch
@@ -160,7 +161,14 @@ class RedisCache {
         await this.redis.connect();
       }
       const cached = await this.redis.get(key);
-      return cached ? JSON.parse(cached) : null;
+      if (!cached) return null;
+      try {
+        return JSON.parse(cached);
+      } catch (parseError) {
+        // Malformed cache - delete and return null
+        await this.redis.del(key).catch(() => {});
+        return null;
+      }
     } catch (error) {
       return null;
     }

@@ -115,6 +115,10 @@ export class AlertWorker {
 
       const currentPrice = priceData.priceUsd;
       const targetValue = parseFloat(alert.targetValue);
+      if (isNaN(targetValue)) {
+        console.warn(`[Alert Worker] Invalid target value for alert ${alert.id}`);
+        return { triggered: false, alert, currentPrice: null };
+      }
 
       // Update last checked price with fixed precision (avoid exponential notation)
       await storage.updatePriceAlert(alert.id, { lastPrice: currentPrice.toFixed(8) });
@@ -140,6 +144,9 @@ export class AlertWorker {
           // For now, use lastPrice as baseline (simplified)
           if (alert.lastPrice) {
             const lastPrice = parseFloat(alert.lastPrice);
+            if (isNaN(lastPrice) || lastPrice === 0) {
+              break; // Skip evaluation if lastPrice is invalid
+            }
             const percentChange = ((currentPrice - lastPrice) / lastPrice) * 100;
             
             if (alert.alertType === 'percent_change') {

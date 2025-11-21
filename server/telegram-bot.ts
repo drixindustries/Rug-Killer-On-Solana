@@ -10,6 +10,12 @@ import { getExchangeStats } from './exchange-whitelist';
 import { nameCache } from './name-cache';
 import { rally } from './bot-personality';
 import { trendingCallsTracker } from './trending-calls-tracker';
+import { holderAnalysis } from './services/holder-analysis';
+import { DexScreenerService } from './dexscreener-service';
+import { getCreatorWallet } from './creator-wallet';
+
+const dexScreener = new DexScreenerService();
+const creatorWalletService = getCreatorWallet();
 
 // Bot instance - only created when startTelegramBot() is called
 let botInstance: Telegraf | null = null;
@@ -464,21 +470,23 @@ function createTelegramBot(botToken: string): Telegraf {
       
       let message = `💰 **PRICE CHECK - ${analysis.metadata.symbol}**\n\n`;
       
-      if (pair) {
+      if (pair && pair.priceUsd) {
         const price = parseFloat(pair.priceUsd);
-        message += `📊 **Current Price**: $${price.toFixed(price < 0.01 ? 8 : 4)}\n\n`;
+        if (isNaN(price)) {
+          message += `⚠️ Price data unavailable\n`;
+        } else {
+          message += `📊 **Current Price**: $${price.toFixed(price < 0.01 ? 8 : 4)}\n\n`;
         
-        // 24h change with trend indicator
-        const change24h = pair.priceChange.h24;
-        const changeEmoji = change24h >= 0 ? '📈' : '📉';
-        const changeColor = change24h >= 0 ? '🟢' : '🔴';
-        message += `${changeEmoji} **24h Change**: ${changeColor} ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}%\n`;
-        
-        // Volume
-        message += `📦 **24h Volume**: $${formatNumber(pair.volume.h24)}\n`;
-        message += `💧 **Liquidity**: $${formatNumber(pair.liquidity?.usd || 0)}\n`;
-        
-        // Market cap
+          // 24h change with trend indicator
+          const change24h = pair.priceChange.h24;4;
+          const changeEmoji = change24h >= 0 ? '📈' : '📉';
+          const changeColor = change24h >= 0 ? '🟢' : '🔴';
+          message += `${changeEmoji} **24h Change**: ${changeColor} ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}%\n`;
+          
+          // Volume
+          message += `📦 **24h Volume**: $${formatNumber(pair.volume.h24)}\n`;
+          message += `💧 **Liquidity**: $${formatNumber(pair.liquidity?.usd || 0)}\n`;
+        }        // Market cap
         if (pair.marketCap) {
           message += `💎 **Market Cap**: $${formatNumber(pair.marketCap)}\n`;
         }
@@ -735,13 +743,19 @@ function createTelegramBot(botToken: string): Telegraf {
       const pair1 = analysis1.dexscreenerData?.pairs?.[0];
       const pair2 = analysis2.dexscreenerData?.pairs?.[0];
       
-      if (pair1 && pair2) {
-        message += `💰 **PRICE & VOLUME**\n`;
-        message += `A: $${parseFloat(pair1.priceUsd).toFixed(8)} | Vol: $${formatNumber(pair1.volume.h24)}\n`;
-        message += `B: $${parseFloat(pair2.priceUsd).toFixed(8)} | Vol: $${formatNumber(pair2.volume.h24)}\n`;
+      if (pair1 && pair2 && pair1.priceUsd && pair2.priceUsd) {
+        const price1 = parseFloat(pair1.priceUsd);
+        const price2 = parseFloat(pair2.priceUsd);
+        if (!isNaN(price1) && !isNaN(price2)) {
+          message += `💰 **PRICE & VOLUME**\n`;
+          message += `A: $${price1.toFixed(8)} | Vol: $${formatNumber(pair1.volume.h24)}\n`;
+          message += `B: $${price2.toFixed(8)} | Vol: $${formatNumber(pair2.volume.h24)}\n`;
         
-        const betterVol = pair1.volume.h24 > pair2.volume.h24 ? 'A' : 'B';
-        message += `👑 Higher Volume: Token ${betterVol}\n\n`;
+          const betterVol = pair1.volume.h24 > pair2.volume.h24 ? 'A' : 'B';
+          message += `👑 Higher Volume: Token ${betterVol}\n\n`;
+          
+          message += `💰 Price Difference: $${Math.abs(price1 - price2).toFixed(8)}\n\n`;
+        }
         
         message += `📊 **MARKET CAP**\n`;
         message += `A: $${formatNumber(pair1.marketCap || 0)}\n`;
@@ -917,7 +931,7 @@ function createTelegramBot(botToken: string): Telegraf {
       return ctx.reply('❌ Usage: `/chart <address>`', { parse_mode: 'Markdown' });
     }
     const tokenAddress = args[1];
-    await ctx.reply(`📈 Chart links for \`${formatAddress(tokenAddress)}\`\n• DexScreener: https://dexscreener.com/solana/${tokenAddress}\n• GMGN: https://gmgn.ai/sol/token/${tokenAddress}`, { parse_mode: 'Markdown', disable_web_page_preview: true });
+    await ctx.reply(`📈 Chart links for \`${formatAddress(tokenAddress)}\`\n• DexScreener: https://dexscreener.com/solana/${tokenAddress}\n• GMGN: https://gmgn.ai/sol/token/${tokenAddress}`, { parse_mode: 'Markdown' });
   });
 
   // Watchlist & alerts require user record; helper
@@ -967,11 +981,15 @@ function createTelegramBot(botToken: string): Telegraf {
   // /alert
   bot.command('alert', async (ctx) => {
     const args = (ctx.message?.text || '').split(' ').filter(Boolean);
-    if (args.length < 4) return ctx.reply('❌ Usage: `/alert <address> above|below <price>`', { parse_mode: 'Markdown' });
+    if (args.length < 4) {
+      return ctx.reply('❌ Usage: `/alert <address> above|below <price>`', { parse_mode: 'Markdown' });
+    }
     const tokenAddress = args[1];
     const direction = (args[2] || '').toLowerCase();
     const price = parseFloat(args[3]);
-    if (!['above','below'].includes(direction) || !isFinite(price)) return ctx.reply('❌ Usage: `/alert <address> above|below <price>`', { parse_mode: 'Markdown' });
+    if (isNaN(price) || price <= 0 || !['above','below'].includes(direction)) {
+      return ctx.reply('❌ Invalid parameters. Use: `/alert <address> above|below <price>`', { parse_mode: 'Markdown' });
+    }
     const alertType = direction === 'above' ? 'price_above' : 'price_below';
     const userId = await ensureUser(ctx);
     try {
@@ -997,7 +1015,7 @@ function createTelegramBot(botToken: string): Telegraf {
     const top = await getTopFlaggedWallets(limit);
     if (top.length === 0) return ctx.reply('No data');
     let message = `🚫 **TOP FLAGGED WALLETS**\n\n`;
-    message += top.map((w, i) => `${i + 1}. \`${formatAddress(w.walletAddress)}\` — sev ${w.severity}, rugs ${w.rugCount}`).join('\n');
+    message += top.map((w: any, i: number) => `${i + 1}. \`${formatAddress(w.walletAddress)}\` — sev ${w.severity}, rugs ${w.rugCount}`).join('\n');
     await ctx.reply(message, { parse_mode: 'Markdown' });
   });
 
@@ -1258,7 +1276,7 @@ function createTelegramBot(botToken: string): Telegraf {
               await ctx.reply('⚠️ Could not fetch holder data.');
               return;
             }
-            const top20Text = holders.top20Holders.slice(0, 20).map((h, idx) => 
+            const top20Text = holders.top20Holders.slice(0, 20).map((h: any, idx: number) => 
               `${idx + 1}. \`${h.address.slice(0, 4)}...${h.address.slice(-4)}\` - ${h.percentage.toFixed(2)}%`
             ).join('\n');
             await ctx.reply(`🏆 **Top 20 Holders**\nTotal: ${holders.holderCount}\nTop 10: ${holders.topHolderConcentration.toFixed(1)}%\n\n${top20Text}`, { parse_mode: 'Markdown' });
@@ -1270,11 +1288,15 @@ function createTelegramBot(botToken: string): Telegraf {
         case 'devaudit':
           try {
             const analysis = await tokenAnalyzer.analyzeToken(address);
-            const devWallet = analysis.topHolders?.[0];
-            if (!devWallet) {
+            if (!analysis.topHolders || analysis.topHolders.length === 0) {
               await ctx.reply('⚠️ Could not identify developer wallet.');
               return;
             }
+            if (!analysis.topHolders || analysis.topHolders.length === 0) {
+              await ctx.reply('⚠️ Could not identify developer wallet.');
+              return;
+            }
+            const devWallet = analysis.topHolders[0];
             await ctx.reply(
               `🔎 **Dev Wallet Audit**\n` +
               `Wallet: \`${devWallet.address.slice(0,8)}...${devWallet.address.slice(-8)}\`\n` +
@@ -1339,11 +1361,15 @@ function createTelegramBot(botToken: string): Telegraf {
           try {
             const dexData = await dexScreener.getTokenData(address);
             const pair = dexData?.pairs?.[0];
-            if (!pair) {
+            if (!pair || !pair.priceUsd) {
               await ctx.reply('⚠️ No price data found.');
               return;
             }
-            const price = parseFloat(pair.priceUsd || '0');
+            const price = parseFloat(pair.priceUsd);
+            if (isNaN(price)) {
+              await ctx.reply('⚠️ Invalid price data.');
+              return;
+            }
             const priceChange = pair.priceChange?.h24 ?? 0;
             const emoji = priceChange >= 0 ? '📈' : '📉';
             await ctx.reply(
@@ -1527,8 +1553,7 @@ function createTelegramBot(botToken: string): Telegraf {
           `💡 _Use /execute ${text.slice(0, 8)}... for full rug analysis_`;
         
         await ctx.reply(linksMessage, { 
-          parse_mode: 'Markdown',
-          disable_web_page_preview: true 
+          parse_mode: 'Markdown'
         });
       } catch (error) {
         // Silently ignore if not a valid address
@@ -1586,8 +1611,7 @@ export async function startTelegramBot() {
           for (const target of telegramTargets) {
             try {
               await botInstance!.telegram.sendMessage(target.channelId, message, { 
-                parse_mode: 'Markdown',
-                disable_web_page_preview: false
+                parse_mode: 'Markdown'
               });
             } catch (chatError) {
               console.error(`[Telegram Bot] Failed to send alpha alert to chat ${target.channelId}:`, chatError);
