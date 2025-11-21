@@ -923,30 +923,50 @@ export class SolanaTokenAnalyzer {
       const bondingCurve = pumpFun.bondingCurve ?? 0;
       const isGraduated = bondingCurve >= 100 || pumpFun.mayhemMode;
       
-      console.log(`[LP Analyzer DEBUG] Pump.fun token - Graduated: ${isGraduated}`);
+      console.log(`[LP Analyzer DEBUG] Pump.fun token - Graduated: ${isGraduated}, Bonding: ${bondingCurve}%`);
       
       if (!isGraduated) {
         // Token hasn't bonded yet - no LP to burn
-        console.log(`[LP Analyzer DEBUG] Not bonded yet - returning no burn data`);
+        console.log(`[LP Analyzer DEBUG] Not bonded yet (${bondingCurve}% bonding curve) - returning no burn data`);
         return {
           exists: false,
           status: 'UNKNOWN' as const,
           burnPercentage: undefined, // Explicitly undefined - not 0%
+          lpMintAddress: undefined,
+          notBondedYet: true, // Flag to indicate pre-bond state
         };
       }
       
       // Token has graduated - check actual LP burn
-      console.log(`[LP Analyzer DEBUG] Token graduated - checking LP burn`);
+      console.log(`[LP Analyzer DEBUG] Token graduated - checking LP burn for pair: ${pairAddress}`);
       if (pairAddress) {
-        const burnPct = await this.calculateLPBurnPercentage(pairAddress);
-        console.log(`[LP Analyzer DEBUG] Calculated burn percentage: ${burnPct}%`);
-        return {
-          exists: true,
-          status: burnPct >= 90 ? 'SAFE' : 'RISKY',
-          burnPercentage: burnPct,
-          lpMintAddress: pairAddress,
-        };
+        try {
+          const burnPct = await this.calculateLPBurnPercentage(pairAddress);
+          console.log(`[LP Analyzer DEBUG] Calculated burn percentage: ${burnPct}%`);
+          return {
+            exists: true,
+            status: burnPct >= 90 ? 'SAFE' : 'RISKY',
+            burnPercentage: burnPct,
+            lpMintAddress: pairAddress,
+          };
+        } catch (error: any) {
+          console.error(`[LP Analyzer DEBUG] Error calculating burn for graduated Pump.fun token:`, error.message);
+          return {
+            exists: true,
+            status: 'UNKNOWN' as const,
+            burnPercentage: undefined,
+            lpMintAddress: pairAddress,
+          };
+        }
       }
+      
+      // Graduated but no pair address found yet
+      console.log(`[LP Analyzer DEBUG] Token graduated but no pair address found`);
+      return {
+        exists: false,
+        status: 'UNKNOWN' as const,
+        burnPercentage: undefined,
+      };
     }
     
     // For regular tokens with liquidity pools

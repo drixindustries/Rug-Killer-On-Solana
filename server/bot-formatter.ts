@@ -132,20 +132,32 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   if (analysis.pumpFunData?.isPumpFun) {
     // For Pump.fun tokens, check if bonded to Raydium
     const bondingCurve = analysis.pumpFunData.bondingCurve ?? 0;
-    if (bondingCurve >= 100 || analysis.pumpFunData.mayhemMode) {
+    const isGraduated = bondingCurve >= 100 || analysis.pumpFunData.mayhemMode;
+    
+    if (!isGraduated) {
+      // Token is still on bonding curve, not bonded yet - NO LP exists yet
+      lpBurnText = `⏳ Not Bonded (${bondingCurve.toFixed(1)}% progress)`;
+    } else {
       // Token has graduated/bonded - check actual LP burn
-      const burnPercent = analysis.liquidityPool?.burnPercentage ?? 0;
+      const burnPercent = analysis.liquidityPool?.burnPercentage;
+      if (burnPercent !== undefined) {
+        const burnEmoji = burnPercent > 95 ? '🔥' : burnPercent > 50 ? '⚠️' : '❌';
+        lpBurnText = `${burnEmoji} ${burnPercent.toFixed(1)}%`;
+      } else {
+        // Graduated but burn data unavailable
+        lpBurnText = `⏳ Bonded (checking burn...)`;
+      }
+    }
+  } else {
+    // Regular token - show burn percentage if available
+    const burnPercent = analysis.liquidityPool?.burnPercentage;
+    if (burnPercent !== undefined) {
       const burnEmoji = burnPercent > 95 ? '🔥' : burnPercent > 50 ? '⚠️' : '❌';
       lpBurnText = `${burnEmoji} ${burnPercent.toFixed(1)}%`;
     } else {
-      // Token is still on bonding curve, not bonded yet
-      lpBurnText = `⏳ Not Bonded (${bondingCurve.toFixed(1)}% to Raydium)`;
+      // No burn data available
+      lpBurnText = `❓ Unknown`;
     }
-  } else {
-    // Regular token - show burn percentage
-    const burnPercent = analysis.liquidityPool?.burnPercentage ?? 0;
-    const burnEmoji = burnPercent > 95 ? '🔥' : burnPercent > 50 ? '⚠️' : '❌';
-    lpBurnText = `${burnEmoji} ${burnPercent.toFixed(1)}%`;
   }
   
   const security = `🔐 **Security**\n• Mint: ${mintStatus}\n• Freeze: ${freezeStatus}\n• LP Burn: ${lpBurnText}`;

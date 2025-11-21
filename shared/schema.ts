@@ -63,6 +63,7 @@ export interface LiquidityPoolStatus {
   lpReserve?: number;
   actualSupply?: number;
   lpAddresses?: string[];
+  notBondedYet?: boolean; // True for Pump.fun tokens that haven't graduated to Raydium yet
 }
 
 // Token Metadata
