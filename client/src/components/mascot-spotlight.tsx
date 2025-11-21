@@ -108,8 +108,8 @@ export function MascotSpotlight() {
         <div className="relative">
           <div className="absolute inset-0 -z-10 rounded-[32px] bg-primary/20 blur-3xl" aria-hidden />
           <img
-            src="/images/rug-killer-mascot.png"
-            alt="Rug Killer mascot illustration"
+            src="/images/rally-mascot.png"
+            alt="Rally - Rug Killer mascot"
             width={512}
             height={512}
             loading="lazy"
