@@ -1,10 +1,5 @@
 // Try to load .env if it exists (local dev), but don't fail if it doesn't (Railway)
-try {
-  await import('dotenv/config');
-} catch {
-  // Railway injects env vars directly - no dotenv needed
-}
-
+// Moved to synchronous import to avoid top-level await issues in esbuild
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "../shared/schema.ts";
