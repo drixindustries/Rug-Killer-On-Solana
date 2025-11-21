@@ -22,6 +22,7 @@ import { redisCache } from './redis-cache.js';
 import { rpcBalancer } from './rpc-balancer.js';
 import { EXCHANGE_WALLETS, isExchangeWallet } from '../exchange-whitelist.js';
 import { getKnownAddressInfo } from '../known-addresses.js';
+import { isPumpFunAmm } from '../pumpfun-whitelist.js';
 import bs58 from 'bs58';
 
 export interface HolderDetail {
@@ -46,6 +47,8 @@ export interface HolderAnalysisResult {
   exchangeHolderCount: number;
   exchangeSupplyPercent: number;
   lpSupplyPercent: number;
+  pumpFunFilteredCount: number;
+  pumpFunFilteredPercent: number;
   source: 'birdeye' | 'gmgn' | 'helius' | 'rpc' | 'mixed';
   cachedAt: number;
 }
@@ -210,6 +213,8 @@ export class HolderAnalysisService {
           exchangeHolderCount: 0,
           exchangeSupplyPercent: 0,
           lpSupplyPercent: 0,
+          pumpFunFilteredCount: 0,
+          pumpFunFilteredPercent: 0,
           source: 'rpc',
           cachedAt: Date.now(),
         };
@@ -225,21 +230,44 @@ export class HolderAnalysisService {
       console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Aggregated to ${byOwner.size} unique holders`);
 
       // Build holder list and sort by balance desc
-      const list = Array.from(byOwner.entries()).map(([address, amountRaw]) => {
-        const percentage = Number(amountRaw) / Number(totalSupplyRaw) * 100;
-        const balance = Number(amountRaw) / Math.pow(10, decimals);
-        const labeled = this.labelWallet(address, percentage);
-        return {
-          address,
-          balance,
-          percentage,
-          uiAmount: balance,
-          label: labeled.label,
-          isExchange: labeled.isExchange,
-          isLP: labeled.isLP,
-          isCreator: labeled.isCreator,
-        } as HolderDetail;
-      }).sort((a, b) => b.balance - a.balance);
+      let pumpFunFilteredCount = 0;
+      let pumpFunFilteredRaw = 0n;
+
+      const nonPumpFunEntries = Array.from(byOwner.entries()).reduce<Array<{ address: string; amountRaw: bigint }>>((acc, [address, amountRaw]) => {
+        if (isPumpFunAmm(address)) {
+          pumpFunFilteredCount += 1;
+          pumpFunFilteredRaw += amountRaw;
+          return acc;
+        }
+        acc.push({ address, amountRaw });
+        return acc;
+      }, []);
+
+      const effectiveSupplyRaw = totalSupplyRaw - pumpFunFilteredRaw;
+      const safeEffectiveSupplyRaw = effectiveSupplyRaw > 0n ? effectiveSupplyRaw : 1n;
+      const effectiveSupply = Number(safeEffectiveSupplyRaw);
+      const totalSupplyNumber = Number(totalSupplyRaw);
+      const pumpFunFilteredPercent = totalSupplyNumber > 0
+        ? (Number(pumpFunFilteredRaw) / totalSupplyNumber) * 100
+        : 0;
+
+      const list = nonPumpFunEntries
+        .map(({ address, amountRaw }) => {
+          const percentage = Number(amountRaw) / effectiveSupply * 100;
+          const balance = Number(amountRaw) / Math.pow(10, decimals);
+          const labeled = this.labelWallet(address, percentage);
+          return {
+            address,
+            balance,
+            percentage,
+            uiAmount: balance,
+            label: labeled.label,
+            isExchange: labeled.isExchange,
+            isLP: labeled.isLP,
+            isCreator: labeled.isCreator,
+          } as HolderDetail;
+        })
+        .sort((a, b) => b.balance - a.balance);
 
       const top20 = list.slice(0, 20);
       const top10Concentration = top20.slice(0, 10).reduce((sum, h) => sum + h.percentage, 0);
@@ -254,6 +282,8 @@ export class HolderAnalysisService {
         exchangeHolderCount: exchangeHolders.length,
         exchangeSupplyPercent: exchangeHolders.reduce((sum, h) => sum + h.percentage, 0),
         lpSupplyPercent: lpHolders.reduce((sum, h) => sum + h.percentage, 0),
+        pumpFunFilteredCount,
+        pumpFunFilteredPercent,
         source: 'rpc' as const,
         cachedAt: Date.now(),
       };
@@ -301,15 +331,40 @@ export class HolderAnalysisService {
         return null;
       }
 
-      const totalSupply = Number(mintInfo.supply);
-      const top20 = validAccounts.slice(0, 20).map(acc => {
-        const amount = Number(acc.amount);
-        const balance = amount / Math.pow(10, mintInfo.decimals);
-        const percentage = (amount / totalSupply) * 100;
-        const labeled = this.labelWallet(acc.address.toBase58(), percentage);
-        
+      const totalSupplyRaw = Number(mintInfo.supply);
+      const decimals = mintInfo.decimals;
+      const lookupCount = Math.min(200, validAccounts.length);
+      const ownerLookup = await this.resolveTokenAccountOwners(
+        connection,
+        validAccounts.slice(0, lookupCount).map(acc => acc.address)
+      );
+
+      const filteredAccounts: Array<{ owner: string; amountRaw: number }> = [];
+      let pumpFunFilteredCount = 0;
+      let pumpFunFilteredRaw = 0;
+
+      for (const acc of validAccounts) {
+        const amountRaw = Number(acc.amount);
+        const ownerAddress = ownerLookup.get(acc.address.toBase58()) ?? acc.address.toBase58();
+
+        if (isPumpFunAmm(ownerAddress)) {
+          pumpFunFilteredCount += 1;
+          pumpFunFilteredRaw += amountRaw;
+          continue;
+        }
+
+        filteredAccounts.push({ owner: ownerAddress, amountRaw });
+      }
+
+      const effectiveSupplyRaw = Math.max(totalSupplyRaw - pumpFunFilteredRaw, 1);
+      const pumpFunFilteredPercent = totalSupplyRaw > 0 ? (pumpFunFilteredRaw / totalSupplyRaw) * 100 : 0;
+
+      const top20: HolderDetail[] = filteredAccounts.slice(0, 20).map(({ owner, amountRaw }) => {
+        const balance = amountRaw / Math.pow(10, decimals);
+        const percentage = (amountRaw / effectiveSupplyRaw) * 100;
+        const labeled = this.labelWallet(owner, percentage);
         return {
-          address: acc.address.toBase58(),
+          address: owner,
           balance,
           percentage,
           uiAmount: balance,
@@ -326,12 +381,14 @@ export class HolderAnalysisService {
 
       return {
         tokenAddress,
-        holderCount: validAccounts.length, // This is still limited to top accounts
+        holderCount: filteredAccounts.length, // Limited to top accounts, minus Pump.fun AMM
         top20Holders: top20,
         topHolderConcentration: top10Concentration,
         exchangeHolderCount: exchangeHolders.length,
         exchangeSupplyPercent: exchangeHolders.reduce((sum, h) => sum + h.percentage, 0),
         lpSupplyPercent: lpHolders.reduce((sum, h) => sum + h.percentage, 0),
+        pumpFunFilteredCount,
+        pumpFunFilteredPercent,
         source: 'helius',
         cachedAt: Date.now(),
       };
@@ -356,15 +413,40 @@ export class HolderAnalysisService {
       const largestAccounts = await connection.getTokenLargestAccounts(mintPubkey, 'confirmed');
       const validAccounts = largestAccounts.value.filter(acc => Number(acc.amount) > 0);
 
-      const totalSupply = Number(mintInfo.supply);
-      const top20 = validAccounts.slice(0, 20).map(acc => {
-        const amount = Number(acc.amount);
-        const balance = amount / Math.pow(10, mintInfo.decimals);
-        const percentage = (amount / totalSupply) * 100;
-        const labeled = this.labelWallet(acc.address.toBase58(), percentage);
-        
+      const totalSupplyRaw = Number(mintInfo.supply);
+      const decimals = mintInfo.decimals;
+      const lookupCount = Math.min(200, validAccounts.length);
+      const ownerLookup = await this.resolveTokenAccountOwners(
+        connection,
+        validAccounts.slice(0, lookupCount).map(acc => acc.address)
+      );
+
+      const filteredAccounts: Array<{ owner: string; amountRaw: number }> = [];
+      let pumpFunFilteredCount = 0;
+      let pumpFunFilteredRaw = 0;
+
+      for (const acc of validAccounts) {
+        const amountRaw = Number(acc.amount);
+        const ownerAddress = ownerLookup.get(acc.address.toBase58()) ?? acc.address.toBase58();
+
+        if (isPumpFunAmm(ownerAddress)) {
+          pumpFunFilteredCount += 1;
+          pumpFunFilteredRaw += amountRaw;
+          continue;
+        }
+
+        filteredAccounts.push({ owner: ownerAddress, amountRaw });
+      }
+
+      const effectiveSupplyRaw = Math.max(totalSupplyRaw - pumpFunFilteredRaw, 1);
+      const pumpFunFilteredPercent = totalSupplyRaw > 0 ? (pumpFunFilteredRaw / totalSupplyRaw) * 100 : 0;
+
+      const top20: HolderDetail[] = filteredAccounts.slice(0, 20).map(({ owner, amountRaw }) => {
+        const balance = amountRaw / Math.pow(10, decimals);
+        const percentage = (amountRaw / effectiveSupplyRaw) * 100;
+        const labeled = this.labelWallet(owner, percentage);
         return {
-          address: acc.address.toBase58(),
+          address: owner,
           balance,
           percentage,
           uiAmount: balance,
@@ -387,6 +469,8 @@ export class HolderAnalysisService {
         exchangeHolderCount: exchangeHolders.length,
         exchangeSupplyPercent: exchangeHolders.reduce((sum, h) => sum + h.percentage, 0),
         lpSupplyPercent: lpHolders.reduce((sum, h) => sum + h.percentage, 0),
+        pumpFunFilteredCount,
+        pumpFunFilteredPercent,
         source: 'rpc',
         cachedAt: Date.now(),
       };
@@ -402,10 +486,42 @@ export class HolderAnalysisService {
         exchangeHolderCount: 0,
         exchangeSupplyPercent: 0,
         lpSupplyPercent: 0,
+        pumpFunFilteredCount: 0,
+        pumpFunFilteredPercent: 0,
         source: 'rpc',
         cachedAt: Date.now(),
       };
     }
+  }
+
+  private async resolveTokenAccountOwners(
+    connection: Connection,
+    tokenAccounts: PublicKey[]
+  ): Promise<Map<string, string>> {
+    const owners = new Map<string, string>();
+    if (!tokenAccounts.length) {
+      return owners;
+    }
+
+    const chunkSize = 50;
+    for (let i = 0; i < tokenAccounts.length; i += chunkSize) {
+      const chunk = tokenAccounts.slice(i, i + chunkSize);
+      const infos = await connection.getMultipleAccountsInfo(chunk, 'confirmed');
+      infos.forEach((info, idx) => {
+        if (!info?.data) {
+          return;
+        }
+        const data = info.data as Buffer;
+        if (data.length < 64) {
+          return;
+        }
+        const ownerBytes = data.subarray(32, 64);
+        const ownerAddress = bs58.encode(ownerBytes);
+        owners.set(chunk[idx].toBase58(), ownerAddress);
+      });
+    }
+
+    return owners;
   }
 
   /**
@@ -424,6 +540,15 @@ export class HolderAnalysisService {
         label: 'Exchange',
         isExchange: true,
         isLP: false,
+        isCreator: false,
+      };
+    }
+
+    if (isPumpFunAmm(address)) {
+      return {
+        label: 'Pump.fun AMM',
+        isExchange: false,
+        isLP: true,
         isCreator: false,
       };
     }

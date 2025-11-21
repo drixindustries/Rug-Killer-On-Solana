@@ -258,6 +258,29 @@ body::before {
   html {
     @apply dark;
   }
+
+  .skip-link {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 1000;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius);
+    background-color: hsl(var(--sidebar));
+    color: hsl(var(--foreground));
+    font-weight: 600;
+    text-decoration: none;
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-150%);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .skip-link:focus {
+    transform: translateY(0);
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    box-shadow: var(--shadow-md);
+  }
 }
 
 /**

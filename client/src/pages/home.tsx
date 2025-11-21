@@ -458,7 +458,6 @@ export default function Home() {
                         <Suspense fallback={<ComponentLoader />}>
                           <TopHoldersTable 
                             holders={analysis.topHolders}
-                            decimals={analysis.metadata?.decimals || 0}
                           />
                         </Suspense>
                       )}
