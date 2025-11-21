@@ -7,6 +7,7 @@ import { gte, and, eq } from 'drizzle-orm';
 import { GMGNService } from './services/gmgn-service.ts';
 import { NansenService, type NansenSmartMoneyTrade } from './services/nansen-service.ts';
 import { storage } from './storage.ts';
+import { rpcBalancer } from './services/rpc-balancer.ts';
 
 interface AlphaAlert {
   type: 'new_token' | 'whale_buy' | 'caller_signal';
@@ -51,19 +52,31 @@ export class AlphaAlertService {
   private heartbeatInterval: NodeJS.Timeout | null = null;
 
   constructor(rpcUrl?: string, customCallers?: AlphaCallerConfig[]) {
-    // Prefer explicit env overrides, else rotate through public RPCs
+    // Prefer explicit env overrides, else use RPC balancer for load distribution
     const explicitHttp = process.env.ALPHA_HTTP_RPC?.trim();
     const explicitWs = process.env.ALPHA_WS_RPC?.trim();
     const heliusKey = process.env.HELIUS_API_KEY?.trim();
-    const heliusHttp = heliusKey ? `https://mainnet.helius-rpc.com/?api-key=${heliusKey}` : null;
     const heliusWs = heliusKey ? `wss://atlas-mainnet.helius-rpc.com/?api-key=${heliusKey}` : null;
 
-    const httpEndpoint = explicitHttp || heliusHttp || rpcUrl || getRandomPublicRpc();
+    let httpEndpoint: string;
+    if (explicitHttp) {
+      httpEndpoint = explicitHttp;
+      console.log('[Alpha Alerts] Using explicit HTTP RPC override');
+    } else if (rpcUrl) {
+      httpEndpoint = rpcUrl;
+      console.log('[Alpha Alerts] Using provided RPC URL');
+    } else {
+      // Use RPC balancer for intelligent load distribution across all available RPCs
+      const provider = rpcBalancer.select();
+      httpEndpoint = provider.getUrl();
+      console.log(`[Alpha Alerts] Using RPC balancer - selected ${provider.name}`);
+    }
+
     const wsEndpoint = explicitWs || heliusWs || undefined;
 
     this.currentRpc = httpEndpoint;
     this.connection = new Connection(this.currentRpc, { commitment: 'confirmed', wsEndpoint });
-    console.log(`[Alpha Alerts] RPC selected: ${this.currentRpc}`);
+    console.log(`[Alpha Alerts] RPC initialized: ${this.currentRpc.substring(0, 50)}...`);
     this.alphaCallers = customCallers || DEFAULT_ALPHA_CALLERS;
   }
 
@@ -792,9 +805,11 @@ export class AlphaAlertService {
     const delay = Math.round(raw * (0.8 + Math.random() * 0.4));
     console.log(`[Alpha Alerts] Reconnect scheduled in ${delay}ms (attempt ${attempt})`);
     setTimeout(async () => {
-      if (attempt >= 1 && !process.env.ALPHA_HTTP_RPC && !process.env.HELIUS_API_KEY) {
-        this.currentRpc = getRandomPublicRpc();
-        console.log('[Alpha Alerts] Rotating RPC to', this.currentRpc);
+      if (attempt >= 1 && !process.env.ALPHA_HTTP_RPC) {
+        // Use RPC balancer to intelligently rotate to a healthy endpoint
+        const provider = rpcBalancer.select();
+        this.currentRpc = provider.getUrl();
+        console.log(`[Alpha Alerts] Rotating to ${provider.name} (tier: ${provider.tier})`);
       }
       await this.establishConnection();
       if (this.consecutiveFailures === 0) {
