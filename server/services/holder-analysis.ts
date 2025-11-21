@@ -461,9 +461,14 @@ export class HolderAnalysisService {
       const exchangeHolders = top20.filter(h => h.isExchange);
       const lpHolders = top20.filter(h => h.isLP);
 
+      // Use filteredAccounts.length as holder count - this represents ALL token accounts from getTokenLargestAccounts
+      // Note: This will be the total number of accounts returned by RPC (up to ~200), which is better than showing 0
+      const estimatedHolderCount = filteredAccounts.length;
+      console.log(`[HolderAnalysis DEBUG - RPC Fallback] Estimated holder count from filteredAccounts: ${estimatedHolderCount}`);
+
       return {
         tokenAddress,
-        holderCount: 0, // RPC cannot provide total count
+        holderCount: estimatedHolderCount, // Use actual count of filtered accounts as best estimate
         top20Holders: top20,
         topHolderConcentration: top10Concentration,
         exchangeHolderCount: exchangeHolders.length,

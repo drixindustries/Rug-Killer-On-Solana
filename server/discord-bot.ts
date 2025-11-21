@@ -5,7 +5,7 @@ import type { TokenAnalysisResponse } from '../shared/schema';
 import { buildCompactMessage, formatNumber, getRiskEmoji, formatAddress } from './bot-formatter';
 import { getAlphaAlertService } from './alpha-alerts';
 import { checkBlacklist, reportWallet, getBlacklistStats, getTopFlaggedWallets } from './ai-blacklist';
-import { getExchangeStats } from './exchange-whitelist';
+import { EXCHANGE_WALLETS, LAST_UPDATED as EXCHANGE_LAST_UPDATED, WHITELIST_VERSION as EXCHANGE_WHITELIST_VERSION, getExchangeStats, isExchangeWallet } from './exchange-whitelist';
 import { nameCache } from './name-cache';
 import { rally } from './bot-personality';
 import { trendingCallsTracker } from './trending-calls-tracker';
@@ -368,6 +368,14 @@ const commands = [
     .addStringOption(option => option.setName('address').setDescription('Token address').setRequired(true))
     .addIntegerOption(option => option.setName('n').setDescription('How many holders (max 50)').setMinValue(1).setMaxValue(50)),
   new SlashCommandBuilder()
+    .setName('whitelist')
+    .setDescription('Exchange whitelist utilities')
+    .addSubcommand(sc => sc.setName('stats')
+      .setDescription('Show whitelist stats and sample wallets'))
+    .addSubcommand(sc => sc.setName('check')
+      .setDescription('Check if a wallet is whitelisted')
+      .addStringOption(o => o.setName('wallet').setDescription('Wallet address').setRequired(true))),
+  new SlashCommandBuilder()
     .setName('exchanges')
     .setDescription('Show exchange wallet presence in holders')
     .addStringOption(option => option.setName('address').setDescription('Token address').setRequired(true)),
@@ -504,7 +512,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             },
             {
               name: '🔥 NEW Popular Commands',
-              value: '`/price <address>` - Quick price\n`/rugcheck <address>` - Instant rug scan\n`/liquidity <address>` - LP analysis\n`/compare <token1> <token2>` - Compare tokens\n`/trending` - Top tokens by volume\n`/exchanges <address>` - Exchange presence\n`/pumpfun <address>` - Pump.fun view\n`/chart <address>` - Chart link'
+              value: '`/price <address>` - Quick price\n`/rugcheck <address>` - Instant rug scan\n`/liquidity <address>` - LP analysis\n`/compare <token1> <token2>` - Compare tokens\n`/trending` - Top tokens by volume\n`/exchanges <address>` - Exchange presence\n`/whitelist stats|check` - Exchange whitelist tools\n`/pumpfun <address>` - Pump.fun view\n`/chart <address>` - Chart link'
             },
             {
               name: '🔔 Personal Tools',
@@ -1450,6 +1458,55 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         } else if (sub === 'where') {
           const cfg = await storage.getSmartTarget('discord', interaction.guildId);
           await interaction.editReply({ content: cfg ? `📍 Smart Money calls go to <#${cfg.channelId}>` : 'ℹ️ No Smart Money channel configured for this server.' });
+        }
+      } else if (interaction.commandName === 'whitelist') {
+        const subcommand = interaction.options.getSubcommand(false) ?? 'stats';
+        if (subcommand === 'check') {
+          await interaction.deferReply({ ephemeral: true });
+          const walletInput = interaction.options.getString('wallet', true).trim();
+          const normalized = walletInput.replace(/\s+/g, '');
+          const whitelisted = isExchangeWallet(normalized);
+          const embed = new EmbedBuilder()
+            .setColor(whitelisted ? 0x00cc66 : 0xff3366)
+            .setTitle('🏦 Exchange Whitelist Check')
+            .setDescription(`Wallet: \`${formatAddress(normalized)}\``)
+            .addFields({
+              name: whitelisted ? 'Status' : 'Status',
+              value: whitelisted
+                ? '✅ This wallet is on the exchange whitelist and will be excluded from rug score penalties.'
+                : '❌ This wallet is **not** on the exchange whitelist. It will be treated as a normal holder.',
+            })
+            .setFooter({ text: `Version ${EXCHANGE_WHITELIST_VERSION} • Updated ${EXCHANGE_LAST_UPDATED}` });
+          await interaction.editReply({ embeds: [embed] });
+        } else {
+          await interaction.deferReply();
+          const total = EXCHANGE_WALLETS.size;
+          const sampleSize = Math.min(total, 10);
+          const sample = Array.from(EXCHANGE_WALLETS).slice(0, sampleSize);
+          const sampleList = sample.length
+            ? sample.map((address, idx) => `${idx + 1}. \`${formatAddress(address)}\``).join('\n')
+            : 'Whitelist is currently empty.';
+          const embed = new EmbedBuilder()
+            .setColor(0x5865f2)
+            .setTitle('🏦 Exchange Wallet Whitelist')
+            .setDescription(`Tracking **${total}** known exchange wallets from major CEX venues.`)
+            .addFields(
+              {
+                name: 'Version',
+                value: `v${EXCHANGE_WHITELIST_VERSION} • Updated ${EXCHANGE_LAST_UPDATED}`,
+                inline: true,
+              },
+              {
+                name: 'Usage',
+                value: 'Use `/exchanges <token>` to quantify how much supply belongs to exchanges.',
+                inline: true,
+              },
+              {
+                name: `Sample (${sampleSize})`,
+                value: sampleList,
+              }
+            );
+          await interaction.editReply({ embeds: [embed] });
         }
       } else if (interaction.commandName === 'exchanges') {
         const tokenAddress = interaction.options.getString('address', true);
