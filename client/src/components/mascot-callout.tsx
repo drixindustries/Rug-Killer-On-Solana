@@ -7,8 +7,8 @@ export function MascotCallout() {
     <Card className="mb-10 border-primary/30 bg-gradient-to-br from-background to-primary/5">
       <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center">
         <img
-          src="/images/rug-killer-mascot.png"
-          alt="Rug Killer mascot cheering"
+          src="/images/rally-mascot.png"
+          alt="Rally mascot cheering"
           width={128}
           height={128}
           loading="lazy"
