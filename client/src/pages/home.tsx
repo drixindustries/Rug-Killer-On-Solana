@@ -880,6 +880,7 @@ export default function Home() {
             rel="noopener noreferrer"
             className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition-all hover:scale-105 group"
             title="Rug Killer Telegram Bot"
+            aria-label="Open Rug Killer Telegram Bot in a new tab"
           >
             <Send className="h-6 w-6" />
             <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-2 py-1 rounded text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
@@ -892,6 +893,7 @@ export default function Home() {
             rel="noopener noreferrer"
             className="bg-purple-500 hover:bg-purple-600 text-white p-3 rounded-full shadow-lg transition-all hover:scale-105 group"
             title="Rug Killer Discord Bot"
+            aria-label="Open Rug Killer Discord bot invite in a new tab"
           >
             <MessageCircle className="h-6 w-6" />
             <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-2 py-1 rounded text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">

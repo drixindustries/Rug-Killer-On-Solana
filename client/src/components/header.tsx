@@ -50,7 +50,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
             asChild
             data-testid="button-github"
           >
-            <a href="https://github.com/drixindustries/Rug-Killer-On-Solana" target="_blank" rel="noopener noreferrer" title="View on GitHub">
+            <a href="https://github.com/drixindustries/Rug-Killer-On-Solana" target="_blank" rel="noopener noreferrer" title="View on GitHub" aria-label="Open Rug Killer GitHub repository in a new tab">
               <SiGithub className="h-4 w-4" />
             </a>
           </Button>
@@ -62,7 +62,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
               asChild
               data-testid="button-telegram-bot"
             >
-              <a href={botLinks.telegram} target="_blank" rel="noopener noreferrer" title="Join Telegram Bot">
+              <a href={botLinks.telegram} target="_blank" rel="noopener noreferrer" title="Join Telegram Bot" aria-label="Open Rug Killer Telegram bot in a new tab">
                 <SiTelegram className="h-4 w-4" />
               </a>
             </Button>
@@ -75,7 +75,7 @@ export function Header({ onNewAnalysis }: HeaderProps) {
               asChild
               data-testid="button-discord-bot"
             >
-              <a href={botLinks.discord} target="_blank" rel="noopener noreferrer" title="Join Discord Bot">
+              <a href={botLinks.discord} target="_blank" rel="noopener noreferrer" title="Join Discord Bot" aria-label="Open Rug Killer Discord bot invite in a new tab">
                 <SiDiscord className="h-4 w-4" />
               </a>
             </Button>
