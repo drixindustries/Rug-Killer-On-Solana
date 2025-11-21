@@ -33,6 +33,7 @@ import {
   Target,
   Shield,
 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 // Color palette for risk levels
 const RISK_COLORS = {
@@ -134,7 +135,11 @@ export default function Analytics() {
 
   // Market Overview Query
   const { data: marketOverview, isLoading: overviewLoading } = useQuery<MarketOverviewData>({
-    queryKey: ["/api/analytics/market-overview"],
+    queryKey: ["analytics", "market-overview"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/analytics/market-overview");
+      return (await res.json()) as MarketOverviewData;
+    },
   });
 
   // Historical Data Query
@@ -144,23 +149,40 @@ export default function Analytics() {
     dataPoints: number;
     data: HistoricalDataPoint[];
   }>({
-    queryKey: ["/api/analytics/historical", selectedToken, historicalDays],
+    queryKey: ["analytics", "historical", selectedToken, historicalDays],
     enabled: !!selectedToken && selectedToken.length >= 32,
+    queryFn: async () => {
+      const url = `/api/analytics/historical/${selectedToken}?days=${historicalDays}`;
+      const res = await apiRequest("GET", url);
+      return await res.json();
+    },
   });
 
   // Risk Insights Query
   const { data: riskInsights, isLoading: insightsLoading } = useQuery<RiskInsightsData>({
-    queryKey: ["/api/analytics/risk-insights"],
+    queryKey: ["analytics", "risk-insights"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/analytics/risk-insights");
+      return (await res.json()) as RiskInsightsData;
+    },
   });
 
   // Hot Tokens Query (with auto-refresh)
   const { data: hotTokens, isLoading: hotTokensLoading, refetch: refetchHotTokens } = useQuery<HotToken[]>({
-    queryKey: ["/api/analytics/hot-tokens", hotTokensRefresh],
+    queryKey: ["analytics", "hot-tokens", hotTokensRefresh],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/analytics/hot-tokens?limit=20&_=${hotTokensRefresh}`);
+      return (await res.json()) as HotToken[];
+    },
   });
 
   // Performance Metrics Query
   const { data: performance, isLoading: performanceLoading } = useQuery<PerformanceData>({
-    queryKey: ["/api/analytics/performance"],
+    queryKey: ["analytics", "performance"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/analytics/performance");
+      return (await res.json()) as PerformanceData;
+    },
   });
 
   // Auto-refresh hot tokens every 30 seconds

@@ -3,6 +3,8 @@
  * Production-ready, no Vite dependencies
  */
 
+export {};
+
 // Suppress noisy crypto library warnings
 process.removeAllListeners('warning');
 process.on('warning', (warning) => {

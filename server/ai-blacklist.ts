@@ -20,12 +20,14 @@ export interface BlacklistCheckResult {
   warnings: string[];
 }
 
+type BadActorLabel = typeof badActorLabels.$inferSelect;
+
 /**
  * Check if a wallet address is blacklisted
  */
 export async function checkBlacklist(walletAddress: string): Promise<BlacklistCheckResult> {
   try {
-    const labels = await db
+    const labels: BadActorLabel[] = await db
       .select()
       .from(badActorLabels)
       .where(

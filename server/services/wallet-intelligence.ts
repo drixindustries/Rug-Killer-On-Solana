@@ -125,7 +125,7 @@ export class WalletIntelligenceService {
       // Get wallet creation date and transaction history
       const [accountInfo, signatures] = await Promise.all([
         fastRPC.getAccountInfo(address),
-        fastRPC.getSignaturesForAddress(address, { limit: 100 })
+        fastRPC.getSignaturesForAddress(address, 100 as any)
       ]);
       
       if (!accountInfo || !signatures.length) {

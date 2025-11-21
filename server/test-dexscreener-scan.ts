@@ -1,4 +1,4 @@
-import { tokenAnalyzer } from "./solana-analyzer.ts";
+import { tokenAnalyzer } from "./solana-analyzer";
 
 // Test token scan with DexScreener
 const TEST_TOKEN = "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"; // Jupiter token
@@ -12,8 +12,8 @@ async function testScan() {
     
     console.log("✅ Scan successful!\n");
     console.log("📊 DexScreener Data:");
-    if (result.dexScreenerData?.pairs?.[0]) {
-      const pair = result.dexScreenerData.pairs[0];
+    if (result.dexscreenerData?.pairs?.[0]) {
+      const pair = result.dexscreenerData.pairs[0];
       console.log(`  Price: $${pair.priceUsd}`);
       console.log(`  24h Volume: $${pair.volume.h24.toLocaleString()}`);
       console.log(`  Liquidity: $${pair.liquidity?.usd?.toLocaleString() || 'N/A'}`);
@@ -25,9 +25,9 @@ async function testScan() {
     }
 
     console.log("\n📈 Market Data:");
-    console.log(`  Price: $${result.marketData?.price || 'N/A'}`);
+    console.log(`  Price: $${result.marketData?.priceUsd || 'N/A'}`);
     console.log(`  Volume 24h: $${result.marketData?.volume24h?.toLocaleString() || 'N/A'}`);
-    console.log(`  Liquidity: $${result.marketData?.liquidity?.toLocaleString() || 'N/A'}`);
+    console.log(`  Liquidity: $${result.marketData?.liquidityUsd?.toLocaleString() || 'N/A'}`);
 
     console.log("\n🎯 Token Info:");
     console.log(`  Name: ${result.metadata?.name}`);

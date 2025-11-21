@@ -304,7 +304,7 @@ export class DatabaseStorage implements IStorage {
 
   async redeemCode(userId: string, code: string): Promise<{ success: boolean; message: string; subscription?: Subscription }> {
     // Use transaction to prevent race conditions
-    return await db.transaction(async (tx) => {
+    return await db.transaction(async (tx: any) => {
       // Lock the code row for update to prevent concurrent redemptions
       const [codeRecord] = await tx
         .select()
@@ -681,7 +681,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Use database transaction with row-level locking
-    const result = await db.transaction(async (trx) => {
+    const result = await db.transaction(async (trx: any) => {
       // Find or create position with SELECT FOR UPDATE (lock the row)
       let [position] = await trx
         .select()
@@ -948,7 +948,7 @@ export class DatabaseStorage implements IStorage {
   async updateTrendingScores(tokens: InsertTrendingToken[]): Promise<void> {
     if (tokens.length === 0) return;
 
-    await db.transaction(async (tx) => {
+    await db.transaction(async (tx: any) => {
       for (const token of tokens) {
         await tx
           .insert(trendingTokens)
@@ -1097,8 +1097,8 @@ export class DatabaseStorage implements IStorage {
       .from(commentVotes)
       .where(eq(commentVotes.commentId, commentId));
     
-    const upvotes = votes.filter(v => v.voteType === 'up').length;
-    const downvotes = votes.filter(v => v.voteType === 'down').length;
+    const upvotes = votes.filter((v: any) => v.voteType === 'up').length;
+    const downvotes = votes.filter((v: any) => v.voteType === 'down').length;
     
     await db
       .update(tokenComments)
@@ -1316,7 +1316,7 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(sharedWatchlists, eq(watchlistFollowers.watchlistId, sharedWatchlists.id))
       .where(eq(watchlistFollowers.userId, userId));
     
-    return followed.map(f => f.watchlist);
+    return followed.map((f: any) => f.watchlist);
   }
 
   async isFollowingWatchlist(userId: string, watchlistId: string): Promise<boolean> {

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Download, Shield, Zap, TrendingUp, Lock, Database, Bot, Wallet, Code, AlertTriangle, CheckCircle } from "lucide-react";
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { CONTRACT_ADDRESS } from "@/constants";
+import { MascotCallout } from "@/components/mascot-callout";
 
 // PDF Document Component with comprehensive content
 const pdfStyles = StyleSheet.create({
@@ -475,6 +476,8 @@ export default function Documentation() {
               )}
             </PDFDownloadLink>
           </div>
+
+          <MascotCallout />
 
           {/* Overview Section */}
           <Card className="mb-8" data-testid="card-overview" id="overview">

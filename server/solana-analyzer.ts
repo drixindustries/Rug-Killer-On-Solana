@@ -96,7 +96,8 @@ export class SolanaTokenAnalyzer {
         
         // Holder analysis - now using comprehensive holder service
         holderCount: holders?.holderCount || 0,
-        topHolders: holders?.top20Holders?.map(h => ({
+        topHolders: holders?.top20Holders?.map((h, idx) => ({
+          rank: idx + 1,
           address: h.address,
           balance: h.balance,
           percentage: h.percentage,
@@ -149,10 +150,10 @@ export class SolanaTokenAnalyzer {
         riskScore: this.calculateRiskScore(dex, onChain, holders),
         riskLevel: this.determineRiskLevel(dex, onChain, holders),
         redFlags: this.generateRiskFlags(dex, onChain, holders, pumpFun, null),
-        rugScoreBreakdown: this.calculateRugScore(dex, onChain, holders, creationDate),
+        rugScoreBreakdown: this.calculateRugScore(dex, onChain, holders, creationDate || undefined),
         
         // Creation info
-        creationDate: creationDate,
+        creationDate: creationDate ?? undefined,
         
         // Pump.fun specific data
         pumpFunData: pumpFun && pumpFun.isPumpFun ? {
@@ -167,7 +168,7 @@ export class SolanaTokenAnalyzer {
           floorData: this.detectFloor(dex, dex?.pairs?.[0]?.priceUsd ? parseFloat(dex.pairs[0].priceUsd) : 0),
         
         // External data references
-        dexScreenerData: dex,
+        dexscreenerData: dex || undefined,
         
         // Advanced rug detection (2025)
         quillcheckData: quillCheck || undefined,
@@ -416,7 +417,7 @@ export class SolanaTokenAnalyzer {
     
     // === HOLDER CONCENTRATION (whale/dev control) ===
     // Filter out LP/exchanges to only penalize actual dev/whale wallets
-    const realWallets = holders?.top20Holders?.filter(h => 
+    const realWallets = holders?.top20Holders?.filter((h: any) =>
       !h.isLP && !h.isExchange && h.address !== '11111111111111111111111111111111'
     ) || [];
     const topHolderPercent = realWallets[0]?.percentage || 0;
@@ -684,7 +685,7 @@ export class SolanaTokenAnalyzer {
 
     // RED FLAG #1 & #5: Holder concentration (top holder warnings)
     // IMPORTANT: Filter out LP pools, exchanges, and burn addresses - only flag actual dev/whale wallets
-    const realWallets = holders?.top20Holders?.filter(h => 
+    const realWallets = holders?.top20Holders?.filter((h: any) =>
       !h.isLP && !h.isExchange && h.address !== '11111111111111111111111111111111'
     ) || [];
     

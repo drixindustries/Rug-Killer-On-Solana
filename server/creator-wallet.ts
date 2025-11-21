@@ -101,6 +101,10 @@ export class CreatorWalletService {
       privateKey: bs58.encode(keypair.secretKey),
     };
   }
+
+  // Stub risk intelligence methods used by bots (to be implemented later)
+  async isWalletBlacklisted(_address: string): Promise<boolean> { return false; }
+  async isKnownKOL(_address: string): Promise<boolean> { return false; }
 }
 
 export const getCreatorWallet = () => CreatorWalletService.getInstance();

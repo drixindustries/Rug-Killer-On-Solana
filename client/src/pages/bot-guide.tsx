@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { SiTelegram, SiDiscord } from "react-icons/si";
 import { Bot, Zap, Shield, Copy, CheckCircle2, Globe, Search, TrendingUp } from "lucide-react";
 import { useState } from "react";
+import { MascotCallout } from "@/components/mascot-callout";
 
 // Helper component for command cards with copy functionality
 function CommandCard({ 
@@ -85,6 +86,8 @@ export default function BotGuide() {
               Public Access - No Subscription Required
             </Badge>
           </div>
+
+          <MascotCallout />
 
           {/* Platform Tabs */}
           <Tabs defaultValue="telegram" className="mb-8">

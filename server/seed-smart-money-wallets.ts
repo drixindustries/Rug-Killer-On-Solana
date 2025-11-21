@@ -3,6 +3,7 @@ import 'dotenv/config';
 import Papa from 'papaparse';
 import { db } from './db';
 import { smartWallets } from '../shared/schema';
+import { sql } from 'drizzle-orm';
 
 const DUNE_EXECUTION_ID = '8342646';
 const DUNE_API_KEY = process.env.DUNE_API_KEY;
@@ -18,8 +19,8 @@ async function fetchDuneData() {
   console.log('Fetching smart money wallets from Dune...');
   const response = await fetch(DUNE_API_URL, {
     headers: {
-      'X-Dune-API-Key': DUNE_API_KEY,
-    },
+      'X-Dune-API-Key': DUNE_API_KEY as string,
+    } as Record<string, string>,
   });
 
   if (!response.ok) {
@@ -47,18 +48,15 @@ async function seedWallets() {
 
   const walletsToInsert = parsed.data
     .map((row: any) => {
-      const address = row.user_address || row.address; // Adjust based on CSV column name
-      if (!address) {
-        // console.warn('Skipping row with no address:', row);
-        return null;
-      }
+      const address = (row.user_address || row.address || '').trim();
+      if (!address) return null;
       return {
-        address: address.trim(),
+        walletAddress: address,
         source: 'dune-smart-money',
-        name: row.name || row.label || `Smart Money Wallet`,
-      };
+        displayName: row.name || row.label || 'Smart Money Wallet',
+      } as (typeof smartWallets.$inferInsert);
     })
-    .filter((w) => w !== null) as (typeof smartWallets.$inferInsert)[];
+    .filter((w): w is (typeof smartWallets.$inferInsert) => w !== null);
 
   if (walletsToInsert.length === 0) {
     console.log('No new wallets found to insert.');
@@ -72,9 +70,10 @@ async function seedWallets() {
       .insert(smartWallets)
       .values(walletsToInsert)
       .onConflictDoUpdate({
-        target: smartWallets.address,
+        target: smartWallets.walletAddress,
         set: {
-          source: 'dune-smart-money', // You might want to update the source or name if a wallet is found in multiple lists
+          source: 'dune-smart-money',
+          displayName: (sql`excluded.display_name`) as any,
         },
       });
     console.log('Successfully seeded smart money wallets.');

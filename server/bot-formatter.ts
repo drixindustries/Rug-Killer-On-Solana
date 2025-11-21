@@ -53,6 +53,7 @@ export interface CompactMessageData {
   holders: string;
   market?: string;
   pumpFun?: string;
+  floorInfo?: string;
   honeypot?: string;
   funding?: string;
   bundle?: string;
@@ -82,7 +83,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   
   let ageString = '❓ Unknown';
   if (tokenAge !== null) {
-    if (tokenAge < 1) {
+    if (tokenAge < 1 && analysis.creationDate) {
       const ageMs = Date.now() - analysis.creationDate;
       const hours = Math.floor(ageMs / (1000 * 60 * 60));
       const minutes = Math.floor((ageMs % (1000 * 60 * 60)) / (1000 * 60));

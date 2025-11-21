@@ -16,6 +16,9 @@ interface RpcProvider {
   lastRequestTime?: number;
   rateLimitResetTime?: number;
   isRateLimited?: boolean;
+  // Added optional rate limit metadata used by balancer logic
+  rateLimit?: number;
+  rateLimitWindow?: number;
 }
 
 // Helper to safely read env vars even if a key was added with stray whitespace

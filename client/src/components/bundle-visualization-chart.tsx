@@ -355,7 +355,11 @@ export function BundleVisualizationChart({ filtering, totalHolders }: BundleVisu
                           return null;
                         }}
                       />
-                      <Bar dataKey="value" fill={(data) => data.color} />
+                      <Bar dataKey="value">
+                        {ageDistributionData.map((bucket) => (
+                          <Cell key={bucket.name} fill={bucket.color} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

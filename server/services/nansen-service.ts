@@ -134,7 +134,7 @@ export class NansenService {
     const items = this.extractTradeArray(payload);
     const trades = items
       .map((item) => this.mapTrade(item))
-      .filter((t): t is NansenSmartMoneyTrade => Boolean(t) && t.side === 'buy');
+      .filter((t): t is NansenSmartMoneyTrade => !!t && t.side === 'buy');
 
     const nextCursor = this.extractCursor(payload);
     if (nextCursor) {

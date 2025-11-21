@@ -10,7 +10,12 @@ import { nameCache } from './name-cache';
 import { rally } from './bot-personality';
 import { trendingCallsTracker } from './trending-calls-tracker';
 import { holderAnalysis } from './services/holder-analysis';
-import { dexscreenerService } from './dexscreener-service';
+import { DexScreenerService } from './dexscreener-service';
+import { getCreatorWallet } from './creator-wallet';
+
+// Instantiate shared service singletons needed in command handlers
+const dexScreener = new DexScreenerService();
+const creatorWalletService = getCreatorWallet();
 
 // Client instance - only created when startDiscordBot() is called
 let clientInstance: Client | null = null;
@@ -1654,7 +1659,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         const embed = new EmbedBuilder()
           .setColor(0xff4444)
           .setTitle('🚫 Top Flagged Wallets')
-          .setDescription(top.length ? top.map((w, i) => `${i + 1}. \`${formatAddress(w.walletAddress)}\` — sev ${w.severity}, rugs ${w.rugCount}`).join('\n') : 'No data')
+          .setDescription(top.length ? top.map((w: { walletAddress: string; severity: number; rugCount: number }, i: number) => `${i + 1}. \`${formatAddress(w.walletAddress)}\` — sev ${w.severity}, rugs ${w.rugCount}`).join('\n') : 'No data')
           .setTimestamp();
         await interaction.editReply({ embeds: [embed] });
       } else if (interaction.commandName === 'reload') {

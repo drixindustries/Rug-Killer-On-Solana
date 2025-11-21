@@ -24,6 +24,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import type { TokenAnalysisResponse, TokenComment, CommunityVote, CommunityVoteSummary } from "@shared/schema";
 import { CONTRACT_ADDRESS } from "@/constants";
+import { MascotSpotlight } from "@/components/mascot-spotlight";
 
 // Lazy load heavy components for better initial page load
 const MetricsGrid = lazy(() => import("@/components/metrics-grid").then(m => ({ default: m.MetricsGrid })));
@@ -318,17 +319,22 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
           <div className="space-y-6 sm:space-y-8">
             {!analysis && (
-              <div className="text-center space-y-4 sm:space-y-6 py-8 sm:py-12 lg:py-16">
-                <div className="space-y-3">
-                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">Rug Killer Alpha Bot</h1>
-                  <p className="text-base sm:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
-                    Made by trenchers, for trenchers.
-                  </p>
+              <>
+                <div className="text-center space-y-4 sm:space-y-6 py-8 sm:py-12 lg:py-16">
+                  <div className="space-y-3">
+                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">Rug Killer Alpha Bot</h1>
+                    <p className="text-base sm:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
+                      Made by trenchers, for trenchers.
+                    </p>
+                  </div>
                 </div>
-              </div>
+                <MascotSpotlight />
+              </>
             )}
 
-            <TokenInput onAnalyze={handleAnalyze} isAnalyzing={isLoading} />
+            <div id="token-input" className="scroll-mt-32">
+              <TokenInput onAnalyze={handleAnalyze} isAnalyzing={isLoading} />
+            </div>
 
             {/* BubbleMaps - Positioned directly below token input for better visibility */}
             {analysis && (
