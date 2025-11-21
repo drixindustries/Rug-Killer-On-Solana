@@ -9,6 +9,25 @@ import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "../shared/schema.ts";
 
+// Drizzle regression guard: some index() definitions are receiving base PgColumn instances
+// lacking the internal defaultConfig expected by the index builder (which JSON.parse's it).
+// This causes: SyntaxError: "undefined" is not valid JSON during drizzle() init.
+// We defensively attach a defaultConfig to any column missing it before creating the db.
+function ensureDrizzleIndexDefaults(root: any) {
+  const DRIZZLE_COLUMNS = Symbol.for("drizzle:Columns");
+  for (const value of Object.values(root)) {
+    if (!value || typeof value !== "object") continue;
+    const cols = (value as any)[DRIZZLE_COLUMNS];
+    if (!cols || typeof cols !== "object") continue;
+    for (const col of Object.values(cols)) {
+      if (col && typeof col === "object" && !("defaultConfig" in col)) {
+        (col as any).defaultConfig = { order: "asc", nulls: "last", opClass: undefined };
+      }
+    }
+  }
+}
+ensureDrizzleIndexDefaults(schema);
+
 // Railway provides DATABASE_URL automatically when PostgreSQL is attached
 const DATABASE_URL = process.env.DATABASE_URL;
 const FORCE_IN_MEMORY = ((process.env.FORCE_IN_MEMORY_DB || '').trim().toLowerCase()) === 'true';
