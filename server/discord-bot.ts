@@ -9,6 +9,8 @@ import { getExchangeStats } from './exchange-whitelist';
 import { nameCache } from './name-cache';
 import { rally } from './bot-personality';
 import { trendingCallsTracker } from './trending-calls-tracker';
+import { holderAnalysis } from './services/holder-analysis';
+import { dexscreenerService } from './dexscreener-service';
 
 // Client instance - only created when startDiscordBot() is called
 let clientInstance: Client | null = null;
@@ -68,6 +70,22 @@ function getLiquidityFieldValue(liquidityPool: any): string {
   return value;
 }
 
+function addSectionField(embed: EmbedBuilder, raw: string | undefined, fallbackLabel: string, inline = false): void {
+  if (!raw) return;
+  const trimmed = raw.trim();
+  if (!trimmed) return;
+  const lines = trimmed.split('\n');
+  const firstLine = lines.shift() ?? '';
+  const name = lines.length > 0 ? firstLine.replace(/\*\*/g, '') : fallbackLabel;
+  const value = lines.length > 0 ? lines.join('\n') : firstLine;
+  if (!name || !value) return;
+  embed.addFields({
+    name: name.slice(0, 256),
+    value: value.slice(0, 1024),
+    inline
+  });
+}
+
 function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   const messageData = buildCompactMessage(analysis);
   const color = getRiskColor(analysis.riskLevel);
@@ -119,6 +137,18 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
     });
   }
   
+  addSectionField(embed, messageData.floorInfo, '📊 Support Analysis');
+  addSectionField(embed, messageData.honeypot, '🍯 Honeypot Detection');
+  addSectionField(embed, messageData.funding, '💸 Suspicious Funding');
+  addSectionField(embed, messageData.bundle, '📦 Bundle Activity');
+  addSectionField(embed, messageData.network, '🌐 Wallet Network', true);
+  addSectionField(embed, messageData.whales, '🐋 Whale Activity', true);
+  addSectionField(embed, messageData.pumpDump, '🚨 Pump & Dump');
+  addSectionField(embed, messageData.liquidity, '💧 Liquidity Alerts');
+  addSectionField(embed, messageData.holderActivity, '📉 Holder Activity');
+  addSectionField(embed, messageData.agedWallets, '⏰ Aged Wallet Risk');
+  addSectionField(embed, messageData.gmgn, '📊 GMGN Intelligence');
+  
   // WALLET AGES - Prominent section for wallet age analysis
   if (messageData.walletAges) {
     embed.addFields({
@@ -129,52 +159,7 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   }
   
   // ADVANCED DETECTION (Consolidate into sections)
-  const advancedWarnings: string[] = [];
-  
-  if (messageData.honeypot) {
-    advancedWarnings.push(messageData.honeypot.replace(/\*\*/g, '**'));
-  }
-  
-  if (messageData.funding) {
-    advancedWarnings.push(messageData.funding.replace(/\*\*/g, '**'));
-  }
-  
-  if (messageData.bundle) {
-    advancedWarnings.push(messageData.bundle.replace(/\*\*/g, '**'));
-  }
-  
-  if (messageData.network) {
-    advancedWarnings.push(messageData.network.replace(/\*\*/g, '**'));
-  }
-  
-  if (messageData.whales) {
-    advancedWarnings.push(messageData.whales.replace(/\*\*/g, '**'));
-  }
-  
-  if (messageData.pumpDump) {
-    advancedWarnings.push(messageData.pumpDump.replace(/\*\*/g, '**'));
-  }
-  
-  if (messageData.liquidity) {
-    advancedWarnings.push(messageData.liquidity.replace(/\*\*/g, '**'));
-  }
-  
-  if (messageData.holderActivity) {
-    advancedWarnings.push(messageData.holderActivity.replace(/\*\*/g, '**'));
-  }
-  
-  if (messageData.agedWallets) {
-    advancedWarnings.push(messageData.agedWallets.replace(/\*\*/g, '**'));
-  }
-  
-  if (messageData.gmgn) {
-    advancedWarnings.push(messageData.gmgn.replace(/\*\*/g, '**'));
-  }
-  
-  // Add alerts from red flags
-  if (messageData.alerts.length > 0) {
-    advancedWarnings.push(...messageData.alerts);
-  }
+  const advancedWarnings: string[] = [...messageData.alerts];
   
   // Add warnings field if any exist (max 1024 chars per field)
   if (advancedWarnings.length > 0) {
@@ -964,19 +949,19 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         
         embed.addFields({ name: '🔐 Security Checks', value: securityChecks });
         
-        let holderAnalysis = '';
+        let holderAnalysisText = '';
         if (analysis.topHolderConcentration > 80) {
-          holderAnalysis += `❌ Extreme Concentration (${analysis.topHolderConcentration.toFixed(1)}%)\n`;
+          holderAnalysisText += `❌ Extreme Concentration (${analysis.topHolderConcentration.toFixed(1)}%)\n`;
           dangerFlags++;
         } else if (analysis.topHolderConcentration > 50) {
-          holderAnalysis += `⚠️ High Concentration (${analysis.topHolderConcentration.toFixed(1)}%)\n`;
+          holderAnalysisText += `⚠️ High Concentration (${analysis.topHolderConcentration.toFixed(1)}%)\n`;
           warningFlags++;
         } else {
-          holderAnalysis += `✅ Good Distribution (${analysis.topHolderConcentration.toFixed(1)}%)\n`;
+          holderAnalysisText += `✅ Good Distribution (${analysis.topHolderConcentration.toFixed(1)}%)\n`;
         }
-        holderAnalysis += `• Total Holders: ${analysis.holderCount}`;
+        holderAnalysisText += `• Total Holders: ${analysis.holderCount}`;
         
-        embed.addFields({ name: '📊 Holder Analysis', value: holderAnalysis });
+        embed.addFields({ name: '📊 Holder Analysis', value: holderAnalysisText });
         
         if (analysis.aiVerdict) {
           embed.addFields({
