@@ -23,6 +23,7 @@ import crypto from 'crypto';
 import { tokenMetrics } from './services/token-metrics.ts';
 import getRawBody from 'raw-body';
 import { gte, sql } from "drizzle-orm";
+import webhookRoutes from "./webhook-routes.ts";
 
 // Stub authentication for Railway deployment (no Replit OIDC)
 const setupAuth = async (app: Express) => {
@@ -63,6 +64,10 @@ const isAdmin = async (req: any, res: any, next: any) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Mount webhook routes
+  app.use('/api/webhooks', webhookRoutes);
+  console.log('✅ Webhook routes registered at /api/webhooks');
+
   // Helper to allow anonymous sessions for lightweight features (e.g., watchlist)
   const withUser = async (req: any, _res: any, next: any) => {
     try {

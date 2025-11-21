@@ -246,4 +246,42 @@ async function startServices() {
   } catch (err: any) {
     console.warn('⚠️ Social worker not available:', err.message);
   }
+
+  // Webhook services - real-time blockchain monitoring
+  if (process.env.HELIUS_API_KEY || process.env.QUICKNODE_STREAM_URL) {
+    console.log('🔔 Starting webhook services...');
+    
+    // Helius webhook service
+    if (process.env.HELIUS_API_KEY) {
+      try {
+        const { heliusWebhook } = await import('./services/helius-webhook.ts');
+        await heliusWebhook.start();
+        console.log('✅ Helius webhook service started');
+      } catch (err: any) {
+        console.warn('⚠️ Helius webhook service failed:', err.message);
+      }
+    }
+
+    // QuickNode webhook service
+    if (process.env.QUICKNODE_STREAM_URL) {
+      try {
+        const { quickNodeWebhook } = await import('./services/quicknode-webhook.ts');
+        await quickNodeWebhook.start();
+        console.log('✅ QuickNode webhook service started');
+      } catch (err: any) {
+        console.warn('⚠️ QuickNode webhook service failed:', err.message);
+      }
+    }
+
+    // Pump.fun WebSocket (already in use)
+    try {
+      const { pumpFunWebhook } = await import('./services/pumpfun-webhook.ts');
+      await pumpFunWebhook.connect();
+      console.log('✅ Pump.fun WebSocket connected');
+    } catch (err: any) {
+      console.warn('⚠️ Pump.fun WebSocket failed:', err.message);
+    }
+  } else {
+    console.log('ℹ️ Webhook services disabled - set HELIUS_API_KEY or QUICKNODE_STREAM_URL to enable real-time monitoring');
+  }
 }
