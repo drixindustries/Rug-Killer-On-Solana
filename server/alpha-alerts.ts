@@ -606,8 +606,18 @@ export class AlphaAlertService {
     console.log('[Alpha Alerts] Starting service...');
     this.isRunning = true;
 
-    // Load initial wallets from DB
-    await this.loadWalletsFromDatabase();
+    // Load initial wallets from DB with timeout
+    try {
+      const loadTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database load timeout')), 10000)
+      );
+      await Promise.race([
+        this.loadWalletsFromDatabase(),
+        loadTimeout
+      ]);
+    } catch (err: any) {
+      console.warn('[Alpha Alerts] Wallet loading timed out or failed:', err?.message);
+    }
 
     // Establish initial RPC connectivity and test it
     await this.establishConnection();
@@ -754,7 +764,14 @@ export class AlphaAlertService {
   private async establishConnection(): Promise<void> {
     try {
       this.connection = new Connection(this.currentRpc, { commitment: 'confirmed' });
-      await this.connection.getVersion();
+      // Test connection with timeout
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timeout')), 5000)
+      );
+      await Promise.race([
+        this.connection.getVersion(),
+        timeoutPromise
+      ]);
       this.lastSuccessAt = Date.now();
       this.consecutiveFailures = 0;
       console.log('[Alpha Alerts] Connection healthy:', this.currentRpc);
