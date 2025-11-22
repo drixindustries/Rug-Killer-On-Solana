@@ -2213,6 +2213,160 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       return;
     }
     
+    // !holders - Top N holders
+    const holdersMatch = text.match(/^!holders[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})(?:\s+(\d+))?$/im);
+    if (holdersMatch) {
+      const tokenAddress = holdersMatch[1];
+      const count = holdersMatch[2] ? parseInt(holdersMatch[2]) : 10;
+      const loadingMsg = await message.reply(`🔍 Analyzing top ${count} holders...`);
+      
+      try {
+        await message.channel.sendTyping();
+        const holders = await holderAnalysis.analyzeHolders(tokenAddress);
+        
+        if (!holders || holders.top20Holders.length === 0) {
+          await loadingMsg.edit('⚠️ Could not fetch holder data.');
+          return;
+        }
+        
+        const holderText = holders.top20Holders.slice(0, count).map((h, idx) => 
+          `${idx + 1}. ${h.address.slice(0, 4)}...${h.address.slice(-4)} - ${h.percentage.toFixed(2)}%`
+        ).join('\n');
+        
+        const embed = new EmbedBuilder()
+          .setColor('#3498db')
+          .setTitle(`👥 Top ${count} Holders`)
+          .setDescription(`Total: ${holders.holderCount}`)
+          .addFields({ name: 'Holders', value: holderText, inline: false })
+          .setFooter({ text: `Token: ${tokenAddress}` });
+        
+        await loadingMsg.edit({ content: '', embeds: [embed] });
+      } catch (error: any) {
+        await loadingMsg.edit(`❌ Error: ${error.message}`);
+      }
+      return;
+    }
+    
+    // !liquidity - LP analysis
+    const liquidityMatch = text.match(/^!liquidity[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    if (liquidityMatch) {
+      const tokenAddress = liquidityMatch[1];
+      const loadingMsg = await message.reply('💧 Analyzing liquidity...');
+      
+      try {
+        await message.channel.sendTyping();
+        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+        const liq = analysis.liquidityInfo;
+        
+        const embed = new EmbedBuilder()
+          .setColor('#3498db')
+          .setTitle(`💧 Liquidity Analysis`)
+          .addFields(
+            { name: 'Pool Size', value: `$${formatNumber(liq?.poolSize || 0)}`, inline: true },
+            { name: 'Locked', value: liq?.isLocked ? '✅ Yes' : '❌ No', inline: true },
+            { name: 'Burned', value: liq?.isBurned ? '✅ Yes' : '❌ No', inline: true }
+          )
+          .setFooter({ text: `Token: ${tokenAddress}` });
+        
+        await loadingMsg.edit({ content: '', embeds: [embed] });
+      } catch (error: any) {
+        await loadingMsg.edit(`❌ Error: ${error.message}`);
+      }
+      return;
+    }
+    
+    // !chart - Chart links
+    const chartMatch = text.match(/^!chart[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    if (chartMatch) {
+      const tokenAddress = chartMatch[1];
+      
+      const embed = new EmbedBuilder()
+        .setColor('#9b59b6')
+        .setTitle('📊 Chart Links')
+        .setDescription(
+          `🟢 [DexScreener](https://dexscreener.com/solana/${tokenAddress})\n` +
+          `🔵 [BirdEye](https://birdeye.so/token/${tokenAddress})\n` +
+          `🟣 [Pump.fun](https://pump.fun/${tokenAddress})`
+        );
+      
+      await message.reply({ embeds: [embed] });
+      return;
+    }
+    
+    // !pumpfun - Pump.fun link
+    const pumpfunMatch = text.match(/^!pumpfun[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    if (pumpfunMatch) {
+      const tokenAddress = pumpfunMatch[1];
+      await message.reply(`🟣 **Pump.fun**: https://pump.fun/${tokenAddress}`);
+      return;
+    }
+    
+    // !watch - Add to watchlist
+    const watchMatch = text.match(/^!watch[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    if (watchMatch) {
+      const tokenAddress = watchMatch[1];
+      const userId = message.author.id;
+      
+      try {
+        await storage.addToWatchlist({ userId, tokenAddress, label: null, metadata: null });
+        await message.reply(`✅ Added to your watchlist: \`${formatAddress(tokenAddress)}\``);
+      } catch (error: any) {
+        await message.reply(`❌ Error: ${error.message}`);
+      }
+      return;
+    }
+    
+    // !unwatch - Remove from watchlist
+    const unwatchMatch = text.match(/^!unwatch[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    if (unwatchMatch) {
+      const tokenAddress = unwatchMatch[1];
+      const userId = message.author.id;
+      
+      try {
+        await storage.removeFromWatchlist(userId, tokenAddress);
+        await message.reply(`✅ Removed from your watchlist: \`${formatAddress(tokenAddress)}\``);
+      } catch (error: any) {
+        await message.reply(`❌ Error: ${error.message}`);
+      }
+      return;
+    }
+    
+    // !watchlist - Show watchlist
+    const watchlistMatch = text.match(/^!watchlist$/i);
+    if (watchlistMatch) {
+      const userId = message.author.id;
+      
+      try {
+        const list = await storage.getWatchlist(userId);
+        if (!list || list.length === 0) {
+          await message.reply('ℹ️ Your watchlist is empty. Use `!watch <address>` to add tokens.');
+          return;
+        }
+        
+        const lines = list.map((item, i) => `${i + 1}. \`${formatAddress(item.tokenAddress)}\``);
+        await message.reply(`📝 **Your Watchlist (${list.length})**\n${lines.join('\n')}`);
+      } catch (error: any) {
+        await message.reply(`❌ Error: ${error.message}`);
+      }
+      return;
+    }
+    
+    // !report - Report wallet
+    const reportMatch = text.match(/^!report[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})[\s\n]+(.+)$/im);
+    if (reportMatch) {
+      const walletAddress = reportMatch[1];
+      const reason = reportMatch[2];
+      const userId = message.author.id;
+      
+      try {
+        await reportWallet(walletAddress, reason, userId);
+        await message.reply(`✅ Reported wallet: \`${formatAddress(walletAddress)}\`\nReason: ${reason}`);
+      } catch (error: any) {
+        await message.reply(`❌ Error: ${error.message}`);
+      }
+      return;
+    }
+    
     // ===================================================================
     // PRIORITY 2: Handle bot mentions/replies (personality responses)
     // ===================================================================

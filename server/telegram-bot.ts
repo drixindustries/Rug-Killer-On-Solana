@@ -1403,6 +1403,123 @@ function createTelegramBot(botToken: string): Telegraf {
             await ctx.reply(`❌ Error: ${error.message}`);
           }
           return;
+          
+        case 'holders':
+          const holdersMatch = text.match(/^!holders\s+([1-9A-HJ-NP-Za-km-z]{32,44})(?:\s+(\d+))?$/);
+          if (holdersMatch) {
+            const [, addr, countStr] = holdersMatch;
+            const count = countStr ? parseInt(countStr) : 10;
+            try {
+              const holders = await holderAnalysis.analyzeHolders(addr);
+              if (!holders || holders.top20Holders.length === 0) {
+                await ctx.reply('⚠️ Could not fetch holder data.');
+                return;
+              }
+              const holderText = holders.top20Holders.slice(0, count).map((h: any, idx: number) => 
+                `${idx + 1}. \`${h.address.slice(0, 4)}...${h.address.slice(-4)}\` - ${h.percentage.toFixed(2)}%`
+              ).join('\n');
+              await ctx.reply(`👥 **Top ${count} Holders**\nTotal: ${holders.holderCount}\n\n${holderText}`, { parse_mode: 'Markdown' });
+            } catch (error: any) {
+              await ctx.reply(`❌ Error: ${error.message}`);
+            }
+          }
+          return;
+          
+        case 'liquidity':
+          try {
+            const analysis = await tokenAnalyzer.analyzeToken(address);
+            const liq = analysis.liquidityInfo;
+            await ctx.reply(
+              `💧 **Liquidity Analysis**\n` +
+              `Pool Size: $${formatNumber(liq?.poolSize || 0)}\n` +
+              `Locked: ${liq?.isLocked ? '✅ Yes' : '❌ No'}\n` +
+              `Burned: ${liq?.isBurned ? '✅ Yes' : '❌ No'}`,
+              { parse_mode: 'Markdown' }
+            );
+          } catch (error: any) {
+            await ctx.reply(`❌ Error: ${error.message}`);
+          }
+          return;
+          
+        case 'chart':
+          try {
+            const links = `📊 **Chart Links**\n\n` +
+              `🟢 [DexScreener](https://dexscreener.com/solana/${address})\n` +
+              `🔵 [BirdEye](https://birdeye.so/token/${address})\n` +
+              `🟣 [Pump.fun](https://pump.fun/${address})`;
+            await ctx.reply(links, { parse_mode: 'Markdown' });
+          } catch (error: any) {
+            await ctx.reply(`❌ Error: ${error.message}`);
+          }
+          return;
+          
+        case 'pumpfun':
+          try {
+            const link = `🟣 **Pump.fun**\n[View Token](https://pump.fun/${address})`;
+            await ctx.reply(link, { parse_mode: 'Markdown' });
+          } catch (error: any) {
+            await ctx.reply(`❌ Error: ${error.message}`);
+          }
+          return;
+      }
+    }
+    
+    // Handle multi-argument commands
+    if (text.startsWith('!')) {
+      const parts = text.slice(1).trim().split(/\s+/);
+      const cmd = parts[0].toLowerCase();
+      
+      // !watch <address>
+      if (cmd === 'watch' && parts.length === 2) {
+        const addr = parts[1];
+        try {
+          await storage.addToWatchlist({ userId, tokenAddress: addr, label: null, metadata: null });
+          await ctx.reply(`✅ Added to watchlist: \`${formatAddress(addr)}\``, { parse_mode: 'Markdown' });
+        } catch (error: any) {
+          await ctx.reply(`❌ Error: ${error.message}`);
+        }
+        return;
+      }
+      
+      // !unwatch <address>
+      if (cmd === 'unwatch' && parts.length === 2) {
+        const addr = parts[1];
+        try {
+          await storage.removeFromWatchlist(userId, addr);
+          await ctx.reply(`✅ Removed from watchlist: \`${formatAddress(addr)}\``, { parse_mode: 'Markdown' });
+        } catch (error: any) {
+          await ctx.reply(`❌ Error: ${error.message}`);
+        }
+        return;
+      }
+      
+      // !watchlist
+      if (cmd === 'watchlist') {
+        try {
+          const list = await storage.getWatchlist(userId);
+          if (!list || list.length === 0) {
+            await ctx.reply('ℹ️ Your watchlist is empty.');
+            return;
+          }
+          const lines = list.map((item, i) => `${i + 1}. \`${formatAddress(item.tokenAddress)}\``);
+          await ctx.reply(`📝 **Your Watchlist (${list.length})**\n${lines.join('\n')}`, { parse_mode: 'Markdown' });
+        } catch (error: any) {
+          await ctx.reply(`❌ Error: ${error.message}`);
+        }
+        return;
+      }
+      
+      // !report <wallet> <reason>
+      if (cmd === 'report' && parts.length >= 3) {
+        const wallet = parts[1];
+        const reason = parts.slice(2).join(' ');
+        try {
+          await reportWallet(wallet, reason, userId);
+          await ctx.reply(`✅ Reported wallet: \`${formatAddress(wallet)}\``, { parse_mode: 'Markdown' });
+        } catch (error: any) {
+          await ctx.reply(`❌ Error: ${error.message}`);
+        }
+        return;
       }
     }
     
