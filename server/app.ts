@@ -317,13 +317,17 @@ async function startServices() {
       }
     }
 
-    // Pump.fun WebSocket (already in use)
-    try {
-      const { pumpFunWebhook } = await import('./services/pumpfun-webhook.ts');
-      await pumpFunWebhook.connect();
-      console.log('✅ Pump.fun WebSocket connected');
-    } catch (err: any) {
-      console.warn('⚠️ Pump.fun WebSocket failed:', err.message);
+    // Pump.fun WebSocket (optional - can be disabled)
+    if (process.env.ENABLE_PUMPFUN_MONITOR !== 'false') {
+      try {
+        const { pumpFunWebhook } = await import('./services/pumpfun-webhook.ts');
+        await pumpFunWebhook.connect();
+        console.log('✅ Pump.fun WebSocket connected');
+      } catch (err: any) {
+        console.warn('⚠️ Pump.fun WebSocket failed:', err.message);
+      }
+    } else {
+      console.log('ℹ️ Pump.fun WebSocket disabled (ENABLE_PUMPFUN_MONITOR=false)');
     }
   } else {
     console.log('ℹ️ Webhook services disabled - set HELIUS_API_KEY or QUICKNODE_STREAM_URL to enable real-time monitoring');
