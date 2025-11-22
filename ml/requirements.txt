@@ -1,0 +1,69 @@
+# ML Pipeline Requirements for Rug Killer Bot — 2025 Ultimate Edition
+# Install with: pip install -r requirements.txt
+
+# ============================================================================
+# CORE ML LIBRARIES (Required)
+# ============================================================================
+xgboost>=2.0.0
+scikit-learn>=1.3.0
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.11.0
+joblib>=1.3.0
+requests>=2.31.0
+
+# ============================================================================
+# GRADIENT BOOSTING ENSEMBLE (Ultimate Stacking)
+# ============================================================================
+lightgbm>=4.0.0
+catboost>=1.2.0
+
+# ============================================================================
+# DEEP LEARNING (SwiGLU Neural Net + TabNet + GNN)
+# ============================================================================
+torch>=2.0.0
+# For TabNet (interpretable neural network)
+pytorch-tabnet>=4.0
+
+# For GNN (wallet cluster detection) - OPTIONAL but HIGHLY RECOMMENDED
+# Uncomment if you want GNN support:
+# torch-geometric>=2.3.0
+# torch-scatter>=2.1.0
+# torch-sparse>=0.6.0
+
+# ============================================================================
+# GPU ACCELERATION (Optional but 10x faster)
+# ============================================================================
+# Uncomment if you have NVIDIA CUDA GPU:
+# xgboost[gpu]>=2.0.0
+
+# ============================================================================
+# UTILITIES
+# ============================================================================
+tqdm>=4.66.0
+
+# ============================================================================
+# VISUALIZATION (Optional - for debugging)
+# ============================================================================
+# matplotlib>=3.7.0
+# seaborn>=0.12.0
+
+# ============================================================================
+# INSTALLATION GUIDE
+# ============================================================================
+# Basic (XGBoost only):
+#   pip install xgboost scikit-learn pandas numpy scipy joblib requests
+#
+# Standard (Stacking Ensemble):
+#   pip install -r requirements.txt
+#
+# Ultimate (TabNet + GNN):
+#   pip install -r requirements.txt
+#   pip install torch-geometric torch-scatter torch-sparse
+#
+# GPU (10x speedup):
+#   pip install xgboost[gpu] lightgbm catboost torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+#
+# Full Installation (everything):
+#   pip install -r requirements.txt
+#   pip install torch-geometric torch-scatter torch-sparse --index-url https://data.pyg.org/whl/torch-2.0.0+cu118.html

@@ -817,11 +817,30 @@ export class AlphaAlertService {
   }
 
   // Monitor pump.fun WebSocket for new token launches
+  private pumpFunReconnectAttempts = 0;
+  private maxPumpFunReconnects = 5;
+  private last403Error = 0;
+  
   private startPumpFunMonitor(): void {
+    // If we got a 403 in the last 5 minutes, don't try again
+    if (Date.now() - this.last403Error < 300000) {
+      console.log('[Alpha Alerts] Skipping pump.fun reconnect - recent 403 error (auth required)');
+      return;
+    }
+
+    if (this.pumpFunReconnectAttempts >= this.maxPumpFunReconnects) {
+      console.error('[Alpha Alerts] ⚠️  Pump.fun WebSocket disabled after max reconnect attempts');
+      console.error('[Alpha Alerts] Using Helius webhook for token detection instead');
+      return;
+    }
+
     try {
       const ws = new WebSocket('wss://pumpportal.fun/api/data');
+      let errorCount = 0;
 
       ws.on('open', () => {
+        console.log('[Alpha Alerts] ✅ Pump.fun WebSocket connected');
+        this.pumpFunReconnectAttempts = 0; // Reset on successful connection
         ws.send(JSON.stringify({ method: "subscribeNewToken" }));
       });
 
@@ -856,19 +875,38 @@ export class AlphaAlertService {
         }
       });
 
-      ws.on('error', (error) => {
-        console.error('[ALPHA ALERT] pump.fun WebSocket error:', error);
+      ws.on('error', (error: any) => {
+        errorCount++;
+        const errorMsg = error?.message || String(error);
+        
+        // Check for 403 auth errors
+        if (errorMsg.includes('403') || errorMsg.includes('Forbidden')) {
+          this.last403Error = Date.now();
+          console.error('[Alpha Alerts] ❌ Pump.fun 403 - Authentication required or IP blocked');
+          console.error('[Alpha Alerts] Consider adding PUMPPORTAL_API_KEY env var or disable pump.fun monitoring');
+          // Close and don't reconnect
+          ws.close();
+          this.pumpFunReconnectAttempts = this.maxPumpFunReconnects;
+        } else if (errorCount <= 3) {
+          // Only log first 3 errors to avoid spam
+          console.error('[Alpha Alerts] pump.fun WebSocket error:', errorMsg);
+        }
       });
 
-      ws.on('close', () => {
-        if (this.isRunning) {
-          setTimeout(() => this.startPumpFunMonitor(), 10000);
+      ws.on('close', (code, reason) => {
+        console.log(`[Alpha Alerts] Pump.fun WebSocket closed: ${code} - ${reason || 'no reason'}`);
+        
+        if (this.isRunning && this.pumpFunReconnectAttempts < this.maxPumpFunReconnects) {
+          this.pumpFunReconnectAttempts++;
+          const backoff = Math.min(30000, 5000 * Math.pow(2, this.pumpFunReconnectAttempts - 1));
+          console.log(`[Alpha Alerts] Reconnecting to pump.fun in ${backoff/1000}s (attempt ${this.pumpFunReconnectAttempts}/${this.maxPumpFunReconnects})`);
+          setTimeout(() => this.startPumpFunMonitor(), backoff);
         }
       });
 
       this.wsConnections.push(ws);
-    } catch (error) {
-      console.error('[ALPHA ALERT] Failed to start pump.fun monitor:', error);
+    } catch (error: any) {
+      console.error('[Alpha Alerts] Failed to start pump.fun monitor:', error?.message || error);
     }
   }
 
@@ -918,6 +956,15 @@ export class AlphaAlertService {
       } catch (error) {
         console.error('[Alpha Alerts] Failed to start migration detector:', error);
       }
+    }
+
+    // Start pump.fun monitor only if not explicitly disabled
+    const enablePumpFun = process.env.ENABLE_PUMPFUN_MONITOR !== 'false';
+    if (enablePumpFun) {
+      console.log('[Alpha Alerts] Starting pump.fun WebSocket monitor...');
+      this.startPumpFunMonitor();
+    } else {
+      console.log('[Alpha Alerts] Pump.fun monitoring disabled (ENABLE_PUMPFUN_MONITOR=false)');
     }
 
     // Begin heartbeat loop (but don't rely on it for WebSocket silence detection)

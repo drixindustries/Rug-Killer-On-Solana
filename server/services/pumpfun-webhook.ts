@@ -186,7 +186,16 @@ export class PumpFunWebhookService extends EventEmitter {
    * Handle WebSocket error
    */
   private onError(error: Error): void {
-    console.error('[PumpFun] WebSocket error:', error);
+    // Check for 403 authentication errors
+    const errorMsg = error.message || String(error);
+    if (errorMsg.includes('403') || errorMsg.includes('Forbidden')) {
+      console.error('[PumpFun] ⚠️  403 Authentication Error - Pump Portal may require API key or your IP is rate-limited');
+      console.error('[PumpFun] Consider disabling pump.fun monitoring or contact pumpportal.fun for API access');
+      // Stop aggressive reconnection on auth errors
+      this.maxReconnectAttempts = 3;
+    } else {
+      console.error('[PumpFun] WebSocket error:', errorMsg);
+    }
     this.emit('error', error);
   }
 
