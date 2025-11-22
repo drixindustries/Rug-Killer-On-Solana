@@ -140,56 +140,10 @@ const RPC_PROVIDERS = [
     tier: "fallback" as const,
     rateLimit: 40,
     rateLimitWindow: 60000
-  },
-  { 
-    getUrl: () => "https://rpc.ankr.com/solana",
-    weight: 35, 
-    name: "Ankr-Public",
-    tier: "fallback" as const,
-    rateLimit: 100,
-    rateLimitWindow: 60000
-  },
-  { 
-    getUrl: () => "https://solana-mainnet.phantom.tech",
-    weight: 35, 
-    name: "Phantom-Public",
-    tier: "fallback" as const,
-    rateLimit: 100,
-    rateLimitWindow: 60000
-  },
-  // Tier 2 High-Performance Cluster (Distributed load)
-  { 
-    getUrl: () => "http://54.204.139.215:8545",
-    weight: 25, 
-    name: "AWS-US-1",
-    tier: "fallback" as const,
-    rateLimit: 200,
-    rateLimitWindow: 60000
-  },
-  { 
-    getUrl: () => "http://103.50.32.83:8899",
-    weight: 25, 
-    name: "Latitude-BR-1",
-    tier: "fallback" as const,
-    rateLimit: 200,
-    rateLimitWindow: 60000
-  },
-  { 
-    getUrl: () => "http://44.192.126.28:8545",
-    weight: 25, 
-    name: "AWS-US-2",
-    tier: "fallback" as const,
-    rateLimit: 200,
-    rateLimitWindow: 60000
-  },
-  { 
-    getUrl: () => "http://186.233.186.148:8899",
-    weight: 25, 
-    name: "Latitude-BR-2",
-    tier: "fallback" as const,
-    rateLimit: 200,
-    rateLimitWindow: 60000
   }
+  // REMOVED: Ankr, Phantom, AWS, and Latitude endpoints
+  // These were consistently failing with 403 Forbidden or timeouts
+  // The premium RPCs (QuickNode, Shyft, Helius) + Solana Official are sufficient
 ];
 
 export class SolanaRpcBalancer {
