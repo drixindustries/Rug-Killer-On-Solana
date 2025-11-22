@@ -84,7 +84,8 @@ export class MigrationDetector {
   }
 
   /**
-   * Start listening for migrations via WebSocket
+   * Start listening for migrations (WebSocket disabled - causes 403 errors)
+   * Migration detection now handled by Helius webhook events
    */
   async start(): Promise<void> {
     if (this.isRunning) {
@@ -93,36 +94,21 @@ export class MigrationDetector {
     }
 
     this.isRunning = true;
-    console.log('[MIGRATION] Starting migration detector...');
+    console.log('[MIGRATION] Starting migration detector (WebSocket disabled)...');
 
     try {
-      // Subscribe to logs mentioning migrator account
-      this.subscriptionId = this.connection.onLogs(
-        new PublicKey(MIGRATOR_ACCOUNT),
-        async (logs, context) => {
-          try {
-            if (logs.err) return; // Skip failed transactions
+      // WebSocket subscription disabled - causes 403 errors with HTTP-only RPC connections
+      // Migration events will be detected via Helius webhook transaction monitoring instead
+      // 
+      // this.subscriptionId = this.connection.onLogs(  // ❌ Requires WebSocket
+      //   new PublicKey(MIGRATOR_ACCOUNT),
+      //   async (logs, context) => { ... },
+      //   'confirmed'
+      // );
 
-            const signature = logs.signature;
-            
-            if (this.options.debug) {
-              console.log(`[MIGRATION] Potential migration tx: ${signature}`);
-            }
+      this.subscriptionId = 0; // Dummy value for compatibility
 
-            // Decode transaction to extract migration details
-            const migrationEvent = await this.decodeMigrationTx(signature);
-            
-            if (migrationEvent) {
-              await this.handleMigrationEvent(migrationEvent);
-            }
-          } catch (error) {
-            console.error('[MIGRATION] Error processing log:', error);
-          }
-        },
-        'confirmed'
-      );
-
-      console.log('[MIGRATION] Detector started successfully (subscription ID:', this.subscriptionId, ')');
+      console.log('[MIGRATION] Detector started (WebSocket subscriptions disabled - using webhook events)');
     } catch (error) {
       console.error('[MIGRATION] Failed to start detector:', error);
       this.isRunning = false;
@@ -138,10 +124,11 @@ export class MigrationDetector {
 
     console.log('[MIGRATION] Stopping migration detector...');
     
-    if (this.subscriptionId !== null) {
-      await this.connection.removeOnLogsListener(this.subscriptionId);
-      this.subscriptionId = null;
-    }
+    // WebSocket subscription disabled, nothing to remove
+    // if (this.subscriptionId !== null && this.subscriptionId !== 0) {
+    //   await this.connection.removeOnLogsListener(this.subscriptionId);
+    //   this.subscriptionId = null;
+    // }
 
     this.isRunning = false;
     console.log('[MIGRATION] Detector stopped');
