@@ -70,8 +70,39 @@ function getHeliusUrl(): string | undefined {
   return finalUrl;
 }
 
+// Build dRPC API URL using API key
+function getDrpcUrl(): string | undefined {
+  const apiKey = getEnv('DRPC_API_KEY')?.trim();
+  
+  console.log('[dRPC Config] DRPC_API_KEY present:', !!apiKey);
+  
+  if (!apiKey || apiKey.length === 0) {
+    console.log('[dRPC Config] No dRPC API key found');
+    return undefined;
+  }
+
+  // Strip quotes and whitespace
+  const cleaned = apiKey.replace(/^\"|\"$/g, '').trim();
+  
+  // dRPC endpoint format: https://lb.drpc.org/ogrpc?network=solana&dkey=YOUR_KEY
+  const finalUrl = `https://lb.drpc.org/ogrpc?network=solana&dkey=${cleaned}`;
+  console.log('[dRPC Config] dRPC URL configured');
+  return finalUrl;
+}
+
 const RPC_PROVIDERS = [
-  // Shyft Premium RPC (Primary - 60% weight)
+  // dRPC Premium RPC (Primary - 70% weight)
+  { 
+    getUrl: () => `${getDrpcUrl() || ""}`,
+    weight: 70, 
+    name: "dRPC",
+    tier: "premium" as const,
+    requiresKey: true,
+    hasKey: () => !!getDrpcUrl(),
+    rateLimit: 1000,
+    rateLimitWindow: 60000
+  },
+  // Shyft Premium RPC (Secondary - 60% weight)
   { 
     getUrl: () => `${getShyftUrl() || ""}`,
     weight: 60, 
@@ -103,7 +134,7 @@ const RPC_PROVIDERS = [
     rateLimitWindow: 60000
   }
   // REMOVED: Ankr, Phantom, AWS, Latitude, and QuickNode endpoints
-  // The premium RPCs (Shyft, Helius) + Solana Official are sufficient
+  // Premium RPCs: dRPC (primary), Shyft, Helius + Solana Official fallback
 ];
 
 export class SolanaRpcBalancer {
