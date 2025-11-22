@@ -380,17 +380,26 @@ export class SolanaTokenAnalyzer {
       const connection = this.getConnection();
       
       // Get token mint info
-      const mintInfo = await getMint(
-        connection,
-        tokenAddress,
-        'confirmed',
-        TOKEN_PROGRAM_ID
-      ).catch(() => getMint(
-        connection,
-        tokenAddress,
-        'confirmed',
-        TOKEN_2022_PROGRAM_ID
-      ));
+      let mintInfo;
+      try {
+        mintInfo = await getMint(
+          connection,
+          tokenAddress,
+          'confirmed',
+          TOKEN_PROGRAM_ID
+        ).catch(() => getMint(
+          connection,
+          tokenAddress,
+          'confirmed',
+          TOKEN_2022_PROGRAM_ID
+        ));
+      } catch (error: any) {
+        // Transform generic RPC errors to more specific messages
+        if (error.message?.includes('Received one or more errors')) {
+          throw new Error('Unable to fetch token data from blockchain. Token may be too new or invalid.');
+        }
+        throw error;
+      }
 
       const totalSupplyRaw = Number(mintInfo.supply);
       const decimals = mintInfo.decimals;

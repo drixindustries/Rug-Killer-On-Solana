@@ -142,8 +142,17 @@ export class HolderAnalysisService {
 
       // Fetch mint info for decimals and supply
       console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Fetching mint info...`);
-      const mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID)
-        .catch(() => getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID));
+      let mintInfo;
+      try {
+        mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID)
+          .catch(() => getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID));
+      } catch (error: any) {
+        if (error.message?.includes('Received one or more errors')) {
+          console.warn(`[HolderAnalysis] RPC batch error fetching mint info for ${tokenAddress}`);
+          return null;
+        }
+        throw error;
+      }
       console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Mint info received - decimals: ${mintInfo.decimals}, supply: ${mintInfo.supply.toString()}`);
 
       const totalSupplyRaw = BigInt(mintInfo.supply.toString());
