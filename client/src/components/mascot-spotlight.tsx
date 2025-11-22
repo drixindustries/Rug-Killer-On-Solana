@@ -119,21 +119,17 @@ export function MascotSpotlight() {
           <div className="absolute -bottom-6 left-1/2 w-full max-w-3xl -translate-x-1/2 rounded-2xl border bg-background/95 p-5 shadow-xl">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-1">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Wallets guarded</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Wallets tracked</p>
                 <p className="text-2xl font-semibold leading-tight">{formatMetric(stats?.walletsGuarded)}</p>
                 <p className="text-xs text-muted-foreground">
-                  {stats
-                    ? `${stats.discordDestinations} Discord · ${stats.telegramDestinations} Telegram`
-                    : 'Syncing relay destinations...'}
+                  {stats?.running ? 'Active monitoring' : 'Initializing...'}
                 </p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Alpha relays (7d)</p>
                 <p className="text-2xl font-semibold leading-tight">{formatMetric(stats?.alphaPings7d)}</p>
                 <p className="text-xs text-muted-foreground">
-                  {stats
-                    ? `${formatMetric(stats.discordRelayPings7d)} Discord · ${formatMetric(stats.telegramRelayPings7d)} Telegram`
-                    : 'Estimating per-platform volume...'}
+                  {stats?.alphaPings7d ? `${stats.alphaPings7d} signal${stats.alphaPings7d !== 1 ? 's' : ''} detected` : 'Monitoring activity...'}
                 </p>
               </div>
               <div className="space-y-1">
