@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Copy root package files and install ALL dependencies (including devDependencies for vite)
 COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci
+RUN --mount=type=cache,id=npm-cache,target=/root/.npm npm ci
 
 # Copy necessary files for build
 COPY client/ ./client/
@@ -27,7 +27,7 @@ FROM node:20-alpine
 # Install only the server runtime dependencies
 WORKDIR /app/server
 COPY server/package.json server/package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
+RUN --mount=type=cache,id=npm-cache,target=/root/.npm npm ci --omit=dev
 
 # Copy shared directory and server source (node_modules retained from npm ci)
 WORKDIR /app
