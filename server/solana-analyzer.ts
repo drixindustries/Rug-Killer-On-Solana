@@ -68,6 +68,15 @@ export class SolanaTokenAnalyzer {
         options.skipExternal ? null : quillCheckService.getHoneypotDetection(tokenMintAddress),
       ]);
 
+      // Log any failures for debugging
+      if (dexData.status === 'rejected') console.warn(`[Analyzer] DexScreener failed:`, dexData.reason?.message);
+      if (onChainData.status === 'rejected') console.warn(`[Analyzer] On-chain data failed:`, onChainData.reason?.message);
+      if (holderData.status === 'rejected') console.warn(`[Analyzer] Holder analysis failed:`, holderData.reason?.message);
+      if (creationDateData.status === 'rejected') console.warn(`[Analyzer] Creation date failed:`, creationDateData.reason?.message);
+      if (pumpFunData.status === 'rejected') console.warn(`[Analyzer] Pump.fun check failed:`, pumpFunData.reason?.message);
+      if (quillCheckData.status === 'rejected') console.warn(`[Analyzer] QuillCheck failed:`, quillCheckData.reason?.message);
+      if (honeypotData.status === 'rejected') console.warn(`[Analyzer] Honeypot detection failed:`, honeypotData.reason?.message);
+
       const dex = dexData.status === 'fulfilled' ? dexData.value : null;
       const onChain = onChainData.status === 'fulfilled' ? onChainData.value : null;
       const holders = holderData.status === 'fulfilled' ? holderData.value : null;
@@ -75,6 +84,11 @@ export class SolanaTokenAnalyzer {
       const pumpFun = pumpFunData.status === 'fulfilled' ? pumpFunData.value : null;
       const quillCheck = quillCheckData.status === 'fulfilled' ? quillCheckData.value : null;
       const honeypotDetection = honeypotData.status === 'fulfilled' ? honeypotData.value : null;
+      
+      // Check if critical data is missing
+      if (!dex && !onChain) {
+        throw new Error('Unable to fetch token data - both DexScreener and on-chain queries failed');
+      }
 
       console.log(`✅ [Analyzer] Data fetched in ${Date.now() - startTime}ms`);
       console.log(`[Analyzer DEBUG] DexScreener data:`, { hasDex: !!dex, pairs: dex?.pairs?.length ?? 0 });
