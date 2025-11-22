@@ -23,6 +23,7 @@ import { rpcBalancer } from './rpc-balancer.js';
 import { EXCHANGE_WALLETS, isExchangeWallet } from '../exchange-whitelist.js';
 import { getKnownAddressInfo } from '../known-addresses.js';
 import { isPumpFunAmm } from '../pumpfun-whitelist.js';
+import { isSystemWallet, isPumpFunBondingCurve, getSystemWalletType, filterHoldersWithStats } from '../pumpfun-system-wallets';
 import bs58 from 'bs58';
 
 export interface HolderDetail {
@@ -49,6 +50,8 @@ export interface HolderAnalysisResult {
   lpSupplyPercent: number;
   pumpFunFilteredCount: number;
   pumpFunFilteredPercent: number;
+  systemWalletsFiltered: number; // Bonding curve + CEX + Raydium authorities
+  isPreMigration: boolean; // True if bonding curve is top holder
   source: 'birdeye' | 'gmgn' | 'helius' | 'rpc' | 'mixed';
   cachedAt: number;
 }
@@ -342,6 +345,9 @@ export class HolderAnalysisService {
       const filteredAccounts: Array<{ owner: string; amountRaw: number }> = [];
       let pumpFunFilteredCount = 0;
       let pumpFunFilteredRaw = 0;
+      let systemWalletsFiltered = 0;
+      let systemWalletsFilteredRaw = 0;
+      let isPreMigration = false;
 
       for (const acc of validAccounts) {
         const amountRaw = Number(acc.amount);
@@ -353,10 +359,17 @@ export class HolderAnalysisService {
           continue;
         }
 
+        if (isSystemWallet(ownerAddress)) {
+          systemWalletsFiltered += 1;
+          systemWalletsFilteredRaw += amountRaw;
+          if (isPumpFunBondingCurve(ownerAddress)) isPreMigration = true;
+          continue;
+        }
+
         filteredAccounts.push({ owner: ownerAddress, amountRaw });
       }
 
-      const effectiveSupplyRaw = Math.max(totalSupplyRaw - pumpFunFilteredRaw, 1);
+      const effectiveSupplyRaw = Math.max(totalSupplyRaw - pumpFunFilteredRaw - systemWalletsFilteredRaw, 1);
       const pumpFunFilteredPercent = totalSupplyRaw > 0 ? (pumpFunFilteredRaw / totalSupplyRaw) * 100 : 0;
 
       const top20: HolderDetail[] = filteredAccounts.slice(0, 20).map(({ owner, amountRaw }) => {
@@ -381,7 +394,7 @@ export class HolderAnalysisService {
 
       return {
         tokenAddress,
-        holderCount: filteredAccounts.length, // Limited to top accounts, minus Pump.fun AMM
+        holderCount: filteredAccounts.length,
         top20Holders: top20,
         topHolderConcentration: top10Concentration,
         exchangeHolderCount: exchangeHolders.length,
@@ -389,6 +402,8 @@ export class HolderAnalysisService {
         lpSupplyPercent: lpHolders.reduce((sum, h) => sum + h.percentage, 0),
         pumpFunFilteredCount,
         pumpFunFilteredPercent,
+        systemWalletsFiltered,
+        isPreMigration,
         source: 'helius',
         cachedAt: Date.now(),
       };
@@ -468,7 +483,7 @@ export class HolderAnalysisService {
 
       return {
         tokenAddress,
-        holderCount: estimatedHolderCount, // Use actual count of filtered accounts as best estimate
+        holderCount: estimatedHolderCount,
         top20Holders: top20,
         topHolderConcentration: top10Concentration,
         exchangeHolderCount: exchangeHolders.length,
@@ -476,6 +491,8 @@ export class HolderAnalysisService {
         lpSupplyPercent: lpHolders.reduce((sum, h) => sum + h.percentage, 0),
         pumpFunFilteredCount,
         pumpFunFilteredPercent,
+        systemWalletsFiltered: 0, // Not tracked in RPC fallback (limited data)
+        isPreMigration: false,
         source: 'rpc',
         cachedAt: Date.now(),
       };
