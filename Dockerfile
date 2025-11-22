@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Copy root package files and install ALL dependencies (including devDependencies for vite)
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --loglevel=error --prefer-offline
 
 # Copy necessary files for build
 COPY client/ ./client/
@@ -29,7 +29,7 @@ WORKDIR /app
 # Copy server package files and install production dependencies only
 COPY server/package.json server/package-lock.json ./server/
 WORKDIR /app/server
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --loglevel=error --prefer-offline
 
 WORKDIR /app
 # Copy shared directory and server source
