@@ -72,9 +72,9 @@ function getHeliusUrl(): string | undefined {
 
 // Build dRPC API URL using API key
 function getDrpcUrl(): string | undefined {
-  const apiKey = getEnv('DRPC_API_KEY')?.trim();
+  const apiKey = getEnv('DRPC_KEY')?.trim();
   
-  console.log('[dRPC Config] DRPC_API_KEY present:', !!apiKey);
+  console.log('[dRPC Config] DRPC_KEY present:', !!apiKey);
   
   if (!apiKey || apiKey.length === 0) {
     console.log('[dRPC Config] No dRPC API key found');

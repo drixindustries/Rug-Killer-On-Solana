@@ -308,7 +308,7 @@ async function startServices() {
   }
 
   // Webhook services - real-time blockchain monitoring
-  if (process.env.HELIUS_API_KEY || process.env.DRPC_API_KEY) {
+  if (process.env.HELIUS_API_KEY || process.env.DRPC_KEY) {
     console.log('🔔 Starting webhook services...');
     
     // Helius webhook service
@@ -323,7 +323,7 @@ async function startServices() {
     }
 
     // dRPC webhook service (fallback)
-    if (process.env.DRPC_API_KEY) {
+    if (process.env.DRPC_KEY) {
       try {
         const { drpcWebhook } = await import('./services/drpc-webhook.ts');
         await drpcWebhook.start();
@@ -335,6 +335,6 @@ async function startServices() {
 
     // Pump.fun WebSocket removed - Helius/dRPC webhooks handle all token detection
   } else {
-    console.log('ℹ️ Webhook services disabled - set HELIUS_API_KEY or DRPC_API_KEY to enable real-time monitoring');
+    console.log('ℹ️ Webhook services disabled - set HELIUS_API_KEY or DRPC_KEY to enable real-time monitoring');
   }
 }

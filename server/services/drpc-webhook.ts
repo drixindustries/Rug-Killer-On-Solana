@@ -44,7 +44,7 @@ export class DrpcWebhookService extends EventEmitter {
 
   constructor() {
     super();
-    this.DRPC_API_KEY = process.env.DRPC_API_KEY?.trim() || '';
+    this.DRPC_API_KEY = process.env.DRPC_KEY?.trim() || '';
 
     if (!this.DRPC_API_KEY) {
       console.warn('[dRPC Webhook] No API key configured - webhook monitoring disabled');
