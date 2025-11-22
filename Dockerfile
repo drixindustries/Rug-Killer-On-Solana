@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Copy root package files and install ALL dependencies (including devDependencies for vite)
 COPY package*.json ./
-RUN --mount=type=cache,id=railway-npm-frontend,target=/root/.npm npm ci
+RUN npm ci
 
 # Copy necessary files for build
 COPY client/ ./client/
@@ -24,14 +24,22 @@ RUN ls -la /app/dist/public/ && echo "âœ… Frontend build successful" || (echo "â
 # Production stage
 FROM node:20-alpine
 
-# Install only the server runtime dependencies
-WORKDIR /app/server
-COPY server/package.json server/package-lock.json ./
-RUN --mount=type=cache,id=railway-npm-server,target=/root/.npm npm ci --omit=dev
-
-# Copy shared directory and server source (node_modules retained from npm ci)
 WORKDIR /app
+
+# Copy shared directory first (needed by both root and server)
 COPY shared/ ./shared/
+
+# Copy root package files and install ALL dependencies (shared needs them)
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+# Copy server package files and install production dependencies
+COPY server/package.json server/package-lock.json ./server/
+WORKDIR /app/server
+RUN npm ci --omit=dev
+
+WORKDIR /app
+# Copy server source
 COPY server/ ./server/
 
 # Copy frontend build from builder stage
@@ -46,6 +54,6 @@ ENV PORT=8080
 ENV NODE_PATH=/app/server/node_modules
 EXPOSE 8080
 
-# Run from server directory using local tsx
+# Run tsx from server directory
 WORKDIR /app/server
-CMD ["./node_modules/.bin/tsx", "index.ts"]
+CMD ["sh", "-c", "cd /app/server && node_modules/.bin/tsx index.ts"]
