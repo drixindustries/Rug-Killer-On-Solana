@@ -270,14 +270,22 @@ export default function Home() {
 
   const analyzeMutation = useMutation({
     mutationFn: async (tokenAddress: string) => {
-      const response = await apiRequest("POST", "/api/analyze", { tokenAddress });
-      return await response.json() as TokenAnalysisResponse;
+      try {
+        const response = await apiRequest("POST", "/api/analyze", { tokenAddress });
+        const data = await response.json();
+        console.log("[Analyze] Response received:", data);
+        return data as TokenAnalysisResponse;
+      } catch (error: any) {
+        console.error("[Analyze] Error in mutationFn:", error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
+      console.log("[Analyze] Success, setting analysis data");
       setAnalysis(data);
     },
     onError: (error: Error) => {
-      console.error("Analysis error:", error);
+      console.error("[Analyze] Error in onError handler:", error);
       toast({
         variant: "destructive",
         title: "Analysis Failed",
