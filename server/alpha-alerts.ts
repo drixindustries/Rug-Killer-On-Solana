@@ -5,7 +5,6 @@ import { db } from './db';
 import { kolWallets, smartWallets, smartSignals } from '../shared/schema.ts';
 import { gte, and, eq } from 'drizzle-orm';
 import { GMGNService } from './services/gmgn-service.ts';
-import { NansenService, type NansenSmartMoneyTrade } from './services/nansen-service.ts';
 import { storage } from './storage.ts';
 import { rpcBalancer } from './services/rpc-balancer.ts';
 import { TemporalGNNDetector, type TGNResult } from './temporal-gnn-detector.ts';
@@ -40,12 +39,6 @@ export class AlphaAlertService {
   private alphaCallers: AlphaCallerConfig[];
   private autoRefreshInterval: NodeJS.Timeout | null = null;
   private gmgn = new GMGNService();
-  private nansen = new NansenService();
-  private nansenInterval: NodeJS.Timeout | null = null;
-  private nansenCursor: string | null = null;
-  private nansenSeenTransactions = new Set<string>();
-  private nansenLastTimestamp = 0;
-  private nansenPolling = false;
   // Reliability tracking
   private currentRpc: string = '';
   private consecutiveFailures = 0;
@@ -126,7 +119,7 @@ export class AlphaAlertService {
 
       // Instead of WebSocket subscription (which requires premium API keys),
       // we mark this wallet for periodic polling via getSignaturesForAddress
-      // The actual monitoring happens in the webhook services and Nansen feed
+      // The actual monitoring happens in the webhook services
       console.log(`[Alpha Alerts] Wallet ${caller.name} registered for webhook-based monitoring`);
       
       // Store a placeholder listener ID to track monitoring state
@@ -136,8 +129,7 @@ export class AlphaAlertService {
       // The real monitoring happens via:
       // 1. Helius webhook service (token_created events)
       // 2. QuickNode webhook service (transaction events) 
-      // 3. Nansen feed (smart money trades)
-      // 4. Pump.fun WebSocket (new token launches)
+      // 3. Pump.fun WebSocket (new token launches)
       
       this.lastLogAt = Date.now();
       // Monitoring is now handled by external webhook services
@@ -235,162 +227,6 @@ export class AlphaAlertService {
     if (this.autoRefreshInterval) {
       clearInterval(this.autoRefreshInterval);
       this.autoRefreshInterval = null;
-    }
-  }
-
-  private startNansenWatcher(): void {
-    if (!this.nansen.isEnabled()) {
-      console.log('[Alpha Alerts] Nansen smart money watcher disabled (missing API key)');
-      return;
-    }
-
-    const lookbackMinutes = Number(process.env.NANSEN_LOOKBACK_MINUTES || 15);
-    if (!this.nansenLastTimestamp) {
-      const windowMs = Math.max(1, lookbackMinutes) * 60 * 1000;
-      this.nansenLastTimestamp = Date.now() - windowMs;
-    }
-
-    const poll = async () => {
-      if (this.nansenPolling) {
-        return;
-      }
-      this.nansenPolling = true;
-      try {
-        const { trades, nextCursor } = await this.nansen.fetchSmartMoneyBuys({
-          since: this.nansenLastTimestamp,
-          cursor: this.nansenCursor,
-        });
-
-        if (nextCursor) {
-          this.nansenCursor = nextCursor;
-        }
-
-        for (const trade of trades) {
-          if (!trade.txHash || this.nansenSeenTransactions.has(trade.txHash)) {
-            continue;
-          }
-
-          this.nansenSeenTransactions.add(trade.txHash);
-          if (trade.timestamp && trade.timestamp > this.nansenLastTimestamp) {
-            this.nansenLastTimestamp = trade.timestamp;
-          }
-
-          await this.handleNansenTrade(trade);
-        }
-
-        if (this.nansenSeenTransactions.size > 500) {
-          const recent = Array.from(this.nansenSeenTransactions).slice(-400);
-          this.nansenSeenTransactions = new Set(recent);
-        }
-      } catch (error) {
-        console.error('[Alpha Alerts] Nansen watcher error:', error);
-      } finally {
-        this.nansenPolling = false;
-      }
-    };
-
-    void poll();
-
-    if (this.nansenInterval) {
-      clearInterval(this.nansenInterval);
-    }
-
-    this.nansenInterval = setInterval(() => {
-      void poll();
-    }, this.nansen.getPollingInterval());
-  }
-
-  private stopNansenWatcher(): void {
-    if (this.nansenInterval) {
-      clearInterval(this.nansenInterval);
-      this.nansenInterval = null;
-    }
-    this.nansenPolling = false;
-  }
-
-  private async handleNansenTrade(trade: NansenSmartMoneyTrade): Promise<void> {
-    try {
-      if (!trade.tokenAddress || trade.tokenAddress.length < 32) {
-        return;
-      }
-
-      const isQuality = await this.isQualityToken(trade.tokenAddress);
-      if (!isQuality) {
-        return;
-      }
-
-      const timestamp = trade.timestamp || Date.now();
-      const shortWallet = `${trade.walletAddress.slice(0, 4)}...${trade.walletAddress.slice(-4)}`;
-      const walletLabel = trade.walletLabel?.trim() || `Smart Wallet ${shortWallet}`;
-      const influenceRaw = trade.confidence !== undefined ? Math.round(trade.confidence) : 80;
-      const influenceScore = Math.min(100, Math.max(40, influenceRaw));
-
-      try {
-        await db
-          .insert(smartWallets)
-          .values({
-            walletAddress: trade.walletAddress,
-            displayName: walletLabel,
-            source: 'nansen',
-            influenceScore,
-            isActive: true,
-            lastActiveAt: new Date(timestamp),
-            notes: 'Imported via Nansen smart money feed',
-          })
-          .onConflictDoUpdate({
-            target: smartWallets.walletAddress,
-            set: {
-              displayName: walletLabel,
-              source: 'nansen',
-              influenceScore,
-              isActive: true,
-              lastActiveAt: new Date(timestamp),
-              updatedAt: new Date(),
-            },
-          });
-      } catch (error) {
-        console.error('[Alpha Alerts] Failed to upsert Nansen smart wallet:', error);
-      }
-
-      try {
-        await db
-          .insert(smartSignals)
-          .values({
-            walletAddress: trade.walletAddress,
-            tokenAddress: trade.tokenAddress,
-            action: 'buy',
-            amountTokens: trade.amountToken !== undefined ? String(trade.amountToken) : undefined,
-            priceUsd: trade.amountUsd !== undefined ? String(trade.amountUsd) : undefined,
-            txSignature: trade.txHash,
-            confidence: Number.isFinite(trade.confidence) ? Math.round(trade.confidence as number) : undefined,
-            source: 'nansen',
-            detectedAt: new Date(timestamp),
-          })
-          .onConflictDoNothing({ target: smartSignals.txSignature });
-      } catch (error) {
-        console.error('[Alpha Alerts] Failed to log Nansen smart signal:', error);
-      }
-
-      await this.sendAlert({
-        type: 'caller_signal',
-        mint: trade.tokenAddress,
-        source: walletLabel,
-        timestamp,
-        data: {
-          wallet: trade.walletAddress,
-          tokenSymbol: trade.tokenSymbol,
-          tokenName: trade.tokenName,
-          amountUsd: trade.amountUsd,
-          amountToken: trade.amountToken,
-          txHash: trade.txHash,
-          source: 'nansen',
-          provider: 'Nansen',
-          sourceUrl: trade.sourceUrl,
-          confidence: influenceScore,
-        },
-      });
-    } catch (error) {
-      console.error('[Alpha Alerts] Error handling Nansen trade:', error);
     }
   }
 
@@ -860,9 +696,6 @@ export class AlphaAlertService {
     // Start auto-refreshing the wallet list
     this.startAutoRefresh();
 
-    // Start Nansen watcher if enabled
-    this.startNansenWatcher();
-
     // Start migration detector if enabled
     if (this.migrationDetector) {
       try {
@@ -944,8 +777,6 @@ export class AlphaAlertService {
     this.isRunning = false;
 
     this.stopAutoRefresh();
-    this.stopNansenWatcher();
-    this.nansenSeenTransactions.clear();
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;

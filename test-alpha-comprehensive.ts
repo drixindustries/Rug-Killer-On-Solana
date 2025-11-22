@@ -148,7 +148,7 @@ async function testEnvironmentConfiguration() {
     'ALPHA_DISCORD_WEBHOOK',
     'ALPHA_TELEGRAM_BOT_TOKEN',
     'ALPHA_TELEGRAM_CHAT_ID',
-    'NANSEN_API_KEY',
+
     'GMGN_API_KEY',
   ];
   
