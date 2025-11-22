@@ -28,7 +28,8 @@ router.post('/migrate', async (req: Request, res: Response) => {
     }
 
     // Run smart_wallets migration
-    const migrationPath = path.join(process.cwd(), 'migrations', '20251121_create_smart_wallets_and_signals.sql');
+    // Working directory is /app/server, migrations are in /app/migrations
+    const migrationPath = path.join(process.cwd(), '..', 'migrations', '20251121_create_smart_wallets_and_signals.sql');
     const migrationSQL = fs.readFileSync(migrationPath, 'utf-8');
 
     await pool.query(migrationSQL);
