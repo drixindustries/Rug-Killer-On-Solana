@@ -3357,18 +3357,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     (async () => {
       try {
         const { liveScanWS } = await import('./live-scan-websocket.ts');
-        const { pumpFunWebhook } = await import('./services/pumpfun-webhook.ts');
         
         // Initialize WebSocket server
         liveScanWS.initialize(httpServer);
         
-        // Connect to Pump.fun webhook (only if enabled)
-        if (process.env.ENABLE_PUMPFUN_WEBHOOK === 'true') {
-          await pumpFunWebhook.connect();
-          console.log('✅ Pump.fun webhook enabled and connected');
-        } else {
-          console.log('ℹ️  Pump.fun webhook disabled (set ENABLE_PUMPFUN_WEBHOOK=true to enable)');
-        }
+        // Pump.fun tokens detected via Helius webhook (no separate WebSocket needed)
+        console.log('ℹ️  Pump.fun tokens detected via Helius webhook');
       } catch (error: any) {
         console.warn('⚠️ Live scan WebSocket unavailable (silenced):', error?.message || String(error));
       }

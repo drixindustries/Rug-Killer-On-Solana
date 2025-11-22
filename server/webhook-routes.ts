@@ -6,7 +6,6 @@
 import { Router, Request, Response } from 'express';
 import { heliusWebhook } from './services/helius-webhook.ts';
 import { quickNodeWebhook } from './services/quicknode-webhook.ts';
-import { pumpFunWebhook } from './services/pumpfun-webhook.ts';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 type RequestWithRawBody = Request & { rawBody?: unknown };
@@ -183,7 +182,6 @@ router.get('/health', (req: Request, res: Response) => {
   const status = {
     helius: heliusWebhook.getStatus(),
     quicknode: quickNodeWebhook.getStatus(),
-    pumpfun: pumpFunWebhook.getStatus(),
     timestamp: Date.now(),
   };
   
