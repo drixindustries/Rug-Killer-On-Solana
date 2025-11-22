@@ -31,6 +31,7 @@ RUN npm ci --omit=dev
 
 # Copy shared directory and server source (node_modules retained from npm ci)
 WORKDIR /app
+RUN ln -s /app/server/node_modules /app/node_modules
 COPY shared/ ./shared/
 COPY server/ ./server/
 
