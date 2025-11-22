@@ -31,6 +31,8 @@ export class NansenService {
   private readonly defaultLimit = Number(process.env.NANSEN_POLL_LIMIT || 50);
   private readonly cacheKey = 'nansen:last-cursor';
   private lastCursor: string | null = null;
+  private disabled = false;
+  private consecutiveFailures = 0;
 
   isEnabled(): boolean {
     return !!this.apiKey;
@@ -69,7 +71,7 @@ export class NansenService {
     cursor?: string | null;
     limit?: number;
   }): Promise<NansenSmartMoneyResult> {
-    if (!this.apiKey) {
+    if (!this.apiKey || this.disabled) {
       return { trades: [] };
     }
 
@@ -109,6 +111,11 @@ export class NansenService {
     } catch (error) {
       clearTimeout(timer);
       console.error('[Nansen] Request failed:', error);
+      this.consecutiveFailures++;
+      if (this.consecutiveFailures >= 3) {
+        this.disabled = true;
+        console.warn('[Nansen] Disabling smart money polling after repeated failures');
+      }
       return { trades: [] };
     }
 
@@ -117,11 +124,24 @@ export class NansenService {
     if (!response.ok) {
       if (response.status === 429) {
         console.warn('[Nansen] Rate limited while fetching smart money buys');
+      } else if (response.status === 401 || response.status === 403) {
+        console.warn(`[Nansen] API auth error ${response.status}. Disabling polling until NANSEN_API_KEY is updated.`);
+        this.disabled = true;
+      } else if (response.status === 404) {
+        console.warn('[Nansen] API endpoint not found (404). Set NANSEN_SMARTMONEY_ENDPOINT to a valid URL. Disabling polling.');
+        this.disabled = true;
       } else {
         console.error(`[Nansen] API error ${response.status}: ${response.statusText}`);
+        this.consecutiveFailures++;
+        if (this.consecutiveFailures >= 3) {
+          this.disabled = true;
+          console.warn('[Nansen] Disabling smart money polling after consecutive HTTP errors');
+        }
       }
       return { trades: [] };
     }
+
+    this.consecutiveFailures = 0;
 
     let payload: any;
     try {

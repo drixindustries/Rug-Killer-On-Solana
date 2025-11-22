@@ -38,6 +38,7 @@ export class PumpFunWebhookService extends EventEmitter {
   private shouldReconnect = true;
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private readonly PUMP_FUN_WS_URL = process.env.PUMP_FUN_WS_URL || 'wss://pumpportal.fun/api/data';
+  private readonly enabled = (process.env.ENABLE_PUMPFUN_MONITOR || 'false').toLowerCase() === 'true';
 
   constructor() {
     super();
@@ -47,6 +48,13 @@ export class PumpFunWebhookService extends EventEmitter {
    * Connect to Pump.fun WebSocket
    */
   public async connect(): Promise<void> {
+    if (!this.enabled) {
+      if (!this.shouldReconnect) return;
+      console.log('[PumpFun] WebSocket monitoring disabled (ENABLE_PUMPFUN_MONITOR=false)');
+      this.shouldReconnect = false;
+      return;
+    }
+
     if (this.ws && this.isConnected) {
       console.log('[PumpFun] Already connected');
       return;
@@ -248,6 +256,10 @@ export class PumpFunWebhookService extends EventEmitter {
    * Schedule reconnection
    */
   private scheduleReconnect(): void {
+    if (!this.enabled) {
+      return;
+    }
+
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error('[PumpFun] Max reconnection attempts reached');
       this.emit('max_reconnect_reached');

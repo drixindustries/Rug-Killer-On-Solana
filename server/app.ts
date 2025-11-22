@@ -4,10 +4,12 @@
  */
 import express, { type Request, type Response, type NextFunction } from "express";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import { registerRoutes } from "./routes.ts";
 import path from "path";
 import fs from "fs";
 import { storage } from './storage.ts';
+import { pool } from './db.ts';
 
 export const app = express();
 
@@ -15,15 +17,29 @@ export const app = express();
 const SESSION_SECRET = process.env.SESSION_SECRET || 'railway-fallback-secret-' + Date.now();
 console.log('🔑 Using session secret:', SESSION_SECRET.substring(0, 10) + '...');
 
+const PgSession = connectPgSimple(session);
+const sessionStore = pool
+  ? new PgSession({
+      pool,
+      tableName: 'sessions',
+      createTableIfMissing: true,
+    })
+  : undefined;
+
+if (!sessionStore) {
+  console.warn('⚠️ Using in-memory session store (database unavailable)');
+}
+
 app.use(session({
+  store: sessionStore,
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax', // Allow cookies in same-site navigation
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   },
 }));
 

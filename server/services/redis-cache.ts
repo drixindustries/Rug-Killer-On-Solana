@@ -21,9 +21,17 @@ class RedisCache {
   private maxErrors: number = 3;
 
   constructor() {
-    // Use Railway Redis if available, fallback to localhost for dev
-    const redisUrl = process.env.REDIS_URL || process.env.REDISCLOUD_URL || 'redis://localhost:6379';
-    
+    const configuredUrl = process.env.REDIS_URL || process.env.REDISCLOUD_URL;
+    const isDev = (process.env.NODE_ENV || 'development') !== 'production';
+
+    if (!configuredUrl && !isDev) {
+      console.log('[Redis] Disabled - no REDIS_URL configured');
+      this.isEnabled = false;
+      return;
+    }
+
+    // Default to local Redis only in development to avoid noisy prod errors
+    const redisUrl = configuredUrl || 'redis://localhost:6379';
     this.isEnabled = true;
     this.redis = new Redis(redisUrl as string, {
       maxRetriesPerRequest: 1,
@@ -55,7 +63,7 @@ class RedisCache {
     this.redis.on('error', (error) => {
       // Only log first few errors to avoid spam
       if (this.errorCount < 3) {
-        console.error('[Redis] ⚠️ Connection error:', error.message);
+        console.warn('[Redis] ⚠️ Connection error:', error.message);
         this.errorCount++;
       }
       if (this.errorCount === 3) {

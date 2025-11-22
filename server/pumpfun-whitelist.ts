@@ -14,27 +14,31 @@ interface PumpFunWhitelistFile {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_PATH = path.resolve(__dirname, "generated", "pumpfun-amm.json");
+let missingFileLogged = false;
 
 function loadWhitelist(): PumpFunWhitelistFile {
   try {
     if (!fs.existsSync(DATA_PATH)) {
-      console.warn(
-        "[PumpFunWhitelist] pumpfun-amm.json not found. Run `npm run pumpfun:sync` to generate it."
-      );
+      if (!missingFileLogged) {
+        console.log(
+          "[PumpFunWhitelist] pumpfun-amm.json not found (optional). Run `npm run pumpfun:sync` only if Pump.fun AMM filtering is required."
+        );
+        missingFileLogged = true;
+      }
       return { addresses: [] };
     }
 
     const raw = fs.readFileSync(DATA_PATH, "utf8");
     const parsed = JSON.parse(raw) as PumpFunWhitelistFile;
     if (!Array.isArray(parsed.addresses)) {
-      console.warn(
-        "[PumpFunWhitelist] Generated file is missing an addresses array. Falling back to empty set."
+      console.log(
+        "[PumpFunWhitelist] Generated file missing addresses array. Falling back to empty set."
       );
       return { addresses: [] };
     }
     return parsed;
   } catch (error) {
-    console.error("[PumpFunWhitelist] Failed to read pumpfun-amm.json:", error);
+    console.warn("[PumpFunWhitelist] Failed to read pumpfun-amm.json:", error);
     return { addresses: [] };
   }
 }

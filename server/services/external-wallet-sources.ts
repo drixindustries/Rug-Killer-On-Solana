@@ -25,6 +25,7 @@ interface ExternalWallet {
 }
 
 export class ExternalWalletSourceService {
+  private birdeyeDisabled = false;
   
   /**
    * Fetch trending wallets from Solscan API
@@ -48,6 +49,10 @@ export class ExternalWalletSourceService {
       return [];
     }
 
+    if (this.birdeyeDisabled) {
+      return [];
+    }
+
     try {
       // Birdeye has trader analytics endpoints (requires paid plan)
       const endpoint = tokenMint 
@@ -61,7 +66,13 @@ export class ExternalWalletSourceService {
       });
 
       if (!response.ok) {
-        console.error('[External Wallets] Birdeye API error:', response.status);
+        const authError = response.status === 401 || response.status === 403;
+        const logFn = authError ? console.warn : console.error;
+        logFn('[External Wallets] Birdeye API error:', response.status);
+        if (authError) {
+          this.birdeyeDisabled = true;
+          console.warn('[External Wallets] Disabling Birdeye importer until next deploy (invalid key or plan)');
+        }
         return [];
       }
 
