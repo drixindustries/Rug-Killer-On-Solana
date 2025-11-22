@@ -237,7 +237,7 @@ export default function Analytics() {
               </CardContent>
             </Card>
 
-            <Card data-testid="card-rugs-detected">
+            <Card data-testid="card-rugs-detected" className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => window.location.href = '/rugs'}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Rugs Detected</CardTitle>
                 <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -250,7 +250,7 @@ export default function Analytics() {
                     <div className="text-2xl font-bold text-destructive" data-testid="text-rugs-detected">
                       {marketOverview?.rugsDetected.toLocaleString() || 0}
                     </div>
-                    <p className="text-xs text-muted-foreground">All time</p>
+                    <p className="text-xs text-muted-foreground">All time • Click to view</p>
                   </>
                 )}
               </CardContent>

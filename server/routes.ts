@@ -1660,6 +1660,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // GET /api/analytics/rugs - Get detected rug tokens
+  app.get('/api/analytics/rugs', async (req, res) => {
+    try {
+      const { getBlacklist } = await import('./ai-blacklist.ts');
+      const { priceCache } = await import('./services/price-cache.ts');
+      
+      // Get all blacklisted tokens
+      const blacklist = await getBlacklist();
+      
+      // Enrich with current data
+      const rugs = await Promise.all(
+        blacklist.map(async (token) => {
+          try {
+            // Get latest snapshot
+            const snapshots = await storage.getHistoricalData(token, 1);
+            const latestSnapshot = snapshots.length > 0 ? snapshots[snapshots.length - 1] : null;
+            
+            // Get token name from cache
+            const tokenName = await nameCache.get(token);
+            
+            // Determine rug type based on risk flags
+            let rugType: 'honeypot' | 'liquidity_drain' | 'mint_authority' | 'freeze_authority' | 'other' = 'other';
+            const rugReasons: string[] = [];
+            
+            if (latestSnapshot) {
+              const stats = latestSnapshot.riskStatistics;
+              if (stats) {
+                if (stats.isHoneypot) {
+                  rugType = 'honeypot';
+                  rugReasons.push('Honeypot detected');
+                }
+                if (stats.hasMintAuthority) {
+                  if (rugType === 'other') rugType = 'mint_authority';
+                  rugReasons.push('Mint authority active');
+                }
+                if (stats.hasFreezeAuthority) {
+                  if (rugType === 'other') rugType = 'freeze_authority';
+                  rugReasons.push('Freeze authority active');
+                }
+                if (stats.lpBurned === false) {
+                  rugReasons.push('LP not burned');
+                }
+                if (stats.creatorPercentage && stats.creatorPercentage > 30) {
+                  rugReasons.push(`High creator holdings (${stats.creatorPercentage}%)`);
+                }
+                if (stats.top10Percentage && stats.top10Percentage > 80) {
+                  rugReasons.push('Concentrated ownership');
+                }
+              }
+            }
+            
+            if (rugReasons.length === 0) {
+              rugReasons.push('Failed security checks');
+            }
+            
+            return {
+              mint: token,
+              name: tokenName?.name || undefined,
+              symbol: tokenName?.symbol || undefined,
+              rugScore: latestSnapshot?.riskScore || 100,
+              detectedAt: latestSnapshot?.timestamp.getTime() || Date.now(),
+              rugReasons,
+              price: latestSnapshot?.price ? parseFloat(latestSnapshot.price as string) : undefined,
+              marketCap: latestSnapshot?.marketCap ? parseFloat(latestSnapshot.marketCap as string) : undefined,
+              holders: latestSnapshot?.riskStatistics?.holders || undefined,
+              liquidity: latestSnapshot?.liquidity ? parseFloat(latestSnapshot.liquidity as string) : undefined,
+              rugType,
+            };
+          } catch (error) {
+            console.error(`Error enriching rug token ${token}:`, error);
+            return {
+              mint: token,
+              rugScore: 100,
+              detectedAt: Date.now(),
+              rugReasons: ['Failed security checks'],
+              rugType: 'other' as const,
+            };
+          }
+        })
+      );
+      
+      res.json(rugs);
+    } catch (error: any) {
+      console.error("Error fetching rug tokens:", error);
+      res.status(500).json({ message: "Failed to fetch rug tokens: " + error.message });
+    }
+  });
+
   // GET /api/analytics/historical/:tokenAddress - Historical token data
   app.get('/api/analytics/historical/:tokenAddress', async (req, res) => {
     try {
