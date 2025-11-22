@@ -185,9 +185,9 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   security += `${taxClean ? '✅' : '⚠️'} Tax: ${buyTax}%/${sellTax}%      `;
   security += `${analysis.metadata?.metadataLocked !== false ? '✅' : '⚠️'} Metadata: ${analysis.metadata?.metadataLocked !== false ? 'Locked' : 'Unlocked'}\n`;
   
-  // Add Jito bundle status
+  // Add Jito bundle status with package emoji
   if (analysis.advancedBundleData) {
-    security += `${jitoBundleClean ? '✅' : '⚠️'} Jito Bundles: ${jitoBundleClean ? 'None detected' : `${analysis.advancedBundleData.suspiciousWallets.length} detected`}`;
+    security += `${jitoBundleClean ? '✅' : '📦'} Jito Bundles: ${jitoBundleClean ? 'None detected' : `📦 ${analysis.advancedBundleData.suspiciousWallets.length} detected`}`;
   } else {
     security += `✅ Jito Bundles: None detected`;
   }
@@ -199,6 +199,8 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   const devBoughtPct = analysis.pumpFunData?.devBought ?? 0;
   const bundledClusters = analysis.advancedBundleData?.suspiciousWallets?.length ?? 0;
   const systemWalletsFiltered = analysis.systemWalletsFiltered ?? 0;
+  const avgWalletAge = analysis.agedWalletData?.walletIntelligence?.avgWalletAge ?? 0;
+  const agedWalletCount = analysis.agedWalletData?.walletIntelligence?.ageDistribution?.aged ?? 0;
   
   // Calculate "real" holders (after filtering out Pump.fun, CEX, and Jito)
   const realHolders = holderCount - systemWalletsFiltered;
@@ -206,7 +208,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   
   let holders = `👥 **Holders** (clean)\n`;
   holders += `${holderCountText} real holders • Top 10: ${topHolderConc.toFixed(1)}% • Snipers: ${sniperPct.toFixed(0)}%\n`;
-  holders += `Dev bought: ${devBoughtPct.toFixed(0)}% • Bundled clusters: ${bundledClusters}`;
+  holders += `👨‍💻 Dev bought: ${devBoughtPct.toFixed(0)}% • ${bundledClusters > 0 ? '📦' : '✅'} Bundles: ${bundledClusters} • 👴 Aged: ${agedWalletCount}`;
   
   // Add ML scan status (TabNet + GNN)
   if (bundledClusters === 0 && sniperPct < 10) {
