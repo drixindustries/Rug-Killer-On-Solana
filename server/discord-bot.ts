@@ -973,8 +973,49 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           holderAnalysisText += `✅ Good Distribution (${analysis.topHolderConcentration.toFixed(1)}%)\n`;
         }
         holderAnalysisText += `• Total Holders: ${analysis.holderCount}`;
+        if (analysis.systemWalletsFiltered && analysis.systemWalletsFiltered > 0) {
+          holderAnalysisText += `\n• System Wallets Filtered: ${analysis.systemWalletsFiltered}`;
+        }
         
         embed.addFields({ name: '📊 Holder Analysis', value: holderAnalysisText });
+        
+        // TGN Temporal Analysis (if available)
+        if (analysis.tgnResult) {
+          const tgn = analysis.tgnResult;
+          const rugPercent = (tgn.rugProbability * 100).toFixed(1);
+          let tgnEmoji = '✅';
+          let tgnText = '';
+          
+          if (tgn.rugProbability > 0.70) {
+            tgnEmoji = '🚨';
+            tgnText = `${tgnEmoji} **HIGH RUG RISK**: ${rugPercent}% probability\n`;
+            dangerFlags += 2;
+          } else if (tgn.rugProbability > 0.40) {
+            tgnEmoji = '⚠️';
+            tgnText = `${tgnEmoji} **MODERATE RISK**: ${rugPercent}% rug probability\n`;
+            warningFlags++;
+          } else {
+            tgnText = `${tgnEmoji} **LOW RISK**: ${rugPercent}% rug probability\n`;
+          }
+          
+          tgnText += `• Graph: ${tgn.graphMetrics.nodeCount} wallets, ${tgn.graphMetrics.edgeCount} transactions\n`;
+          tgnText += `• Confidence: ${(tgn.confidence * 100).toFixed(0)}%`;
+          
+          if (analysis.isPreMigration) {
+            tgnText += `\n⏳ **Pre-Migration** (Pump.fun bonding curve)`;
+          }
+          
+          if (tgn.patterns.length > 0) {
+            tgnText += `\n\n**Detected Patterns:**\n`;
+            for (const pattern of tgn.patterns.slice(0, 3)) {
+              const patternEmoji = pattern.type === 'migration_event' ? '🔄' : 
+                                   pattern.confidence > 0.8 ? '🔴' : '🟡';
+              tgnText += `${patternEmoji} ${pattern.description}\n`;
+            }
+          }
+          
+          embed.addFields({ name: '🧠 Temporal GNN Analysis', value: tgnText });
+        }
         
         if (analysis.aiVerdict) {
           embed.addFields({

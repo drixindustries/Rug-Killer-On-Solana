@@ -20,12 +20,25 @@ import { rpcBalancer } from "./services/rpc-balancer.ts";
 import { checkPumpFun } from "./services/pumpfun-api.ts";
 import { holderAnalysis } from "./services/holder-analysis.ts";
 import { quillCheckService } from "./services/quillcheck-service.ts";
+import { TemporalGNNDetector } from "./temporal-gnn-detector.ts";
+import { getMigrationDetector } from "./migration-detector.ts";
 
 export class SolanaTokenAnalyzer {
   private dexScreener: DexScreenerService;
+  private tgnDetector: TemporalGNNDetector | null = null;
 
   constructor() {
     this.dexScreener = new DexScreenerService();
+    
+    // Initialize TGN detector with RPC connection
+    try {
+      const connection = rpcBalancer.getConnection();
+      this.tgnDetector = new TemporalGNNDetector(connection);
+      console.log('[Analyzer] TGN detector initialized');
+    } catch (error) {
+      console.error('[Analyzer] Failed to initialize TGN detector:', error);
+      this.tgnDetector = null;
+    }
   }
 
   async analyzeToken(
@@ -174,6 +187,31 @@ export class SolanaTokenAnalyzer {
         quillcheckData: quillCheck || undefined,
         honeypotDetection: honeypotDetection || undefined,
       };
+
+      // TEMPORAL GNN ANALYSIS - Add TGN detection results
+      if (this.tgnDetector && !options.skipExternal) {
+        try {
+          const lpPoolAddress = dex?.pairs?.[0]?.pairAddress || undefined;
+          const isPreMigration = holders?.isPreMigration || false;
+          
+          console.log(`[Analyzer] Running TGN analysis for ${tokenMintAddress}...`);
+          const tgnResult = await this.tgnDetector.analyzeToken(tokenMintAddress, lpPoolAddress, isPreMigration);
+          
+          response.tgnResult = tgnResult;
+          response.isPreMigration = isPreMigration;
+          response.systemWalletsFiltered = holders?.systemWalletsFiltered || 0;
+          response.lpPoolAddress = lpPoolAddress;
+          
+          // Check if migration was recently detected
+          const migrationDetector = getMigrationDetector(rpcBalancer.getConnection());
+          response.migrationDetected = migrationDetector.hasMigrated(tokenMintAddress);
+          
+          console.log(`[Analyzer] TGN P(rug): ${(tgnResult.rugProbability * 100).toFixed(1)}% | Pre-migration: ${isPreMigration} | Patterns: ${tgnResult.patterns.length}`);
+        } catch (tgnError) {
+          console.error('[Analyzer] TGN analysis failed:', tgnError);
+          response.tgnResult = undefined;
+        }
+      }
 
       console.log(`✅ [Analyzer] Complete in ${Date.now() - startTime}ms - Risk: ${response.riskLevel}`);
       return response;

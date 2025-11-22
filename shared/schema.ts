@@ -552,6 +552,32 @@ export interface FundingAnalysisData {
   risks: string[];
 }
 
+// Temporal Graph Neural Network (TGN) Detection Data
+export interface TGNPattern {
+  type: 'star_dump' | 'coordinated_cluster' | 'bridge_wallet' | 'lp_drain' | 'sniper_bot' | 'migration_event';
+  description: string;
+  confidence: number; // 0-1
+  timestamp: number;
+  involvedWallets?: string[];
+}
+
+export interface TGNGraphMetrics {
+  nodeCount: number;
+  edgeCount: number;
+  avgDegree: number;
+  densityScore: number;
+}
+
+export interface TGNResult {
+  rugProbability: number; // 0-1 probability score
+  patterns: TGNPattern[];
+  graphMetrics: TGNGraphMetrics;
+  riskFactors: string[];
+  confidence: number; // Overall confidence in analysis
+  isPreMigration?: boolean; // Token still on bonding curve
+  migrationDetected?: boolean; // Token recently migrated
+}
+
 // Detailed Rug Score Breakdown (professional-grade like Rugcheck.xyz)
 export interface RugScoreBreakdown {
   totalScore: number; // 0-100+ (lower = safer, higher = more dangerous)
@@ -657,6 +683,13 @@ export interface TokenAnalysisResponse {
   liquidityMonitor?: LiquidityMonitorData; // Real-time liquidity tracking
   holderTracking?: HolderTrackingData; // Top holder sell-off detection
   fundingAnalysis?: FundingAnalysisData; // Wallet funding source analysis
+  
+  // Temporal GNN Detection (2025)
+  tgnResult?: TGNResult; // Temporal graph analysis with 0.958-0.966 F1-score
+  isPreMigration?: boolean; // Token still on Pump.fun bonding curve
+  migrationDetected?: boolean; // Recently migrated to Raydium
+  systemWalletsFiltered?: number; // Count of filtered system wallets
+  lpPoolAddress?: string; // LP pool address for TGN graph analysis
 }
 
 // Storage schema (not used for in-memory but kept for consistency)

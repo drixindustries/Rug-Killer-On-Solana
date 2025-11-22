@@ -51,6 +51,7 @@ export interface CompactMessageData {
   aiVerdict?: string;
   security: string;
   holders: string;
+  tgnAnalysis?: string;
   market?: string;
   pumpFun?: string;
   floorInfo?: string;
@@ -166,9 +167,40 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   const holderCount = analysis.holderCount ?? 0;
   const topHolderConc = analysis.topHolderConcentration ?? 0;
   const supply = analysis.metadata?.supply ?? 0;
+  const systemWalletsFiltered = analysis.systemWalletsFiltered ?? 0;
   
   const holderCountText = holderCount.toLocaleString();
-  const holders = `👥 **Holders**\n• Total: ${holderCountText}\n• Top 10: ${topHolderConc.toFixed(1)}%\n• Supply: ${formatNumber(supply)}`;
+  let holders = `👥 **Holders**\n• Total: ${holderCountText}\n• Top 10: ${topHolderConc.toFixed(1)}%\n• Supply: ${formatNumber(supply)}`;
+  if (systemWalletsFiltered > 0) {
+    holders += `\n• Filtered: ${systemWalletsFiltered} system wallets`;
+  }
+  
+  // TEMPORAL GNN ANALYSIS
+  let tgnAnalysis: string | undefined;
+  if (analysis.tgnResult) {
+    const tgn = analysis.tgnResult;
+    const rugPercent = (tgn.rugProbability * 100).toFixed(1);
+    let tgnEmoji = '✅';
+    
+    if (tgn.rugProbability > 0.70) {
+      tgnEmoji = '🚨';
+    } else if (tgn.rugProbability > 0.40) {
+      tgnEmoji = '⚠️';
+    }
+    
+    tgnAnalysis = `🧠 **Temporal GNN**\n${tgnEmoji} Rug Risk: ${rugPercent}%\n• Graph: ${tgn.graphMetrics.nodeCount} wallets, ${tgn.graphMetrics.edgeCount} txns\n• Confidence: ${(tgn.confidence * 100).toFixed(0)}%`;
+    
+    if (analysis.isPreMigration) {
+      tgnAnalysis += `\n⏳ Pre-Migration (Bonding Curve)`;
+    }
+    
+    if (tgn.patterns.length > 0) {
+      const topPattern = tgn.patterns[0];
+      const patternEmoji = topPattern.type === 'migration_event' ? '🔄' : 
+                           topPattern.confidence > 0.8 ? '🔴' : '🟡';
+      tgnAnalysis += `\n${patternEmoji} ${topPattern.type.replace(/_/g, ' ')}`;
+    }
+  }
   
   // MARKET DATA
   let market: string | undefined;
@@ -459,6 +491,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     aiVerdict,
     security,
     holders,
+    tgnAnalysis,
     market,
     pumpFun,
       floorInfo,
@@ -498,6 +531,10 @@ export function toPlainText(data: CompactMessageData): string {
   
   message += `${data.security}\n\n`;
   message += `${data.holders}\n\n`;
+  
+  if (data.tgnAnalysis) {
+    message += `${data.tgnAnalysis}\n\n`;
+  }
   
   if (data.market) {
     message += `${data.market}\n\n`;
