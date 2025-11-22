@@ -69,13 +69,31 @@ export class SolanaTokenAnalyzer {
       ]);
 
       // Log any failures for debugging
-      if (dexData.status === 'rejected') console.warn(`[Analyzer] DexScreener failed:`, dexData.reason?.message);
-      if (onChainData.status === 'rejected') console.warn(`[Analyzer] On-chain data failed:`, onChainData.reason?.message);
-      if (holderData.status === 'rejected') console.warn(`[Analyzer] Holder analysis failed:`, holderData.reason?.message);
-      if (creationDateData.status === 'rejected') console.warn(`[Analyzer] Creation date failed:`, creationDateData.reason?.message);
-      if (pumpFunData.status === 'rejected') console.warn(`[Analyzer] Pump.fun check failed:`, pumpFunData.reason?.message);
-      if (quillCheckData.status === 'rejected') console.warn(`[Analyzer] QuillCheck failed:`, quillCheckData.reason?.message);
-      if (honeypotData.status === 'rejected') console.warn(`[Analyzer] Honeypot detection failed:`, honeypotData.reason?.message);
+      const failures: string[] = [];
+      if (dexData.status === 'rejected') {
+        console.warn(`[Analyzer] DexScreener failed:`, dexData.reason?.message);
+        failures.push('DexScreener');
+      }
+      if (onChainData.status === 'rejected') {
+        console.warn(`[Analyzer] On-chain data failed:`, onChainData.reason?.message);
+        failures.push('On-chain');
+      }
+      if (holderData.status === 'rejected') {
+        console.warn(`[Analyzer] Holder analysis failed:`, holderData.reason?.message);
+        failures.push('Holders');
+      }
+      if (creationDateData.status === 'rejected') {
+        console.warn(`[Analyzer] Creation date failed:`, creationDateData.reason?.message);
+      }
+      if (pumpFunData.status === 'rejected') {
+        console.warn(`[Analyzer] Pump.fun check failed:`, pumpFunData.reason?.message);
+      }
+      if (quillCheckData.status === 'rejected') {
+        console.warn(`[Analyzer] QuillCheck failed:`, quillCheckData.reason?.message);
+      }
+      if (honeypotData.status === 'rejected') {
+        console.warn(`[Analyzer] Honeypot detection failed:`, honeypotData.reason?.message);
+      }
 
       const dex = dexData.status === 'fulfilled' ? dexData.value : null;
       const onChain = onChainData.status === 'fulfilled' ? onChainData.value : null;
@@ -87,7 +105,10 @@ export class SolanaTokenAnalyzer {
       
       // Check if critical data is missing
       if (!dex && !onChain) {
-        throw new Error('Unable to fetch token data - both DexScreener and on-chain queries failed');
+        const errorMsg = failures.length > 0 
+          ? `Token data unavailable - ${failures.join(', ')} services failed. This token may be too new or not yet indexed.`
+          : 'Token data unavailable - unable to fetch from DexScreener or blockchain';
+        throw new Error(errorMsg);
       }
 
       console.log(`✅ [Analyzer] Data fetched in ${Date.now() - startTime}ms`);

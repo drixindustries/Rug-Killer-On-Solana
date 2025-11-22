@@ -560,18 +560,41 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           console.log(`[Discord /execute] Reply sent for ${tokenAddress}`);
         } catch (error: any) {
           console.error(`[Discord /execute] Error for ${tokenAddress}:`, error.message);
-          const errorEmbed = new EmbedBuilder()
-            .setColor(0xff0000)
-            .setTitle('❌ Analysis Failed')
-            .setDescription(
-              `Failed to analyze token: \`${tokenAddress.slice(0, 8)}...${tokenAddress.slice(-8)}\`\n\n` +
-              `**Error:** ${error?.message || 'Unknown error'}\n\n` +
+          
+          // Provide more specific error messages based on the error type
+          let errorTitle = '❌ Analysis Failed';
+          let errorDescription = `Failed to analyze token: \`${tokenAddress.slice(0, 8)}...${tokenAddress.slice(-8)}\`\n\n`;
+          
+          if (error.message?.includes('Token data unavailable') || error.message?.includes('services failed')) {
+            errorTitle = '⏳ Token Data Not Ready';
+            errorDescription += `**Error:** ${error.message}\n\n` +
+              `This token might be:\n` +
+              `• Too new (just launched)\n` +
+              `• Not yet indexed by data providers\n` +
+              `• Missing liquidity pool\n\n` +
+              `Try again in a few moments once the token is indexed.`;
+          } else if (error.message?.includes('Invalid')) {
+            errorTitle = '❌ Invalid Token Address';
+            errorDescription += `The provided address is not a valid Solana token address.\n\n` +
+              `Please verify the address and try again.`;
+          } else if (error.message?.includes('RPC') || error.message?.includes('connection')) {
+            errorTitle = '🔌 Connection Issue';
+            errorDescription += `**Error:** ${error.message}\n\n` +
+              `Blockchain connection is experiencing issues.\n\n` +
+              `Please try again in a moment.`;
+          } else {
+            errorDescription += `**Error:** ${error?.message || 'Unknown error'}\n\n` +
               `This could be due to:\n` +
               `• Invalid token address\n` +
               `• RPC connection issues\n` +
               `• Token data not available\n\n` +
-              `Please verify the address and try again.`
-            )
+              `Please verify the address and try again.`;
+          }
+          
+          const errorEmbed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle(errorTitle)
+            .setDescription(errorDescription)
             .setTimestamp();
           
           await interaction.editReply({ embeds: [errorEmbed] });
