@@ -122,26 +122,25 @@ export class HeliusWebhookService extends EventEmitter {
     }
 
     try {
-      console.log('[Helius Webhook] Starting real-time monitoring...');
+      console.log('[Helius Webhook] Starting HTTP-based monitoring...');
       
-      // Connect to Helius RPC with WebSocket support
+      // Connect to Helius RPC - HTTP only (WebSocket disabled to avoid 403 errors)
+      // Helius webhooks provide real-time data via HTTP POST, no WebSocket needed
       this.connection = new Connection(
         `https://mainnet.helius-rpc.com/?api-key=${this.HELIUS_API_KEY}`,
         {
-          wsEndpoint: `wss://mainnet.helius-rpc.com/?api-key=${this.HELIUS_API_KEY}`,
           commitment: 'confirmed',
+          // wsEndpoint disabled - webhook provides real-time updates via HTTP
         }
       );
 
-      // Start monitoring new token creations
-      await this.subscribeToTokenCreations();
-      
-      // Start monitoring DEX trades
-      await this.subscribeToDexTrades();
+      // WebSocket subscriptions disabled - Helius webhook provides events via HTTP POST
+      // await this.subscribeToTokenCreations();  // ❌ Requires WebSocket - causes 403 errors
+      // await this.subscribeToDexTrades();       // ❌ Requires WebSocket - causes 403 errors
 
       this.isMonitoring = true;
       this.emit('started');
-      console.log('[Helius Webhook] ✅ Real-time monitoring active');
+      console.log('[Helius Webhook] ✅ HTTP-based monitoring active (WebSocket subscriptions disabled)');
     } catch (error) {
       console.error('[Helius Webhook] Start error:', error);
       throw error;
