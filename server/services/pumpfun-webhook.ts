@@ -38,10 +38,13 @@ export class PumpFunWebhookService extends EventEmitter {
   private shouldReconnect = true;
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private readonly PUMP_FUN_WS_URL = process.env.PUMP_FUN_WS_URL || 'wss://pumpportal.fun/api/data';
-  private readonly enabled = (process.env.ENABLE_PUMPFUN_MONITOR || 'false').toLowerCase() === 'true';
+  private readonly enabled = process.env.ENABLE_PUMPFUN_MONITOR?.toLowerCase().trim() === 'true';
 
   constructor() {
     super();
+    if (!this.enabled) {
+      console.log('[PumpFun] Service disabled (ENABLE_PUMPFUN_MONITOR not set to true)');
+    }
   }
 
   /**
@@ -49,8 +52,7 @@ export class PumpFunWebhookService extends EventEmitter {
    */
   public async connect(): Promise<void> {
     if (!this.enabled) {
-      if (!this.shouldReconnect) return;
-      console.log('[PumpFun] WebSocket monitoring disabled (ENABLE_PUMPFUN_MONITOR=false)');
+      console.log('[PumpFun] WebSocket monitoring disabled (ENABLE_PUMPFUN_MONITOR not set to true)');
       this.shouldReconnect = false;
       return;
     }
@@ -197,11 +199,20 @@ export class PumpFunWebhookService extends EventEmitter {
     // Check for 403 authentication errors
     const errorMsg = error.message || String(error);
     if (errorMsg.includes('403') || errorMsg.includes('Forbidden')) {
-      console.error('[PumpFun] ⚠️  403 Authentication Error - Pump Portal may require API key or your IP is rate-limited');
-      console.error('[PumpFun] Consider disabling pump.fun monitoring or contact pumpportal.fun for API access');
+      console.error('[PumpFun] ⚠️  403 Authentication Error - Pump.fun WebSocket requires authentication');
+      console.error('[PumpFun] Set ENABLE_PUMPFUN_MONITOR=false in Railway environment variables to disable');
       // Stop reconnection completely on auth errors
       this.shouldReconnect = false;
       this.maxReconnectAttempts = 0;
+      // Close the connection immediately
+      if (this.ws) {
+        try {
+          this.ws.terminate();
+        } catch (e) {
+          // Ignore termination errors
+        }
+        this.ws = null;
+      }
     } else {
       console.error('[PumpFun] WebSocket error:', errorMsg);
     }
@@ -256,7 +267,7 @@ export class PumpFunWebhookService extends EventEmitter {
    * Schedule reconnection
    */
   private scheduleReconnect(): void {
-    if (!this.enabled) {
+    if (!this.enabled || !this.shouldReconnect) {
       return;
     }
 
