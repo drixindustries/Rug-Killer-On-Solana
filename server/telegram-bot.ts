@@ -1248,8 +1248,8 @@ function createTelegramBot(botToken: string): Telegraf {
       return;
     }
     
-    // Parse !command arguments
-    const cmdMatch = text.match(/^!(\w+)\s+([1-9A-HJ-NP-Za-km-z]{32,44})$/);
+    // Parse !command arguments (flexible whitespace handling)
+    const cmdMatch = text.match(/^!(\w+)[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
     if (cmdMatch) {
       const [, command, address] = cmdMatch;
       
@@ -1405,7 +1405,7 @@ function createTelegramBot(botToken: string): Telegraf {
           return;
           
         case 'holders':
-          const holdersMatch = text.match(/^!holders\s+([1-9A-HJ-NP-Za-km-z]{32,44})(?:\s+(\d+))?$/);
+          const holdersMatch = text.match(/^!holders[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})(?:[\s\n]+(\d+))?$/im);
           if (holdersMatch) {
             const [, addr, countStr] = holdersMatch;
             const count = countStr ? parseInt(countStr) : 10;
