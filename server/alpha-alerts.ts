@@ -740,14 +740,6 @@ export class AlphaAlertService {
         }
       });
 
-      // Listen to QuickNode webhook events
-      const { quickNodeWebhook } = await import('./services/quicknode-webhook.ts');
-      
-      quickNodeWebhook.on('token_created', async (event: any) => {
-        console.log('[Alpha Alerts] New token detected via QuickNode:', event.mint);
-        await this.checkTokenForAlphaWallets(event.mint, 'QuickNode Stream');
-      });
-
       // Pump.fun tokens are detected via Helius webhook (no separate WebSocket needed)
 
       console.log('[Alpha Alerts] ✅ Webhook listeners registered');
