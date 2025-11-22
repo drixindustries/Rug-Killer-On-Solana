@@ -153,7 +153,51 @@ export async function startServer() {
   return server;
 }
 
+async function seedWalletsOnStartup() {
+  console.log('🌱 Auto-seeding wallets on startup...');
+  
+  try {
+    // Check if database is available
+    if (process.env.FORCE_IN_MEMORY_DB === 'true') {
+      console.warn('⚠️ Skipping wallet seeding - database is in-memory mode');
+      console.warn('⚠️ Set FORCE_IN_MEMORY_DB=false to enable persistence');
+      return;
+    }
+
+    // Seed KOL wallets (45 high-influence traders from kolscan.io)
+    console.log('📊 Seeding KOL wallets...');
+    const { seedKolWallets } = await import('./seed-kol-wallets.ts');
+    await seedKolWallets();
+
+    // Seed smart money wallets from Dune (optional - requires DUNE_API_KEY)
+    if (process.env.DUNE_API_KEY) {
+      console.log('📊 Seeding smart money wallets from Dune...');
+      try {
+        // Dynamic import to avoid failure if Dune seeding fails
+        const seedSmartModule = await import('./seed-smart-money-wallets.ts');
+        // The seed-smart-money-wallets.ts runs on import, so just importing it triggers the seed
+        console.log('✅ Smart money wallet seeding initiated');
+      } catch (err: any) {
+        console.warn('⚠️ Smart money wallet seeding skipped:', err.message);
+      }
+    } else {
+      console.log('ℹ️ Skipping Dune smart money wallets (DUNE_API_KEY not set)');
+    }
+
+    console.log('✅ Wallet seeding completed');
+  } catch (err: any) {
+    console.error('❌ Wallet seeding failed:', err.message);
+    console.error('Stack:', err.stack);
+    // Don't crash the server, just log the error
+  }
+}
+
 async function startServices() {
+  // Auto-seed wallets on startup if enabled
+  if (process.env.SEED_WALLETS === 'true') {
+    await seedWalletsOnStartup();
+  }
+
   // Telegram bot (optional)
   if (
     (process.env.TELEGRAM_ENABLED || '').toLowerCase() === 'true' &&
