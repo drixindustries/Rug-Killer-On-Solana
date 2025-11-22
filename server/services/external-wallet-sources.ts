@@ -6,7 +6,6 @@
  * 
  * Sources:
  * - Solscan API (trending traders)
- * - Birdeye API (top traders)
  * - Community submissions (verified manually)
  * - Auto-discovered wallets (from our own analysis)
  */
@@ -25,8 +24,6 @@ interface ExternalWallet {
 }
 
 export class ExternalWalletSourceService {
-  private birdeyeDisabled = false;
-  
   /**
    * Fetch trending wallets from Solscan API
    * Note: Solscan doesn't have a public profitable traders API
@@ -35,65 +32,6 @@ export class ExternalWalletSourceService {
   async fetchSolscanTrendingWallets(): Promise<ExternalWallet[]> {
     console.log('[External Wallets] Solscan trending wallets - Not yet available via API');
     return [];
-  }
-
-  /**
-   * Fetch top traders from Birdeye API
-   * Requires Birdeye API key
-   */
-  async fetchBirdeyeTopTraders(tokenMint?: string): Promise<ExternalWallet[]> {
-    const apiKey = process.env.BIRDEYE_API_KEY;
-    
-    if (!apiKey) {
-      console.log('[External Wallets] Birdeye API key not configured');
-      return [];
-    }
-
-    if (this.birdeyeDisabled) {
-      return [];
-    }
-
-    try {
-      // Birdeye has trader analytics endpoints (requires paid plan)
-      const endpoint = tokenMint 
-        ? `https://public-api.birdeye.so/v1/token/top_traders/${tokenMint}`
-        : 'https://public-api.birdeye.so/v1/wallet/trending';
-
-      const response = await fetch(endpoint, {
-        headers: {
-          'X-API-KEY': apiKey,
-        },
-      });
-
-      if (!response.ok) {
-        const authError = response.status === 401 || response.status === 403;
-        const logFn = authError ? console.warn : console.error;
-        logFn('[External Wallets] Birdeye API error:', response.status);
-        if (authError) {
-          this.birdeyeDisabled = true;
-          console.warn('[External Wallets] Disabling Birdeye importer until next deploy (invalid key or plan)');
-        }
-        return [];
-      }
-
-      const data = await response.json();
-      
-      // Parse Birdeye response (format depends on their actual API)
-      const wallets: ExternalWallet[] = (data.data?.traders || []).map((trader: any) => ({
-        address: trader.address,
-        displayName: trader.name,
-        winRate: trader.winRate,
-        profitSol: trader.pnl_sol,
-        trades: trader.trades,
-        source: 'birdeye',
-      }));
-
-      console.log(`[External Wallets] Found ${wallets.length} wallets from Birdeye`);
-      return wallets;
-    } catch (error) {
-      console.error('[External Wallets] Error fetching Birdeye traders:', error);
-      return [];
-    }
   }
 
   /**
@@ -156,12 +94,8 @@ export class ExternalWalletSourceService {
   async aggregateAllSources(): Promise<void> {
     console.log('[External Wallets] Starting wallet aggregation from all sources...');
 
-    const [birdeyeWallets] = await Promise.all([
-      this.fetchBirdeyeTopTraders(),
-      // Add more sources here as they become available
-    ]);
-
-    const allWallets = [...birdeyeWallets];
+    // Add more sources here as they become available
+    const allWallets: ExternalWallet[] = [];
 
     await this.importCommunityWallets(allWallets);
 

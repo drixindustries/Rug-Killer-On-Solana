@@ -545,7 +545,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   const links = `**Best Solana Trading Tools**
 [Buy 0.5% • Jupiter](https://jup.ag/swap/SOL-${analysis.tokenAddress})  [Buy 1% • Photon](https://photon-sol.tinyastro.io/en/lp/${analysis.tokenAddress})  [Buy 2% • BullX](https://bullx.io/terminal?chainId=1399811149&address=${analysis.tokenAddress})
 [Limit Orders • Trojan](https://t.me/solana_trojanbot?start=r-rugkiller)  [Snipe • BonkBot](https://t.me/bonkbot_bot?start=ref_rugkiller)  [Track • Ave.ai](https://ave.ai/token/${analysis.tokenAddress})
-Quick Links → [Solscan](https://solscan.io/token/${analysis.tokenAddress}) • [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress}) • [RugCheck](https://rugcheck.xyz/tokens/${analysis.tokenAddress}) • [Birdeye](https://birdeye.so/token/${analysis.tokenAddress}?chain=solana) • [GMGN](https://gmgn.ai/sol/token/${analysis.tokenAddress}) • [Jito Explorer](https://explorer.jito.wtf/address/${analysis.tokenAddress})`;
+Quick Links → [Solscan](https://solscan.io/token/${analysis.tokenAddress}) • [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress}) • [RugCheck](https://rugcheck.xyz/tokens/${analysis.tokenAddress}) • [GMGN](https://gmgn.ai/sol/token/${analysis.tokenAddress}) • [Jito Explorer](https://explorer.jito.wtf/address/${analysis.tokenAddress})`;
   
   return {
     header,

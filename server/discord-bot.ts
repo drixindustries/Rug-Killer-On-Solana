@@ -2308,8 +2308,8 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         .setTitle('📊 Chart Links')
         .setDescription(
           `🟢 [DexScreener](https://dexscreener.com/solana/${tokenAddress})\n` +
-          `🔵 [BirdEye](https://birdeye.so/token/${tokenAddress})\n` +
-          `🟣 [Pump.fun](https://pump.fun/${tokenAddress})`
+          `🟣 [Pump.fun](https://pump.fun/${tokenAddress})\n` +
+          `🔍 [GMGN](https://gmgn.ai/sol/token/${tokenAddress})`
         );
       
       await message.reply({ embeds: [embed] });
