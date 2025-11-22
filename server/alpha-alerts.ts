@@ -534,12 +534,58 @@ export class AlphaAlertService {
   // Check if token passes basic quality filters
   private async isQualityToken(mint: string): Promise<boolean> {
     try {
+      // 1. Validate Solana token format (base58, 32-44 chars)
+      if (!mint || mint.length < 32 || mint.length > 44) {
+        console.log(`[ALPHA ALERT] Invalid token length: ${mint?.length}`);
+        return false;
+      }
+
+      // 2. Check if it's a valid Solana address (base58 characters only)
+      const base58Regex = /^[1-9A-HJ-NP-Za-km-z]+$/;
+      if (!base58Regex.test(mint)) {
+        console.log(`[ALPHA ALERT] Invalid base58 format: ${mint}`);
+        return false;
+      }
+
+      // 3. Verify token exists on Solana blockchain
+      try {
+        const { PublicKey } = await import('@solana/web3.js');
+        const pubkey = new PublicKey(mint);
+        
+        // Quick RPC call to verify account exists
+        const accountInfo = await this.connection.getAccountInfo(pubkey);
+        if (!accountInfo) {
+          console.log(`[ALPHA ALERT] Token not found on-chain: ${mint}`);
+          return false;
+        }
+        
+        // Verify it's actually a token (has data)
+        if (accountInfo.data.length === 0) {
+          console.log(`[ALPHA ALERT] Not a token account: ${mint}`);
+          return false;
+        }
+      } catch (error) {
+        console.log(`[ALPHA ALERT] Invalid Solana address: ${mint}`);
+        return false;
+      }
+
+      // 4. Check external APIs for quality metrics
       const [rugCheck, dexScreener] = await Promise.all([
         fetch(`https://api.rugcheck.xyz/v1/tokens/${mint}/report`).then(r => r.json()).catch(() => null),
         fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`).then(r => r.json()).catch(() => null),
       ]);
 
-      // Basic filters
+      // Verify it's listed as a Solana token on DexScreener
+      const isSolanaToken = dexScreener?.pairs?.some((pair: any) => 
+        pair.chainId === 'solana' || pair.baseToken?.address === mint
+      );
+      
+      if (!isSolanaToken && dexScreener?.pairs?.length > 0) {
+        console.log(`[ALPHA ALERT] Not a Solana token on DexScreener: ${mint}`);
+        return false;
+      }
+
+      // Basic quality filters
       const hasGoodRugScore = rugCheck?.score > 85;
       const notHoneypot = !rugCheck?.isHoneypot;
       const hasLiquidity = (dexScreener?.pairs?.[0]?.liquidity?.usd || 0) > 5000;
