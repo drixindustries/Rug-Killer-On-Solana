@@ -861,19 +861,10 @@ export class AlphaAlertService {
       this.lastSuccessAt = Date.now();
       this.consecutiveFailures = 0;
       console.log(`[Alpha Alerts] ✅ Connection healthy: ${provider.name} (${provider.tier})`);
-      
-      // Report success back to balancer for scoring
-      rpcBalancer.reportSuccess(provider, 200); // Assume good latency
     } catch (err: any) {
       this.lastFailureAt = Date.now();
       this.consecutiveFailures++;
       console.error('[Alpha Alerts] ❌ Connection failed:', err?.message || String(err));
-      
-      // Report failure back to balancer
-      const provider = rpcBalancer.providers.find(p => p.getUrl() === this.currentRpc);
-      if (provider) {
-        rpcBalancer.reportFailure(provider);
-      }
       
       await this.scheduleReconnect();
     }
