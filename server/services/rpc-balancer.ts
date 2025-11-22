@@ -30,34 +30,6 @@ function getEnv(key: string): string | undefined {
   return undefined;
 }
 
-// Build QuickNode URL from env (PRIMARY RPC PROVIDER)
-function getQuickNodeUrl(): string | undefined {
-  const url = getEnv('QUICKNODE_RPC_URL')?.trim();
-  
-  console.log('[QuickNode Config] QUICKNODE_RPC_URL present:', !!url);
-  
-  if (!url || url.length === 0 || url === 'UNUSED') {
-    return undefined;
-  }
-
-  // Strip quotes and whitespace
-  const cleaned = url.replace(/^\"|\"$/g, '').trim();
-  
-  // Validate URL format
-  try {
-    const u = new URL(cleaned);
-    if (u.protocol !== 'https:') {
-      u.protocol = 'https:';
-    }
-    const finalUrl = u.toString();
-    console.log('[QuickNode Config] QuickNode URL configured:', finalUrl.substring(0, 50) + '...');
-    return finalUrl;
-  } catch (err) {
-    console.error('[QuickNode Config] Error parsing QuickNode URL:', err);
-    return undefined;
-  }
-}
-
 // Build Shyft API URL using API key
 function getShyftUrl(): string | undefined {
   const apiKey = getEnv('SHYFT_KEY')?.trim();
@@ -99,18 +71,7 @@ function getHeliusUrl(): string | undefined {
 }
 
 const RPC_PROVIDERS = [
-  // QuickNode Premium RPC (PRIMARY - 90% weight)
-  { 
-    getUrl: () => `${getQuickNodeUrl() || ""}`,
-    weight: 90, 
-    name: "QuickNode",
-    tier: "premium" as const,
-    requiresKey: true,
-    hasKey: () => !!getQuickNodeUrl(),
-    rateLimit: 1000,
-    rateLimitWindow: 60000
-  },
-  // Shyft Premium RPC (Secondary - 60% weight)
+  // Shyft Premium RPC (Primary - 60% weight)
   { 
     getUrl: () => `${getShyftUrl() || ""}`,
     weight: 60, 
@@ -141,9 +102,8 @@ const RPC_PROVIDERS = [
     rateLimit: 40,
     rateLimitWindow: 60000
   }
-  // REMOVED: Ankr, Phantom, AWS, and Latitude endpoints
-  // These were consistently failing with 403 Forbidden or timeouts
-  // The premium RPCs (QuickNode, Shyft, Helius) + Solana Official are sufficient
+  // REMOVED: Ankr, Phantom, AWS, Latitude, and QuickNode endpoints
+  // The premium RPCs (Shyft, Helius) + Solana Official are sufficient
 ];
 
 export class SolanaRpcBalancer {

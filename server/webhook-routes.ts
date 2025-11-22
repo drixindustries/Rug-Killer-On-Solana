@@ -1,11 +1,10 @@
 /**
  * Webhook Routes
- * Handle incoming webhooks from Helius, QuickNode, and other providers
+ * Handle incoming webhooks from Helius and other providers
  */
 
 import { Router, Request, Response } from 'express';
 import { heliusWebhook } from './services/helius-webhook.ts';
-import { quickNodeWebhook } from './services/quicknode-webhook.ts';
 import { pumpFunWebhook } from './services/pumpfun-webhook.ts';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
@@ -51,7 +50,7 @@ function verifySignature({
   rawBody: unknown;
   signature: string | undefined;
   secret: string;
-  provider: 'helius' | 'quicknode';
+  provider: 'helius';
 }): boolean {
   if (!signature) {
     console.warn(`[Webhook] Missing signature header for ${provider} webhook`);
@@ -122,46 +121,6 @@ router.post('/helius', async (req: Request, res: Response) => {
 });
 
 /**
- * QuickNode Streams Webhook Endpoint
- * POST /api/webhooks/quicknode
- */
-router.post('/quicknode', async (req: Request, res: Response) => {
-  try {
-    console.log('[Webhook] Received QuickNode stream webhook');
-    
-    const payload = req.body;
-    
-    // Validate webhook signature if secret is configured
-    const webhookSecret = process.env.QUICKNODE_WEBHOOK_SECRET;
-    if (webhookSecret) {
-      const signature = req.headers['x-qn-signature'] as string;
-      const isValid = verifySignature({
-        rawBody: getRawBody(req),
-        signature,
-        secret: webhookSecret,
-        provider: 'quicknode',
-      });
-
-      if (!isValid) {
-        console.warn('[Webhook] Rejected QuickNode webhook - invalid signature');
-        return res.status(401).json({ error: 'Invalid QuickNode signature' });
-      }
-    }
-
-    // Respond immediately to prevent timeout
-    res.status(200).json({ success: true });
-    
-    // Process the stream event asynchronously (fire-and-forget)
-    quickNodeWebhook.processWebhook(payload).catch(err => {
-      console.error('[Webhook] QuickNode processing error:', err);
-    });
-  } catch (error: any) {
-    console.error('[Webhook] QuickNode webhook error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-/**
  * Pump.fun Webhook Endpoint (if they add HTTP webhooks in future)
  * POST /api/webhooks/pumpfun
  */
@@ -188,7 +147,6 @@ router.post('/pumpfun', async (req: Request, res: Response) => {
 router.get('/health', (req: Request, res: Response) => {
   const status = {
     helius: heliusWebhook.getStatus(),
-    quicknode: quickNodeWebhook.getStatus(),
     timestamp: Date.now(),
   };
   

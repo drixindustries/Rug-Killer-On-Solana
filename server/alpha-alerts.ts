@@ -128,8 +128,7 @@ export class AlphaAlertService {
       
       // The real monitoring happens via:
       // 1. Helius webhook service (token_created events)
-      // 2. QuickNode webhook service (transaction events) 
-      // 3. Pump.fun WebSocket (new token launches)
+      // 2. Pump.fun WebSocket (new token launches)
       
       this.lastLogAt = Date.now();
       // Monitoring is now handled by external webhook services

@@ -518,7 +518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Solana Streams Webhook Receiver (Helius/QuickNode-compatible)
+  // Solana Streams Webhook Receiver (Helius-compatible)
   if (process.env.ENABLE_SOLANA_STREAM_WEBHOOK === 'true') {
     // Middleware to capture raw body for HMAC verification
     const captureRawBody = (req: any, res: any, next: any) => {
@@ -553,7 +553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const verifyHmac = (process.env.SOLANA_STREAM_VERIFY_HMAC || 'true').toLowerCase() === 'true';
         const rawBody: Buffer | undefined = req.rawBody;
         const headerCandidates: string[] = [
-          req.header('x-quicknode-signature'),
+
           req.header('x-helius-signature'),
           req.header('x-signature'),
         ].filter(Boolean) as string[];
