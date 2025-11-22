@@ -1682,8 +1682,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const snapshots = await storage.getHistoricalData(token, 1);
             const latestSnapshot = snapshots.length > 0 ? snapshots[snapshots.length - 1] : null;
             
-            // Get token name from cache
-            const tokenName = await nameCache.get(token);
+            // Get token name from cache (nameCache uses resolve() not get())
+            const tokenName = nameCache.resolve(token) || token.slice(0, 8);
             
             // Determine rug type based on risk flags
             let rugType: 'honeypot' | 'liquidity_drain' | 'mint_authority' | 'freeze_authority' | 'other' = 'other';
