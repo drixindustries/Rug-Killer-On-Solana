@@ -531,9 +531,13 @@ export class AlphaAlertService {
     }
   }
 
-  // Check if token passes basic quality filters
+  // Enhanced rug detection using SolRPDS-based metrics
+  // Composite scoring: >75/100 = safe alpha call
   private async isQualityToken(mint: string): Promise<boolean> {
     try {
+      let rugScore = 0; // Composite score out of 100
+      const risks: string[] = [];
+
       // 1. Validate Solana token format (base58, 32-44 chars)
       if (!mint || mint.length < 32 || mint.length > 44) {
         console.log(`[ALPHA ALERT] Invalid token length: ${mint?.length}`);
@@ -547,50 +551,115 @@ export class AlphaAlertService {
         return false;
       }
 
-      // 3. Verify token exists on Solana blockchain
+      // 3. Verify token exists on Solana blockchain + check mint/freeze authority
       try {
         const { PublicKey } = await import('@solana/web3.js');
         const pubkey = new PublicKey(mint);
         
-        // Quick RPC call to verify account exists
         const accountInfo = await this.connection.getAccountInfo(pubkey);
         if (!accountInfo) {
           console.log(`[ALPHA ALERT] Token not found on-chain: ${mint}`);
           return false;
         }
         
-        // Verify it's actually a token (has data)
         if (accountInfo.data.length === 0) {
           console.log(`[ALPHA ALERT] Not a token account: ${mint}`);
           return false;
+        }
+
+        // Check mint authority (revoked = +25 points)
+        // SPL Token mint data: First 32 bytes = mint authority (all zeros = revoked)
+        const mintAuthority = accountInfo.data.slice(0, 32);
+        const isAuthorityRevoked = mintAuthority.every(byte => byte === 0);
+        if (isAuthorityRevoked) {
+          rugScore += 25;
+        } else {
+          risks.push('Active mint authority');
         }
       } catch (error) {
         console.log(`[ALPHA ALERT] Invalid Solana address: ${mint}`);
         return false;
       }
 
-      // 4. Check external APIs for quality metrics
+      // 4. Fetch quality metrics from multiple APIs
       const [rugCheck, dexScreener] = await Promise.all([
         fetch(`https://api.rugcheck.xyz/v1/tokens/${mint}/report`).then(r => r.json()).catch(() => null),
         fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`).then(r => r.json()).catch(() => null),
       ]);
 
-      // Verify it's listed as a Solana token on DexScreener
-      const isSolanaToken = dexScreener?.pairs?.some((pair: any) => 
-        pair.chainId === 'solana' || pair.baseToken?.address === mint
-      );
-      
-      if (!isSolanaToken && dexScreener?.pairs?.length > 0) {
+      // Verify it's a Solana token on DexScreener
+      const solanaPair = dexScreener?.pairs?.find((pair: any) => pair.chainId === 'solana');
+      if (!solanaPair && dexScreener?.pairs?.length > 0) {
         console.log(`[ALPHA ALERT] Not a Solana token on DexScreener: ${mint}`);
         return false;
       }
 
-      // Basic quality filters
-      const hasGoodRugScore = rugCheck?.score > 85;
-      const notHoneypot = !rugCheck?.isHoneypot;
-      const hasLiquidity = (dexScreener?.pairs?.[0]?.liquidity?.usd || 0) > 5000;
+      // 5. RugCheck Score (0-10 scale, higher = safer) - Weight: 20 points
+      const rugCheckScore = rugCheck?.score || 0;
+      if (rugCheckScore > 8) {
+        rugScore += 20;
+      } else if (rugCheckScore > 6) {
+        rugScore += 10;
+        risks.push(`Low RugCheck score: ${rugCheckScore}/10`);
+      } else {
+        risks.push(`Very low RugCheck score: ${rugCheckScore}/10`);
+      }
 
-      return hasGoodRugScore && notHoneypot && hasLiquidity;
+      // 6. Honeypot Detection - Weight: 15 points
+      if (!rugCheck?.isHoneypot) {
+        rugScore += 15;
+      } else {
+        risks.push('Honeypot detected');
+      }
+
+      // 7. Liquidity Ratio (LP/MC > 15%) - Weight: 30 points
+      const liquidityUsd = solanaPair?.liquidity?.usd || 0;
+      const marketCap = solanaPair?.marketCap || 0;
+      const liquidityRatio = marketCap > 0 ? (liquidityUsd / marketCap) : 0;
+      
+      if (liquidityUsd > 10000 && liquidityRatio > 0.15) {
+        rugScore += 30;
+      } else if (liquidityUsd > 5000 && liquidityRatio > 0.10) {
+        rugScore += 15;
+        risks.push(`Low liquidity ratio: ${(liquidityRatio * 100).toFixed(1)}%`);
+      } else {
+        risks.push(`Insufficient liquidity: $${liquidityUsd.toFixed(0)} (${(liquidityRatio * 100).toFixed(1)}% ratio)`);
+      }
+
+      // 8. Holder Distribution (>300 holders, top 10 <25%) - Weight: 25 points
+      // Note: This requires additional API calls to Helius or Solscan
+      // For now, use transaction count as proxy
+      const txCount = solanaPair?.txns?.h24?.buys || 0 + solanaPair?.txns?.h24?.sells || 0;
+      if (txCount > 500) {
+        rugScore += 25;
+      } else if (txCount > 200) {
+        rugScore += 12;
+        risks.push(`Low tx count: ${txCount} in 24h`);
+      } else {
+        risks.push(`Very low tx count: ${txCount} in 24h`);
+      }
+
+      // 9. Trading Activity - Buy/Sell Ratio should favor buys early on
+      const buys = solanaPair?.txns?.h1?.buys || 0;
+      const sells = solanaPair?.txns?.h1?.sells || 0;
+      const buySellRatio = sells > 0 ? buys / sells : buys;
+      if (buySellRatio > 1.2) {
+        rugScore += 10; // Bonus for positive momentum
+      }
+
+      // Log scoring breakdown
+      console.log(`[ALPHA ALERT] ${mint} - Rug Score: ${rugScore}/100 | Risks: ${risks.length ? risks.join(', ') : 'None'}`);
+
+      // Threshold: >75/100 = safe alpha call (per SolRPDS research)
+      if (rugScore >= 75 && risks.length === 0) {
+        return true;
+      } else if (rugScore >= 60 && risks.length <= 2) {
+        console.log(`[ALPHA ALERT] ${mint} - Marginal quality (${rugScore}/100), skipping`);
+        return false;
+      } else {
+        console.log(`[ALPHA ALERT] ${mint} - Failed quality check (${rugScore}/100)`);
+        return false;
+      }
     } catch (error) {
       console.error('[ALPHA ALERT] Quality check error:', error);
       return false;
