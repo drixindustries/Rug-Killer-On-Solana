@@ -24,6 +24,7 @@ import { tokenMetrics } from './services/token-metrics.ts';
 import getRawBody from 'raw-body';
 import { gte, sql } from "drizzle-orm";
 import webhookRoutes from "./webhook-routes.ts";
+import adminRoutes from "./admin-routes.ts";
 
 // Stub authentication for Railway deployment (no Replit OIDC)
 const setupAuth = async (app: Express) => {
@@ -67,6 +68,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mount webhook routes
   app.use('/api/webhooks', webhookRoutes);
   console.log('✅ Webhook routes registered at /api/webhooks');
+
+  // Mount admin routes
+  app.use('/api/admin', adminRoutes);
+  console.log('✅ Admin routes registered at /api/admin');
 
   // Helper to allow anonymous sessions for lightweight features (e.g., watchlist)
   const withUser = async (req: any, _res: any, next: any) => {
