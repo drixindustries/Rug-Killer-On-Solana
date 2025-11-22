@@ -12,6 +12,7 @@
         "pumpfun:sync": "tsx scripts/fetch-pumpfun-amm.ts"
     },
     "dependencies": {
+        "@duneanalytics/client-sdk": "^0.3.4",
         "@hookform/resolvers": "^3.10.0",
         "@jridgewell/trace-mapping": "^0.3.25",
         "@playwright/test": "^1.56.1",

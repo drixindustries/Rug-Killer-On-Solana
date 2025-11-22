@@ -348,6 +348,10 @@ const commands = [
     .addSubcommand(sc => sc.setName('remove')
       .setDescription('Remove alpha caller wallet')
       .addStringOption(o => o.setName('wallet').setDescription('Wallet address').setRequired(true))
+    )
+    .addSubcommand(sc => sc.setName('reload')
+      .setDescription('Reload wallets from database')
+      .addIntegerOption(o => o.setName('mininfluence').setDescription('Minimum influence score (default: 60)').setMinValue(0).setMaxValue(100))
     ),
   new SlashCommandBuilder()
     .setName('smart')
@@ -1460,6 +1464,12 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             console.log(`[Discord /alpha remove] Removing alpha caller - Wallet: ${wallet}`);
             alpha.removeCaller(wallet);
             await interaction.editReply({ content: `✅ Removed alpha caller (${formatAddress(wallet)})` });
+          } else if (sub === 'reload') {
+            const minInfluence = interaction.options.getInteger('mininfluence') ?? 60;
+            console.log(`[Discord /alpha reload] Reloading wallets from database with min influence: ${minInfluence}`);
+            await alpha.loadWalletsFromDatabase(minInfluence);
+            const st = alpha.getStatus();
+            await interaction.editReply({ content: `✅ Reloaded wallets from database.\n• Total Callers: ${st.totalCallers}\n• Monitored: ${st.monitoredCallers}` });
           } else {
             await interaction.editReply({ content: '⚠️ Unknown subcommand. Try `/alpha status`.' });
           }

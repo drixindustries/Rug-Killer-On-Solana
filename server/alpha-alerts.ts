@@ -160,6 +160,8 @@ export class AlphaAlertService {
    */
   async loadWalletsFromDatabase(minInfluence: number = 60): Promise<void> {
     try {
+      console.log(`[Alpha Alerts] Loading wallets from database (min influence: ${minInfluence})...`);
+      
       // Simpler selection to avoid cross-package drizzle type conflicts
       // Fetch smart wallets first
       type WalletRow = { walletAddress: string; displayName: string | null; influenceScore: number | null };
@@ -173,6 +175,7 @@ export class AlphaAlertService {
           .where(eq(smartWallets.isActive, true))
           .limit(200);
         wallets = smart.filter(meetsInfluenceThreshold);
+        console.log(`[Alpha Alerts] Found ${smart.length} active smart wallets, ${wallets.length} meet influence threshold`);
       } catch (err) {
         console.warn('[Alpha Alerts] Smart wallets query failed, will fallback:', err);
       }
@@ -183,6 +186,7 @@ export class AlphaAlertService {
             .from(kolWallets)
             .limit(200);
           wallets = kol.filter(meetsInfluenceThreshold);
+          console.log(`[Alpha Alerts] Found ${kol.length} KOL wallets, ${wallets.length} meet influence threshold`);
         } catch (err) {
           console.warn('[Alpha Alerts] KOL wallets query failed:', err);
         }
@@ -195,10 +199,13 @@ export class AlphaAlertService {
         influenceScore: w.influenceScore || 50,
       }));
 
+      let addedCount = 0;
       // Merge with existing callers (avoid duplicates)
       for (const newWallet of walletsToAdd) {
         if (!this.alphaCallers.find(c => c.wallet === newWallet.wallet)) {
           this.alphaCallers.push(newWallet);
+          addedCount++;
+          console.log(`[Alpha Alerts] Added wallet: ${newWallet.name} (${newWallet.wallet.substring(0, 8)}...) - influence: ${newWallet.influenceScore}`);
           
           // If already running, start monitoring this wallet
           if (this.isRunning) {
@@ -207,7 +214,7 @@ export class AlphaAlertService {
         }
       }
 
-      console.log(`[Alpha Alerts] Loaded ${walletsToAdd.length} wallets from database (min influence: ${minInfluence})`);
+      console.log(`[Alpha Alerts] ✅ Loaded ${addedCount} new wallets from database (${this.alphaCallers.length} total active)`);
     } catch (error) {
       console.error('[Alpha Alerts] Error loading wallets from database:', error);
     }
@@ -967,13 +974,19 @@ export class AlphaAlertService {
 
   // Get current monitoring status
   getStatus(verbose: boolean = false) {
+    const enabledCallers = this.alphaCallers.filter(c => c.enabled);
     const status = {
       isRunning: this.isRunning,
-      monitoredCallers: this.alphaCallers.filter(c => c.enabled).length,
+      monitoredCallers: enabledCallers.length,
       totalCallers: this.alphaCallers.length,
       activeListeners: this.listeners.size,
       activeWebSockets: this.wsConnections.length,
-      callers: verbose ? this.alphaCallers : undefined,
+      callers: verbose ? this.alphaCallers.map(c => ({
+        name: c.name,
+        wallet: c.wallet,
+        enabled: c.enabled,
+        influenceScore: c.influenceScore,
+      })) : undefined,
       message: undefined as string | undefined,
     };
     

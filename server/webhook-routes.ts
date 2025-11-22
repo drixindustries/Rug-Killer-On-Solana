@@ -108,10 +108,13 @@ router.post('/helius', async (req: Request, res: Response) => {
       }
     }
 
-    // Process the webhook payload
-    await heliusWebhook.processWebhook(payload);
+    // Respond immediately to prevent timeout
+    res.status(200).json({ success: true, received: Array.isArray(payload) ? payload.length : 1 });
     
-    res.status(200).json({ success: true, processed: Array.isArray(payload) ? payload.length : 1 });
+    // Process the webhook payload asynchronously (fire-and-forget)
+    heliusWebhook.processWebhook(payload).catch(err => {
+      console.error('[Webhook] Helius processing error:', err);
+    });
   } catch (error: any) {
     console.error('[Webhook] Helius webhook error:', error);
     res.status(500).json({ error: error.message });
@@ -145,10 +148,13 @@ router.post('/quicknode', async (req: Request, res: Response) => {
       }
     }
 
-    // Process the stream event
-    await quickNodeWebhook.processWebhook(payload);
-    
+    // Respond immediately to prevent timeout
     res.status(200).json({ success: true });
+    
+    // Process the stream event asynchronously (fire-and-forget)
+    quickNodeWebhook.processWebhook(payload).catch(err => {
+      console.error('[Webhook] QuickNode processing error:', err);
+    });
   } catch (error: any) {
     console.error('[Webhook] QuickNode webhook error:', error);
     res.status(500).json({ error: error.message });
