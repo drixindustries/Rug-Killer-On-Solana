@@ -35,6 +35,7 @@ WORKDIR /app
 # Copy shared directory and server source
 COPY shared/ ./shared/
 COPY server/ ./server/
+COPY migrations/ ./migrations/
 
 # Copy frontend build from builder stage
 COPY --from=frontend-builder /app/dist/public ./server/dist/public
