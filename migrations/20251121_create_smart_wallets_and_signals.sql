@@ -1,5 +1,29 @@
 -- Migration: create smart_wallets and smart_signals tables for alpha alerts
 
+CREATE TABLE IF NOT EXISTS alpha_alert_targets (
+  id SERIAL PRIMARY KEY,
+  platform VARCHAR(20) NOT NULL,
+  group_id VARCHAR(255) NOT NULL,
+  channel_id VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(platform, group_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_alpha_targets_platform ON alpha_alert_targets(platform);
+
+CREATE TABLE IF NOT EXISTS smart_alert_targets (
+  id SERIAL PRIMARY KEY,
+  platform VARCHAR(20) NOT NULL,
+  group_id VARCHAR(255) NOT NULL,
+  channel_id VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(platform, group_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_smart_targets_platform ON smart_alert_targets(platform);
+
 CREATE TABLE IF NOT EXISTS smart_wallets (
   id SERIAL PRIMARY KEY,
   wallet_address VARCHAR(255) NOT NULL UNIQUE,
