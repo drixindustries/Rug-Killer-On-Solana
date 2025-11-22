@@ -19,7 +19,6 @@ import { DexScreenerService } from "./dexscreener-service.ts";
 import { rpcBalancer } from "./services/rpc-balancer.ts";
 import { checkPumpFun } from "./services/pumpfun-api.ts";
 import { holderAnalysis } from "./services/holder-analysis.ts";
-import { quillCheckService } from "./services/quillcheck-service.ts";
 import { TemporalGNNDetector } from "./temporal-gnn-detector.ts";
 import { getMigrationDetector } from "./migration-detector.ts";
 
@@ -57,15 +56,13 @@ export class SolanaTokenAnalyzer {
         throw new Error("Invalid token address format");
       }
 
-      // Fetch data in parallel - DexScreener, on-chain data, holder analysis, pump.fun check, and honeypot detection
-      const [dexData, onChainData, holderData, creationDateData, pumpFunData, quillCheckData, honeypotData] = await Promise.allSettled([
+      // Fetch data in parallel - DexScreener, on-chain data, holder analysis, pump.fun check
+      const [dexData, onChainData, holderData, creationDateData, pumpFunData] = await Promise.allSettled([
         options.skipExternal ? null : this.dexScreener.getTokenData(tokenMintAddress),
         options.skipOnChain ? null : this.getOnChainData(tokenAddress),
         options.skipExternal ? null : holderAnalysis.analyzeHolders(tokenMintAddress),
         options.skipOnChain ? null : this.getTokenCreationDate(tokenAddress),
         options.skipExternal ? null : checkPumpFun(tokenMintAddress),
-        options.skipExternal ? null : quillCheckService.checkToken(tokenMintAddress),
-        options.skipExternal ? null : quillCheckService.getHoneypotDetection(tokenMintAddress),
       ]);
 
       // Log any failures for debugging
@@ -88,20 +85,12 @@ export class SolanaTokenAnalyzer {
       if (pumpFunData.status === 'rejected') {
         console.warn(`[Analyzer] Pump.fun check failed:`, pumpFunData.reason?.message);
       }
-      if (quillCheckData.status === 'rejected') {
-        console.warn(`[Analyzer] QuillCheck failed:`, quillCheckData.reason?.message);
-      }
-      if (honeypotData.status === 'rejected') {
-        console.warn(`[Analyzer] Honeypot detection failed:`, honeypotData.reason?.message);
-      }
 
       const dex = dexData.status === 'fulfilled' ? dexData.value : null;
       const onChain = onChainData.status === 'fulfilled' ? onChainData.value : null;
       const holders = holderData.status === 'fulfilled' ? holderData.value : null;
       const creationDate = creationDateData.status === 'fulfilled' ? creationDateData.value : undefined;
       const pumpFun = pumpFunData.status === 'fulfilled' ? pumpFunData.value : null;
-      const quillCheck = quillCheckData.status === 'fulfilled' ? quillCheckData.value : null;
-      const honeypotDetection = honeypotData.status === 'fulfilled' ? honeypotData.value : null;
       
       // Check if critical data is missing
       if (!dex && !onChain) {
@@ -217,10 +206,6 @@ export class SolanaTokenAnalyzer {
         
         // External data references
         dexscreenerData: dex || undefined,
-        
-        // Advanced rug detection (2025)
-        quillcheckData: quillCheck || undefined,
-        honeypotDetection: honeypotDetection || undefined,
       };
 
       // TEMPORAL GNN ANALYSIS - Add TGN detection results
