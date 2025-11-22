@@ -40,7 +40,7 @@ router.post('/migrate', async (req: Request, res: Response) => {
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
-      AND table_name IN ('smart_wallets', 'smart_signals', 'kol_wallets')
+      AND table_name IN ('smart_wallets', 'smart_signals', 'kol_wallets', 'alpha_alert_targets', 'smart_alert_targets')
     `);
 
     const tables = result.rows.map(r => r.table_name);
