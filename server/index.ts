@@ -5,6 +5,22 @@
 
 export {};
 
+// Suppress bigint-buffer stderr warning before any imports
+const originalStderrWrite = process.stderr.write.bind(process.stderr);
+process.stderr.write = (chunk: any, encoding?: any, callback?: any): boolean => {
+  const message = chunk.toString();
+  if (message.includes('bigint: Failed to load bindings')) {
+    // Silently ignore bigint-buffer native binding warning
+    if (typeof encoding === 'function') {
+      encoding();
+      return true;
+    }
+    if (callback) callback();
+    return true;
+  }
+  return originalStderrWrite(chunk, encoding, callback);
+};
+
 // Suppress noisy crypto library warnings
 process.removeAllListeners('warning');
 process.on('warning', (warning) => {
