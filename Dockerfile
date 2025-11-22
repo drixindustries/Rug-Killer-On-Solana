@@ -24,20 +24,12 @@ RUN ls -la /app/dist/public/ && echo "âœ… Frontend build successful" || (echo "â
 # Production stage
 FROM node:20-alpine
 
-WORKDIR /app
-
-# Copy ALL package files first
-COPY package*.json ./
-COPY server/package.json server/package-lock.json ./server/
-
-# Install dependencies at ROOT level (so shared/ can resolve modules)
-RUN npm ci --omit=dev
-
-# Also install server dependencies
+# Install only the server runtime dependencies
 WORKDIR /app/server
+COPY server/package.json server/package-lock.json ./
 RUN npm ci --omit=dev
 
-# Copy shared directory and server source
+# Copy shared directory and server source (node_modules retained from npm ci)
 WORKDIR /app
 COPY shared/ ./shared/
 COPY server/ ./server/
