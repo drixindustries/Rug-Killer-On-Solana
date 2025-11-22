@@ -43,7 +43,7 @@ interface GraphSnapshot {
 }
 
 interface TemporalPattern {
-  type: 'star_dump' | 'coordinated_cluster' | 'bridge_wallet' | 'lp_drain' | 'sniper_bot';
+  type: 'star_dump' | 'coordinated_cluster' | 'bridge_wallet' | 'lp_drain' | 'sniper_bot' | 'migration_event';
   confidence: number; // 0-1
   description: string;
   affectedNodes: string[];
@@ -60,6 +60,8 @@ interface TGNResult {
     clusterCoefficient: number;
   };
   riskFactors: string[];
+  isPreMigration?: boolean; // True if bonding curve detected
+  migrationDetected?: boolean; // True if migration event processed
 }
 
 // ============================================================================
@@ -70,6 +72,7 @@ export class TemporalGNNDetector {
   private snapshots: GraphSnapshot[] = [];
   private readonly maxSnapshots = 12; // Track last 12 snapshots (e.g., 5s each = 1min)
   private readonly memoryDecay = 0.9; // Decay factor for node memory
+  private migrationEvents = new Map<string, { timestamp: number; lpAddress: string }>(); // tokenMint -> migration data
   
   constructor(
     private connection: Connection,
@@ -82,36 +85,66 @@ export class TemporalGNNDetector {
   ) {}
 
   /**
+   * Inject migration event into temporal graph
+   * This triggers a "phase shift" in the graph, updating LP node memory
+   * 
+   * @param tokenMint Token mint address
+   * @param lpAddress Raydium LP pool address
+   * @param timestamp Migration timestamp (Unix seconds)
+   */
+  injectMigrationEvent(tokenMint: string, lpAddress: string, timestamp: number): void {
+    console.log(`[TGN] Migration event injected: ${tokenMint} → LP ${lpAddress.slice(0, 8)}...`);
+    
+    // Store migration event
+    this.migrationEvents.set(tokenMint, { timestamp, lpAddress });
+    
+    // Force immediate re-analysis on next analyzeToken call
+    // The migration will be detected and included in pattern analysis
+  }
+
+  /**
+   * Check if token has migrated
+   */
+  hasMigrated(tokenMint: string): boolean {
+    return this.migrationEvents.has(tokenMint);
+  }
+
+  /**
    * Analyze a token for rug pull patterns using temporal graph analysis
    * 
    * @param tokenAddress Token mint address
    * @param lpPoolAddress Optional LP pool address for focused analysis
+   * @param isPreMigration Optional pre-migration flag from holder analysis
    * @returns TGN analysis result with rug probability
    */
-  async analyzeToken(tokenAddress: string, lpPoolAddress?: string): Promise<TGNResult> {
+  async analyzeToken(tokenAddress: string, lpPoolAddress?: string, isPreMigration?: boolean): Promise<TGNResult> {
     if (!this.config.enableTGN) {
       return this.getDisabledResult();
     }
 
     try {
+      // Check if migration event occurred
+      const migrationData = this.migrationEvents.get(tokenAddress);
+      const migrationDetected = !!migrationData;
+
       // Build transaction graph from recent activity
       const graph = await this.buildTransactionGraph(tokenAddress, lpPoolAddress);
       
       if (graph.edges.length < this.config.minTransactions) {
-        return this.getInsufficientDataResult();
+        return this.getInsufficientDataResult(isPreMigration);
       }
 
       // Store snapshot
       this.addSnapshot(graph);
 
-      // Analyze temporal patterns
-      const patterns = this.analyzeTemporalPatterns();
+      // Analyze temporal patterns (includes migration if detected)
+      const patterns = this.analyzeTemporalPatterns(tokenAddress, migrationData);
 
       // Calculate graph metrics
       const metrics = this.calculateGraphMetrics(graph);
 
       // Compute final rug probability using TGN-inspired scoring
-      const rugProbability = this.calculateRugProbability(patterns, metrics, graph);
+      const rugProbability = this.calculateRugProbability(patterns, metrics, graph, isPreMigration);
 
       // Extract risk factors
       const riskFactors = this.extractRiskFactors(patterns, metrics);
@@ -120,6 +153,8 @@ export class TemporalGNNDetector {
         rugProbability,
         patterns,
         graphMetrics: metrics,
+        isPreMigration,
+        migrationDetected,
         riskFactors,
       };
 
@@ -271,10 +306,23 @@ export class TemporalGNNDetector {
 
   /**
    * Analyze temporal patterns across snapshots
-   * Detects: star dumps, coordinated clusters, bridge wallets, LP drains
+   * Detects: star dumps, coordinated clusters, bridge wallets, LP drains, migrations
    */
-  private analyzeTemporalPatterns(): TemporalPattern[] {
+  private analyzeTemporalPatterns(
+    tokenMint?: string, 
+    migrationData?: { timestamp: number; lpAddress: string }
+  ): TemporalPattern[] {
     const patterns: TemporalPattern[] = [];
+
+    // Add migration event as a pattern if detected
+    if (migrationData) {
+      patterns.push({
+        type: 'migration_event',
+        confidence: 1.0,
+        description: `Token migrated to Raydium LP ${migrationData.lpAddress.slice(0, 8)}... at ${new Date(migrationData.timestamp * 1000).toISOString()}`,
+        affectedNodes: [migrationData.lpAddress],
+      });
+    }
 
     if (this.snapshots.length < 2) return patterns;
 
@@ -533,8 +581,15 @@ export class TemporalGNNDetector {
   private calculateRugProbability(
     patterns: TemporalPattern[],
     metrics: ReturnType<typeof this.calculateGraphMetrics>,
-    snapshot: GraphSnapshot
+    snapshot: GraphSnapshot,
+    isPreMigration?: boolean
   ): number {
+    // Pre-migration tokens cannot be rugs yet - bonding curve holds supply
+    if (isPreMigration) {
+      console.log('[TGN] Pre-migration detected - returning low rug probability (0.05)');
+      return 0.05; // Very low probability, but not zero (migration itself could be risky)
+    }
+
     let score = 0;
 
     // Pattern-based scoring (0-70 points)
@@ -554,6 +609,10 @@ export class TemporalGNNDetector {
           break;
         case 'sniper_bot':
           score += 10 * pattern.confidence;
+          break;
+        case 'migration_event':
+          // Migration itself isn't a rug indicator, but signals phase change
+          // Don't add to score
           break;
       }
     }
@@ -637,7 +696,7 @@ export class TemporalGNNDetector {
   /**
    * Return insufficient data result
    */
-  private getInsufficientDataResult(): TGNResult {
+  private getInsufficientDataResult(isPreMigration?: boolean): TGNResult {
     return {
       rugProbability: 0,
       patterns: [],
@@ -649,6 +708,7 @@ export class TemporalGNNDetector {
         clusterCoefficient: 0,
       },
       riskFactors: ['Insufficient transaction data for TGN analysis'],
+      isPreMigration,
     };
   }
 

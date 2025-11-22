@@ -9,6 +9,8 @@ import { NansenService, type NansenSmartMoneyTrade } from './services/nansen-ser
 import { storage } from './storage.ts';
 import { rpcBalancer } from './services/rpc-balancer.ts';
 import { TemporalGNNDetector, type TGNResult } from './temporal-gnn-detector.ts';
+import { MigrationDetector, getMigrationDetector, type MigrationEvent } from './migration-detector.ts';
+import { HolderAnalysisService, type HolderAnalysisResult } from './services/holder-analysis.ts';
 
 interface AlphaAlert {
   type: 'new_token' | 'whale_buy' | 'caller_signal';
@@ -52,6 +54,7 @@ export class AlphaAlertService {
   private lastLogAt = 0;
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private tgnDetector: TemporalGNNDetector | null = null;
+  private migrationDetector: MigrationDetector | null = null;
 
   constructor(rpcUrl?: string, customCallers?: AlphaCallerConfig[]) {
     // Use RPC balancer for intelligent load distribution - NO WebSocket subscriptions
@@ -87,6 +90,24 @@ export class AlphaAlertService {
     if (process.env.TGN_ENABLED !== 'false') {
       this.tgnDetector = new TemporalGNNDetector(this.connection);
       console.log('[Alpha Alerts] Temporal GNN detector initialized (10-18% better rug detection)');
+      
+      // Initialize migration detector
+      this.migrationDetector = getMigrationDetector(this.connection);
+      
+      // Register migration callback to inject events into TGN
+      this.migrationDetector.onMigration(async (event: MigrationEvent) => {
+        console.log(`[Alpha Alerts] Migration detected: ${event.tokenMint} → ${event.raydiumLP}`);
+        
+        // Inject migration event into TGN detector
+        if (this.tgnDetector) {
+          this.tgnDetector.injectMigrationEvent(event.tokenMint, event.raydiumLP, event.timestamp);
+        }
+        
+        // Trigger re-analysis for this token
+        await this.handleMigrationReAnalysis(event);
+      });
+      
+      console.log('[Alpha Alerts] Migration detector initialized');
     } else {
       console.log('[Alpha Alerts] Temporal GNN detector disabled');
     }
@@ -541,10 +562,37 @@ export class AlphaAlertService {
     }
   }
 
+  /**
+   * Handle migration event - re-analyze token post-migration
+   * Migration from bonding curve to Raydium triggers immediate re-scoring
+   */
+  private async handleMigrationReAnalysis(event: MigrationEvent): Promise<void> {
+    try {
+      console.log(`[Alpha Alerts] Re-analyzing ${event.tokenMint} post-migration...`);
+      
+      // Run full quality check with migration context
+      const isQuality = await this.isQualityToken(event.tokenMint);
+      
+      if (isQuality) {
+        // Token passed post-migration quality check - potentially send alert
+        console.log(`[Alpha Alerts] ✅ ${event.tokenMint} passed post-migration check`);
+        
+        // Could trigger alert here if monitoring this token
+        // For now, just log - actual alerts come from webhook triggers
+      } else {
+        // Token failed post-migration - likely a rug
+        console.log(`[Alpha Alerts] ⚠️ ${event.tokenMint} FAILED post-migration check - potential rug`);
+      }
+    } catch (error) {
+      console.error(`[Alpha Alerts] Error re-analyzing ${event.tokenMint}:`, error);
+    }
+  }
+
   // Enhanced rug detection using SolRPDS-based metrics + Temporal GNN
   // Composite scoring: >75/100 = safe alpha call (heuristics)
   // TGN probability: 0-1 (temporal graph analysis)
   // Final decision: 70% TGN + 30% heuristics (per 2025 research)
+  // NOW WITH: Pre-migration detection - relaxed checks before Raydium migration
   private async isQualityToken(mint: string): Promise<boolean> {
     try {
       let rugScore = 0; // Composite score out of 100
@@ -663,11 +711,34 @@ export class AlphaAlertService {
         rugScore += 10; // Bonus for positive momentum
       }
 
+      // 9.5 HOLDER ANALYSIS - Get pre-migration status for TGN
+      let holderAnalysis: HolderAnalysisResult | null = null;
+      let isPreMigration = false;
+      try {
+        const holderService = new HolderAnalysisService(this.connection);
+        holderAnalysis = await holderService.analyzeHolders(mint);
+        isPreMigration = holderAnalysis.isPreMigration || false;
+        
+        if (isPreMigration) {
+          console.log(`[ALPHA ALERT] ${mint} - Pre-migration token detected (bonding curve active)`);
+        }
+        
+        // Use holder concentration for additional scoring
+        if (holderAnalysis.topHoldersConcentration < 0.25) {
+          rugScore += 15; // Bonus for distributed holdings
+        } else if (holderAnalysis.topHoldersConcentration > 0.50 && !isPreMigration) {
+          risks.push(`High concentration: top holders ${(holderAnalysis.topHoldersConcentration * 100).toFixed(1)}%`);
+        }
+      } catch (holderError) {
+        console.error('[ALPHA ALERT] Holder analysis failed:', holderError);
+        holderAnalysis = null;
+      }
+
       // 10. TEMPORAL GNN ANALYSIS (10-18% better detection per SolRPDS benchmarks)
       let tgnResult: TGNResult | null = null;
       if (this.tgnDetector) {
         try {
-          tgnResult = await this.tgnDetector.analyzeToken(mint, lpPoolAddress);
+          tgnResult = await this.tgnDetector.analyzeToken(mint, lpPoolAddress, isPreMigration);
           
           // Log TGN findings
           if (tgnResult.patterns.length > 0) {
@@ -712,9 +783,23 @@ export class AlphaAlertService {
       // Decision thresholds:
       // - finalSafety >= 0.80 (80% safe) = PASS (20% rug risk)
       // - finalRugRisk > 0.25 (25% rug risk) = REJECT
+      // - PRE-MIGRATION: Relaxed checks - treat as safe by default (cannot rug before LP creation)
       const SAFETY_THRESHOLD = 0.80;
       const MAX_RUG_RISK = 0.25;
+      const PRE_MIGRATION_SAFETY_THRESHOLD = 0.60; // More lenient for pre-migration tokens
 
+      if (isPreMigration) {
+        // Pre-migration tokens use relaxed threshold (cannot rug before Raydium migration)
+        if (finalSafety >= PRE_MIGRATION_SAFETY_THRESHOLD) {
+          console.log(`[ALPHA ALERT] ${mint} - ✅ PASS (pre-migration, ${(finalSafety * 100).toFixed(1)}% confidence)`);
+          return true;
+        } else {
+          console.log(`[ALPHA ALERT] ${mint} - ❌ REJECT (even pre-migration score too low: ${(finalSafety * 100).toFixed(1)}%)`);
+          return false;
+        }
+      }
+
+      // Post-migration: Standard thresholds
       if (finalSafety >= SAFETY_THRESHOLD) {
         console.log(`[ALPHA ALERT] ${mint} - ✅ PASS (${(finalSafety * 100).toFixed(1)}% confidence)`);
         return true;
@@ -824,6 +909,16 @@ export class AlphaAlertService {
 
     // Start Nansen watcher if enabled
     this.startNansenWatcher();
+
+    // Start migration detector if enabled
+    if (this.migrationDetector) {
+      try {
+        await this.migrationDetector.start();
+        console.log('[Alpha Alerts] Migration detector started successfully');
+      } catch (error) {
+        console.error('[Alpha Alerts] Failed to start migration detector:', error);
+      }
+    }
 
     // Begin heartbeat loop (but don't rely on it for WebSocket silence detection)
     this.startHeartbeat();
