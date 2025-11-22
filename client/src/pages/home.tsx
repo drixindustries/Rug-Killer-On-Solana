@@ -49,6 +49,7 @@ const FundingAnalysisCard = lazy(() => import("@/components/funding-analysis-car
 const CondensedTokenHeader = lazy(() => import("@/components/condensed-token-header").then(m => ({ default: m.CondensedTokenHeader })));
 const CondensedAlerts = lazy(() => import("@/components/condensed-alerts").then(m => ({ default: m.CondensedAlerts })));
 const CascadingAnalysisBars = lazy(() => import("@/components/cascading-analysis-bars").then(m => ({ default: m.CascadingAnalysisBars })));
+const TGNAnalysisCard = lazy(() => import("@/components/tgn-analysis-card").then(m => ({ default: m.TGNAnalysisCard })));
 
 // Loading fallback component for lazy-loaded components
 const ComponentLoader = () => <Skeleton className="h-48 w-full" />;
@@ -390,6 +391,18 @@ export default function Home() {
                   <Suspense fallback={<ComponentLoader />}>
                     <CascadingAnalysisBars analysis={analysis} />
                   </Suspense>
+
+                  {/* Temporal GNN Analysis - Prominent Position */}
+                  {analysis.tgnResult && (
+                    <Suspense fallback={<ComponentLoader />}>
+                      <TGNAnalysisCard 
+                        tgnResult={analysis.tgnResult}
+                        isPreMigration={analysis.isPreMigration}
+                        migrationDetected={analysis.migrationDetected}
+                        systemWalletsFiltered={analysis.systemWalletsFiltered}
+                      />
+                    </Suspense>
+                  )}
 
                   {/* Detailed Charts Section - Collapsible/Below Bars */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
