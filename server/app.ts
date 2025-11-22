@@ -308,7 +308,7 @@ async function startServices() {
   }
 
   // Webhook services - real-time blockchain monitoring
-  if (process.env.HELIUS_API_KEY || process.env.QUICKNODE_STREAM_URL) {
+  if (process.env.HELIUS_API_KEY || process.env.DRPC_API_KEY) {
     console.log('🔔 Starting webhook services...');
     
     // Helius webhook service
@@ -322,19 +322,19 @@ async function startServices() {
       }
     }
 
-    // QuickNode webhook service
-    if (process.env.QUICKNODE_STREAM_URL) {
+    // dRPC webhook service (fallback)
+    if (process.env.DRPC_API_KEY) {
       try {
-        const { quickNodeWebhook } = await import('./services/quicknode-webhook.ts');
-        await quickNodeWebhook.start();
-        console.log('✅ QuickNode webhook service started');
+        const { drpcWebhook } = await import('./services/drpc-webhook.ts');
+        await drpcWebhook.start();
+        console.log('✅ dRPC webhook service started');
       } catch (err: any) {
-        console.warn('⚠️ QuickNode webhook service failed:', err.message);
+        console.warn('⚠️ dRPC webhook service failed:', err.message);
       }
     }
 
-    // Pump.fun WebSocket removed - Helius webhook handles all token detection
+    // Pump.fun WebSocket removed - Helius/dRPC webhooks handle all token detection
   } else {
-    console.log('ℹ️ Webhook services disabled - set HELIUS_API_KEY or QUICKNODE_STREAM_URL to enable real-time monitoring');
+    console.log('ℹ️ Webhook services disabled - set HELIUS_API_KEY or DRPC_API_KEY to enable real-time monitoring');
   }
 }

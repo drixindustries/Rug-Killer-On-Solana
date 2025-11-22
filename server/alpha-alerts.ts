@@ -128,7 +128,8 @@ export class AlphaAlertService {
       
       // The real monitoring happens via:
       // 1. Helius webhook service (token_created events)
-      // 2. Pump.fun WebSocket (new token launches)
+      // 2. dRPC webhook service (fallback for token detection)
+      // 3. Pump.fun WebSocket (new token launches)
       
       this.lastLogAt = Date.now();
       // Monitoring is now handled by external webhook services
@@ -740,12 +741,29 @@ export class AlphaAlertService {
         }
       });
 
-      // Pump.fun tokens are detected via Helius webhook (no separate WebSocket needed)
+      // Listen to dRPC webhook events (fallback)
+      const { drpcWebhook } = await import('./services/drpc-webhook.ts');
+      
+      drpcWebhook.on('token_created', async (event: any) => {
+        console.log('[Alpha Alerts] New token detected via dRPC:', event.mint);
+        await this.checkTokenForAlphaWallets(event.mint, 'dRPC Webhook');
+      });
 
-      console.log('[Alpha Alerts] ✅ Webhook listeners registered');
+      drpcWebhook.on('token_transfer', async (event: any) => {
+        const isMonitored = this.alphaCallers.some(c => 
+          c.wallet === event.from || c.wallet === event.to
+        );
+        if (isMonitored) {
+          console.log('[Alpha Alerts] Monitored wallet activity via dRPC:', event);
+          await this.checkTokenForAlphaWallets(event.mint, 'dRPC Transfer');
+        }
+      });
+
+      // Pump.fun tokens are detected via webhooks (no separate WebSocket needed)
+
+      console.log('[Alpha Alerts] ✅ Webhook listeners registered (Helius + dRPC)');
     } catch (error) {
       console.warn('[Alpha Alerts] Some webhook services unavailable:', error);
-      console.log('[Alpha Alerts] Falling back to Nansen feed only');
     }
   }
 
