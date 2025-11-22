@@ -120,42 +120,8 @@ export class AlphaAlertService {
     }
   }
   
-  // REMOVED OLD CODE: The old onLogs WebSocket subscription approach caused errors.
-  // Now using webhook-based monitoring instead. The removed code was:
-          const text = (logInfo.logs || []).join('\n');
-          const matches = text.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/g) || [];
-
-          // De-duplicate and cap work
-          const uniques = Array.from(new Set(matches)).slice(0, 5);
-
-          for (const candidate of uniques) {
-            // Basic sanity check and quality filter (fast short-circuit)
-            if (candidate.length < 32) continue;
-            const ok = await this.isQualityToken(candidate);
-            if (!ok) continue;
-
-            await this.sendAlert({
-              type: 'caller_signal',
-              mint: candidate,
-              source: caller.name || 'Alpha Caller',
-              timestamp: Date.now(),
-              data: {
-                wallet: caller.wallet,
-                provider: 'Wallet Monitor',
-              },
-            });
-            break; // send a single alert per tx/log burst
-          }
-        } catch (err) {
-          console.error('[Alpha Alerts] monitorAlphaCaller log handler error:', err);
-        }
-      });
-
-      this.listeners.set(caller.wallet, listenerId);
-    } catch (error) {
-      console.error(`[Alpha Alerts] Failed to monitor caller ${caller.name || caller.wallet}:`, error);
-    }
-  }
+  // REMOVED OLD CODE: The legacy onLogs WebSocket subscription caused API key issues.
+  // The logic now lives in the webhook services and is intentionally omitted here.
 
   /**
    * Load profitable wallets from database to monitor

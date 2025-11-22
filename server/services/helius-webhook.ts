@@ -78,6 +78,14 @@ export class HeliusWebhookService extends EventEmitter {
   private isMonitoring = false;
   private processedSignatures = new Set<string>();
   private readonly MAX_CACHE_SIZE = 10000;
+  private readonly TOKEN_WINDOW_MS = Number(process.env.HELIUS_TOKEN_WINDOW_MS ?? '60000');
+  private readonly TOKEN_WINDOW_CAP = Number(process.env.HELIUS_TOKEN_WINDOW_CAP ?? '120');
+  private readonly ANALYSIS_WINDOW_MS = Number(process.env.HELIUS_ANALYSIS_WINDOW_MS ?? '60000');
+  private readonly ANALYSIS_WINDOW_CAP = Number(process.env.HELIUS_ANALYSIS_WINDOW_CAP ?? '12');
+  private tokenDetectionTimestamps: number[] = [];
+  private analysisTimestamps: number[] = [];
+  private tokenThrottleNoticeAt = 0;
+  private analysisThrottleNoticeAt = 0;
 
   // DEX program IDs to monitor
   private readonly DEX_PROGRAMS = [
@@ -156,11 +164,15 @@ export class HeliusWebhookService extends EventEmitter {
             
             // Skip if already processed
             if (this.processedSignatures.has(mintAddress)) return;
+            this.addToCache(mintAddress);
+            if (this.shouldThrottleTokenDetection()) {
+              if (process.env.DEBUG_HELIUS_THROTTLE === 'true') {
+                console.debug('[Helius Webhook] Throttled token detection:', mintAddress);
+              }
+              return;
+            }
             
             console.log('[Helius Webhook] 🆕 New token detected:', mintAddress);
-            
-            // Add to processed cache
-            this.addToCache(mintAddress);
             
             // Emit raw event
             this.emit('token_created', {
@@ -264,6 +276,17 @@ export class HeliusWebhookService extends EventEmitter {
       
       for (const event of setAuthorityEvents) {
         const mintAddress = event.account;
+        if (this.processedSignatures.has(mintAddress)) {
+          continue;
+        }
+
+        this.addToCache(mintAddress);
+        if (this.shouldThrottleTokenDetection()) {
+          if (process.env.DEBUG_HELIUS_THROTTLE === 'true') {
+            console.debug('[Helius Webhook] Throttled token creation webhook:', mintAddress);
+          }
+          continue;
+        }
         
         console.log('[Helius Webhook] 🆕 Token created via setAuthority:', mintAddress);
         
@@ -314,6 +337,12 @@ export class HeliusWebhookService extends EventEmitter {
    */
   private async analyzeNewToken(mintAddress: string): Promise<void> {
     try {
+      if (this.shouldThrottleAnalysis()) {
+        if (process.env.DEBUG_HELIUS_THROTTLE === 'true') {
+          console.debug('[Helius Webhook] Skipping analysis (rate limited):', mintAddress);
+        }
+        return;
+      }
       console.log('[Helius Webhook] 🔍 Auto-analyzing token:', mintAddress);
       
       // Small delay to ensure token is fully initialized
@@ -331,6 +360,50 @@ export class HeliusWebhookService extends EventEmitter {
     } catch (error) {
       console.error(`[Helius Webhook] Auto-analysis failed for ${mintAddress}:`, error);
     }
+  }
+
+  private shouldThrottleTokenDetection(): boolean {
+    if (this.TOKEN_WINDOW_CAP <= 0) {
+      return false;
+    }
+
+    const now = Date.now();
+    this.tokenDetectionTimestamps = this.tokenDetectionTimestamps.filter(ts => now - ts < this.TOKEN_WINDOW_MS);
+
+    if (this.tokenDetectionTimestamps.length >= this.TOKEN_WINDOW_CAP) {
+      if (now - this.tokenThrottleNoticeAt > 10000) {
+        console.warn(
+          `[Helius Webhook] Throttling token detections (${this.tokenDetectionTimestamps.length}/${this.TOKEN_WINDOW_CAP} in ${this.TOKEN_WINDOW_MS}ms)`
+        );
+        this.tokenThrottleNoticeAt = now;
+      }
+      return true;
+    }
+
+    this.tokenDetectionTimestamps.push(now);
+    return false;
+  }
+
+  private shouldThrottleAnalysis(): boolean {
+    if (this.ANALYSIS_WINDOW_CAP <= 0) {
+      return false;
+    }
+
+    const now = Date.now();
+    this.analysisTimestamps = this.analysisTimestamps.filter(ts => now - ts < this.ANALYSIS_WINDOW_MS);
+
+    if (this.analysisTimestamps.length >= this.ANALYSIS_WINDOW_CAP) {
+      if (now - this.analysisThrottleNoticeAt > 10000) {
+        console.warn(
+          `[Helius Webhook] Rate limiting auto-analysis (${this.analysisTimestamps.length}/${this.ANALYSIS_WINDOW_CAP} in ${this.ANALYSIS_WINDOW_MS}ms)`
+        );
+        this.analysisThrottleNoticeAt = now;
+      }
+      return true;
+    }
+
+    this.analysisTimestamps.push(now);
+    return false;
   }
 
   /**
