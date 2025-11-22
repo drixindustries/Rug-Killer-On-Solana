@@ -1326,13 +1326,20 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           console.log(`[Discord /alpha] User ${interaction.user.tag} (ID: ${interaction.user.id}) | Guild: ${interaction.guildId || 'DM'} | Subcommand: ${sub}`);
           const alpha = getAlphaAlertService();
           const isDebug = sub === 'debug';
+          if (!interaction.deferred && !interaction.replied) {
+            try {
+              await interaction.deferReply({ ephemeral: true });
+            } catch (deferError) {
+              console.error('[Discord /alpha] Failed to defer reply:', deferError);
+              throw deferError;
+            }
+          }
           if (!isDebug && !canAdmin('alpha')) {
             console.log(`[Discord /alpha] PERMISSION DENIED for user ${interaction.user.id} | hasGuildPerms: ${hasGuildPerms} | isAdminEnv: ${isAdminEnv}`);
-            await interaction.reply({ content: '⛔ Admins only.', ephemeral: true });
+            await interaction.editReply({ content: '⛔ Admins only.' });
             return;
           }
           console.log(`[Discord /alpha] Permission granted for user ${interaction.user.id} | hasGuildPerms: ${hasGuildPerms} | isAdminEnv: ${isAdminEnv}`);
-          await interaction.deferReply({ ephemeral: true });
           if (sub === 'status') {
             const verbose = interaction.options.getBoolean('verbose') || false;
             const st = alpha.getStatus(verbose);
