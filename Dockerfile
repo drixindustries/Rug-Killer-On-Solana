@@ -31,7 +31,6 @@ RUN npm ci --omit=dev
 
 # Copy shared directory and server source (node_modules retained from npm ci)
 WORKDIR /app
-RUN ln -s /app/server/node_modules /app/node_modules
 COPY shared/ ./shared/
 COPY server/ ./server/
 
@@ -44,6 +43,7 @@ RUN ls -la ./server/dist/public/ && test -f ./server/dist/public/index.html && e
 # Environment
 ENV NODE_ENV=production
 ENV PORT=8080
+ENV NODE_PATH=/app/server/node_modules
 EXPOSE 8080
 
 # Run from server directory using local tsx
