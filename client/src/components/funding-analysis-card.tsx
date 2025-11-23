@@ -47,8 +47,6 @@ export function FundingAnalysisCard({ fundingData }: FundingAnalysisCardProps) {
           )}
         </div>
         <CardDescription>
-          Nova-style detection of coordinated funding patterns
-        <CardDescription>
           Where top holders obtained their SOL - detects coordination & insider activity
         </CardDescription>
       </CardHeader>
