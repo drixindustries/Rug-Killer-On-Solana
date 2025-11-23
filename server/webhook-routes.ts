@@ -1,11 +1,10 @@
 /**
  * Webhook Routes
- * Handle incoming webhooks from Helius, dRPC, and other providers
+ * Handle incoming webhooks from Helius and other providers
  */
 
 import { Router, Request, Response } from 'express';
 import { heliusWebhook } from './services/helius-webhook.ts';
-import { drpcWebhook } from './services/drpc-webhook.ts';
 import { pumpFunWebhook } from './services/pumpfun-webhook.ts';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
@@ -51,7 +50,7 @@ function verifySignature({
   rawBody: unknown;
   signature: string | undefined;
   secret: string;
-  provider: 'helius' | 'drpc';
+  provider: 'helius';
 }): boolean {
   if (!signature) {
     console.warn(`[Webhook] Missing signature header for ${provider} webhook`);
@@ -122,46 +121,6 @@ router.post('/helius', async (req: Request, res: Response) => {
 });
 
 /**
- * dRPC Webhook Endpoint
- * POST /api/webhooks/drpc
- */
-router.post('/drpc', async (req: Request, res: Response) => {
-  try {
-    console.log('[Webhook] Received dRPC webhook');
-    
-    const payload = req.body;
-    
-    // Validate webhook signature if secret is configured
-    const webhookSecret = process.env.DRPC_WEBHOOK_SECRET;
-    if (webhookSecret) {
-      const signature = req.headers['x-drpc-signature'] as string;
-      const isValid = verifySignature({
-        rawBody: getRawBody(req),
-        signature,
-        secret: webhookSecret,
-        provider: 'drpc',
-      });
-
-      if (!isValid) {
-        console.warn('[Webhook] Rejected dRPC webhook - invalid signature');
-        return res.status(401).json({ error: 'Invalid dRPC signature' });
-      }
-    }
-
-    // Respond immediately to prevent timeout
-    res.status(200).json({ success: true, received: Array.isArray(payload) ? payload.length : 1 });
-    
-    // Process the webhook payload asynchronously (fire-and-forget)
-    drpcWebhook.processWebhook(payload).catch(err => {
-      console.error('[Webhook] dRPC processing error:', err);
-    });
-  } catch (error: any) {
-    console.error('[Webhook] dRPC webhook error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-/**
  * Pump.fun Webhook Endpoint (if they add HTTP webhooks in future)
  * POST /api/webhooks/pumpfun
  */
@@ -188,7 +147,6 @@ router.post('/pumpfun', async (req: Request, res: Response) => {
 router.get('/health', (req: Request, res: Response) => {
   const status = {
     helius: heliusWebhook.getStatus(),
-    drpc: drpcWebhook.getStatus(),
     timestamp: Date.now(),
   };
   

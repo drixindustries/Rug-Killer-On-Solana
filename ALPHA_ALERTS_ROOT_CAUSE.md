@@ -56,17 +56,6 @@ HELIUS_WEBHOOK_ID: undefined ❌
 railway variables --set HELIUS_WEBHOOK_ID=your_webhook_id_from_dashboard
 ```
 
-#### Option B: Set up dRPC Webhook (Alternative)
-```bash
-# 1. Create webhook at https://drpc.org/webhooks
-# 2. Configure webhook to send to: https://rugkilleralphabot.fun/api/webhooks/drpc
-# 3. Add wallet addresses (25 wallets)
-# 4. Set secret:
-railway variables --set DRPC_WEBHOOK_SECRET=your_secret_key
-```
-
----
-
 ### 3. **BUG FIXED: meteoraFilteredPercent Crash**
 ```
 [HolderAnalysis] Helius fetch failed: ReferenceError: meteoraFilteredPercent is not defined
@@ -90,7 +79,6 @@ railway variables --set DRPC_WEBHOOK_SECRET=your_secret_key
 ### ❌ Not Working
 - Discord webhook: **Placeholder URL** ("SET_ME")
 - Helius webhook: **Not configured** (undefined)
-- dRPC webhook: **Not configured**
 - **Result: Zero alerts triggered in 12 hours**
 
 ---
@@ -101,7 +89,7 @@ railway variables --set DRPC_WEBHOOK_SECRET=your_secret_key
 ```
 Alpha Wallet Buys Token
     ↓
-Helius/dRPC Webhook Receives Transaction
+Helius Webhook Receives Transaction
     ↓
 POST to https://rugkilleralphabot.fun/api/webhooks/helius
     ↓

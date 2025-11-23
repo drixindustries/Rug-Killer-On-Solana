@@ -60,8 +60,8 @@ If you don't have access to the complete Ankr API key, you can:
 
 **Current Status**:
 - ✅ System is still operational (falls back to other RPCs)
-- ⚠️  Ankr Premium RPC unavailable (65% weight lost)
-- ✅ Using: dRPC (70%), Shyft (60%), Helius (50%), Public (30%)
+- ⚠️  Ankr Premium RPC unavailable (80% weight lost)
+- ✅ Using: Helius (75%), Shyft (60%), Public (30%)
 
 **Recommendation**: 
 Fix the Ankr API key to improve performance and reduce load on other RPC providers.

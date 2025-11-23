@@ -70,26 +70,6 @@ function getHeliusUrl(): string | undefined {
   return finalUrl;
 }
 
-// Build dRPC API URL using API key
-function getDrpcUrl(): string | undefined {
-  const apiKey = getEnv('DRPC_KEY')?.trim();
-  
-  console.log('[dRPC Config] DRPC_KEY present:', !!apiKey);
-  
-  if (!apiKey || apiKey.length === 0) {
-    console.log('[dRPC Config] No dRPC API key found');
-    return undefined;
-  }
-
-  // Strip quotes and whitespace
-  const cleaned = apiKey.replace(/^\"|\"$/g, '').trim();
-  
-  // dRPC endpoint format: https://lb.drpc.org/ogrpc?network=solana&dkey=YOUR_KEY
-  const finalUrl = `https://lb.drpc.org/ogrpc?network=solana&dkey=${cleaned}`;
-  console.log('[dRPC Config] dRPC URL configured');
-  return finalUrl;
-}
-
 // Build Ankr API URL using API key
 function getAnkrUrl(): string | undefined {
   const apiKey = getEnv('ANKR_API_KEY')?.trim();
@@ -117,17 +97,6 @@ function getAnkrUrl(): string | undefined {
 }
 
 const RPC_PROVIDERS = [
-  // dRPC Premium RPC (Minimal weight - liability at 130ms+)
-  { 
-    getUrl: () => `${getDrpcUrl() || ""}`,
-    weight: 10, // MINIMAL: Too slow at 130ms+, liability
-    name: "dRPC",
-    tier: "premium" as const,
-    requiresKey: true,
-    hasKey: () => !!getDrpcUrl(),
-    rateLimit: 1000,
-    rateLimitWindow: 60000
-  },
   // Ankr Premium RPC - Using direct HTTP client to bypass superstruct bug
   // The @solana/web3.js library has a bug with superstruct validation
   // that affects Ankr's response format. We bypass it with ankr-direct-client.ts

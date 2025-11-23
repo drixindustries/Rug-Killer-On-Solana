@@ -7,7 +7,7 @@ Automatically detects and filters exchange wallets using RPC provider metadata, 
 
 ### 2. Scanner Speed Improvements
 - **Parallel RPC calls**: 3-5x faster owner resolution
-- **dRPC weight reduced**: Prioritize fast providers (Helius, Ankr)
+- **Removed dRPC provider**: Only fast providers (Helius, Ankr, Shyft)
 - **Concurrent operations**: Multiple chunks processed simultaneously
 
 ---
@@ -117,10 +117,9 @@ Helius: 50 weight (Tertiary)   - Fast
 Ankr:   80 weight (Primary)    - Fast + exchange metadata ✅
 Helius: 75 weight (Secondary)  - Fast + DAS labels ✅
 Shyft:  60 weight (Tertiary)   - Good fallback
-dRPC:   30 weight (Fallback)   - Slow (150ms+) - reduced priority
 ```
 
-**Impact:** Scanner now prioritizes fastest providers first, falling back to dRPC only when others are rate-limited.
+**Impact:** Scanner now prioritizes fastest providers and completely removes dRPC to avoid 150ms latency spikes.
 
 ### 2. Parallel Owner Resolution
 
@@ -234,7 +233,7 @@ Check RPC selection logs:
 [RPC Balancer] Selected Helius (premium) - score: 100, latency: 52ms
 ```
 
-Should see Ankr/Helius 80% of the time, dRPC only when others busy.
+Should see Ankr/Helius 80% of the time, with Shyft as the rare fallback.
 
 ---
 
@@ -245,7 +244,8 @@ Should see Ankr/Helius 80% of the time, dRPC only when others busy.
 
 ### Modified Files
 - `server/services/holder-analysis.ts` - Integrated auto-detection + parallel owner resolution
-- `server/services/rpc-balancer.ts` - Re-prioritized providers, reduced dRPC weight
+- `server/services/rpc-balancer.ts` - Removed dRPC provider + re-prioritized fast providers
+- `server/webhook-routes.ts` - Dropped unused dRPC webhook endpoint
 
 ### Unchanged (Still Works)
 - `server/exchange-whitelist.ts` - Pre-listed exchanges (150+ addresses)
@@ -255,13 +255,6 @@ Should see Ankr/Helius 80% of the time, dRPC only when others busy.
 ---
 
 ## 💡 Future Enhancements
-
-### Optional dRPC Removal
-If 150ms latency persists, consider completely removing dRPC:
-```typescript
-// Simply comment out the dRPC provider in rpc-balancer.ts
-// Current weight: 30 (already de-prioritized)
-```
 
 ### Database Persistence
 Store auto-detected exchanges in PostgreSQL for cross-session memory:
@@ -287,7 +280,7 @@ const response = await fetch(`https://mainnet.helius-rpc.com/v1/accounts/${addre
 
 **Problems Solved:**
 1. ❌ Manual exchange whitelist maintenance → ✅ Auto-detection
-2. ❌ dRPC causing 150ms delays → ✅ Fast providers prioritized
+2. ❌ dRPC causing 150ms delays → ✅ Provider removed and fast nodes prioritized
 3. ❌ Sequential owner resolution → ✅ Parallel processing (5x faster)
 
 **Result:**

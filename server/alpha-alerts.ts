@@ -128,7 +128,7 @@ export class AlphaAlertService {
       
       // The real monitoring happens via:
       // 1. Helius webhook service (token_created events)
-      // 2. dRPC webhook service (fallback for token detection)
+      // 2. Ankr/Helius direct detections via RPC balancer
       // 3. Pump.fun WebSocket (new token launches)
       
       this.lastLogAt = Date.now();
@@ -722,8 +722,8 @@ export class AlphaAlertService {
       console.error('   Set webhook URL: railway variables --set ALPHA_DISCORD_WEBHOOK=https://discord.com/api/webhooks/...');
     }
     
-    if (!process.env.HELIUS_WEBHOOK_ID && !process.env.DRPC_WEBHOOK_SECRET) {
-      console.warn('⚠️ [Alpha Alerts] No webhook provider configured (Helius or dRPC) - transaction monitoring may not work');
+    if (!process.env.HELIUS_WEBHOOK_ID) {
+      console.warn('⚠️ [Alpha Alerts] Helius webhook not configured - transaction monitoring may be limited');
       console.warn('   Setup guide: See ALPHA_ALERTS_ROOT_CAUSE.md');
     }
   }
@@ -750,24 +750,6 @@ export class AlphaAlertService {
         if (isMonitored) {
           console.log('[Alpha Alerts] Monitored wallet activity:', event);
           await this.checkTokenForAlphaWallets(event.mint, 'Large Transfer');
-        }
-      });
-
-      // Listen to dRPC webhook events (fallback)
-      const { drpcWebhook } = await import('./services/drpc-webhook.ts');
-      
-      drpcWebhook.on('token_created', async (event: any) => {
-        console.log('[Alpha Alerts] New token detected via dRPC:', event.mint);
-        await this.checkTokenForAlphaWallets(event.mint, 'dRPC Webhook');
-      });
-
-      drpcWebhook.on('token_transfer', async (event: any) => {
-        const isMonitored = this.alphaCallers.some(c => 
-          c.wallet === event.from || c.wallet === event.to
-        );
-        if (isMonitored) {
-          console.log('[Alpha Alerts] Monitored wallet activity via dRPC:', event);
-          await this.checkTokenForAlphaWallets(event.mint, 'dRPC Transfer');
         }
       });
 
@@ -800,7 +782,7 @@ export class AlphaAlertService {
 
       // Pump.fun tokens are detected via webhooks (no separate WebSocket needed)
 
-      console.log('[Alpha Alerts] ✅ Webhook listeners registered (Helius + dRPC + Ankr)');
+      console.log('[Alpha Alerts] ✅ Webhook listeners registered (Helius + Ankr)');
     } catch (error) {
       console.warn('[Alpha Alerts] Some webhook services unavailable:', error);
     }

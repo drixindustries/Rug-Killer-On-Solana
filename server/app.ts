@@ -317,7 +317,7 @@ async function startServices() {
   }
 
   // Webhook services - real-time blockchain monitoring
-  if (process.env.HELIUS_API_KEY || process.env.DRPC_KEY) {
+  if (process.env.HELIUS_API_KEY || process.env.ANKR_API_KEY) {
     console.log('🔔 Starting webhook services...');
     
     // Helius webhook service
@@ -328,17 +328,6 @@ async function startServices() {
         console.log('✅ Helius webhook service started');
       } catch (err: any) {
         console.warn('⚠️ Helius webhook service failed:', err.message);
-      }
-    }
-
-    // dRPC webhook service (fallback)
-    if (process.env.DRPC_KEY) {
-      try {
-        const { drpcWebhook } = await import('./services/drpc-webhook.ts');
-        await drpcWebhook.start();
-        console.log('✅ dRPC webhook service started');
-      } catch (err: any) {
-        console.warn('⚠️ dRPC webhook service failed:', err.message);
       }
     }
 
@@ -362,8 +351,8 @@ async function startServices() {
       }
     }
 
-    // Pump.fun WebSocket removed - Helius/dRPC/Ankr webhooks handle all token detection
+    // Pump.fun WebSocket removed - Helius/Ankr services handle all token detection
   } else {
-    console.log('ℹ️ Webhook services disabled - set HELIUS_API_KEY, DRPC_KEY, or ANKR_API_KEY to enable real-time monitoring');
+    console.log('ℹ️ Webhook services disabled - set HELIUS_API_KEY or ANKR_API_KEY to enable real-time monitoring');
   }
 }

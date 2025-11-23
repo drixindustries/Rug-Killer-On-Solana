@@ -157,12 +157,11 @@ This is the error from your screenshot. It indicates:
 
 ## Performance
 
-The RPC balancer prioritizes providers:
-1. **dRPC** (70% weight) - Primary
-2. **Ankr** (65% weight) - Secondary ✨
-3. **Shyft** (60% weight) - Tertiary
-4. **Helius** (50% weight) - Quaternary
-5. Public fallbacks (30% weight) - Last resort
+The RPC balancer now prioritizes only the fast providers:
+1. **Ankr** (80% weight) - Primary ✨
+2. **Helius** (75% weight) - Secondary
+3. **Shyft** (60% weight) - Fallback
+4. Public fallbacks (30% weight) - Last resort
 
 Ankr provides:
 - Low latency
