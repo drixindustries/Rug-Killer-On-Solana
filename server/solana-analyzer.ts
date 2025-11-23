@@ -22,6 +22,7 @@ import { checkPumpFun } from "./services/pumpfun-api.ts";
 import { holderAnalysis } from "./services/holder-analysis.ts";
 import { TemporalGNNDetector } from "./temporal-gnn-detector.ts";
 import { getMigrationDetector } from "./migration-detector.ts";
+import { mlScorer } from "./services/ml-scorer.ts";
 
 export class SolanaTokenAnalyzer {
   private dexScreener: DexScreenerService;
@@ -217,6 +218,47 @@ export class SolanaTokenAnalyzer {
           console.error('[Analyzer] TGN analysis failed:', tgnError);
           response.tgnResult = undefined;
         }
+      }
+      
+      // Run ML scorer for additional risk assessment
+      try {
+        const mlFeatures = {
+          topHolderPercent: response.topHolders?.[0]?.percentage || 0,
+          top10Concentration: response.topHolderConcentration || 0,
+          holderCount: response.holderCount || 0,
+          liquidityUSD: response.liquidityInfo?.poolSize || 0,
+          poolLocked: response.liquidityInfo?.isLocked || false,
+          poolBurned: response.liquidityInfo?.isBurned || false,
+          mintEnabled: response.mintAuthority?.hasAuthority || false,
+          freezeEnabled: response.freezeAuthority?.hasAuthority || false,
+          ageHours: response.creationDate ? (Date.now() - response.creationDate) / (1000 * 60 * 60) : 0,
+          volume24h: response.dexscreenerData?.pairs?.[0]?.volume?.h24 || 0,
+          txns24h: (response.dexscreenerData?.pairs?.[0]?.txns?.h24?.buys || 0) + (response.dexscreenerData?.pairs?.[0]?.txns?.h24?.sells || 0),
+          priceChange24h: response.dexscreenerData?.pairs?.[0]?.priceChange?.h24 || 0,
+          buyPressure: (() => {
+            const buys = response.dexscreenerData?.pairs?.[0]?.txns?.h24?.buys || 0;
+            const sells = response.dexscreenerData?.pairs?.[0]?.txns?.h24?.sells || 0;
+            return buys + sells > 0 ? buys / (buys + sells) : 0.5;
+          })(),
+          isPumpFun: response.pumpFunData?.isPumpFun || false,
+          bondingCurve: response.pumpFunData?.bondingCurve || 0,
+          hasWebsite: !!response.metadata?.website,
+          hasTwitter: !!response.metadata?.twitter,
+          hasTelegram: !!response.metadata?.telegram,
+        };
+        
+        const mlResult = mlScorer.score(mlFeatures);
+        console.log(`[Analyzer] ML Score: ${(mlResult.rugProbability * 100).toFixed(1)}% (confidence: ${(mlResult.confidence * 100).toFixed(0)}%)`);
+        
+        // Add ML result to response for additional context
+        (response as any).mlScore = {
+          probability: mlResult.rugProbability,
+          confidence: mlResult.confidence,
+          topFactors: mlResult.topFactors,
+          model: mlResult.model
+        };
+      } catch (mlError) {
+        console.error('[Analyzer] ML scoring failed:', mlError);
       }
 
       console.log(`✅ [Analyzer] Complete in ${Date.now() - startTime}ms - Risk: ${response.riskLevel}`);
