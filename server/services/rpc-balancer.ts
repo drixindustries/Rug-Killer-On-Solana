@@ -90,6 +90,26 @@ function getDrpcUrl(): string | undefined {
   return finalUrl;
 }
 
+// Build Ankr API URL using API key
+function getAnkrUrl(): string | undefined {
+  const apiKey = getEnv('ANKR_API_KEY')?.trim();
+  
+  console.log('[Ankr Config] ANKR_API_KEY present:', !!apiKey);
+  
+  if (!apiKey || apiKey.length === 0) {
+    console.log('[Ankr Config] No Ankr API key found');
+    return undefined;
+  }
+
+  // Strip quotes and whitespace
+  const cleaned = apiKey.replace(/^\"|\"$/g, '').trim();
+  
+  // Ankr RPC endpoint format: https://rpc.ankr.com/solana/YOUR_KEY
+  const finalUrl = `https://rpc.ankr.com/solana/${cleaned}`;
+  console.log('[Ankr Config] Ankr URL configured');
+  return finalUrl;
+}
+
 const RPC_PROVIDERS = [
   // dRPC Premium RPC (Primary - 70% weight)
   { 
@@ -102,7 +122,18 @@ const RPC_PROVIDERS = [
     rateLimit: 1000,
     rateLimitWindow: 60000
   },
-  // Shyft Premium RPC (Secondary - 60% weight)
+  // Ankr Premium RPC (Secondary - 65% weight)
+  { 
+    getUrl: () => `${getAnkrUrl() || ""}`,
+    weight: 65, 
+    name: "Ankr",
+    tier: "premium" as const,
+    requiresKey: true,
+    hasKey: () => !!getAnkrUrl(),
+    rateLimit: 500,
+    rateLimitWindow: 60000
+  },
+  // Shyft Premium RPC (Quaternary - 60% weight)
   { 
     getUrl: () => `${getShyftUrl() || ""}`,
     weight: 60, 
@@ -113,7 +144,7 @@ const RPC_PROVIDERS = [
     rateLimit: 500,
     rateLimitWindow: 60000
   },
-  // Helius Premium RPC (Tertiary - 50% weight)
+  // Helius Premium RPC (Quinary - 50% weight)
   { 
     getUrl: () => `${getHeliusUrl() || ""}`,
     weight: 50, 
