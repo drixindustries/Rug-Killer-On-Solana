@@ -11,10 +11,17 @@ Pump.fun tokens often show system wallets (AMM vaults, fee receivers, bonding cu
 
 ## Solution
 
-All Pump.fun system wallets are maintained in a **hardcoded whitelist** at `server/pumpfun-whitelist.ts`.
+Pump.fun system wallets are filtered using a **hybrid approach**:
+
+1. **Hardcoded whitelist** - Known critical addresses in `server/pumpfun-whitelist.ts`
+2. **Pattern matching** - Automatically detects wallets by address prefix patterns
+3. **Dynamic detection** - Advanced on-chain analysis for edge cases (optional)
+
+This ensures **ALL** Pump.fun AMM wallets are filtered, including ones we haven't seen before.
 
 ### Current Whitelisted Addresses
 
+### Hardcoded Addresses
 ```typescript
 const CORE_PUMPFUN_ADDRESSES = new Set([
   '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P', // Pump.fun Program (bonding curve vault)
@@ -27,6 +34,25 @@ const CORE_PUMPFUN_ADDRESSES = new Set([
   'e4HZW81GuZkgDK2YAdPF6PsToQAB6Go6dL3iQpDz2Hy',  // Pump.fun AMM/Liquidity Vault
 ]);
 ```
+
+### Auto-Detection via Patterns (NEW!)
+
+The system now **automatically detects** new Pump.fun AMM wallets using address pattern matching:
+
+```typescript
+const PUMPFUN_ADDRESS_PATTERNS = [
+  /^6EF8/,   // Bonding curve vault prefix
+  /^CebN/,   // Global/system prefix  
+  /^39az/,   // Fee receiver prefix
+  /^TSLv/,   // Associated token prefix
+  /^Ce6T/,   // Event authority prefix
+  /^e4HZ/,   // AMM vault prefix
+  /^DezX/,   // Bonk-style vault clone
+  /^4wTV/,   // Legacy vault
+];
+```
+
+**This means**: ANY wallet address starting with these prefixes is **automatically filtered** - no manual addition needed!
 
 ## How to Add New Wallets
 

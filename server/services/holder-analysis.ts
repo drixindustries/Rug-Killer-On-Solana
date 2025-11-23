@@ -24,6 +24,7 @@ import { EXCHANGE_WALLETS, isExchangeWallet } from '../exchange-whitelist.js';
 import { getKnownAddressInfo } from '../known-addresses.js';
 import { isPumpFunAmm } from '../pumpfun-whitelist.js';
 import { isSystemWallet, isPumpFunBondingCurve, getSystemWalletType, filterHoldersWithStats } from '../pumpfun-system-wallets';
+import { isPumpFunAmmWallet } from './pumpfun-amm-detector.js';
 import bs58 from 'bs58';
 
 export interface HolderDetail {

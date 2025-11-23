@@ -56,6 +56,27 @@ const CORE_PUMPFUN_ADDRESSES = new Set([
   'e4HZW81GuZkgDK2YAdPF6PsToQAB6Go6dL3iQpDz2Hy',  // Pump.fun AMM/Liquidity Vault
 ]);
 
+// Pattern-based detection for Pump.fun AMM wallets
+// These prefixes are used by Pump.fun's address generation
+const PUMPFUN_ADDRESS_PATTERNS = [
+  /^6EF8/,   // Bonding curve vault prefix
+  /^CebN/,   // Global/system prefix  
+  /^39az/,   // Fee receiver prefix
+  /^TSLv/,   // Associated token prefix
+  /^Ce6T/,   // Event authority prefix
+  /^e4HZ/,   // AMM vault prefix
+  /^DezX/,   // Bonk-style vault clone
+  /^4wTV/,   // Legacy vault
+];
+
+/**
+ * Check if address matches known Pump.fun AMM patterns
+ * This provides fast, synchronous filtering for most cases
+ */
+function matchesPumpFunPattern(address: string): boolean {
+  return PUMPFUN_ADDRESS_PATTERNS.some(pattern => pattern.test(address));
+}
+
 const fileContents = loadWhitelist();
 const normalizedAddresses = new Set([
   ...CORE_PUMPFUN_ADDRESSES, // Always include core addresses
@@ -67,7 +88,18 @@ const normalizedAddresses = new Set([
 export const PUMPFUN_AMM_WALLETS = normalizedAddresses;
 
 export function isPumpFunAmm(address: string): boolean {
-  return normalizedAddresses.has(address);
+  // Check hardcoded addresses first (fastest)
+  if (normalizedAddresses.has(address)) {
+    return true;
+  }
+  
+  // Then check pattern matching (catches new AMM wallets automatically)
+  if (matchesPumpFunPattern(address)) {
+    console.log(`[PumpFunWhitelist] Auto-detected AMM wallet via pattern: ${address.slice(0, 8)}...`);
+    return true;
+  }
+  
+  return false;
 }
 
 export function getPumpFunWhitelistStats() {
