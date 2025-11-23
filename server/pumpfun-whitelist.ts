@@ -53,6 +53,7 @@ const CORE_PUMPFUN_ADDRESSES = new Set([
   'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',  // Associated Token Program
   'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',  // Token Program
   'Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1',  // Pump.fun Event Authority
+  'e4HZW81GuZkgDK2YAdPF6PsToQAB6Go6dL3iQpDz2Hy',  // Pump.fun AMM/Liquidity Vault
 ]);
 
 const fileContents = loadWhitelist();
