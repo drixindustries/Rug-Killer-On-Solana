@@ -189,6 +189,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
 
+    // Public test endpoint for alpha alerts (no auth required)
+    app.get('/api/alpha-test', async (_req, res) => {
+      try {
+        const { getAlphaAlertService } = await import('./alpha-alerts.ts');
+        const alpha = getAlphaAlertService();
+        await alpha.triggerTestAlert('So11111111111111111111111111111111111111112', 'Test Alert - Public Endpoint');
+        res.json({ ok: true, message: 'Test alert sent to Discord/Telegram' });
+      } catch (err: any) {
+        res.status(500).json({ ok: false, error: err?.message || String(err) });
+      }
+    });
+
     // Debug: actively ping the currently selected RPC and report latency
     app.get('/api/debug/ping-rpc', requireDebugToken, async (req, res) => {
       const started = Date.now();
