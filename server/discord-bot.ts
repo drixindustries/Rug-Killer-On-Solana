@@ -75,13 +75,18 @@ function getLiquidityFieldValue(liquidityPool: any): string {
   return value;
 }
 
+function stripBold(text?: string): string {
+  if (typeof text !== 'string') return '';
+  return text.replace(/\*\*/g, '');
+}
+
 function addSectionField(embed: EmbedBuilder, raw: string | undefined, fallbackLabel: string, inline = false): void {
   if (!raw) return;
   const trimmed = raw.trim();
   if (!trimmed) return;
   const lines = trimmed.split('\n');
   const firstLine = lines.shift() ?? '';
-  const name = lines.length > 0 ? firstLine.replace(/\*\*/g, '') : fallbackLabel;
+  const name = lines.length > 0 ? stripBold(firstLine) : fallbackLabel;
   const value = lines.length > 0 ? lines.join('\n') : firstLine;
   if (!name || !value) return;
   embed.addFields({
@@ -104,10 +109,11 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
     .setImage(`https://dd.dexscreener.com/ds-data/tokens/solana/${analysis.tokenAddress}.png?size=lg&t=${Date.now()}`);
   
   // AI VERDICT
-  if (messageData.aiVerdict) {
+  const sanitizedAiVerdict = stripBold(messageData.aiVerdict);
+  if (sanitizedAiVerdict) {
     embed.addFields({
       name: '🤖 AI Analysis',
-      value: messageData.aiVerdict.replace(/\*\*/g, ''),
+      value: sanitizedAiVerdict,
       inline: false
     });
   }
@@ -172,10 +178,11 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   }
   
   // WALLET AGES - Prominent section for wallet age analysis
-  if (messageData.walletAges) {
+  const sanitizedWalletAges = stripBold(messageData.walletAges);
+  if (sanitizedWalletAges) {
     embed.addFields({
       name: '⏰ Wallet Ages',
-      value: messageData.walletAges.replace(/\*\*/g, ''),
+      value: sanitizedWalletAges,
       inline: false
     });
   }
