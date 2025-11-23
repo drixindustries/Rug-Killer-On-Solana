@@ -44,8 +44,12 @@ export class AnkrWebSocketService extends EventEmitter {
   constructor() {
     super();
     
-    // Build Ankr WebSocket URL
+    // Build Ankr URLs (both HTTP and WebSocket)
     const ankrKey = process.env.ANKR_API_KEY;
+    const httpUrl = ankrKey 
+      ? `https://rpc.ankr.com/solana/${ankrKey}` 
+      : 'https://rpc.ankr.com/solana';
+    
     this.ankrWsUrl = ankrKey 
       ? `wss://rpc.ankr.com/solana/${ankrKey}` 
       : 'wss://rpc.ankr.com/solana';
@@ -73,9 +77,14 @@ export class AnkrWebSocketService extends EventEmitter {
     }
 
     try {
-      console.log('[Ankr WebSocket] Connecting to:', this.ankrWsUrl.replace(/\/[^/]+$/, '/***'));
+      const ankrKey = process.env.ANKR_API_KEY;
+      const httpUrl = ankrKey 
+        ? `https://rpc.ankr.com/solana/${ankrKey}` 
+        : 'https://rpc.ankr.com/solana';
       
-      this.connection = new Connection(this.ankrWsUrl, {
+      console.log('[Ankr WebSocket] Connecting to:', httpUrl.replace(/\/[^/]+$/, '/***'));
+      
+      this.connection = new Connection(httpUrl, {
         commitment: 'confirmed',
         wsEndpoint: this.ankrWsUrl,
       });
