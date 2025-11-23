@@ -201,6 +201,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
 
+    // Cache statistics endpoint (debug only)
+    app.get('/api/cache/stats', requireDebugToken, async (_req, res) => {
+      try {
+        const { redisCache } = await import('./services/redis-cache.ts');
+        const { cacheWarmer } = await import('./services/cache-warmer.ts');
+        
+        const redisStats = await redisCache.getStats();
+        const warmerStats = cacheWarmer.getStats();
+        
+        res.json({
+          ok: true,
+          redis: redisStats,
+          warmer: warmerStats,
+          timestamp: Date.now(),
+        });
+      } catch (err: any) {
+        res.status(500).json({ ok: false, error: err?.message || String(err) });
+      }
+    });
+
     // Debug: actively ping the currently selected RPC and report latency
     app.get('/api/debug/ping-rpc', requireDebugToken, async (req, res) => {
       const started = Date.now();

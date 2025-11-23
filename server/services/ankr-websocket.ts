@@ -1,6 +1,9 @@
 import { EventEmitter } from 'events';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { tokenAnalyzer } from '../solana-analyzer.ts';
+import { redisCache } from './redis-cache.ts';
+import { DexScreenerService } from '../dexscreener-service.ts';
+import { cacheWarmer } from './cache-warmer.ts';
 
 export interface AnkrTokenEvent {
   mint: string;
@@ -226,8 +229,8 @@ export class AnkrWebSocketService extends EventEmitter {
         console.log(`[Ankr WebSocket] 🚀 New token detected: ${mintAddress}`);
         this.emit('token_created', tokenEvent);
         
-        // Auto-scan the token
-        await this.autoScanToken(mintAddress);
+        // Pre-warm cache (non-blocking)
+        cacheWarmer.warmToken(mintAddress).catch(() => {});
       }
     } catch (error) {
       console.error('[Ankr WebSocket] Error handling program logs:', error);
@@ -334,13 +337,32 @@ export class AnkrWebSocketService extends EventEmitter {
   }
 
   /**
-   * Auto-scan detected token
+   * Auto-scan detected token and pre-cache results
    */
   private async autoScanToken(mint: string): Promise<void> {
     try {
-      console.log(`[Ankr WebSocket] Auto-scanning ${mint}...`);
+      console.log(`[Ankr WebSocket] 🚀 PRE-FETCHING token data for ${mint}...`);
 
-      const analysis = await tokenAnalyzer.analyzeToken(mint);
+      // Pre-fetch DexScreener data immediately
+      const dexScreener = new DexScreenerService();
+      const dexPromise = dexScreener.getTokenData(mint).catch(() => null);
+      
+      // Pre-fetch full analysis (will be cached by Redis)
+      const analysisPromise = tokenAnalyzer.analyzeToken(mint).catch((err) => {
+        console.error(`[Ankr WebSocket] Pre-fetch failed for ${mint}:`, err.message);
+        return null;
+      });
+
+      // Execute in parallel
+      const [dexData, analysis] = await Promise.all([dexPromise, analysisPromise]);
+      
+      if (dexData) {
+        console.log(`[Ankr WebSocket] ✅ PRE-CACHED DexScreener for ${mint}`);
+      }
+      
+      if (analysis) {
+        console.log(`[Ankr WebSocket] ✅ PRE-CACHED full analysis for ${mint}`);
+      }
 
       this.emit('token_analyzed', {
         mint,

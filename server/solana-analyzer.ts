@@ -24,6 +24,7 @@ import { TemporalGNNDetector } from "./temporal-gnn-detector.ts";
 import { getMigrationDetector } from "./migration-detector.ts";
 import { mlScorer } from "./services/ml-scorer.ts";
 import { fundingAnalyzer } from "./services/funding-source-analyzer.ts";
+import { redisCache } from "./services/redis-cache.ts";
 
 export class SolanaTokenAnalyzer {
   private dexScreener: DexScreenerService;
@@ -51,6 +52,13 @@ export class SolanaTokenAnalyzer {
     console.log(`🔍 [Analyzer] Starting analysis for ${tokenMintAddress}`);
 
     try {
+      // Check Redis cache first for instant results
+      const cached = await redisCache.get<TokenAnalysisResponse>(`token:analysis:${tokenMintAddress}`);
+      if (cached) {
+        console.log(`⚡ [Analyzer] Cache HIT - returning in ${Date.now() - startTime}ms`);
+        return cached;
+      }
+
       // Validate address
       let tokenAddress: PublicKey;
       try {
@@ -59,13 +67,31 @@ export class SolanaTokenAnalyzer {
         throw new Error("Invalid token address format");
       }
 
-      // Fetch data in parallel - DexScreener, on-chain data, holder analysis, pump.fun check
-      const [dexData, onChainData, holderData, creationDateData, pumpFunData] = await Promise.allSettled([
-        options.skipExternal ? null : this.dexScreener.getTokenData(tokenMintAddress),
-        options.skipOnChain ? null : this.getOnChainData(tokenAddress),
-        options.skipExternal ? null : holderAnalysis.analyzeHolders(tokenMintAddress),
-        options.skipOnChain ? null : this.getTokenCreationDate(tokenAddress),
-        options.skipExternal ? null : checkPumpFun(tokenMintAddress),
+      // Fetch data in parallel with aggressive timeouts for speed
+      // DexScreener: 8s, On-chain: 10s, Holders: 15s, PumpFun: 5s
+      const withTimeout = <T>(promise: Promise<T>, ms: number, name: string): Promise<T | null> => {
+        return Promise.race([
+          promise,
+          new Promise<null>((_, reject) => 
+            setTimeout(() => reject(new Error(`${name} timeout after ${ms}ms`)), ms)
+          )
+        ]).catch((err) => {
+          console.warn(`[Analyzer] ${name} failed:`, err.message);
+          return null;
+        });
+      };
+
+      const [dexData, onChainData, holderData, creationDateData, pumpFunData] = await Promise.all([
+        options.skipExternal ? Promise.resolve({ status: 'fulfilled' as const, value: null }) : 
+          withTimeout(this.dexScreener.getTokenData(tokenMintAddress), 8000, 'DexScreener').then(v => ({ status: 'fulfilled' as const, value: v })),
+        options.skipOnChain ? Promise.resolve({ status: 'fulfilled' as const, value: null }) : 
+          withTimeout(this.getOnChainData(tokenAddress), 10000, 'OnChain').then(v => ({ status: 'fulfilled' as const, value: v })),
+        options.skipExternal ? Promise.resolve({ status: 'fulfilled' as const, value: null }) : 
+          withTimeout(holderAnalysis.analyzeHolders(tokenMintAddress), 15000, 'Holders').then(v => ({ status: 'fulfilled' as const, value: v })),
+        options.skipOnChain ? Promise.resolve({ status: 'fulfilled' as const, value: null }) : 
+          withTimeout(this.getTokenCreationDate(tokenAddress), 5000, 'CreationDate').then(v => ({ status: 'fulfilled' as const, value: v })),
+        options.skipExternal ? Promise.resolve({ status: 'fulfilled' as const, value: null }) : 
+          withTimeout(checkPumpFun(tokenMintAddress), 5000, 'PumpFun').then(v => ({ status: 'fulfilled' as const, value: v })),
       ]);
 
       // Log any failures for debugging
@@ -294,6 +320,10 @@ export class SolanaTokenAnalyzer {
       }
 
       console.log(`✅ [Analyzer] Complete in ${Date.now() - startTime}ms - Risk: ${response.riskLevel}`);
+      
+      // Cache result for 5 minutes (300 seconds)
+      await redisCache.set(`token:analysis:${tokenMintAddress}`, response, 300).catch(() => {});
+      
       return response;
 
     } catch (error: any) {

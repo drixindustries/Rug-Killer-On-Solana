@@ -1,4 +1,5 @@
 import type { DexScreenerData } from "../shared/schema";
+import { redisCache } from "./services/redis-cache.ts";
 
 const DEXSCREENER_API_URL = "https://api.dexscreener.com";
 
@@ -71,6 +72,15 @@ export class DexScreenerService {
 
   async getTokenData(tokenAddress: string): Promise<DexScreenerData | null> {
     const now = Date.now();
+    
+    // Check Redis cache first (3 min TTL)
+    const redisCached = await redisCache.get<DexScreenerData>(`dex:${tokenAddress}`);
+    if (redisCached) {
+      console.log(`[DexScreener] ⚡ Redis HIT: ${tokenAddress}`);
+      return redisCached;
+    }
+    
+    // Fallback to memory cache
     const cached = CACHE.get(tokenAddress);
     if (cached && (now - cached.fetchedAt) < this.ttlMs) {
       return cached.data;
@@ -86,6 +96,12 @@ export class DexScreenerService {
       const raw = await response.json();
       const parsed = this.buildData(raw);
       CACHE.set(tokenAddress, { data: parsed, fetchedAt: now });
+      
+      // Cache in Redis for 3 minutes (180 seconds)
+      if (parsed) {
+        await redisCache.set(`dex:${tokenAddress}`, parsed, 180).catch(() => {});
+      }
+      
       return parsed;
     } catch (error) {
       console.error('DexScreener API error:', error);

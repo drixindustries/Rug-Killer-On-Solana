@@ -849,6 +849,7 @@ export class AlphaAlertService {
         
         ankrWebSocket.on('token_created', async (event: any) => {
           console.log('[Alpha Alerts] New token detected via Ankr:', event.mint);
+          // Cache warmer already triggered in ankr-websocket, just check for alpha
           await this.checkTokenForAlphaWallets(event.mint, 'Ankr WebSocket');
         });
 
