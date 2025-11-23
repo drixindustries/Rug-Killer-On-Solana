@@ -116,3 +116,5 @@ export function TopHoldersTable({ holders }: TopHoldersTableProps) {
     </Card>
   );
 }
+
+export default TopHoldersTable;

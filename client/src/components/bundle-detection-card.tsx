@@ -163,3 +163,5 @@ export function BundleDetectionCard({ data }: BundleDetectionCardProps) {
     </Card>
   );
 }
+
+export default BundleDetectionCard;

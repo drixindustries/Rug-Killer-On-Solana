@@ -316,3 +316,5 @@ export function HoneypotCard({ data }: HoneypotCardProps) {
     </Card>
   );
 }
+
+export default HoneypotCard;

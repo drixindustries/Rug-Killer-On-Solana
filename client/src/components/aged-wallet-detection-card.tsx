@@ -250,3 +250,5 @@ export function AgedWalletDetectionCard({ data }: AgedWalletDetectionCardProps) 
     </Card>
   );
 }
+
+export default AgedWalletDetectionCard;

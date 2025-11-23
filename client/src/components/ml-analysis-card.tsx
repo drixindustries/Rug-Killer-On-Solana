@@ -143,3 +143,5 @@ export function MLAnalysisCard({ mlScore }: MLAnalysisCardProps) {
     </Card>
   );
 }
+
+export default MLAnalysisCard;

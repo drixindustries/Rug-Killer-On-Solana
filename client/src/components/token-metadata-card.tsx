@@ -189,3 +189,5 @@ export function TokenMetadataCard({ metadata, tokenAddress, creationDate }: Toke
     </Card>
   );
 }
+
+export default TokenMetadataCard;

@@ -195,3 +195,5 @@ export function FundingAnalysisCard({ fundingData }: FundingAnalysisCardProps) {
     </Card>
   );
 }
+
+export default FundingAnalysisCard;

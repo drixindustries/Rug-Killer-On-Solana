@@ -244,3 +244,5 @@ export function TokenInfoSidebar({ tokenAddress, mintAuthority, freezeAuthority,
     </Card>
   );
 }
+
+export default TokenInfoSidebar;

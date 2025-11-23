@@ -148,3 +148,5 @@ export function CondensedAlerts({ redFlags, className = "" }: CondensedAlertsPro
     </div>
   );
 }
+
+export default CondensedAlerts;

@@ -380,3 +380,5 @@ export function CascadingAnalysisBars({ analysis }: CascadingAnalysisBarsProps) 
     </div>
   );
 }
+
+export default CascadingAnalysisBars;

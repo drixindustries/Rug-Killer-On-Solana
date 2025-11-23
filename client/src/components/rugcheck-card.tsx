@@ -123,3 +123,5 @@ export function RugcheckCard({ data, tokenAddress }: RugcheckCardProps) {
     </Card>
   );
 }
+
+export default RugcheckCard;

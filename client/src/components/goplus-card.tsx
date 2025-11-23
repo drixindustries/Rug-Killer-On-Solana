@@ -193,3 +193,5 @@ export function GoPlusCard({ data, tokenAddress }: GoPlusCardProps) {
     </Card>
   );
 }
+
+export default GoPlusCard;

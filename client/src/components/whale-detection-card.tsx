@@ -192,3 +192,5 @@ export function WhaleDetectionCard({ data, symbol }: WhaleDetectionCardProps) {
     </Card>
   );
 }
+
+export default WhaleDetectionCard;

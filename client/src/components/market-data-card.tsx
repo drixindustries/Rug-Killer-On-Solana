@@ -182,3 +182,5 @@ export function MarketDataCard({ data, tokenAddress }: MarketDataCardProps) {
     </Card>
   );
 }
+
+export default MarketDataCard;

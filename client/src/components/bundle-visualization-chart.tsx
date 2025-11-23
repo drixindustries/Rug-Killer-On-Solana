@@ -449,3 +449,5 @@ export function BundleVisualizationChart({ filtering, totalHolders }: BundleVisu
     </Card>
   );
 }
+
+export default BundleVisualizationChart;

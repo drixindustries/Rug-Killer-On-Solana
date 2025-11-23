@@ -184,3 +184,5 @@ export function MetricsGrid({
     </div>
   );
 }
+
+export default MetricsGrid;

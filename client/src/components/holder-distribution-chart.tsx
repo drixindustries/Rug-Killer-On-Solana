@@ -93,3 +93,5 @@ export function HolderDistributionChart({ holders, totalConcentration }: HolderD
     </Card>
   );
 }
+
+export default HolderDistributionChart;

@@ -83,3 +83,5 @@ export function BubbleMapsCard({ tokenAddress }: BubbleMapsCardProps) {
     </Card>
   );
 }
+
+export default BubbleMapsCard;

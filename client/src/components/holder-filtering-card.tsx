@@ -160,3 +160,5 @@ export function HolderFilteringCard({ filtering }: HolderFilteringCardProps) {
     </Card>
   );
 }
+
+export default HolderFilteringCard;

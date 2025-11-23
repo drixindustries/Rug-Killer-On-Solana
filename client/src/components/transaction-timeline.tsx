@@ -112,3 +112,5 @@ export function TransactionTimeline({ transactions }: TransactionTimelineProps) 
     </Card>
   );
 }
+
+export default TransactionTimeline;

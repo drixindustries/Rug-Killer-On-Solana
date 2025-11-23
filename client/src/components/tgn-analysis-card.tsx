@@ -203,3 +203,5 @@ export function TGNAnalysisCard({ tgnResult, isPreMigration, migrationDetected, 
     </Card>
   );
 }
+
+export default TGNAnalysisCard;

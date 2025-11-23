@@ -186,3 +186,5 @@ export function NetworkAnalysisCard({ data }: NetworkAnalysisCardProps) {
     </Card>
   );
 }
+
+export default NetworkAnalysisCard;

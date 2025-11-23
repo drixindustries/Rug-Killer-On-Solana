@@ -189,3 +189,5 @@ export function LiquidityBurnCard({
     </Card>
   );
 }
+
+export default LiquidityBurnCard;
