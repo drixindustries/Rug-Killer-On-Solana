@@ -97,47 +97,48 @@ function getAnkrUrl(): string | undefined {
 }
 
 const RPC_PROVIDERS = [
-  // Ankr Premium RPC - Using direct HTTP client to bypass superstruct bug
+  // Ankr Premium RPC - PAID SUBSCRIPTION (PRIMARY)
+  // Using direct HTTP client to bypass superstruct bug
   // The @solana/web3.js library has a bug with superstruct validation
   // that affects Ankr's response format. We bypass it with ankr-direct-client.ts
   // https://github.com/ianstormtaylor/superstruct/issues/580
   // SOLUTION: Use AnkrDirectClient for direct JSON-RPC HTTP calls
   { 
     getUrl: () => `${getAnkrUrl() || ""}`,
-    weight: 80, // BOOSTED: Fast + has exchange metadata
+    weight: 100, // MAXIMUM: ONLY paid premium subscription
     name: "Ankr",
     tier: "premium" as const,
     requiresKey: true,
     hasKey: () => !!getAnkrUrl(),
-    rateLimit: 500,
+    rateLimit: 9500, // Premium tier limit
     rateLimitWindow: 60000
   },
-  // Helius Premium RPC (High priority - has exchange detection)
+  // Helius Free RPC (Low priority - free tier has strict limits)
   { 
     getUrl: () => `${getHeliusUrl() || ""}`,
-    weight: 75, // BOOSTED: Fast + Enhanced DAS API with labels
+    weight: 15, // FREE TIER: Very limited requests (~100-300/day)
     name: "Helius",
-    tier: "premium" as const,
+    tier: "fallback" as const,
     requiresKey: true,
     hasKey: () => !!getHeliusUrl(),
-    rateLimit: 1000,
+    rateLimit: 30, // Conservative for free tier
     rateLimitWindow: 60000
   },
-  // Shyft Premium RPC (Good fallback)
+  // Shyft Free RPC (Secondary fallback)
   { 
     getUrl: () => `${getShyftUrl() || ""}`,
-    weight: 60, 
+    weight: 20, // FREE TIER: Limited requests
     name: "Shyft",
-    tier: "premium" as const,
+    tier: "fallback" as const,
     requiresKey: true,
     hasKey: () => !!getShyftUrl(),
-    rateLimit: 500,
+    rateLimit: 100, // Conservative for free tier
     rateLimitWindow: 60000
   },
   // Tier 1 Public Fallback
   { 
     getUrl: () => "https://api.mainnet-beta.solana.com",
-    weight: 30, 
+    weight: 10, // FREE PUBLIC: Last resort
     name: "Solana-Official",
     tier: "fallback" as const,
     rateLimit: 40,

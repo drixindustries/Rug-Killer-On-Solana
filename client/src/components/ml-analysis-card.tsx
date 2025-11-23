@@ -19,8 +19,13 @@ interface MLAnalysisCardProps {
 }
 
 export function MLAnalysisCard({ mlScore }: MLAnalysisCardProps) {
+  // Null safety check
+  if (!mlScore || typeof mlScore.probability !== 'number') {
+    return null;
+  }
+
   const rugPercent = (mlScore.probability * 100).toFixed(1);
-  const confidencePercent = (mlScore.confidence * 100).toFixed(0);
+  const confidencePercent = ((mlScore.confidence || 0) * 100).toFixed(0);
   
   // Determine risk level and color
   let riskLevel = "LOW";
