@@ -2586,7 +2586,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         // This prevents spam when users send normal messages
       }
     }
-  });
+  }); // End of messageCreate handler
   
   // Ready event (using clientReady for Discord.js v14+)
   client.once('clientReady' as any, () => {
