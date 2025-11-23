@@ -33,29 +33,7 @@ Webhook services provide instant notifications when:
 - Method: POST
 - Configure in Helius dashboard
 
-### 2. QuickNode Streams
-
-**Features:**
-- Account monitoring
-- Transaction filtering
-- Function call tracking
-- Ultra-low latency (~200ms)
-
-**Setup:**
-1. Get stream URL from [QuickNode](https://quicknode.com)
-2. Add to environment:
-   ```bash
-   QUICKNODE_STREAM_URL=your_stream_url
-   QUICKNODE_STREAM_ID=your_stream_id
-   AUTO_ANALYZE_NEW_TOKENS=true
-   ```
-
-**Webhook Endpoint:**
-- URL: `https://your-domain.com/api/webhooks/quicknode`
-- Method: POST
-- Configure in QuickNode dashboard
-
-### 3. Pump.fun WebSocket
+### 2. Pump.fun WebSocket
 
 **Features:**
 - Real-time Pump.fun token launches
@@ -75,12 +53,6 @@ PUMP_FUN_WS_URL=wss://pumpportal.fun/api/data  # Default
 # Helius
 HELIUS_API_KEY=your_helius_api_key
 HELIUS_WEBHOOK_SECRET=optional_webhook_secret
-
-# QuickNode
-QUICKNODE_RPC_URL=https://your-quicknode-endpoint.com
-QUICKNODE_STREAM_URL=https://your-stream-url.com
-QUICKNODE_STREAM_ID=your_stream_id
-QUICKNODE_WEBHOOK_SECRET=optional_webhook_secret
 
 # Pump.fun
 PUMP_FUN_WS_URL=wss://pumpportal.fun/api/data
@@ -104,11 +76,6 @@ Response:
     "hasApiKey": true,
     "processedCount": 1234
   },
-  "quicknode": {
-    "isActive": true,
-    "hasStreamUrl": true,
-    "processedCount": 567
-  },
   "pumpfun": {
     "isConnected": true,
     "reconnectAttempts": 0
@@ -129,7 +96,6 @@ You can listen to webhook events in your code:
 
 ```typescript
 import { heliusWebhook } from './services/helius-webhook';
-import { quickNodeWebhook } from './services/quicknode-webhook';
 
 // Listen for new tokens
 heliusWebhook.on('token_created', async (event) => {
@@ -155,19 +121,16 @@ heliusWebhook.on('token_analyzed', async (event) => {
 Set webhook secrets:
 ```bash
 HELIUS_WEBHOOK_SECRET=your_secret_key
-QUICKNODE_WEBHOOK_SECRET=your_secret_key
 ```
 
 The webhook handlers will verify signatures from the headers:
 - Helius: `x-helius-signature`
-- QuickNode: `x-qn-signature`
 
 ## Performance
 
 | Provider | Latency | Rate Limit | Cost |
 |----------|---------|------------|------|
 | Helius WebSocket | ~100ms | 1000 req/min | Paid tier required |
-| QuickNode Streams | ~200ms | Based on plan | Paid tier required |
 | Pump.fun WebSocket | ~500ms | Unlimited | Free |
 | 80+ Public RPCs | 1-3s | Varies | Free |
 
@@ -189,7 +152,7 @@ The webhook handlers will verify signatures from the headers:
 If hitting rate limits:
 - Use multiple RPC endpoints (80+ configured)
 - Enable webhook monitoring to reduce polling
-- Upgrade to premium tier on Helius/QuickNode
+- Upgrade to premium tier on Helius
 
 ### Connection issues
 
@@ -211,13 +174,12 @@ Pump.fun WebSocket will auto-reconnect. Check logs for:
 
 Webhooks work automatically on Railway! Just set the environment variables and deploy.
 
-The webhook URLs will be:
+The webhook URL will be:
 ```
 https://your-railway-app.up.railway.app/api/webhooks/helius
-https://your-railway-app.up.railway.app/api/webhooks/quicknode
 ```
 
-Configure these URLs in your Helius/QuickNode dashboards.
+Configure this URL in your Helius dashboard.
 
 ## Support
 
