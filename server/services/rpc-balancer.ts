@@ -117,10 +117,10 @@ function getAnkrUrl(): string | undefined {
 }
 
 const RPC_PROVIDERS = [
-  // dRPC Premium RPC (Primary - 70% weight)
+  // dRPC Premium RPC (Reduced weight due to 150ms+ latency)
   { 
     getUrl: () => `${getDrpcUrl() || ""}`,
-    weight: 70, 
+    weight: 30, // REDUCED: Consistently slow at 150ms+
     name: "dRPC",
     tier: "premium" as const,
     requiresKey: true,
@@ -135,7 +135,7 @@ const RPC_PROVIDERS = [
   // SOLUTION: Use AnkrDirectClient for direct JSON-RPC HTTP calls
   { 
     getUrl: () => `${getAnkrUrl() || ""}`,
-    weight: 65, // RE-ENABLED with direct HTTP client
+    weight: 80, // BOOSTED: Fast + has exchange metadata
     name: "Ankr",
     tier: "premium" as const,
     requiresKey: true,
@@ -143,7 +143,18 @@ const RPC_PROVIDERS = [
     rateLimit: 500,
     rateLimitWindow: 60000
   },
-  // Shyft Premium RPC (Quaternary - 60% weight)
+  // Helius Premium RPC (High priority - has exchange detection)
+  { 
+    getUrl: () => `${getHeliusUrl() || ""}`,
+    weight: 75, // BOOSTED: Fast + Enhanced DAS API with labels
+    name: "Helius",
+    tier: "premium" as const,
+    requiresKey: true,
+    hasKey: () => !!getHeliusUrl(),
+    rateLimit: 1000,
+    rateLimitWindow: 60000
+  },
+  // Shyft Premium RPC (Good fallback)
   { 
     getUrl: () => `${getShyftUrl() || ""}`,
     weight: 60, 
@@ -152,17 +163,6 @@ const RPC_PROVIDERS = [
     requiresKey: true,
     hasKey: () => !!getShyftUrl(),
     rateLimit: 500,
-    rateLimitWindow: 60000
-  },
-  // Helius Premium RPC (Quinary - 50% weight)
-  { 
-    getUrl: () => `${getHeliusUrl() || ""}`,
-    weight: 50, 
-    name: "Helius",
-    tier: "premium" as const,
-    requiresKey: true,
-    hasKey: () => !!getHeliusUrl(),
-    rateLimit: 1000,
     rateLimitWindow: 60000
   },
   // Tier 1 Public Fallback
