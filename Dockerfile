@@ -15,6 +15,9 @@ COPY postcss.config.js ./
 COPY tailwind.config.ts ./
 COPY components.json ./
 
+# Clean any previous builds
+RUN rm -rf /app/dist
+
 # Build ONLY frontend (not server)
 RUN npx vite build --config vite.config.ts
 

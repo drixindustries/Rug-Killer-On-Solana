@@ -22,6 +22,11 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined, // Disable chunk splitting to prevent hash mismatches
+      },
+    },
   },
   server: {
     fs: {
