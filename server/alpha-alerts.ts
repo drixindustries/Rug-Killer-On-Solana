@@ -851,9 +851,25 @@ export class AlphaAlertService {
    */
   private async checkTokenForAlphaWallets(mint: string, source: string): Promise<void> {
     try {
-      // For now, just log - more sophisticated analysis can be added
-      // Could check transaction signatures to see if monitored wallets interacted
       console.log(`[Alpha Alerts] Checking token ${mint} from ${source}`);
+      
+      // Check if token passes quality filters
+      const isQuality = await this.isQualityToken(mint);
+      
+      if (isQuality) {
+        console.log(`[Alpha Alerts] ✅ Token ${mint} passed quality check - sending alert`);
+        
+        // Send the alert
+        await this.sendAlert({
+          type: 'caller_signal',
+          mint,
+          source,
+          timestamp: Date.now(),
+          data: { provider: source }
+        });
+      } else {
+        console.log(`[Alpha Alerts] ⚠️ Token ${mint} failed quality check - skipping alert`);
+      }
     } catch (error) {
       console.error('[Alpha Alerts] Error checking token:', error);
     }
