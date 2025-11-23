@@ -97,7 +97,7 @@ function getAnkrUrl(): string | undefined {
 }
 
 const RPC_PROVIDERS = [
-  // Ankr Premium RPC - PAID SUBSCRIPTION (PRIMARY)
+  // Ankr Premium RPC - PAID SUBSCRIPTION (PRIMARY BUT BALANCED)
   // Using direct HTTP client to bypass superstruct bug
   // The @solana/web3.js library has a bug with superstruct validation
   // that affects Ankr's response format. We bypass it with ankr-direct-client.ts
@@ -105,7 +105,7 @@ const RPC_PROVIDERS = [
   // SOLUTION: Use AnkrDirectClient for direct JSON-RPC HTTP calls
   { 
     getUrl: () => `${getAnkrUrl() || ""}`,
-    weight: 100, // MAXIMUM: ONLY paid premium subscription
+    weight: 50, // BALANCED: Still priority but allow faster fallbacks
     name: "Ankr",
     tier: "premium" as const,
     requiresKey: true,
@@ -113,23 +113,23 @@ const RPC_PROVIDERS = [
     rateLimit: 9500, // Premium tier limit
     rateLimitWindow: 60000
   },
-  // Helius Free RPC (Low priority - free tier has strict limits)
+  // Helius Free RPC (Higher priority for speed despite limits)
   { 
     getUrl: () => `${getHeliusUrl() || ""}`,
-    weight: 15, // FREE TIER: Very limited requests (~100-300/day)
+    weight: 25, // INCREASED: Fast when available
     name: "Helius",
-    tier: "fallback" as const,
+    tier: "premium" as const, // Promoted for speed
     requiresKey: true,
     hasKey: () => !!getHeliusUrl(),
     rateLimit: 30, // Conservative for free tier
     rateLimitWindow: 60000
   },
-  // Shyft Free RPC (Secondary fallback)
+  // Shyft Free RPC (Good speed/reliability balance)
   { 
     getUrl: () => `${getShyftUrl() || ""}`,
-    weight: 20, // FREE TIER: Limited requests
+    weight: 35, // INCREASED: Often fastest
     name: "Shyft",
-    tier: "fallback" as const,
+    tier: "premium" as const, // Promoted for speed
     requiresKey: true,
     hasKey: () => !!getShyftUrl(),
     rateLimit: 100, // Conservative for free tier
@@ -138,7 +138,7 @@ const RPC_PROVIDERS = [
   // Tier 1 Public Fallback
   { 
     getUrl: () => "https://api.mainnet-beta.solana.com",
-    weight: 10, // FREE PUBLIC: Last resort
+    weight: 20, // INCREASED: Often faster than paid slow ones
     name: "Solana-Official",
     tier: "fallback" as const,
     rateLimit: 40,
