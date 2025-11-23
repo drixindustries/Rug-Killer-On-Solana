@@ -23,6 +23,7 @@ import { holderAnalysis } from "./services/holder-analysis.ts";
 import { TemporalGNNDetector } from "./temporal-gnn-detector.ts";
 import { getMigrationDetector } from "./migration-detector.ts";
 import { mlScorer } from "./services/ml-scorer.ts";
+import { fundingAnalyzer } from "./services/funding-source-analyzer.ts";
 
 export class SolanaTokenAnalyzer {
   private dexScreener: DexScreenerService;
@@ -217,6 +218,37 @@ export class SolanaTokenAnalyzer {
         } catch (tgnError) {
           console.error('[Analyzer] TGN analysis failed:', tgnError);
           response.tgnResult = undefined;
+        }
+      }
+      
+      // FUNDING SOURCE ANALYSIS - Detect coordinated funding & fresh wallets
+      if (holders && holders.top20Holders.length > 0 && !options.skipExternal) {
+        try {
+          console.log(`[Analyzer] Running funding source analysis...`);
+          const fundingResult = await fundingAnalyzer.analyzeFundingSources(
+            tokenMintAddress,
+            holders.top20Holders.map(h => ({
+              address: h.address,
+              balance: h.balance,
+              percentage: h.percentage,
+              isExchange: h.isExchange,
+              isLP: h.isLP,
+              label: h.label
+            }))
+          );
+          
+          response.fundingAnalysis = fundingResult;
+          
+          if (fundingResult.suspiciousFunding) {
+            console.log(`[Analyzer] 🚨 SUSPICIOUS FUNDING DETECTED:`);
+            console.log(`  - Total suspicious: ${fundingResult.totalSuspiciousPercentage.toFixed(1)}%`);
+            console.log(`  - Patterns: ${fundingResult.fundingPatterns.length}`);
+            fundingResult.fundingSourceBreakdown && Object.entries(fundingResult.fundingSourceBreakdown).forEach(([source, pct]) => {
+              console.log(`  - ${source}: ${pct.toFixed(1)}%`);
+            });
+          }
+        } catch (fundingError) {
+          console.error('[Analyzer] Funding analysis failed:', fundingError);
         }
       }
       

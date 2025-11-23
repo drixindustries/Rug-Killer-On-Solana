@@ -335,14 +335,46 @@ export class FundingSourceAnalyzer {
   }
 
   /**
-   * Detect fresh wallet funding (recently created wallets)
+   * Detect fresh wallet funding (recently created wallets) - Enhanced Nova-style
    */
   private detectFreshWalletFunding(walletFunding: WalletFunding[]): FundingPattern[] {
     const patterns: FundingPattern[] = [];
     
     const freshWallets = walletFunding.filter(w => w.isRecentlyCreated);
     const highRiskFreshWallets = freshWallets.filter(w => w.riskLevel === 'HIGH_RISK');
+    
+    // Group fresh wallets by funding source to detect clusters
+    const freshWalletClusters: Record<string, WalletFunding[]> = {};
+    freshWallets.forEach(wallet => {
+      if (wallet.fundingSource) {
+        if (!freshWalletClusters[wallet.fundingSource]) {
+          freshWalletClusters[wallet.fundingSource] = [];
+        }
+        freshWalletClusters[wallet.fundingSource].push(wallet);
+      }
+    });
 
+    // Check for fresh wallet clusters from same source (like Nova's detection)
+    Object.entries(freshWalletClusters).forEach(([source, wallets]) => {
+      if (wallets.length >= 3 && wallets[0].riskLevel === 'HIGH_RISK') {
+        patterns.push({
+          type: 'fresh_wallet_funding',
+          severity: 'critical',
+          confidence: 95,
+          description: `${wallets.length} fresh wallets (<7d) funded by ${source} - likely coordinated`,
+          evidence: {
+            fundingSource: source,
+            walletCount: wallets.length,
+            avgWalletAge: wallets.reduce((sum, w) => {
+              const ageHours = w.fundingTime ? (Date.now() / 1000 - w.fundingTime) / 3600 : 0;
+              return sum + ageHours;
+            }, 0) / wallets.length
+          }
+        });
+      }
+    });
+
+    // Overall fresh wallet detection
     if (highRiskFreshWallets.length >= 3) {
       patterns.push({
         type: 'fresh_wallet_funding',

@@ -400,15 +400,56 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     }
   }
   
-  // FUNDING ANALYSIS
+  // FUNDING ANALYSIS - Enhanced Nova-style breakdown
   let funding: string | undefined;
-  if (analysis.fundingAnalysis?.suspiciousFunding) {
+  if (analysis.fundingAnalysis) {
     const fa = analysis.fundingAnalysis;
-    const breakdown = Object.entries(fa.fundingSourceBreakdown)
-      .filter(([_, percentage]) => percentage >= 5)
-      .map(([source, percentage]) => `${source} (${percentage.toFixed(1)}%)`)
+    
+    // Separate CEX funding from swap services
+    const cexSources = ['Binance', 'Coinbase', 'OKX', 'Bybit'];
+    const swapSources = ['Swopshop', 'FixedFloat', 'ChangeNOW', 'SimpleSwap', 'Godex', 'StealthEX'];
+    
+    const cexBreakdown = Object.entries(fa.fundingSourceBreakdown)
+      .filter(([source]) => cexSources.includes(source))
+      .map(([source, pct]) => `${source} ${pct.toFixed(1)}%`)
       .join(', ');
-    funding = `🚨 **FUNDING ALERT**\n• Suspicious: ${fa.totalSuspiciousPercentage.toFixed(1)}%\n• Sources: ${breakdown}\n⚠️ High-risk funding detected`;
+    
+    const swapBreakdown = Object.entries(fa.fundingSourceBreakdown)
+      .filter(([source]) => swapSources.includes(source))
+      .map(([source, pct]) => `${source} ${pct.toFixed(1)}%`)
+      .join(', ');
+    
+    // Count fresh wallets
+    const freshWallets = fa.walletFunding.filter(w => w.isRecentlyCreated);
+    const coordPattern = fa.fundingPatterns.find(p => p.type === 'coordinated_funding');
+    
+    if (fa.suspiciousFunding || freshWallets.length >= 3 || cexBreakdown || swapBreakdown) {
+      funding = `💸 **FUNDING SOURCES** ${fa.suspiciousFunding ? '🚨' : ''}\n`;
+      
+      if (cexBreakdown) {
+        funding += `• CEX: ${cexBreakdown}\n`;
+      }
+      
+      if (swapBreakdown) {
+        funding += `• ⚠️ Swap Services: ${swapBreakdown}\n`;
+      }
+      
+      if (freshWallets.length >= 3) {
+        const freshPct = freshWallets.reduce((sum, w) => {
+          const holder = analysis.topHolders.find(h => h.address === w.wallet);
+          return sum + (holder?.percentage || 0);
+        }, 0);
+        funding += `• 🆕 Fresh Wallets (<7d): ${freshWallets.length} holders (${freshPct.toFixed(1)}%)\n`;
+      }
+      
+      if (coordPattern) {
+        funding += `• 🔗 Coordination: ${coordPattern.evidence.walletCount} wallets from ${coordPattern.evidence.fundingSource}\n`;
+      }
+      
+      if (fa.suspiciousFunding) {
+        funding += `⚠️ **${fa.totalSuspiciousPercentage.toFixed(1)}% from high-risk sources**`;
+      }
+    }
   }
   
   // BUNDLE DETECTION (Always show if data exists)
