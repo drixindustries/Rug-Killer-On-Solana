@@ -340,39 +340,45 @@ export class SolanaRpcBalancer {
         
         if (provider.name === "Ankr") {
           // Wrap fetch to handle superstruct union coercion issue
+          // https://github.com/ianstormtaylor/superstruct/issues/580
           const originalFetch = globalThis.fetch;
           connectionOptions.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
             const response = await originalFetch(input, init);
             
-            // Clone to allow multiple reads
-            const cloned = response.clone();
-            
             try {
-              const data = await cloned.json();
+              // Read the response body once
+              const text = await response.text();
+              const data = JSON.parse(text);
               
-              // Pre-validate the response structure to prevent superstruct errors
-              // The issue is that superstruct can't handle union coercion properly
-              // So we ensure the response matches what @solana/web3.js expects
+              // Normalize the response structure to prevent superstruct union validation errors
+              // The issue is that Ankr's response format causes superstruct's union coercion to fail
               if (data && typeof data === 'object') {
-                // If there's a result field, ensure it's properly structured
-                if ('result' in data) {
-                  // Force coercion by creating a new response with validated structure
-                  return new Response(JSON.stringify(data), {
-                    status: response.status,
-                    statusText: response.statusText,
-                    headers: response.headers,
-                  });
-                }
-                // If there's an error, pass it through
-                if ('error' in data) {
-                  return response;
-                }
+                // Ensure consistent structure that web3.js expects
+                const normalized = {
+                  jsonrpc: data.jsonrpc || '2.0',
+                  id: data.id,
+                  ...(data.result !== undefined && { result: data.result }),
+                  ...(data.error !== undefined && { error: data.error }),
+                };
+                
+                // Return new response with normalized JSON
+                return new Response(JSON.stringify(normalized), {
+                  status: response.status,
+                  statusText: response.statusText,
+                  headers: response.headers,
+                });
               }
               
-              return response;
+              // If not JSON or unexpected structure, return as-is
+              return new Response(text, {
+                status: response.status,
+                statusText: response.statusText,
+                headers: response.headers,
+              });
             } catch (e) {
-              // If JSON parsing fails, return original response
-              return response;
+              // If JSON parsing fails, re-fetch and return original
+              console.error('[Ankr] Response normalization failed:', e);
+              return originalFetch(input, init);
             }
           };
         }
