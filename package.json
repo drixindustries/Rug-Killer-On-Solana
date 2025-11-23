@@ -10,7 +10,8 @@
         "dev": "cross-env NODE_ENV=development tsx server/index.ts",
         "start": "cross-env NODE_ENV=production node dist/prod.js",
         "pumpfun:sync": "tsx scripts/fetch-pumpfun-amm.ts",
-        "add-pumpfun-wallet": "tsx scripts/add-pumpfun-wallet.ts"
+        "add-pumpfun-wallet": "tsx scripts/add-pumpfun-wallet.ts",
+        "sync-helius": "tsx scripts/sync-helius-wallets.ts"
     },
     "dependencies": {
         "@duneanalytics/client-sdk": "^0.3.4",

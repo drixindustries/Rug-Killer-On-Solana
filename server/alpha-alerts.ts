@@ -861,6 +861,68 @@ export class AlphaAlertService {
     return status;
   }
 
+  /**
+   * Sync all active wallets to Helius webhook via API
+   * Supports up to 1000 wallets (vs 25 via dashboard UI)
+   */
+  private async syncToHeliusWebhook(): Promise<void> {
+    const HELIUS_API_KEY = process.env.HELIUS_API_KEY?.trim();
+    const HELIUS_WEBHOOK_ID = process.env.HELIUS_WEBHOOK_ID?.trim();
+    
+    if (!HELIUS_API_KEY || !HELIUS_WEBHOOK_ID) {
+      console.log('[Alpha Alerts] Skipping Helius sync - API key or webhook ID not configured');
+      return;
+    }
+
+    try {
+      // Get all active wallet addresses
+      const addresses = this.alphaCallers
+        .filter(c => c.enabled && c.wallet)
+        .map(c => c.wallet);
+      
+      if (addresses.length === 0) {
+        console.log('[Alpha Alerts] No wallets to sync to Helius');
+        return;
+      }
+
+      console.log(`[Alpha Alerts] Syncing ${addresses.length} wallets to Helius webhook...`);
+
+      // Get current webhook config
+      const getUrl = `https://api.helius.xyz/v0/webhooks/${HELIUS_WEBHOOK_ID}?api-key=${HELIUS_API_KEY}`;
+      const currentWebhook = await fetch(getUrl);
+      
+      if (!currentWebhook.ok) {
+        throw new Error(`Failed to get webhook: ${currentWebhook.status}`);
+      }
+      
+      const webhookData = await currentWebhook.json();
+
+      // Update webhook with all addresses via API (supports 1000+ wallets)
+      const updateUrl = `https://api.helius.xyz/v0/webhooks/${HELIUS_WEBHOOK_ID}?api-key=${HELIUS_API_KEY}`;
+      const response = await fetch(updateUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          webhookURL: webhookData.webhookURL,
+          transactionTypes: webhookData.transactionTypes,
+          accountAddresses: addresses, // Replace with current wallet list
+          webhookType: webhookData.webhookType,
+          txnStatus: webhookData.txnStatus || 'all',
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Failed to update webhook: ${response.status} ${error}`);
+      }
+
+      console.log(`[Alpha Alerts] ✅ Helius webhook synced - monitoring ${addresses.length} wallets`);
+    } catch (error: any) {
+      console.error('[Alpha Alerts] Helius webhook sync error:', error.message);
+      throw error;
+    }
+  }
+
   // Add custom alpha caller
   addCaller(wallet: string, name: string): void {
     if (!this.alphaCallers.find(c => c.wallet === wallet)) {
@@ -879,6 +941,11 @@ export class AlphaAlertService {
           console.error('[ALPHA ALERT] Autostart failed after addCaller:', e);
         }
       }
+      
+      // Auto-sync to Helius webhook (non-blocking)
+      this.syncToHeliusWebhook().catch(err => 
+        console.warn('[Alpha Alerts] Helius sync failed:', err.message)
+      );
     }
   }
 
@@ -895,6 +962,11 @@ export class AlphaAlertService {
         this.connection.removeOnLogsListener(listenerId);
         this.listeners.delete(wallet);
       }
+      
+      // Auto-sync removal to Helius webhook (non-blocking)
+      this.syncToHeliusWebhook().catch(err => 
+        console.warn('[Alpha Alerts] Helius sync failed after removal:', err.message)
+      );
     }
   }
 
