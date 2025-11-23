@@ -157,7 +157,7 @@ export function TGNAnalysisCard({ tgnResult, isPreMigration, migrationDetected, 
                       <div className="flex-1">
                         <p className="text-sm font-medium flex items-center gap-2">
                           <span>{patternEmoji}</span>
-                          <span className="capitalize">{pattern.type.replace(/_/g, ' ')}</span>
+                          <span className="capitalize">{pattern.type?.replace(/_/g, ' ') || 'Unknown'}</span>
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">{pattern.description}</p>
                       </div>

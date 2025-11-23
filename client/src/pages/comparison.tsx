@@ -334,7 +334,7 @@ export default function Comparison() {
                                       className="text-xs"
                                       data-testid={`badge-flag-${index}-${flagIndex}`}
                                     >
-                                      {flag.type.replace(/_/g, ' ')}
+                                      {flag.type?.replace(/_/g, ' ') || 'Unknown'}
                                     </Badge>
                                   ))}
                                 </div>
