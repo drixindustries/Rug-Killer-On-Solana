@@ -52,7 +52,7 @@ export function RugcheckCard({ data, tokenAddress }: RugcheckCardProps) {
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <span className="text-3xl font-bold" data-testid="text-rugcheck-score">
-            {data.score.toFixed(1)}
+            {(typeof data.score === 'number' ? data.score.toFixed(1) : '0.0')}
           </span>
           <span className="text-sm text-muted-foreground">/ 10</span>
         </div>
@@ -95,7 +95,7 @@ export function RugcheckCard({ data, tokenAddress }: RugcheckCardProps) {
                     </div>
                     {market.lpBurn > 0 && (
                       <div className="text-xs text-muted-foreground">
-                        {market.lpBurn.toFixed(1)}% burned
+                        {(typeof market.lpBurn === 'number' ? market.lpBurn.toFixed(1) : '0.0')}% burned
                       </div>
                     )}
                   </div>

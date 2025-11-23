@@ -103,7 +103,7 @@ export function NetworkAnalysisCard({ data }: NetworkAnalysisCardProps) {
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium">Group {i + 1}</span>
                   <Badge variant={group.totalSupplyPercent > 20 ? "destructive" : "secondary"}>
-                    {group.totalSupplyPercent.toFixed(1)}% supply
+                    {(typeof group.totalSupplyPercent === 'number' ? group.totalSupplyPercent.toFixed(1) : '0.0')}% supply
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -133,7 +133,10 @@ export function NetworkAnalysisCard({ data }: NetworkAnalysisCardProps) {
                 data.connectedGroups.reduce((sum, g) => sum + g.totalSupplyPercent, 0) > 40 ? 'text-destructive' : 
                 data.connectedGroups.reduce((sum, g) => sum + g.totalSupplyPercent, 0) > 25 ? 'text-yellow-500' : ''
               }`}>
-                {data.connectedGroups.reduce((sum, g) => sum + g.totalSupplyPercent, 0).toFixed(1)}%
+                {(() => {
+                  const total = data.connectedGroups.reduce((sum, g) => sum + (g.totalSupplyPercent || 0), 0);
+                  return (typeof total === 'number' ? total.toFixed(1) : '0.0');
+                })()}%
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">

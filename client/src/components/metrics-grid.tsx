@@ -63,7 +63,7 @@ export function MetricsGrid({
     {
       icon: AlertTriangle,
       label: "Bundle Supply % (DevsNightmare)",
-      value: `${bundleSupplyPct.toFixed(2)}%`,
+      value: `${(typeof bundleSupplyPct === 'number' ? bundleSupplyPct.toFixed(2) : '0.00')}%`,
       secondary: `${bundledCount} bundled wallet${bundledCount !== 1 ? 's' : ''} control this supply`,
       testId: "metric-bundle-percentage",
       warning: true,
@@ -108,7 +108,7 @@ export function MetricsGrid({
     {
       icon: TrendingUp,
       label: "Top Holder Concentration",
-      value: `${topHolderConcentration.toFixed(1)}%`,
+      value: `${(typeof topHolderConcentration === 'number' ? topHolderConcentration.toFixed(1) : '0.0')}%`,
       secondary: "top 10 wallets",
       testId: "metric-concentration",
     },

@@ -11,8 +11,8 @@ interface TGNAnalysisCardProps {
 }
 
 export function TGNAnalysisCard({ tgnResult, isPreMigration, migrationDetected, systemWalletsFiltered }: TGNAnalysisCardProps) {
-  const rugPercent = (tgnResult.rugProbability * 100).toFixed(1);
-  const confidencePercent = (tgnResult.confidence * 100).toFixed(0);
+  const rugPercent = (typeof tgnResult.rugProbability === 'number' ? (tgnResult.rugProbability * 100).toFixed(1) : '0.0');
+  const confidencePercent = (typeof tgnResult.confidence === 'number' ? (tgnResult.confidence * 100).toFixed(0) : '0');
   
   // Determine risk level and color
   let riskLevel = "LOW";
@@ -107,7 +107,7 @@ export function TGNAnalysisCard({ tgnResult, isPreMigration, migrationDetected, 
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Avg Degree:</span>
-                <span className="font-mono font-semibold">{tgnResult.graphMetrics.avgDegree.toFixed(2)}</span>
+                <span className="font-mono font-semibold">{(typeof tgnResult.graphMetrics.avgDegree === 'number' ? tgnResult.graphMetrics.avgDegree.toFixed(2) : '0.00')}</span>
               </div>
             </div>
           </div>
@@ -120,7 +120,7 @@ export function TGNAnalysisCard({ tgnResult, isPreMigration, migrationDetected, 
             <div className="space-y-1">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Density Score:</span>
-                <span className="font-mono font-semibold">{tgnResult.graphMetrics.densityScore.toFixed(3)}</span>
+                <span className="font-mono font-semibold">{(typeof tgnResult.graphMetrics.densityScore === 'number' ? tgnResult.graphMetrics.densityScore.toFixed(3) : '0.000')}</span>
               </div>
               {systemWalletsFiltered !== undefined && systemWalletsFiltered > 0 && (
                 <div className="flex justify-between text-sm">

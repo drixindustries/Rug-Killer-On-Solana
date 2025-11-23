@@ -29,7 +29,7 @@ export function HolderDistributionChart({ holders, totalConcentration }: HolderD
         <div>
           <h2 className="text-xl font-semibold">Holder Distribution</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Top 10 holders control <span className="font-semibold text-foreground">{totalConcentration.toFixed(1)}%</span> of total supply
+            Top 10 holders control <span className="font-semibold text-foreground">{(typeof totalConcentration === 'number' ? totalConcentration.toFixed(1) : '0.0')}%</span> of total supply
           </p>
         </div>
 

@@ -85,7 +85,7 @@ export function LiquidityBurnCard({
           {status.icon}
           <div className="ml-6 flex-1">
             <div className={`text-5xl font-bold ${status.color}`} data-testid="text-burn-percentage">
-              {burnPercentage.toFixed(2)}%
+              {(typeof burnPercentage === 'number' ? burnPercentage.toFixed(2) : '0.00')}%
             </div>
             <div className="text-sm text-muted-foreground mt-1">
               LP Tokens Burned

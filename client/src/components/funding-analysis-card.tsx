@@ -62,13 +62,13 @@ export function FundingAnalysisCard({ fundingData }: FundingAnalysisCardProps) {
               <div className="flex-1">
                 <h4 className="font-semibold text-red-900">High-Risk Funding Detected</h4>
                 <p className="text-sm text-red-700 mt-1">
-                  {fundingData.totalSuspiciousPercentage.toFixed(1)}% of token supply funded by suspicious sources.
+                  {(typeof fundingData.totalSuspiciousPercentage === 'number' ? fundingData.totalSuspiciousPercentage.toFixed(1) : '0.0')}% of token supply funded by suspicious sources.
                   Similar to patterns Nova detects in bundled tokens.
                 </p>
                 {highRiskSources.length > 0 && (
                   <p className="text-sm text-red-600 mt-2 font-medium">
                     Sources: {highRiskSources.map(([source, percentage]) => 
-                      `${source} (${percentage.toFixed(1)}%)`
+                      `${source} (${typeof percentage === 'number' ? percentage.toFixed(1) : '0.0'}%)`
                     ).join(' and ')}
                   </p>
                 )}
@@ -107,7 +107,7 @@ export function FundingAnalysisCard({ fundingData }: FundingAnalysisCardProps) {
                           />
                         </div>
                         <span className="text-sm text-gray-600 min-w-[3rem] text-right">
-                          {percentage.toFixed(1)}%
+                          {(typeof percentage === 'number' ? percentage.toFixed(1) : '0.0')}%
                         </span>
                       </div>
                     </div>

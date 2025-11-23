@@ -143,7 +143,10 @@ export function CondensedTokenHeader({ analysis }: CondensedTokenHeaderProps) {
             rel="noopener noreferrer"
             className="text-lg font-semibold hover:text-primary transition-colors inline-flex items-center gap-1"
           >
-            {(analysis.topHolders || []).slice(0, 20).reduce((sum, h) => sum + (h.percentage || 0), 0).toFixed(1)}%
+            {(() => {
+              const total = (analysis.topHolders || []).slice(0, 20).reduce((sum, h) => sum + (h.percentage || 0), 0);
+              return (typeof total === 'number' ? total.toFixed(1) : '0.0');
+            })()}%
             <ExternalLink className="h-3 w-3" />
           </a>
         </div>
@@ -163,7 +166,7 @@ export function CondensedTokenHeader({ analysis }: CondensedTokenHeaderProps) {
             <TrendingUp className="h-4 w-4" />
             <span className="text-xs font-medium">TOP 10</span>
           </div>
-          <div className="text-lg font-semibold">{analysis.topHolderConcentration.toFixed(1)}%</div>
+          <div className="text-lg font-semibold">{(typeof analysis.topHolderConcentration === 'number' ? analysis.topHolderConcentration.toFixed(1) : '0.0')}%</div>
         </div>
         
         <div className="text-center">

@@ -104,7 +104,7 @@ export function GoPlusCard({ data, tokenAddress }: GoPlusCardProps) {
               <span>Buy Tax</span>
             </div>
             <div className="font-mono font-semibold" data-testid="goplus-buy-tax">
-              {buyTax.toFixed(2)}%
+              {(typeof buyTax === 'number' ? buyTax.toFixed(2) : '0.00')}%
             </div>
           </div>
 
@@ -114,7 +114,7 @@ export function GoPlusCard({ data, tokenAddress }: GoPlusCardProps) {
               <span>Sell Tax</span>
             </div>
             <div className="flex items-center gap-1 font-mono font-semibold" data-testid="goplus-sell-tax">
-              <span>{sellTax.toFixed(2)}%</span>
+              <span>{(typeof sellTax === 'number' ? sellTax.toFixed(2) : '0.00')}%</span>
               {sellTax > 10 && <AlertTriangle className="h-4 w-4 text-orange-600" />}
             </div>
           </div>

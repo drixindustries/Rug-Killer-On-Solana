@@ -150,7 +150,7 @@ export function BundleVisualizationChart({ filtering, totalHolders }: BundleVisu
           <p className="text-lg font-bold">{data.value.toLocaleString()} wallets</p>
           {data.supplyPercent > 0 && (
             <p className="text-xs text-muted-foreground">
-              {data.supplyPercent.toFixed(2)}% of token supply
+              {(typeof data.supplyPercent === 'number' ? data.supplyPercent.toFixed(2) : '0.00')}% of token supply
             </p>
           )}
         </Card>
@@ -198,7 +198,7 @@ export function BundleVisualizationChart({ filtering, totalHolders }: BundleVisu
               <span className="text-sm text-muted-foreground">
                 {entry.value}: <span className="font-semibold text-foreground">{entry.payload.value}</span>
                 {entry.payload.supplyPercent > 0 && (
-                  <span className="text-xs"> ({entry.payload.supplyPercent.toFixed(1)}%)</span>
+                  <span className="text-xs"> ({typeof entry.payload.supplyPercent === 'number' ? entry.payload.supplyPercent.toFixed(1) : '0.0'}%)</span>
                 )}
               </span>
             </div>
@@ -221,7 +221,7 @@ export function BundleVisualizationChart({ filtering, totalHolders }: BundleVisu
                 data-testid="badge-bundle-percentage"
               >
                 <AlertTriangle className="h-3 w-3" />
-                {filtering.bundledDetection.bundleSupplyPct.toFixed(2)}% Supply
+                {(typeof filtering.bundledDetection.bundleSupplyPct === 'number' ? filtering.bundledDetection.bundleSupplyPct.toFixed(2) : '0.00')}% Supply
               </Badge>
             )}
             <Badge variant="destructive" className="flex items-center gap-1" data-testid="badge-bundle-warning">
@@ -369,17 +369,17 @@ export function BundleVisualizationChart({ filtering, totalHolders }: BundleVisu
                   <div className="grid grid-cols-3 gap-4 mt-4">
                     <div className="text-center p-3 bg-muted rounded-lg">
                       <Clock className="h-6 w-6 mx-auto mb-1 text-muted-foreground" />
-                      <p className="text-lg font-bold">{filtering.walletIntelligence.avgWalletAge.toFixed(0)}</p>
+                      <p className="text-lg font-bold">{(typeof filtering.walletIntelligence.avgWalletAge === 'number' ? filtering.walletIntelligence.avgWalletAge.toFixed(0) : '0')}</p>
                       <p className="text-xs text-muted-foreground">Avg Age (days)</p>
                     </div>
                     <div className="text-center p-3 bg-muted rounded-lg">
                       <TrendingUp className="h-6 w-6 mx-auto mb-1 text-muted-foreground" />
-                      <p className="text-lg font-bold">{filtering.walletIntelligence.oldestWallet.toFixed(0)}</p>
+                      <p className="text-lg font-bold">{(typeof filtering.walletIntelligence.oldestWallet === 'number' ? filtering.walletIntelligence.oldestWallet.toFixed(0) : '0')}</p>
                       <p className="text-xs text-muted-foreground">Oldest (days)</p>
                     </div>
                     <div className="text-center p-3 bg-muted rounded-lg">
                       <Users className="h-6 w-6 mx-auto mb-1 text-muted-foreground" />
-                      <p className="text-lg font-bold">{filtering.walletIntelligence.newestWallet.toFixed(0)}</p>
+                      <p className="text-lg font-bold">{(typeof filtering.walletIntelligence.newestWallet === 'number' ? filtering.walletIntelligence.newestWallet.toFixed(0) : '0')}</p>
                       <p className="text-xs text-muted-foreground">Newest (days)</p>
                     </div>
                   </div>
