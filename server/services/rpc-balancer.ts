@@ -117,10 +117,10 @@ function getAnkrUrl(): string | undefined {
 }
 
 const RPC_PROVIDERS = [
-  // dRPC Premium RPC (Reduced weight due to 150ms+ latency)
+  // dRPC Premium RPC (Minimal weight - liability at 130ms+)
   { 
     getUrl: () => `${getDrpcUrl() || ""}`,
-    weight: 30, // REDUCED: Consistently slow at 150ms+
+    weight: 10, // MINIMAL: Too slow at 130ms+, liability
     name: "dRPC",
     tier: "premium" as const,
     requiresKey: true,
