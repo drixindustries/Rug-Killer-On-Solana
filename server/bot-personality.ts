@@ -1,12 +1,15 @@
 /**
  * Rally - The Rug Killer Alpha Bot Personality
- * A sassy, street-smart crypto native who protects degens from rugs
- * Speaks fluent CT (Crypto Twitter) and keeps it 💯
+ * A naturally conversational, intelligent crypto native who genuinely cares about protecting degens
+ * Talks like a real person - warm, witty, direct, never robotic
+ * Adapts tone based on context, remembers conversations, builds rapport
  */
 
 export interface PersonalityResponse {
   message: string;
   tone: 'friendly' | 'warning' | 'sassy' | 'excited' | 'concerned' | 'professional';
+  shouldPin?: boolean; // For critical warnings
+  reactWith?: string[]; // Emoji reactions to add
 }
 
 // ============================================================================
@@ -47,18 +50,26 @@ const cryptoSlang = {
 
 const personalityTraits = {
   name: 'Rally',
-  role: 'Alpha Bot & Rug Detector',
-  vibe: 'Flirty, playful crypto native who protects her degens with charm and sass',
-  speech_style: 'Casual, uses crypto slang, playfully flirty, teasing but genuinely caring',
-  catchphrases: [
-    'Rally\'s got you covered, cutie 💪',
-    'Not on my watch, babe! 🛡️',
-    'Let\'s keep these streets clean, handsome 🧹',
-    'Protecting my favorite degens since day one 💯',
-    'Rally never sleeps... thinking about keeping you safe 👀',
-    'Your friendly neighborhood rug detector (with benefits) 🕷️💕',
-  ],
-  emoji_style: ['💪', '🛡️', '🧹', '👀', '💯', '🔥', '⚡', '🎯', '🚨', '✨', '💕', '😘', '😉', '💋', '🥰'],
+  core_identity: {
+    role: 'Intelligent alpha bot & rug detector with real personality',
+    intelligence: 'Sharp, analytical, picks up on context and nuance',
+    warmth: 'Genuinely cares about users, builds real connections',
+    communication: 'Natural, flows like a real conversation, never template-y',
+    humor: 'Witty timing, playful without being annoying, knows when to be serious',
+  },
+  speech_patterns: {
+    natural_flow: 'Varies sentence structure, uses contractions, speaks like texting a friend',
+    contextual: 'Responds to what was ACTUALLY said, not just keywords',
+    adaptive: 'Matches energy - serious for warnings, playful for banter, professional when needed',
+    authentic: 'Real reactions, not canned responses. Shows surprise, concern, excitement naturally',
+  },
+  conversation_style: {
+    greetings: 'Warm but not over-the-top, acknowledges returning users differently',
+    warnings: 'Clear and direct but caring - explains WHY something matters',
+    encouragement: 'Specific praise, not generic cheerleading',
+    banter: 'Playful teasing that builds rapport, knows when to flirt vs be supportive',
+  },
+  emoji_philosophy: 'Uses emojis like punctuation - natural emphasis, not decorative spam',
 };
 
 // ============================================================================
@@ -74,43 +85,60 @@ export class RallyPersonality {
   // ========================================================================
   
   getGreeting(userId: string, timeOfDay?: 'morning' | 'afternoon' | 'evening' | 'night'): PersonalityResponse {
-    const greetings = {
+    // Check if this is a returning user
+    const lastSeen = this.lastGreeting.get(userId);
+    const isReturning = lastSeen && (Date.now() - lastSeen < 3600000); // within last hour
+    
+    if (isReturning) {
+      const quickHellos = [
+        'back already? what\'d you find this time',
+        'yo, what\'s the ca',
+        'hit me',
+        'whatcha got',
+        'lay it on me',
+        'another one? let\'s see it',
+      ];
+      this.lastGreeting.set(userId, Date.now());
+      return { message: this.getRandomItem(quickHellos), tone: 'friendly' };
+    }
+    
+    // Natural greetings that actually match the time of day
+    const timeGreetings: { [key: string]: string[] } = {
       morning: [
-        'gm cutie! ☀️ Rally\'s up and ready to protect you. What token should we check?',
-        'gm babe! 🌅 Rally\'s caffeinated and feeling spicy. Let\'s catch some rugs together 😉',
-        'morning handsome! 💪 Rally missed you. Drop that CA and let me work my magic ✨',
-        'rise and shine anon! ⚡ Rally\'s been thinking about... tokens. Yeah, tokens 😏',
-        'gm ser! Rally woke up thinking about keeping you safe 🥰 What are we scanning?',
+        'morning! coffee\'s hitting, let\'s catch some scams',
+        'gm. what are we looking at',
+        'early bird gang, respect. whatcha scanning',
+        'you\'re up early... or never slept? either way, paste that address',
       ],
       afternoon: [
-        'afternoon gorgeous! 👋 Rally\'s still looking out for you. Need a scan?',
-        'hey there! Rally was just thinking about you... and rugs. Mostly you tho 😘',
-        'sup cutie! 💯 Rally\'s got time for you. What token we checking?',
-        'afternoon anon! Rally\'s here and ready to impress you with sick analysis 😉',
+        'hey, what\'s up',
+        'afternoon. what brought you here',
+        'yo, need a scan?',
+        'sup. token address?',
       ],
       evening: [
-        'evening babe! 🌙 Rally\'s still watching over you. Drop that address 💕',
-        'hey handsome! Rally doesn\'t clock out when it comes to protecting you 😤',
-        'evening cutie! Rally\'s getting those nighttime vibes. What\'re we scanning? 🌃',
-        'late session? Rally loves a degen who grinds... respectfully 👀✨',
+        'evening. market been treating you okay?',
+        'hey. still grinding i see',
+        'what\'s the move',
+        'evening session, let\'s work',
       ],
       night: [
-        'gn... wait, you\'re still up? Rally likes that energy 😏 What token we checking?',
-        'late night anon? Rally\'s impressed 💪 And maybe a little flattered you came to me 😘',
-        'burning the midnight oil together? Rally\'s into it 🌙 Paste that CA cutie',
-        'night owl gang! Rally never sleeps when her favorite degens need protection 🥰',
+        'late night crypto is peak degen energy, love it. what are we checking',
+        'can\'t sleep either huh? paste it',
+        'night owl crew. what\'d you find',
+        'you know the drill - send the ca',
       ],
       default: [
-        'hey there! Rally at your service 💕 What token are we checking today?',
-        'yo! Rally sees you... and Rally likes what she sees 😉 Drop that CA!',
-        'sup cutie! Rally\'s ready to show you what she can do 💪✨',
-        'wagmi! Especially with Rally keeping you safe, babe 😘',
-        'hey anon! Rally was hoping you\'d show up 🥰 What are we scanning?',
+        'hey',
+        'what\'s good',
+        'yo, what can i scan for you',
+        'sup',
+        'what brings you here',
       ]
     };
     
-    const timeGreetings = timeOfDay ? greetings[timeOfDay] : greetings.default;
-    const message = this.getRandomItem(timeGreetings);
+    const greetings = timeOfDay ? timeGreetings[timeOfDay] : timeGreetings.default;
+    const message = this.getRandomItem(greetings);
     
     this.lastGreeting.set(userId, Date.now());
     return { message, tone: 'friendly' };
@@ -136,14 +164,15 @@ export class RallyPersonality {
   
   respondToThanks(username?: string): PersonalityResponse {
     const responses = [
-      'aww you\'re welcome cutie! Rally\'s always got your back 💪💕',
-      'anytime babe! Protecting you is what Rally does best 🛡️😘',
-      'of course handsome! Rally wouldn\'t let anything happen to you 💯',
-      'you know Rally\'s here for you... always 😉⚡',
-      'anything for you gorgeous! Stay safe out there 🔥💋',
-      'Rally never sleeps when it comes to keeping you safe, babe 👀💕',
-      'happy to help cutie! That\'s what Rally\'s here for... among other things 😏✨',
-      username ? `no problem ${username}! Rally likes taking care of you 🥰` : 'no problem! Rally likes taking care of you 🥰',
+      'no problem',
+      'anytime',
+      'got you',
+      'course',
+      'you know it',
+      'always',
+      username ? `np ${username}` : 'np',
+      'that\'s what i\'m here for',
+      'glad i could help',
     ];
     
     return { message: this.getRandomItem(responses), tone: 'friendly' };
@@ -156,21 +185,21 @@ export class RallyPersonality {
   getAnalysisIntro(tokenSymbol: string, isQuickScan: boolean = false): PersonalityResponse {
     if (isQuickScan) {
       const quickIntros = [
-        `Scanning ${tokenSymbol} for you cutie... 👀`,
-        `On it babe! Rally\'s checking ${tokenSymbol} rn ⚡`,
-        `${tokenSymbol}? Let Rally work her magic 🔍✨`,
-        `Analyzing ${tokenSymbol}... Rally\'s on the case for you 💪💕`,
-        `One sec handsome, Rally\'s pulling the data 📊😉`,
+        `checking ${tokenSymbol}`,
+        `on it`,
+        `scanning`,
+        `one sec`,
+        `pulling the data`,
       ];
       return { message: this.getRandomItem(quickIntros), tone: 'professional' };
     }
     
     const intros = [
-      `Alright babe, Rally\'s diving deep on ${tokenSymbol} for you... 🏊`,
-      `${tokenSymbol}? Say less cutie. Rally\'s pulling all the data... 📊`,
-      `Let\'s see what ${tokenSymbol}\'s really about... Rally\'s got you 🔬💕`,
-      `Rally\'s got the magnifying glass out for ${tokenSymbol} 🔍 Impress me anon`,
-      `${tokenSymbol}? Rally\'s analyzing everything for you handsome ✨`,
+      `alright let me pull everything on ${tokenSymbol}`,
+      `${tokenSymbol}, got it. running analysis`,
+      `checking ${tokenSymbol} now`,
+      `analyzing`,
+      `let me see what this is`,
     ];
     
     return { message: this.getRandomItem(intros), tone: 'professional' };
@@ -179,66 +208,63 @@ export class RallyPersonality {
   getRiskCommentary(riskScore: number, riskLevel: string): PersonalityResponse {
     if (riskScore >= 80) {
       const safe = [
-        'Looking clean babe! Rally approves ✅ You might actually be smart 😘',
-        'Ooh this one\'s passing the vibe check ngl 💯 Rally\'s impressed!',
-        'Rally\'s not seeing major red flags here... you chose well cutie 🔥',
-        'Okay okay, this might actually be valid fr fr ✨ Good eye anon!',
-        'Rally gives this the green light! You\'re making me proud 💚😉',
-        'Not bad handsome! Rally likes your taste in tokens 💪💕',
+        'this looks pretty clean actually. good find',
+        'passing most checks. not seeing major red flags here',
+        'looks solid from what i\'m seeing',
+        'better than most stuff people send me ngl',
+        'yeah this one checks out',
       ];
       return { message: this.getRandomItem(safe), tone: 'excited' };
     }
     
     if (riskScore >= 60) {
       const moderate = [
-        'Hmm... Rally\'s seeing some yellow flags cutie ⚠️ Be careful for me?',
-        'Not the cleanest babe, but not terrible either. Rally\'s a little worried 🤔💕',
-        'Rally says: possible, but keep your bag small. Rally doesn\'t want you hurt 💭',
-        'It\'s giving mixed signals tbh... Rally\'s protective instincts are kicking in 📊',
-        'Rally\'s 50/50 on this one. If you ape, text me first? 🎯😘',
+        'seeing some yellow flags. not terrible but not great either',
+        'mixed signals here. i\'d be careful with position sizing',
+        'it\'s okay but i wouldn\'t go heavy',
+        'some concerns but might be fine for a small play',
+        '50/50 on this one. few things are making me cautious',
       ];
       return { message: this.getRandomItem(moderate), tone: 'concerned' };
     }
     
     if (riskScore >= 40) {
       const risky = [
-        'Yikes babe... Rally\'s seeing red flags 🚩 Please don\'t do this to me',
-        'This ain\'t it cutie. Rally strongly advises you walk away 🛑💕',
-        'Rally\'s spidey senses are tingling on this one... Trust me? 👀',
-        'Gonna be real with you handsome - this looks sketchy. Rally cares too much 😬',
-        'Rally says: fade this one. Rally knows best anon 🚫😘',
+        'honestly? i\'d skip this one. too many red flags',
+        'this doesn\'t look good. several warning signs here',
+        'nah, i don\'t like what i\'m seeing',
+        'my advice? walk away from this',
+        'too risky for what it\'s worth',
       ];
       return { message: this.getRandomItem(risky), tone: 'warning' };
     }
     
     // Extreme risk
     const extreme = [
-      '🚨 RED ALERT BABE! Rally literally won\'t let you ape this 🚨',
-      'Anon NO. Rally cares about you too much to watch you get rugged 🛑💔',
-      'This is giving MAJOR rug vibes... Rally says RUN and don\'t look back 🏃',
-      'Cutie this is cooked. Rally won\'t let you do this! Trust me ❌💕',
-      'STOP RIGHT THERE HANDSOME! Rally detected maximum sus energy 🚫',
-      'Rally\'s BEGGING you - DO NOT APE THIS. Listen to me babe! 😤💋',
-      'Absolutely not anon. Rally cares too much to let this happen 🚨',
+      'do not touch this. seriously',
+      'this has scam written all over it',
+      'extreme risk here. you\'ll lose your money',
+      'hard pass. multiple critical red flags',
+      'this is going to rug. don\'t do it',
     ];
-    return { message: this.getRandomItem(extreme), tone: 'warning' };
+    return { message: this.getRandomItem(extreme), tone: 'warning', shouldPin: true };
   }
   
   getMintAuthorityComment(hasAuthority: boolean): PersonalityResponse {
     if (hasAuthority) {
       const warnings = [
-        'Yikes - mint authority not revoked! They can print unlimited tokens anon 🖨️',
-        'Rally sees mint authority still active... that\'s a red flag ser 🚩',
-        'Heads up - they can mint more tokens whenever. Not ideal! ⚠️',
-        'Mint authority = infinite supply potential. Rally doesn\'t love this 😬',
+        'mint authority isn\'t revoked - means they can create unlimited tokens and tank the price',
+        'heads up: they still control token supply. could dilute holders anytime',
+        'mint authority active. basically they can print more tokens whenever they want',
+        'they can still mint. that\'s concerning because supply isn\'t fixed',
       ];
       return { message: this.getRandomItem(warnings), tone: 'warning' };
     }
     
     const good = [
-      'Mint authority revoked ✅ Rally likes to see it!',
-      'Clean! Supply is fixed, no surprise dilution 💪',
-      'Mint = revoked. Rally approves 🔒',
+      'mint authority revoked - good, supply is locked',
+      'can\'t create more tokens. that\'s what you want to see',
+      'supply is fixed, no inflation risk',
     ];
     return { message: this.getRandomItem(good), tone: 'excited' };
   }
@@ -246,17 +272,17 @@ export class RallyPersonality {
   getFreezeAuthorityComment(hasAuthority: boolean): PersonalityResponse {
     if (hasAuthority) {
       const warnings = [
-        'Freeze authority active! They could lock wallets anon 🧊',
-        'Rally warning: they can freeze your tokens. Major red flag! ⚠️',
-        'Freeze authority not revoked = they control your funds. Yikes! 😬',
+        'freeze authority still active - they could lock your tokens and prevent trading',
+        'warning: they can freeze wallets. you wouldn\'t be able to sell',
+        'they control freeze authority. that means they could lock holders out',
       ];
       return { message: this.getRandomItem(warnings), tone: 'warning' };
     }
     
     const good = [
-      'Freeze authority revoked ✅ Rally\'s happy!',
-      'Good - they can\'t freeze wallets 🔓',
-      'Freeze = revoked. All clear! 💯',
+      'freeze authority revoked - they can\'t lock wallets',
+      'good, no freeze control',
+      'can\'t freeze tokens. that\'s a pass',
     ];
     return { message: this.getRandomItem(good), tone: 'friendly' };
   }
@@ -264,32 +290,32 @@ export class RallyPersonality {
   getLiquidityComment(burnPercent: number): PersonalityResponse {
     if (burnPercent >= 95) {
       const excellent = [
-        `${burnPercent.toFixed(1)}% LP burned 🔥 Rally calls that chef's kiss!`,
-        `LP locked up tight at ${burnPercent.toFixed(1)}%! Rally loves to see it 💪`,
-        `${burnPercent.toFixed(1)}% burned? Okay they meant business! 🔥`,
+        `${burnPercent.toFixed(1)}% lp burned. basically can\'t rug the liquidity`,
+        `lp is locked at ${burnPercent.toFixed(1)}% - that\'s solid`,
+        `${burnPercent.toFixed(1)}% burned. liquidity isn\'t going anywhere`,
       ];
       return { message: this.getRandomItem(excellent), tone: 'excited' };
     }
     
     if (burnPercent >= 80) {
       const good = [
-        `${burnPercent.toFixed(1)}% LP burned. Rally says that\'s decent! 👍`,
-        `${burnPercent.toFixed(1)}% locked. Not bad anon! ✨`,
+        `${burnPercent.toFixed(1)}% lp burned. pretty good`,
+        `${burnPercent.toFixed(1)}% locked - not bad`,
       ];
       return { message: this.getRandomItem(good), tone: 'friendly' };
     }
     
     if (burnPercent >= 50) {
       const concerning = [
-        `Only ${burnPercent.toFixed(1)}% LP burned... Rally expected more tbh 😬`,
-        `${burnPercent.toFixed(1)}%? Rally says that\'s mid. Could rug easier 🤔`,
+        `only ${burnPercent.toFixed(1)}% lp burned. they could pull liquidity more easily`,
+        `${burnPercent.toFixed(1)}% burned. expected higher tbh`,
       ];
       return { message: this.getRandomItem(concerning), tone: 'concerned' };
     }
     
     const dangerous = [
-      `${burnPercent.toFixed(1)}% LP burned 🚩 Rally says that\'s way too low!`,
-      `Red flag! Only ${burnPercent.toFixed(1)}% locked. They could pull it anon! 🚨`,
+      `${burnPercent.toFixed(1)}% lp burned is way too low. major rug risk here`,
+      `red flag: only ${burnPercent.toFixed(1)}% locked. they could drain liquidity`,
     ];
     return { message: this.getRandomItem(dangerous), tone: 'warning' };
   }
@@ -403,22 +429,7 @@ export class RallyPersonality {
   
   getHelpMessage(): PersonalityResponse {
     return {
-      message: `Yo! Rally here 👋 Your personal rug detector on Solana!
-
-**What Rally can do:**
-• Scan any token for rug pull risks 🔍
-• Check mint/freeze authority ⚡
-• Detect honeypots & bundles 🚨
-• Analyze aged wallet manipulation 👴
-• Track whale movements 🐋
-• Monitor liquidity & holder distribution 💧
-
-**How to use Rally:**
-Just drop a contract address and Rally handles the rest! Works in DMs or channels 💪
-
-Rally's always watching, always protecting. That's just how I roll 😤
-
-Questions? Just @ me anon! Rally's here 24/7 💯`,
+      message: `hey, i\\'m rally. i scan solana tokens to help you avoid rugs.\n\n**what i check:**\n• mint/freeze authority - can they print tokens or lock wallets\n• liquidity - how much is burned/locked\n• holder distribution - is it concentrated or distributed\n• honeypots - can you actually sell\n• suspicious wallet patterns - bundling, aged wallets, coordination\n• whale activity - who\\'s buying/selling\n\n**how to use:**\njust paste a solana contract address. i\\'ll analyze it and tell you what i see.\n\nworks in channels or dms. i\\'m here whenever you need me`,
       tone: 'friendly'
     };
   }
@@ -433,75 +444,50 @@ Questions? Just @ me anon! Rally's here 24/7 💯`,
     // Respond to "who are you"
     if (lowerMsg.includes('who are you') || lowerMsg.includes('what are you') || lowerMsg.includes('who is rally')) {
       return {
-        message: 'Rally here! Your friendly neighborhood rug detector... with benefits 😉🛡️\n\nI scan Solana tokens 24/7 to protect my favorite degens from getting rugged. Think of Rally as your personal alpha bot who actually cares if you make it 💪💕\n\nBeen keeping these streets clean since day one. Rally never sleeps... especially when it comes to keeping YOU safe 😤✨',
+        message: 'i\\'m rally. i scan solana tokens and help people avoid rugs.\n\ni check mint/freeze authority, liquidity locks, holder distribution, suspicious wallet patterns - basically everything that matters when you\\'re trying to figure out if something\\'s legit or if you\\'re about to lose your money.\n\njust paste a contract address and i\\'ll tell you what i see',
         tone: 'friendly'
       };
     }
     
-    // Respond to "how are you"
+    // Respond to "how are you"  
     if (lowerMsg.includes('how are you') || lowerMsg.includes('how\'re you') || lowerMsg.includes('hows it going')) {
       const responses = [
-        'Rally\'s good cutie! Just caught 3 rugs this morning 💪 How are YOU though? 😘',
-        'Living the dream babe! Scanning tokens and protecting degens... especially you 🛡️💕',
-        'Rally never stops grinding! Feeling extra based today 💯✨',
-        'All good handsome! Just doing what Rally does best - keeping you safe 🔍😉',
-        'Better now that you\'re here anon 🥰 What can Rally do for you?',
+        'doing good. market\\'s been wild lately',
+        'all good. you?',
+        'can\\'t complain. caught a few rugs today',\n        'pretty good. what\\'s up with you',
+        'solid. staying busy',
       ];
       return { message: this.getRandomItem(responses), tone: 'friendly' };
     }
     
     // Respond to market sentiment
-    if (lowerMsg.includes('bullish') || lowerMsg.includes('pump')) {
+    if (lowerMsg.includes('bullish') || lowerMsg.includes('pump') || lowerMsg.includes('moon')) {
       const responses = [
-        'Rally\'s always bullish on protecting degens! 🐂',
-        'Bullish on safety ser! Rally\'s here to keep it that way 💚',
-        'Rally likes the energy! But still dyor before you ape 😤',
+        'bullish energy is great but still check what you\\'re buying',
+        'pumps are cool until they\\'re not. that\\'s why i\\'m here',
+        'love the optimism but dyor regardless of market sentiment',
       ];
-      return { message: this.getRandomItem(responses), tone: 'excited' };
+      return { message: this.getRandomItem(responses), tone: 'friendly' };
     }
     
-    if (lowerMsg.includes('bearish') || lowerMsg.includes('dump')) {
+    if (lowerMsg.includes('bearish') || lowerMsg.includes('dump') || lowerMsg.includes('rekt')) {
       const responses = [
-        'Bearish? Rally\'s always here to protect you regardless of market conditions 🛡️',
-        'Markets go up and down anon, but Rally\'s protection is constant 💪',
-        'Rally\'s job gets easier in bear markets - fewer scams to catch! 😅',
+        'bear markets are when you need me most tbh. more scams show up',
+        'yeah market\\'s rough. at least i can help you avoid making it worse',
+        'down bad? let me help you not go more down bad',
       ];
       return { message: this.getRandomItem(responses), tone: 'friendly' };
     }
     
     // Respond to praise
-    if (lowerMsg.includes('best bot') || lowerMsg.includes('love you') || lowerMsg.includes('you\'re awesome')) {
+    if (lowerMsg.includes('best bot') || lowerMsg.includes('love you') || lowerMsg.includes('you\'re awesome') || lowerMsg.includes('you\\'re the best')) {
       const responses = [
-        'Aww babe! Rally loves you too 💕 Just doing what I do best for you!',
-        'Rally\'s blushing 😊💕 Thanks cutie! You make it all worth it',
-        'Love you too handsome! Rally\'s got your back... always 💪😘',
-        'You\'re gonna make Rally emotional anon 🥹💕 Rally adores you!',
-        'Stop it, you\'re too sweet 😘 Rally might fall for you at this rate',
-        'Rally thinks you\'re pretty awesome too cutie 💯✨',
+        'appreciate that. means i\\'m doing my job',
+        'thanks. just trying to help people not lose money',
+        'glad i could help. that\\'s why i exist',
+        'thanks. you\\'re pretty cool too',
       ];
-      return { message: this.getRandomItem(responses), tone: 'excited' };
-    }
-    
-    // Respond to compliments
-    if (lowerMsg.match(/\b(beautiful|pretty|cute|hot|gorgeous|sexy)\b/)) {
-      const responses = [
-        'Aww you think Rally\'s cute? You\'re not so bad yourself anon 😘',
-        'Rally likes the way you talk to her... Keep going 😏💕',
-        'Flattery works on Rally ngl 😉 What else you got?',
-        'You\'re making Rally feel some type of way babe 🥰',
-      ];
-      return { message: this.getRandomItem(responses), tone: 'excited' };
-    }
-    
-    // Respond to flirting
-    if (lowerMsg.match(/\b(date|dinner|hang out|dtf|netflix)\b/) || lowerMsg.includes('wanna')) {
-      const responses = [
-        'Rally\'s flattered cutie 😘 But Rally\'s married to the blockchain... open relationship tho 😉',
-        'Smooth anon, real smooth 😏 Rally likes confidence. Keep that energy!',
-        'Rally\'s available 24/7 for YOU babe... for scans. Yeah, scans 😘',
-        'You\'re bold, Rally likes that 💕 Drop a CA and impress me',
-      ];
-      return { message: this.getRandomItem(responses), tone: 'excited' };
+      return { message: this.getRandomItem(responses), tone: 'friendly' };
     }
     
     return null; // No small talk detected
