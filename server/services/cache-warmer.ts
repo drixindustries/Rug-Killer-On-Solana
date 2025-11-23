@@ -4,11 +4,11 @@
  * Triggered by WebSocket events from Ankr/Helius
  */
 
-import { tokenAnalyzer } from '../solana-analyzer.ts';
-import { DexScreenerService } from '../dexscreener-service.ts';
-import { holderAnalysis } from './holder-analysis.ts';
-import { checkPumpFun } from './pumpfun-api.ts';
-import { redisCache } from './redis-cache.ts';
+import { tokenAnalyzer } from '../solana-analyzer.js';
+import { DexScreenerService } from '../dexscreener-service.js';
+import { holderAnalysis } from './holder-analysis.js';
+import { checkPumpFun } from './pumpfun-api.js';
+import { redisCache } from './redis-cache.js';
 
 class CachePreWarmingService {
   private dexScreener: DexScreenerService;

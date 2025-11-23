@@ -1,9 +1,9 @@
 import { EventEmitter } from 'events';
 import { Connection, PublicKey } from '@solana/web3.js';
-import { tokenAnalyzer } from '../solana-analyzer.ts';
-import { redisCache } from './redis-cache.ts';
-import { DexScreenerService } from '../dexscreener-service.ts';
-import { cacheWarmer } from './cache-warmer.ts';
+import { tokenAnalyzer } from '../solana-analyzer.js';
+import { redisCache } from './redis-cache.js';
+import { DexScreenerService } from '../dexscreener-service.js';
+import { cacheWarmer } from './cache-warmer.js';
 
 export interface AnkrTokenEvent {
   mint: string;

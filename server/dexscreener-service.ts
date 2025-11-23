@@ -1,5 +1,5 @@
 import type { DexScreenerData } from "../shared/schema";
-import { redisCache } from "./services/redis-cache.ts";
+import { redisCache } from "./services/redis-cache.js";
 
 const DEXSCREENER_API_URL = "https://api.dexscreener.com";
 

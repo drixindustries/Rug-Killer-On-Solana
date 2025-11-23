@@ -16,15 +16,15 @@ import type {
   RiskLevel,
   FloorData,
 } from "../shared/schema";
-import { DexScreenerService } from "./dexscreener-service.ts";
-import { rpcBalancer } from "./services/rpc-balancer.ts";
-import { checkPumpFun } from "./services/pumpfun-api.ts";
-import { holderAnalysis } from "./services/holder-analysis.ts";
-import { TemporalGNNDetector } from "./temporal-gnn-detector.ts";
-import { getMigrationDetector } from "./migration-detector.ts";
-import { mlScorer } from "./services/ml-scorer.ts";
-import { fundingAnalyzer } from "./services/funding-source-analyzer.ts";
-import { redisCache } from "./services/redis-cache.ts";
+import { DexScreenerService } from "./dexscreener-service.js";
+import { rpcBalancer } from "./services/rpc-balancer.js";
+import { checkPumpFun } from "./services/pumpfun-api.js";
+import { holderAnalysis } from "./services/holder-analysis.js";
+import { TemporalGNNDetector } from "./temporal-gnn-detector.js";
+import { getMigrationDetector } from "./migration-detector.js";
+import { mlScorer } from "./services/ml-scorer.js";
+import { fundingAnalyzer } from "./services/funding-source-analyzer.js";
+import { redisCache } from "./services/redis-cache.js";
 
 export class SolanaTokenAnalyzer {
   private dexScreener: DexScreenerService;

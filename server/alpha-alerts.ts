@@ -1,15 +1,15 @@
 import { Connection, PublicKey } from '@solana/web3.js';
-import { getRandomPublicRpc } from './public-rpcs.ts';
+import { getRandomPublicRpc } from './public-rpcs.js';
 import WebSocket from 'ws';
 import { db } from './db';
-import { kolWallets, smartWallets, smartSignals } from '../shared/schema.ts';
+import { kolWallets, smartWallets, smartSignals } from '../shared/schema.js';
 import { gte, and, eq } from 'drizzle-orm';
-import { GMGNService } from './services/gmgn-service.ts';
-import { storage } from './storage.ts';
-import { rpcBalancer } from './services/rpc-balancer.ts';
-import { TemporalGNNDetector, type TGNResult } from './temporal-gnn-detector.ts';
-import { MigrationDetector, getMigrationDetector, type MigrationEvent } from './migration-detector.ts';
-import { HolderAnalysisService, type HolderAnalysisResult } from './services/holder-analysis.ts';
+import { GMGNService } from './services/gmgn-service.js';
+import { storage } from './storage.js';
+import { rpcBalancer } from './services/rpc-balancer.js';
+import { TemporalGNNDetector, type TGNResult } from './temporal-gnn-detector.js';
+import { MigrationDetector, getMigrationDetector, type MigrationEvent } from './migration-detector.js';
+import { HolderAnalysisService, type HolderAnalysisResult } from './services/holder-analysis.js';
 
 interface AlphaAlert {
   type: 'new_token' | 'whale_buy' | 'caller_signal';
@@ -402,11 +402,11 @@ export class AlphaAlertService {
       try {
         console.log(`[ALPHA ALERT] Triggering automatic scan for token: ${alert.mint}`);
         // Import analyzer and run scan
-        const { default: analyze } = await import('./analyzer.ts');
+        const { default: analyze } = await import('./analyzer.js');
         const analysisResult = await analyze({ address: alert.mint });
         
         // Build embed message using the same format as Discord bot
-        const { buildCompactMessage } = await import('./discord-bot.ts');
+        const { buildCompactMessage } = await import('./discord-bot.js');
         const messageData = buildCompactMessage(analysisResult);
         
         // Send scan results as follow-up message
@@ -825,7 +825,7 @@ export class AlphaAlertService {
   private async setupWebhookListeners(): Promise<void> {
     try {
       // Listen to Helius webhook events
-      const { heliusWebhook } = await import('./services/helius-webhook.ts');
+      const { heliusWebhook } = await import('./services/helius-webhook.js');
       
       heliusWebhook.on('token_created', async (event: any) => {
         console.log('[Alpha Alerts] New token detected via Helius:', event.mint);
@@ -845,7 +845,7 @@ export class AlphaAlertService {
 
       // Listen to Ankr WebSocket events
       try {
-        const { ankrWebSocket } = await import('./services/ankr-websocket.ts');
+        const { ankrWebSocket } = await import('./services/ankr-websocket.js');
         
         ankrWebSocket.on('token_created', async (event: any) => {
           console.log('[Alpha Alerts] New token detected via Ankr:', event.mint);

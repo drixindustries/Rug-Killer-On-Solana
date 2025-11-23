@@ -1,10 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { analyzeTokenSchema, insertWatchlistSchema, smartSignals } from "../shared/schema.ts";
-import { tokenAnalyzer } from "./solana-analyzer.ts";
-import { nameCache } from "./name-cache.ts";
+import { analyzeTokenSchema, insertWatchlistSchema, smartSignals } from "../shared/schema.js";
+import { tokenAnalyzer } from "./solana-analyzer.js";
+import { nameCache } from "./name-cache.js";
 // import { setupAuth, isAuthenticated } from "./replitAuth"; // Disabled for non-Replit deployments
-import { storage } from "./storage.ts";
+import { storage } from "./storage.js";
 import { 
   createWhopCheckout, 
   getWhopMembership, 
@@ -12,19 +12,19 @@ import {
   mapWhopStatus,
   mapPlanToTier,
   WHOP_PLAN_IDS 
-} from "./whop-client.ts";
-import { VanityAddressGenerator } from "./vanity-generator.ts";
+} from "./whop-client.js";
+import { VanityAddressGenerator } from "./vanity-generator.js";
 import { z } from "zod";
 import { nanoid } from "nanoid";
-import { rpcBalancer } from "./services/rpc-balancer.ts";
-import { holderAnalysis } from "./services/holder-analysis.ts";
-import { streamMetrics, normalizeSolanaWebhook } from "./services/stream-metrics.ts";
+import { rpcBalancer } from "./services/rpc-balancer.js";
+import { holderAnalysis } from "./services/holder-analysis.js";
+import { streamMetrics, normalizeSolanaWebhook } from "./services/stream-metrics.js";
 import crypto from 'crypto';
-import { tokenMetrics } from './services/token-metrics.ts';
+import { tokenMetrics } from './services/token-metrics.js';
 import getRawBody from 'raw-body';
 import { gte, sql } from "drizzle-orm";
-import webhookRoutes from "./webhook-routes.ts";
-import adminRoutes from "./admin-routes.ts";
+import webhookRoutes from "./webhook-routes.js";
+import adminRoutes from "./admin-routes.js";
 
 // Stub authentication for Railway deployment (no Replit OIDC)
 const setupAuth = async (app: Express) => {
@@ -204,8 +204,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Cache statistics endpoint (debug only)
     app.get('/api/cache/stats', requireDebugToken, async (_req, res) => {
       try {
-        const { redisCache } = await import('./services/redis-cache.ts');
-        const { cacheWarmer } = await import('./services/cache-warmer.ts');
+        const { redisCache } = await import('./services/redis-cache.js');
+        const { cacheWarmer } = await import('./services/cache-warmer.js');
         
         const redisStats = await redisCache.getStats();
         const warmerStats = cacheWarmer.getStats();
