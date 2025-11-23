@@ -135,13 +135,46 @@ const RPC_PROVIDERS = [
     rateLimit: 100, // Conservative for free tier
     rateLimitWindow: 60000
   },
-  // Tier 1 Public Fallback
+  // Tier 1 Public Fallback - Solana Foundation
   { 
     getUrl: () => "https://api.mainnet-beta.solana.com",
-    weight: 20, // INCREASED: Often faster than paid slow ones
+    weight: 20,
     name: "Solana-Official",
     tier: "fallback" as const,
     rateLimit: 40,
+    rateLimitWindow: 60000
+  },
+  // Additional Public RPCs for better redundancy
+  { 
+    getUrl: () => "https://solana-api.projectserum.com",
+    weight: 15,
+    name: "Serum",
+    tier: "fallback" as const,
+    rateLimit: 40,
+    rateLimitWindow: 60000
+  },
+  { 
+    getUrl: () => "https://rpc.ankr.com/solana",
+    weight: 18,
+    name: "Ankr-Public",
+    tier: "fallback" as const,
+    rateLimit: 50,
+    rateLimitWindow: 60000
+  },
+  { 
+    getUrl: () => "https://solana-mainnet.rpc.extrnode.com",
+    weight: 12,
+    name: "Extrnode",
+    tier: "fallback" as const,
+    rateLimit: 30,
+    rateLimitWindow: 60000
+  },
+  { 
+    getUrl: () => "https://solana.public-rpc.com",
+    weight: 12,
+    name: "Public-RPC",
+    tier: "fallback" as const,
+    rateLimit: 30,
     rateLimitWindow: 60000
   }
 ];
