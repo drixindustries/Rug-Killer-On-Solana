@@ -163,7 +163,7 @@ export function CascadingAnalysisBars({ analysis }: CascadingAnalysisBarsProps) 
     ],
     expandable: topHolders.length > 0,
     details: topHolders.length > 0 ? 
-      topHolders.slice(0, 5).map((h, i) => `#${i+1}: ${h.percentage?.toFixed(2)}% (${h.address?.slice(0, 8)}...)`) : 
+      topHolders.slice(0, 5).map((h, i) => `#${i+1}: ${(typeof h.percentage === 'number' ? h.percentage.toFixed(2) : '0.00')}% (${h.address?.slice(0, 8)}...)`) : 
       ["Holder data not available - may require premium RPC access"]
   });
 
@@ -195,7 +195,7 @@ export function CascadingAnalysisBars({ analysis }: CascadingAnalysisBarsProps) 
       status: bd.bundleScore > 70 ? "danger" : "warning",
       mainValue: `${bd.bundleScore}/100 Risk`,
       subValues: [
-        { label: "Bundled Supply", value: `${bd.bundledSupplyPercent.toFixed(1)}%` },
+        { label: "Bundled Supply", value: `${(typeof bd.bundledSupplyPercent === 'number' ? bd.bundledSupplyPercent.toFixed(1) : '0.0')}%` },
         { label: "Suspicious Wallets", value: `${bd.suspiciousWallets}` }
       ],
       expandable: true,
@@ -219,13 +219,13 @@ export function CascadingAnalysisBars({ analysis }: CascadingAnalysisBarsProps) 
       mainValue: suspiciousCount === 0 ? "CLEAN" : `${suspiciousCount} Suspicious`,
       subValues: [
         { label: "Safety Score", value: `${safetyScore}/100` },
-        { label: "Fake Volume", value: `${fakeVolume.toFixed(1)}%` }
+        { label: "Fake Volume", value: `${(typeof fakeVolume === 'number' ? fakeVolume.toFixed(1) : '0.0')}%` }
       ],
       expandable: suspiciousCount > 0,
       details: suspiciousCount > 0 ? 
         [
           `${suspiciousCount} aged wallets detected with coordinated behavior`,
-          `Potential fake volume: ${fakeVolume.toFixed(1)}%`,
+          `Potential fake volume: ${(typeof fakeVolume === 'number' ? fakeVolume.toFixed(1) : '0.0')}%`,
           `Risk Score: ${aw.riskScore}/100`
         ] : undefined
     });
@@ -241,8 +241,8 @@ export function CascadingAnalysisBars({ analysis }: CascadingAnalysisBarsProps) 
       status: wd.totalWhaleSupplyPercent > 40 ? "danger" : wd.totalWhaleSupplyPercent > 20 ? "warning" : "info",
       mainValue: `${wd.whaleCount} Whales`,
       subValues: [
-        { label: "Supply", value: `${wd.totalWhaleSupplyPercent.toFixed(1)}%` },
-        { label: "Avg Buy", value: `${wd.averageBuySize.toFixed(2)} tokens` }
+        { label: "Supply", value: `${(typeof wd.totalWhaleSupplyPercent === 'number' ? wd.totalWhaleSupplyPercent.toFixed(1) : '0.0')}%` },
+        { label: "Avg Buy", value: `${(typeof wd.averageBuySize === 'number' ? wd.averageBuySize.toFixed(2) : '0.00')} tokens` }
       ],
       expandable: wd.whaleBuys.length > 0,
       details: wd.insight ? [wd.insight] : undefined
@@ -279,7 +279,7 @@ export function CascadingAnalysisBars({ analysis }: CascadingAnalysisBarsProps) 
       status: fa.suspiciousFunding ? "warning" : "safe",
       mainValue: patternCount > 0 ? `${patternCount} Patterns` : "CLEAN",
       subValues: [
-        { label: "Suspicious", value: `${fa.totalSuspiciousPercentage.toFixed(1)}%` },
+        { label: "Suspicious", value: `${(typeof fa.totalSuspiciousPercentage === 'number' ? fa.totalSuspiciousPercentage.toFixed(1) : '0.0')}%` },
         { label: "Status", value: fa.suspiciousFunding ? "Risk Detected" : "Safe" }
       ],
       expandable: fa.risks.length > 0,

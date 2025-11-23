@@ -112,7 +112,7 @@ export function AgedWalletDetectionCard({ data }: AgedWalletDetectionCardProps) 
               <DollarSign className="w-3 h-3" />
               Fake Volume %
             </div>
-            <div className="text-xl font-bold">{data.totalFakeVolumePercent.toFixed(1)}%</div>
+            <div className="text-xl font-bold">{(typeof data.totalFakeVolumePercent === 'number' ? data.totalFakeVolumePercent.toFixed(1) : '0.0')}%</div>
           </div>
         </div>
 
@@ -222,7 +222,7 @@ export function AgedWalletDetectionCard({ data }: AgedWalletDetectionCardProps) 
                       {wallet.wallet.slice(0, 8)}...{wallet.wallet.slice(-6)}
                     </code>
                     <Badge variant="outline" className="text-xs">
-                      {wallet.walletAge.toFixed(0)} days old
+                      {(typeof wallet.walletAge === 'number' ? wallet.walletAge.toFixed(0) : '0')} days old
                     </Badge>
                   </div>
                   {wallet.hasOnlyBuys && (

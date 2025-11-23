@@ -85,7 +85,7 @@ export function BundleDetectionCard({ data }: BundleDetectionCardProps) {
           <div className="space-y-1">
             <p className="text-sm text-muted-foreground">Bundled Supply</p>
             <p className={`text-2xl font-bold ${data.bundledSupplyPercent > 30 ? 'text-destructive' : data.bundledSupplyPercent > 15 ? 'text-yellow-500' : ''}`}>
-              {data.bundledSupplyPercent.toFixed(1)}%
+              {(typeof data.bundledSupplyPercent === 'number' ? data.bundledSupplyPercent.toFixed(1) : '0.0')}%
             </p>
           </div>
           <div className="space-y-1">
@@ -130,12 +130,12 @@ export function BundleDetectionCard({ data }: BundleDetectionCardProps) {
             {data.bundleScore >= 60 ? (
               <>
                 <strong className="text-destructive">High Risk:</strong> This token shows strong signs of bundled wallet manipulation. 
-                {data.suspiciousWallets.length} wallets controlling {data.bundledSupplyPercent.toFixed(1)}% of supply can coordinate dumps.
+                {data.suspiciousWallets.length} wallets controlling {(typeof data.bundledSupplyPercent === 'number' ? data.bundledSupplyPercent.toFixed(1) : '0.0')}% of supply can coordinate dumps.
               </>
             ) : (
               <>
                 <strong className="text-yellow-600 dark:text-yellow-400">Moderate Risk:</strong> Some suspicious wallet patterns detected. 
-                Monitor {data.suspiciousWallets.length} wallets holding {data.bundledSupplyPercent.toFixed(1)}% combined supply.
+                Monitor {data.suspiciousWallets.length} wallets holding {(typeof data.bundledSupplyPercent === 'number' ? data.bundledSupplyPercent.toFixed(1) : '0.0')}% combined supply.
               </>
             )}
           </p>
