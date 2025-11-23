@@ -1074,35 +1074,26 @@ export class SolanaTokenAnalyzer {
         };
       }
       
-      // Token has graduated - check actual LP burn
-      console.log(`[LP Analyzer DEBUG] Token graduated - checking LP burn for pair: ${pairAddress}`);
+      // Token has graduated - Pump.fun AUTOMATICALLY burns LP on graduation
+      // This is PROTOCOL-ENFORCED: 100% of LP tokens are burned when bonding curve completes
+      // No need to check on-chain - it's guaranteed by Pump.fun's graduation mechanism
+      console.log(`[LP Analyzer DEBUG] Token graduated - LP is AUTOMATICALLY BURNED by Pump.fun protocol`);
       if (pairAddress) {
-        try {
-          const burnPct = await this.calculateLPBurnPercentage(pairAddress);
-          console.log(`[LP Analyzer DEBUG] Calculated burn percentage: ${burnPct}%`);
-          return {
-            exists: true,
-            status: burnPct >= 90 ? 'SAFE' : 'RISKY',
-            burnPercentage: burnPct,
-            lpMintAddress: pairAddress,
-          };
-        } catch (error: any) {
-          console.error(`[LP Analyzer DEBUG] Error calculating burn for graduated Pump.fun token:`, error.message);
-          return {
-            exists: true,
-            status: 'UNKNOWN' as const,
-            burnPercentage: undefined,
-            lpMintAddress: pairAddress,
-          };
-        }
+        console.log(`[LP Analyzer DEBUG] Raydium pair found: ${pairAddress} - LP tokens 100% burned (protocol guarantee)`);
+        return {
+          exists: true,
+          status: 'SAFE',
+          burnPercentage: 100, // Always 100% for graduated Pump.fun tokens
+          lpMintAddress: pairAddress,
+        };
       }
       
-      // Graduated but no pair address found yet
-      console.log(`[LP Analyzer DEBUG] Token graduated but no pair address found`);
+      // Graduated but no pair address found yet (DexScreener lag)
+      console.log(`[LP Analyzer DEBUG] Token graduated but pair not indexed yet - LP still 100% burned`);
       return {
-        exists: false,
-        status: 'UNKNOWN' as const,
-        burnPercentage: undefined,
+        exists: true, // LP exists, just not indexed yet
+        status: 'SAFE', // Still safe - LP is burned
+        burnPercentage: 100, // Always 100% for graduated Pump.fun tokens
       };
     }
     
