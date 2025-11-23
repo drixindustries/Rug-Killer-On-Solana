@@ -282,11 +282,11 @@ export default function Alerts() {
                           </TableCell>
                           <TableCell data-testid={`cell-type-${alert.id}`}>
                             <Badge variant="outline" data-testid={`badge-type-${alert.id}`}>
-                              {alert.alertType.replace('_', ' ')}
+                              {alert.alertType?.replace('_', ' ') || 'Unknown'}
                             </Badge>
                           </TableCell>
                           <TableCell data-testid={`cell-target-${alert.id}`}>
-                            {alert.alertType.includes('percent') 
+                            {alert.alertType?.includes('percent') 
                               ? `${Number(alert.targetValue || 0).toFixed(1)}%`
                               : `$${Number(alert.targetValue || 0).toFixed(4)}`}
                           </TableCell>
