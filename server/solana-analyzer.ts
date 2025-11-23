@@ -5,6 +5,7 @@
 
 import { Connection, PublicKey } from "@solana/web3.js";
 import { getMint, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import bs58 from "bs58";
 import type {
   TokenAnalysisResponse,
   AuthorityStatus,
@@ -136,11 +137,11 @@ export class SolanaTokenAnalyzer {
         topHolders: holders?.top20Holders?.map((h, idx) => ({
           rank: idx + 1,
           address: h.address,
-          balance: h.balance,
-          percentage: h.percentage,
+          balance: h.balance || 0,
+          percentage: h.percentage || 0,
         })) || [],
         topHolderConcentration: holders?.topHolderConcentration || 0,
-        holderFiltering: {
+        holderFiltering: holders?.holderFiltering || {
           totals: {
             lp: 0,
             exchanges: 0,
@@ -155,6 +156,17 @@ export class SolanaTokenAnalyzer {
             newWallets: 0,
           },
           excluded: [],
+          bundledDetection: {
+            suspiciousWallets: [],
+            bundleSupplyPct: 0,
+            clusters: [],
+          },
+          walletIntelligence: {
+            avgWalletAge: 0,
+            oldestWallet: 0,
+            newestWallet: 0,
+            suspiciousPatterns: [],
+          },
         },
         
         // Liquidity pool - calculate burn percentage
@@ -1086,21 +1098,47 @@ export class SolanaTokenAnalyzer {
       const largestAccounts = await connection.getTokenLargestAccounts(lpMintPubkey, 'confirmed');
       console.log(`[LP Burn DEBUG] Found ${largestAccounts.value.length} LP token accounts`);
       
+      if (largestAccounts.value.length === 0) {
+        console.log(`[LP Burn DEBUG] No token accounts found - 100% burned`);
+        return 100;
+      }
+      
+      // Fetch actual owners of token accounts
+      const accountAddresses = largestAccounts.value.map(acc => acc.address);
+      const accountInfos = await connection.getMultipleAccountsInfo(accountAddresses, 'confirmed');
+      
       // Known burn addresses on Solana
-      const BURN_ADDRESSES = [
+      const BURN_ADDRESSES = new Set([
         '11111111111111111111111111111111', // System program (common burn)
         'So11111111111111111111111111111111111111112', // Wrapped SOL (sometimes used)
         'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', // Token program
-      ];
+        '5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1', // Raydium authority v4
+        'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', // Token program
+      ]);
       
       let burnedAmount = 0;
       
-      for (const account of largestAccounts.value) {
-        const owner = account.address.toBase58();
-        const amount = Number(account.amount);
+      for (let i = 0; i < largestAccounts.value.length; i++) {
+        const accountInfo = accountInfos[i];
+        const amount = Number(largestAccounts.value[i].amount);
         
-        // Check if owner is a burn address or the account has 0 balance
-        const isBurned = BURN_ADDRESSES.includes(owner) || amount === 0;
+        if (!accountInfo?.data || amount === 0) {
+          console.log(`[LP Burn DEBUG] Account ${i}: No data or zero balance - Amount: ${amount}`);
+          continue;
+        }
+        
+        // Parse token account to get owner (owner is at bytes 32-64)
+        const data = accountInfo.data as Buffer;
+        if (data.length < 64) {
+          console.log(`[LP Burn DEBUG] Account ${i}: Insufficient data length`);
+          continue;
+        }
+        
+        const ownerBytes = data.subarray(32, 64);
+        const owner = bs58.encode(ownerBytes);
+        
+        // Check if owner is a burn address
+        const isBurned = BURN_ADDRESSES.has(owner);
         
         if (isBurned) {
           burnedAmount += amount;
@@ -1117,6 +1155,7 @@ export class SolanaTokenAnalyzer {
       
     } catch (error: any) {
       console.error(`[LP Burn DEBUG] Error calculating LP burn:`, error.message);
+      console.error(`[LP Burn DEBUG] Stack:`, error.stack);
       return 0; // Return 0% if we can't calculate (safest assumption)
     }
   }

@@ -541,18 +541,33 @@ export default function Home() {
                                 </Badge>
                               </div>
                               <div className="space-y-2">
-                                <div className="flex items-center justify-between text-sm">
-                                  <span className="text-green-500">Safe</span>
-                                  <span>{((Number(voteSummary.safeWeight) / (Number(voteSummary.safeWeight) + Number(voteSummary.riskyWeight) + Number(voteSummary.scamWeight))) * 100).toFixed(1)}%</span>
-                                </div>
-                                <div className="flex items-center justify-between text-sm">
-                                  <span className="text-amber-500">Risky</span>
-                                  <span>{((Number(voteSummary.riskyWeight) / (Number(voteSummary.safeWeight) + Number(voteSummary.riskyWeight) + Number(voteSummary.scamWeight))) * 100).toFixed(1)}%</span>
-                                </div>
-                                <div className="flex items-center justify-between text-sm">
-                                  <span className="text-destructive">Scam</span>
-                                  <span>{((Number(voteSummary.scamWeight) / (Number(voteSummary.safeWeight) + Number(voteSummary.riskyWeight) + Number(voteSummary.scamWeight))) * 100).toFixed(1)}%</span>
-                                </div>
+                                {(() => {
+                                  const safeWeight = Number(voteSummary.safeWeight) || 0;
+                                  const riskyWeight = Number(voteSummary.riskyWeight) || 0;
+                                  const scamWeight = Number(voteSummary.scamWeight) || 0;
+                                  const totalWeight = safeWeight + riskyWeight + scamWeight;
+                                  
+                                  const safePercent = totalWeight > 0 ? ((safeWeight / totalWeight) * 100).toFixed(1) : '0.0';
+                                  const riskyPercent = totalWeight > 0 ? ((riskyWeight / totalWeight) * 100).toFixed(1) : '0.0';
+                                  const scamPercent = totalWeight > 0 ? ((scamWeight / totalWeight) * 100).toFixed(1) : '0.0';
+                                  
+                                  return (
+                                    <>
+                                      <div className="flex items-center justify-between text-sm">
+                                        <span className="text-green-500">Safe</span>
+                                        <span>{safePercent}%</span>
+                                      </div>
+                                      <div className="flex items-center justify-between text-sm">
+                                        <span className="text-amber-500">Risky</span>
+                                        <span>{riskyPercent}%</span>
+                                      </div>
+                                      <div className="flex items-center justify-between text-sm">
+                                        <span className="text-destructive">Scam</span>
+                                        <span>{scamPercent}%</span>
+                                      </div>
+                                    </>
+                                  );
+                                })()}
                                 <p className="text-xs text-muted-foreground mt-2">{Number(voteSummary.totalVotes)} votes</p>
                               </div>
                             </div>
