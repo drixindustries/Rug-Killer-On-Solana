@@ -1945,13 +1945,18 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     const text = message.content.trim();
     const lowerText = text.toLowerCase();
     
+    // Debug logging for command detection
+    if (text.startsWith('!')) {
+      console.log(`[Discord] Command detected: "${text}" from ${message.author.tag}`);
+    
     // ===================================================================
     // PRIORITY 1: Handle ! prefix commands FIRST (for Android users)
     // These work WITHOUT requiring bot mention
     // ===================================================================
     
     // !scan or !execute - Full rug detection scan
-    const scanMatch = text.match(/^!(?:scan|execute)[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    // More flexible regex: allows multiple spaces and works with/without trailing content
+    const scanMatch = text.match(/^!(?:scan|execute)\s+([1-9A-HJ-NP-Za-km-z]{32,44})/i);
     if (scanMatch) {
       const tokenAddress = scanMatch[1];
       console.log(`[Discord !scan] User ${message.author.tag} scanning: ${tokenAddress}`);
@@ -2018,7 +2023,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     }
     
     // !first20 - Top 20 holders
-    const first20Match = text.match(/^!first20[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    const first20Match = text.match(/^!first20\s+([1-9A-HJ-NP-Za-km-z]{32,44})/i);
     if (first20Match) {
       const tokenAddress = first20Match[1];
       const loadingMsg = await message.reply('🔍 Analyzing top 20 holders...');
@@ -2111,7 +2116,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     }
     
     // !whaletrack - Track whales
-    const whaletrackMatch = text.match(/^!whaletrack[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    const whaletrackMatch = text.match(/^!whaletrack\s+([1-9A-HJ-NP-Za-km-z]{32,44})/i);
     if (whaletrackMatch) {
       const tokenAddress = whaletrackMatch[1];
       const loadingMsg = await message.reply('🐋 Tracking smart money...');
@@ -2144,7 +2149,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     }
     
     // !kol - Check KOL status
-    const kolMatch = text.match(/^!kol[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    const kolMatch = text.match(/^!kol\s+([1-9A-HJ-NP-Za-km-z]{32,44})/i);
     if (kolMatch) {
       const walletAddress = kolMatch[1];
       const loadingMsg = await message.reply('🔍 Checking KOL status...');
@@ -2170,7 +2175,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     }
     
     // !price - Quick price check
-    const priceMatch = text.match(/^!price[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    const priceMatch = text.match(/^!price\s+([1-9A-HJ-NP-Za-km-z]{32,44})/i);
     if (priceMatch) {
       const tokenAddress = priceMatch[1];
       const loadingMsg = await message.reply('💰 Fetching price...');
@@ -2206,7 +2211,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     }
     
     // !rugcheck - Quick rug scan
-    const rugcheckMatch = text.match(/^!rugcheck[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})$/im);
+    const rugcheckMatch = text.match(/^!rugcheck\s+([1-9A-HJ-NP-Za-km-z]{32,44})/i);
     if (rugcheckMatch) {
       const tokenAddress = rugcheckMatch[1];
       const loadingMsg = await message.reply('🔍 Running quick rug scan...');
@@ -2238,7 +2243,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     }
     
     // !holders - Top N holders
-    const holdersMatch = text.match(/^!holders[\s\n]+([1-9A-HJ-NP-Za-km-z]{32,44})(?:\s+(\d+))?$/im);
+    const holdersMatch = text.match(/^!holders\s+([1-9A-HJ-NP-Za-km-z]{32,44})(?:\s+(\d+))?/i);
     if (holdersMatch) {
       const tokenAddress = holdersMatch[1];
       const count = holdersMatch[2] ? parseInt(holdersMatch[2]) : 10;
