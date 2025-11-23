@@ -209,7 +209,6 @@ export class HolderAnalysisService {
         throw error;
       }
       
-      const all = [...classic, ...t2022];
       console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Total accounts found: ${all.length}`);
 
       if (all.length === 0) {
