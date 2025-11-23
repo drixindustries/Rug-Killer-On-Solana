@@ -289,13 +289,19 @@ export class AlphaAlertService {
       };
 
       const summaryLines: string[] = [];
+      
+      // Prominently display who bought
+      const walletName = alert.data?.walletName || alert.source;
+      const influenceScore = alert.data?.influenceScore;
+      const walletEmoji = influenceScore && influenceScore >= 80 ? '⭐' : '👤';
+      
+      summaryLines.push(`${walletEmoji} **${walletName}** ${influenceScore ? `(Influence: ${influenceScore}/100)` : ''}`);
+      if (walletAddress) {
+        summaryLines.push(`🔑 \`${walletAddress}\``);
+      }
       summaryLines.push(`📍 CA: \`${alert.mint}\``);
-      summaryLines.push(`👤 Wallet: ${alert.source}${shortWallet ? ` (${shortWallet})` : ''}`);
       if (providerLabel) {
         summaryLines.push(`📡 Source: ${providerLabel}`);
-      }
-      if (walletAddress) {
-        summaryLines.push(`🔑 Address: \`${walletAddress}\``);
       }
       if (tokenSymbol) {
         summaryLines.push(`🏷️ Token: ${tokenSymbol}${tokenName ? ` (${tokenName})` : ''}`);
@@ -802,12 +808,12 @@ export class AlphaAlertService {
       });
 
       heliusWebhook.on('large_transfer', async (event: any) => {
-        const isMonitored = this.alphaCallers.some(c => 
+        const matchedCaller = this.alphaCallers.find(c => 
           c.wallet === event.from || c.wallet === event.to
         );
-        if (isMonitored) {
+        if (matchedCaller) {
           console.log('[Alpha Alerts] Monitored wallet activity:', event);
-          await this.checkTokenForAlphaWallets(event.mint, 'Large Transfer');
+          await this.checkTokenForAlphaWallets(event.mint, 'Large Transfer', matchedCaller);
         }
       });
 
@@ -821,10 +827,10 @@ export class AlphaAlertService {
         });
 
         ankrWebSocket.on('alpha_wallet_trade', async (event: any) => {
-          const isMonitored = this.alphaCallers.some(c => c.wallet === event.wallet);
-          if (isMonitored) {
+          const matchedCaller = this.alphaCallers.find(c => c.wallet === event.wallet);
+          if (matchedCaller) {
             console.log('[Alpha Alerts] Alpha wallet trade via Ankr:', event.wallet.slice(0, 8), '→', event.mint);
-            await this.checkTokenForAlphaWallets(event.mint, 'Ankr Alpha Trade');
+            await this.checkTokenForAlphaWallets(event.mint, 'Ankr Alpha Trade', matchedCaller);
           }
         });
 
@@ -849,9 +855,10 @@ export class AlphaAlertService {
   /**
    * Check if a newly detected token involves any alpha wallets
    */
-  private async checkTokenForAlphaWallets(mint: string, source: string): Promise<void> {
+  private async checkTokenForAlphaWallets(mint: string, source: string, caller?: AlphaCallerConfig): Promise<void> {
     try {
-      console.log(`[Alpha Alerts] Checking token ${mint} from ${source}`);
+      const walletInfo = caller ? `${caller.name} (${caller.wallet.slice(0, 8)}...)` : 'Unknown';
+      console.log(`[Alpha Alerts] Checking token ${mint} from ${source} - Wallet: ${walletInfo}`);
       
       // Check if token passes quality filters
       const isQuality = await this.isQualityToken(mint);
@@ -859,13 +866,18 @@ export class AlphaAlertService {
       if (isQuality) {
         console.log(`[Alpha Alerts] ✅ Token ${mint} passed quality check - sending alert`);
         
-        // Send the alert
+        // Send the alert with wallet information
         await this.sendAlert({
           type: 'caller_signal',
           mint,
-          source,
+          source: caller ? caller.name : source,
           timestamp: Date.now(),
-          data: { provider: source }
+          data: { 
+            provider: source,
+            wallet: caller?.wallet,
+            walletName: caller?.name,
+            influenceScore: caller?.influenceScore
+          }
         });
       } else {
         console.log(`[Alpha Alerts] ⚠️ Token ${mint} failed quality check - skipping alert`);
