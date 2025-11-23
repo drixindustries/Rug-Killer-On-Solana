@@ -21,7 +21,7 @@ import { getMint, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-to
 import { redisCache } from './redis-cache.js';
 import { rpcBalancer } from './rpc-balancer.js';
 import { EXCHANGE_WALLETS, isExchangeWallet } from '../exchange-whitelist.js';
-import { getKnownAddressInfo } from '../known-addresses.js';
+import { getKnownAddressInfo, getPumpFunBondingCurveAddress, getPumpFunAssociatedBondingCurveAddress } from '../known-addresses.js';
 import { isPumpFunAmm } from '../pumpfun-whitelist.js';
 import { isMeteoraAmm } from '../meteora-whitelist.js';
 import { isSystemWallet, isPumpFunBondingCurve, getSystemWalletType, filterHoldersWithStats } from '../pumpfun-system-wallets';
@@ -262,6 +262,14 @@ export class HolderAnalysisService {
 
       console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Parsed ${holders.length} non-zero token accounts`);
       
+      // Calculate pump.fun bonding curve addresses for this specific token
+      const bondingCurveAddress = getPumpFunBondingCurveAddress(tokenAddress);
+      const associatedBondingCurveAddress = getPumpFunAssociatedBondingCurveAddress(tokenAddress);
+      console.log(`[HolderAnalysis] Bonding curve addresses for ${tokenAddress}:`, {
+        bondingCurve: bondingCurveAddress,
+        associated: associatedBondingCurveAddress
+      });
+      
       // Aggregate by owner (some wallets may hold multiple token accounts)
       const byOwner = new Map<string, bigint>();
       for (const h of holders) {
@@ -276,6 +284,13 @@ export class HolderAnalysisService {
       let meteoraFilteredRaw = 0n;
 
       const nonSystemEntries = Array.from(byOwner.entries()).reduce<Array<{ address: string; amountRaw: bigint }>>((acc, [address, amountRaw]) => {
+        // Filter pump.fun bonding curve addresses (both main and associated)
+        if (address === bondingCurveAddress || address === associatedBondingCurveAddress) {
+          console.log(`[HolderAnalysis] Filtered bonding curve holder: ${address.slice(0, 8)}... (${Number(amountRaw) / 1e9} tokens)`);
+          pumpFunFilteredCount += 1;
+          pumpFunFilteredRaw += amountRaw;
+          return acc;
+        }
         if (isPumpFunAmm(address)) {
           pumpFunFilteredCount += 1;
           pumpFunFilteredRaw += amountRaw;
@@ -396,6 +411,10 @@ export class HolderAnalysisService {
       let pumpFunFilteredRaw = 0;
       let meteoraFilteredCount = 0;
       let meteoraFilteredRaw = 0;
+      // Calculate pump.fun bonding curve addresses for this specific token
+      const bondingCurveAddress = getPumpFunBondingCurveAddress(tokenAddress);
+      const associatedBondingCurveAddress = getPumpFunAssociatedBondingCurveAddress(tokenAddress);
+      
       let systemWalletsFiltered = 0;
       let systemWalletsFilteredRaw = 0;
       let isPreMigration = false;
@@ -403,6 +422,15 @@ export class HolderAnalysisService {
       for (const acc of validAccounts) {
         const amountRaw = Number(acc.amount);
         const ownerAddress = ownerLookup.get(acc.address.toBase58()) ?? acc.address.toBase58();
+
+        // Filter pump.fun bonding curve addresses (both main and associated)
+        if (ownerAddress === bondingCurveAddress || ownerAddress === associatedBondingCurveAddress) {
+          console.log(`[HolderAnalysis] Filtered bonding curve holder: ${ownerAddress.slice(0, 8)}... (${amountRaw / 1e9} tokens)`);
+          pumpFunFilteredCount += 1;
+          pumpFunFilteredRaw += amountRaw;
+          isPreMigration = true;
+          continue;
+        }
 
         if (isPumpFunAmm(ownerAddress)) {
           pumpFunFilteredCount += 1;
@@ -496,6 +524,10 @@ export class HolderAnalysisService {
         validAccounts.slice(0, lookupCount).map(acc => acc.address)
       );
 
+      // Calculate pump.fun bonding curve addresses for this specific token
+      const bondingCurveAddress = getPumpFunBondingCurveAddress(tokenAddress);
+      const associatedBondingCurveAddress = getPumpFunAssociatedBondingCurveAddress(tokenAddress);
+
       const filteredAccounts: Array<{ owner: string; amountRaw: number }> = [];
       let pumpFunFilteredCount = 0;
       let pumpFunFilteredRaw = 0;
@@ -505,6 +537,14 @@ export class HolderAnalysisService {
       for (const acc of validAccounts) {
         const amountRaw = Number(acc.amount);
         const ownerAddress = ownerLookup.get(acc.address.toBase58()) ?? acc.address.toBase58();
+
+        // Filter pump.fun bonding curve addresses (both main and associated)
+        if (ownerAddress === bondingCurveAddress || ownerAddress === associatedBondingCurveAddress) {
+          console.log(`[HolderAnalysis] Filtered bonding curve holder: ${ownerAddress.slice(0, 8)}... (${amountRaw / 1e9} tokens)`);
+          pumpFunFilteredCount += 1;
+          pumpFunFilteredRaw += amountRaw;
+          continue;
+        }
 
         if (isPumpFunAmm(ownerAddress)) {
           pumpFunFilteredCount += 1;
