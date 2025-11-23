@@ -137,7 +137,19 @@ export class HolderAnalysisService {
     try {
       console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Starting scan for ${tokenAddress}`);
       const connection = rpcBalancer.getConnection();
-      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] RPC endpoint: ${connection.rpcEndpoint}`);
+      const rpcEndpoint = connection.rpcEndpoint;
+      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] RPC endpoint: ${rpcEndpoint}`);
+      
+      // Skip getProgramAccounts for providers that timeout or don't support it well
+      if (rpcEndpoint.includes('drpc.org')) {
+        console.log(`[HolderAnalysis DEBUG - getProgramAccounts] ⚠️ Skipping getProgramAccounts for dRPC (free tier timeout), using fallback`);
+        return null;
+      }
+      if (rpcEndpoint.includes('shyft.to')) {
+        console.log(`[HolderAnalysis DEBUG - getProgramAccounts] ⚠️ Skipping getProgramAccounts for Shyft (not supported), using fallback`);
+        return null;
+      }
+      
       const mintPubkey = new PublicKey(tokenAddress);
 
       // Fetch mint info for decimals and supply

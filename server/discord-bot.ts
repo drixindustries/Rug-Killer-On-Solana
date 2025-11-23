@@ -543,10 +543,10 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         await interaction.deferReply();
         
         try {
-          // Add timeout to prevent hanging
+          // Add timeout to prevent hanging (60s for new tokens that need indexing)
           const analysisPromise = tokenAnalyzer.analyzeToken(tokenAddress);
           const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Analysis timeout after 30 seconds')), 30000)
+            setTimeout(() => reject(new Error('Analysis timeout after 60 seconds')), 60000)
           );
           
           const analysis = await Promise.race([analysisPromise, timeoutPromise]) as any;

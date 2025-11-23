@@ -82,6 +82,15 @@ app.use((req, res, next) => {
   next();
 });
 
+// Increase timeout for analysis endpoints (new tokens can take time to index)
+app.use((req, res, next) => {
+  if (req.path === '/api/analyze' || req.path === '/api/analyze-token') {
+    req.setTimeout(90000); // 90 seconds for analysis
+    res.setTimeout(90000);
+  }
+  next();
+});
+
 export async function startServer() {
   // Register API routes
   const server = await registerRoutes(app);
