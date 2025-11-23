@@ -23,6 +23,7 @@ import { rpcBalancer } from './rpc-balancer.js';
 import { EXCHANGE_WALLETS, isExchangeWallet } from '../exchange-whitelist.js';
 import { getKnownAddressInfo } from '../known-addresses.js';
 import { isPumpFunAmm } from '../pumpfun-whitelist.js';
+import { isMeteoraAmm } from '../meteora-whitelist.js';
 import { isSystemWallet, isPumpFunBondingCurve, getSystemWalletType, filterHoldersWithStats } from '../pumpfun-system-wallets';
 import { isPumpFunAmmWallet } from './pumpfun-amm-detector.js';
 import bs58 from 'bs58';
@@ -51,6 +52,8 @@ export interface HolderAnalysisResult {
   lpSupplyPercent: number;
   pumpFunFilteredCount: number;
   pumpFunFilteredPercent: number;
+  meteoraFilteredCount?: number;
+  meteoraFilteredPercent?: number;
   systemWalletsFiltered: number; // Bonding curve + CEX + Raydium authorities
   isPreMigration: boolean; // True if bonding curve is top holder
   source: 'birdeye' | 'gmgn' | 'helius' | 'rpc' | 'mixed';
@@ -268,26 +271,36 @@ export class HolderAnalysisService {
       // Build holder list and sort by balance desc
       let pumpFunFilteredCount = 0;
       let pumpFunFilteredRaw = 0n;
+      let meteoraFilteredCount = 0;
+      let meteoraFilteredRaw = 0n;
 
-      const nonPumpFunEntries = Array.from(byOwner.entries()).reduce<Array<{ address: string; amountRaw: bigint }>>((acc, [address, amountRaw]) => {
+      const nonSystemEntries = Array.from(byOwner.entries()).reduce<Array<{ address: string; amountRaw: bigint }>>((acc, [address, amountRaw]) => {
         if (isPumpFunAmm(address)) {
           pumpFunFilteredCount += 1;
           pumpFunFilteredRaw += amountRaw;
+          return acc;
+        }
+        if (isMeteoraAmm(address)) {
+          meteoraFilteredCount += 1;
+          meteoraFilteredRaw += amountRaw;
           return acc;
         }
         acc.push({ address, amountRaw });
         return acc;
       }, []);
 
-      const effectiveSupplyRaw = totalSupplyRaw - pumpFunFilteredRaw;
+      const effectiveSupplyRaw = totalSupplyRaw - pumpFunFilteredRaw - meteoraFilteredRaw;
       const safeEffectiveSupplyRaw = effectiveSupplyRaw > 0n ? effectiveSupplyRaw : 1n;
       const effectiveSupply = Number(safeEffectiveSupplyRaw);
       const totalSupplyNumber = Number(totalSupplyRaw);
       const pumpFunFilteredPercent = totalSupplyNumber > 0
         ? (Number(pumpFunFilteredRaw) / totalSupplyNumber) * 100
         : 0;
+      const meteoraFilteredPercent = totalSupplyNumber > 0
+        ? (Number(meteoraFilteredRaw) / totalSupplyNumber) * 100
+        : 0;
 
-      const list = nonPumpFunEntries
+      const list = nonSystemEntries
         .map(({ address, amountRaw }) => {
           const percentage = Number(amountRaw) / effectiveSupply * 100;
           const balance = Number(amountRaw) / Math.pow(10, decimals);
@@ -320,6 +333,8 @@ export class HolderAnalysisService {
         lpSupplyPercent: lpHolders.reduce((sum, h) => sum + h.percentage, 0),
         pumpFunFilteredCount,
         pumpFunFilteredPercent,
+        meteoraFilteredCount,
+        meteoraFilteredPercent,
         source: 'rpc' as const,
         cachedAt: Date.now(),
       };
@@ -378,6 +393,8 @@ export class HolderAnalysisService {
       const filteredAccounts: Array<{ owner: string; amountRaw: number }> = [];
       let pumpFunFilteredCount = 0;
       let pumpFunFilteredRaw = 0;
+      let meteoraFilteredCount = 0;
+      let meteoraFilteredRaw = 0;
       let systemWalletsFiltered = 0;
       let systemWalletsFilteredRaw = 0;
       let isPreMigration = false;
@@ -392,6 +409,12 @@ export class HolderAnalysisService {
           continue;
         }
 
+        if (isMeteoraAmm(ownerAddress)) {
+          meteoraFilteredCount += 1;
+          meteoraFilteredRaw += amountRaw;
+          continue;
+        }
+
         if (isSystemWallet(ownerAddress)) {
           systemWalletsFiltered += 1;
           systemWalletsFilteredRaw += amountRaw;
@@ -402,7 +425,7 @@ export class HolderAnalysisService {
         filteredAccounts.push({ owner: ownerAddress, amountRaw });
       }
 
-      const effectiveSupplyRaw = Math.max(totalSupplyRaw - pumpFunFilteredRaw - systemWalletsFilteredRaw, 1);
+      const effectiveSupplyRaw = Math.max(totalSupplyRaw - pumpFunFilteredRaw - meteoraFilteredRaw - systemWalletsFilteredRaw, 1);
       const pumpFunFilteredPercent = totalSupplyRaw > 0 ? (pumpFunFilteredRaw / totalSupplyRaw) * 100 : 0;
 
       const top20: HolderDetail[] = filteredAccounts.slice(0, 20).map(({ owner, amountRaw }) => {
@@ -435,6 +458,8 @@ export class HolderAnalysisService {
         lpSupplyPercent: lpHolders.reduce((sum, h) => sum + h.percentage, 0),
         pumpFunFilteredCount,
         pumpFunFilteredPercent,
+        meteoraFilteredCount,
+        meteoraFilteredPercent,
         systemWalletsFiltered,
         isPreMigration,
         source: 'helius',
@@ -472,6 +497,8 @@ export class HolderAnalysisService {
       const filteredAccounts: Array<{ owner: string; amountRaw: number }> = [];
       let pumpFunFilteredCount = 0;
       let pumpFunFilteredRaw = 0;
+      let meteoraFilteredCount = 0;
+      let meteoraFilteredRaw = 0;
 
       for (const acc of validAccounts) {
         const amountRaw = Number(acc.amount);
@@ -483,11 +510,18 @@ export class HolderAnalysisService {
           continue;
         }
 
+        if (isMeteoraAmm(ownerAddress)) {
+          meteoraFilteredCount += 1;
+          meteoraFilteredRaw += amountRaw;
+          continue;
+        }
+
         filteredAccounts.push({ owner: ownerAddress, amountRaw });
       }
 
-      const effectiveSupplyRaw = Math.max(totalSupplyRaw - pumpFunFilteredRaw, 1);
+      const effectiveSupplyRaw = Math.max(totalSupplyRaw - pumpFunFilteredRaw - meteoraFilteredRaw, 1);
       const pumpFunFilteredPercent = totalSupplyRaw > 0 ? (pumpFunFilteredRaw / totalSupplyRaw) * 100 : 0;
+      const meteoraFilteredPercent = totalSupplyRaw > 0 ? (meteoraFilteredRaw / totalSupplyRaw) * 100 : 0;
 
       const top20: HolderDetail[] = filteredAccounts.slice(0, 20).map(({ owner, amountRaw }) => {
         const balance = amountRaw / Math.pow(10, decimals);
@@ -524,6 +558,8 @@ export class HolderAnalysisService {
         lpSupplyPercent: lpHolders.reduce((sum, h) => sum + h.percentage, 0),
         pumpFunFilteredCount,
         pumpFunFilteredPercent,
+        meteoraFilteredCount,
+        meteoraFilteredPercent,
         systemWalletsFiltered: 0, // Not tracked in RPC fallback (limited data)
         isPreMigration: false,
         source: 'rpc',
@@ -602,6 +638,15 @@ export class HolderAnalysisService {
     if (isPumpFunAmm(address)) {
       return {
         label: 'Pump.fun AMM',
+        isExchange: false,
+        isLP: true,
+        isCreator: false,
+      };
+    }
+
+    if (isMeteoraAmm(address)) {
+      return {
+        label: 'Meteora DLMM Pool',
         isExchange: false,
         isLP: true,
         isCreator: false,
