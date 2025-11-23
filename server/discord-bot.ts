@@ -2555,36 +2555,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           // Silently fail - don't spam errors for cashtag mentions
           return;
         }
-      }
       // If symbol not found, silently ignore (don't spam "not recognized" messages)
-    }
-
-    // Check if it's a Solana address (base58, 32-44 chars, no spaces)
-    if (text.length >= 32 && text.length <= 44 && !/\s/.test(text)) {
-      try {
-        // Validate it looks like a Solana address (base58)
-        const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-        if (!base58Regex.test(text)) return;
-        
-        // Create embed with explorer links
-        const linksEmbed = new EmbedBuilder()
-          .setColor(0x5865f2)
-          .setTitle(`🔗 Quick Links`)
-          .setDescription(`Token: \`${text.slice(0, 4)}...${text.slice(-4)}\``)
-          .addFields(
-            { name: '📊 GMGN.ai', value: `[View on GMGN](https://gmgn.ai/sol/token/${text})`, inline: true },
-            { name: '🎯 Padre', value: `[View on Padre](https://padre.fun/token/${text})`, inline: true },
-            { name: '📈 Axiom', value: `[View on Axiom](https://axiom.trade/sol/token/${text})`, inline: true },
-            { name: '🔍 Solscan', value: `[View on Solscan](https://solscan.io/token/${text})`, inline: true }
-          )
-          .setFooter({ text: `💡 Use /execute ${text.slice(0, 8)}... or !scan ${text.slice(0, 8)}... for full rug analysis` })
-          .setTimestamp();
-        
-        await message.reply({ embeds: [linksEmbed] });
-      } catch (error) {
-        // Silently ignore - not a valid token address
-        // This prevents spam when users send normal messages
-      }
     }
   }); // End of messageCreate handler
   
