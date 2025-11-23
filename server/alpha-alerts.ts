@@ -771,9 +771,36 @@ export class AlphaAlertService {
         }
       });
 
+      // Listen to Ankr WebSocket events
+      try {
+        const { ankrWebSocket } = await import('./services/ankr-websocket.ts');
+        
+        ankrWebSocket.on('token_created', async (event: any) => {
+          console.log('[Alpha Alerts] New token detected via Ankr:', event.mint);
+          await this.checkTokenForAlphaWallets(event.mint, 'Ankr WebSocket');
+        });
+
+        ankrWebSocket.on('alpha_wallet_trade', async (event: any) => {
+          const isMonitored = this.alphaCallers.some(c => c.wallet === event.wallet);
+          if (isMonitored) {
+            console.log('[Alpha Alerts] Alpha wallet trade via Ankr:', event.wallet.slice(0, 8), '→', event.mint);
+            await this.checkTokenForAlphaWallets(event.mint, 'Ankr Alpha Trade');
+          }
+        });
+
+        // Subscribe alpha wallet addresses to Ankr WebSocket monitoring
+        const walletAddresses = this.alphaCallers.map(c => c.wallet);
+        if (walletAddresses.length > 0) {
+          await ankrWebSocket.subscribeToAlphaWallets(walletAddresses);
+          console.log(`[Alpha Alerts] Subscribed ${walletAddresses.length} wallets to Ankr WebSocket`);
+        }
+      } catch (ankrError) {
+        console.warn('[Alpha Alerts] Ankr WebSocket unavailable:', ankrError);
+      }
+
       // Pump.fun tokens are detected via webhooks (no separate WebSocket needed)
 
-      console.log('[Alpha Alerts] ✅ Webhook listeners registered (Helius + dRPC)');
+      console.log('[Alpha Alerts] ✅ Webhook listeners registered (Helius + dRPC + Ankr)');
     } catch (error) {
       console.warn('[Alpha Alerts] Some webhook services unavailable:', error);
     }

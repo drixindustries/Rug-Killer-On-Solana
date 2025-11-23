@@ -33,7 +33,34 @@ Webhook services provide instant notifications when:
 - Method: POST
 - Configure in Helius dashboard
 
-### 2. Pump.fun WebSocket
+### 2. Ankr WebSocket Monitoring
+
+**Features:**
+- Real-time Pump.fun program monitoring
+- Alpha wallet activity tracking
+- Token creation detection via RPC WebSocket
+- Low latency (~50-100ms)
+- Persistent WebSocket connections reduce API overhead
+
+**Setup:**
+1. Get API key from [Ankr](https://www.ankr.com/)
+2. Add to environment:
+   ```bash
+   ANKR_API_KEY=your_ankr_api_key
+   ```
+
+**How it works:**
+- Monitors Pump.fun program (6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P) for new token launches
+- Subscribes to individual alpha wallet addresses for real-time trade detection
+- Uses Solana's native WebSocket RPC (accountSubscribe, logsSubscribe)
+- Automatically connects when ANKR_API_KEY is set
+
+**Events Emitted:**
+- `token_created` - New token detected on Pump.fun
+- `alpha_wallet_trade` - Monitored wallet makes a trade
+- `wallet_activity` - Account changes for subscribed wallets
+
+### 3. Pump.fun WebSocket
 
 **Features:**
 - Real-time Pump.fun token launches
@@ -53,6 +80,9 @@ PUMP_FUN_WS_URL=wss://pumpportal.fun/api/data  # Default
 # Helius
 HELIUS_API_KEY=your_helius_api_key
 HELIUS_WEBHOOK_SECRET=optional_webhook_secret
+
+# Ankr
+ANKR_API_KEY=your_ankr_api_key
 
 # Pump.fun
 PUMP_FUN_WS_URL=wss://pumpportal.fun/api/data
@@ -76,6 +106,11 @@ Response:
     "hasApiKey": true,
     "processedCount": 1234
   },
+  "ankr": {
+    "isConnected": true,
+    "activeSubscriptions": 15,
+    "monitoredWallets": 12
+  },
   "pumpfun": {
     "isConnected": true,
     "reconnectAttempts": 0
@@ -96,12 +131,33 @@ You can listen to webhook events in your code:
 
 ```typescript
 import { heliusWebhook } from './services/helius-webhook';
+import { ankrWebSocket } from './services/ankr-websocket';
 
-// Listen for new tokens
+// Listen for new tokens via Helius
 heliusWebhook.on('token_created', async (event) => {
   console.log('New token:', event.mint);
   // Your custom logic here
 });
+
+// Listen for new tokens via Ankr WebSocket
+ankrWebSocket.on('token_created', async (event) => {
+  console.log('New token via Ankr:', event.mint);
+  await yourAutoScanFunction(event.mint);
+});
+
+// Listen for alpha wallet activity
+ankrWebSocket.on('alpha_wallet_trade', async (event) => {
+  console.log('Alpha trade:', event.wallet, '→', event.mint);
+  // Alert your users about alpha activity
+});
+
+// Subscribe to specific wallets
+await ankrWebSocket.subscribeToWallet('YourAlphaWalletAddress...');
+await ankrWebSocket.subscribeToAlphaWallets([
+  'wallet1...',
+  'wallet2...',
+  'wallet3...'
+]);
 
 // Listen for large transfers
 heliusWebhook.on('large_transfer', async (event) => {
@@ -130,6 +186,7 @@ The webhook handlers will verify signatures from the headers:
 
 | Provider | Latency | Rate Limit | Cost |
 |----------|---------|------------|------|
+| Ankr WebSocket | ~50-100ms | 500 req/min | Paid tier required |
 | Helius WebSocket | ~100ms | 1000 req/min | Paid tier required |
 | Pump.fun WebSocket | ~500ms | Unlimited | Free |
 | 80+ Public RPCs | 1-3s | Varies | Free |
