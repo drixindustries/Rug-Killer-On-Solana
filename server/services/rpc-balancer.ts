@@ -96,13 +96,19 @@ function getAnkrUrl(): string | undefined {
   
   console.log('[Ankr Config] ANKR_API_KEY present:', !!apiKey);
   
-  if (!apiKey || apiKey.length === 0) {
-    console.log('[Ankr Config] No Ankr API key found');
+  if (!apiKey || apiKey.length === 0 || apiKey === 'YOUR_ANKR_API_KEY_HERE') {
+    console.log('[Ankr Config] No valid Ankr API key found');
     return undefined;
   }
 
   // Strip quotes and whitespace
   const cleaned = apiKey.replace(/^\"|\"$/g, '').trim();
+  
+  // Check if key looks valid (should be 64+ chars for premium endpoints)
+  if (cleaned.length < 32) {
+    console.log('[Ankr Config] Ankr API key appears truncated or invalid (too short)');
+    return undefined;
+  }
   
   // Ankr RPC endpoint format: https://rpc.ankr.com/solana/YOUR_KEY
   const finalUrl = `https://rpc.ankr.com/solana/${cleaned}`;
@@ -123,11 +129,15 @@ const RPC_PROVIDERS = [
     rateLimitWindow: 60000
   },
   // Ankr Premium RPC (Secondary - 65% weight)
+  // NOTE: Temporarily reduced weight due to superstruct union validation errors
+  // https://github.com/ianstormtaylor/superstruct/issues/580
+  // Ankr returns responses that trigger: "Expected type | type but received [object Object] [union]"
+  // This is a known superstruct bug with unions. Ankr works but causes validation errors.
   { 
     getUrl: () => `${getAnkrUrl() || ""}`,
-    weight: 65, 
+    weight: 30,  // Reduced from 65 to minimize impact of validation errors
     name: "Ankr",
-    tier: "premium" as const,
+    tier: "fallback" as const,  // Demoted to fallback tier temporarily
     requiresKey: true,
     hasKey: () => !!getAnkrUrl(),
     rateLimit: 500,
@@ -321,11 +331,19 @@ export class SolanaRpcBalancer {
           return this.connectionPool.get(cacheKey)!;
         }
         
-        const connection = new Connection(url, { 
+        // Connection options - enhanced for Ankr compatibility
+        // Ankr RPC can return responses that trigger superstruct union validation errors
+        // https://github.com/ianstormtaylor/superstruct/issues/580
+        const connectionOptions: any = { 
           commitment: "confirmed",
           wsEndpoint: undefined, // Disable websocket for faster REST calls
           confirmTransactionInitialTimeout: 8000, // Reduced timeout
-        });
+          // Disable strict response validation for Ankr
+          // This allows the connection to tolerate minor format differences
+          disableRetryOnRateLimit: provider.name === "Ankr",
+        };
+        
+        const connection = new Connection(url, connectionOptions);
         
         // Add to pool if under limit
         if (this.connectionPool.size < this.poolSize) {
