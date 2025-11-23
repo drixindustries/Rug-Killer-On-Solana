@@ -424,10 +424,45 @@ export class SolanaRpcBalancer {
       }
       
       usedProviders.add(provider.name);
-      connections.push(new Connection(provider.getUrl(), { 
+      
+      // Apply custom fetch for Ankr
+      const connectionOptions: any = { 
         commitment: "confirmed",
         wsEndpoint: undefined
-      }));
+      };
+      
+      if (provider.name === "Ankr") {
+        const originalFetch = globalThis.fetch;
+        connectionOptions.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+          const response = await originalFetch(input, init);
+          try {
+            const text = await response.text();
+            const data = JSON.parse(text);
+            if (data && typeof data === 'object') {
+              const normalized = {
+                jsonrpc: data.jsonrpc || '2.0',
+                id: data.id,
+                ...(data.result !== undefined && { result: data.result }),
+                ...(data.error !== undefined && { error: data.error }),
+              };
+              return new Response(JSON.stringify(normalized), {
+                status: response.status,
+                statusText: response.statusText,
+                headers: response.headers,
+              });
+            }
+            return new Response(text, {
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers,
+            });
+          } catch (e) {
+            return originalFetch(input, init);
+          }
+        };
+      }
+      
+      connections.push(new Connection(provider.getUrl(), connectionOptions));
     }
     
     return connections;
@@ -451,7 +486,45 @@ const performHealthChecks = async () => {
   const healthChecks = rpcBalancer.providers.map(async (p) => {
     const startTime = Date.now();
     const url = p.getUrl();
-    const conn = new Connection(url, { commitment: "confirmed", wsEndpoint: undefined });
+    
+    // Apply custom fetch for Ankr to handle superstruct union validation bug
+    const connectionOptions: any = { 
+      commitment: "confirmed", 
+      wsEndpoint: undefined 
+    };
+    
+    if (p.name === "Ankr") {
+      const originalFetch = globalThis.fetch;
+      connectionOptions.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        const response = await originalFetch(input, init);
+        try {
+          const text = await response.text();
+          const data = JSON.parse(text);
+          if (data && typeof data === 'object') {
+            const normalized = {
+              jsonrpc: data.jsonrpc || '2.0',
+              id: data.id,
+              ...(data.result !== undefined && { result: data.result }),
+              ...(data.error !== undefined && { error: data.error }),
+            };
+            return new Response(JSON.stringify(normalized), {
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers,
+            });
+          }
+          return new Response(text, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+          });
+        } catch (e) {
+          return originalFetch(input, init);
+        }
+      };
+    }
+    
+    const conn = new Connection(url, connectionOptions);
 
     // Helper to race a promise with timeout
     const withTimeout = async <T>(promise: Promise<T>, ms = 5000): Promise<T> => {
