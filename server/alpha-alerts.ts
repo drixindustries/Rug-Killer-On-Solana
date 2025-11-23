@@ -714,6 +714,18 @@ export class AlphaAlertService {
     console.log(`[Alpha Alerts] ✅ Service started using webhook-based monitoring`);
     console.log(`[Alpha Alerts] Registered ${this.alphaCallers.length} wallets for tracking`);
     console.log(`[Alpha Alerts] Using distributed RPC load balancing across 80+ endpoints`);
+    
+    // Health check warnings for missing configuration
+    const discordWebhook = process.env.ALPHA_DISCORD_WEBHOOK;
+    if (!discordWebhook || discordWebhook === 'SET_ME' || discordWebhook.length < 50) {
+      console.error('❌ [Alpha Alerts] ALPHA_DISCORD_WEBHOOK not properly configured! Alerts will not reach Discord.');
+      console.error('   Set webhook URL: railway variables --set ALPHA_DISCORD_WEBHOOK=https://discord.com/api/webhooks/...');
+    }
+    
+    if (!process.env.HELIUS_WEBHOOK_ID && !process.env.DRPC_WEBHOOK_SECRET) {
+      console.warn('⚠️ [Alpha Alerts] No webhook provider configured (Helius or dRPC) - transaction monitoring may not work');
+      console.warn('   Setup guide: See ALPHA_ALERTS_ROOT_CAUSE.md');
+    }
   }
 
   /**
