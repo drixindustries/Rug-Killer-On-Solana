@@ -322,7 +322,7 @@ export class FundingSourceAnalyzer {
           type: 'coordinated_funding',
           severity,
           confidence: Math.min(95, 60 + (wallets.length * 5)),
-          description: `${wallets.length} wallets funded by ${source} (${riskLevel.replace('_', ' ')})`,
+          description: `${wallets.length} wallets funded by ${source} (${riskLevel?.replace('_', ' ') || 'unknown risk'})`,
           evidence: {
             fundingSource: source,
             walletCount: wallets.length

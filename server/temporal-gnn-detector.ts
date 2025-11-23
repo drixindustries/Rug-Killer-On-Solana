@@ -657,7 +657,7 @@ export class TemporalGNNDetector {
     const factors: string[] = [];
 
     for (const pattern of patterns) {
-      factors.push(`${pattern.type.replace(/_/g, ' ').toUpperCase()}: ${pattern.description}`);
+      factors.push(`${pattern.type?.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN'}: ${pattern.description}`);
     }
 
     if (metrics.nodeCount < 10) {

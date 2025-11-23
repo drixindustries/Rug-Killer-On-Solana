@@ -228,7 +228,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
       const topPattern = tgn.patterns[0];
       const patternEmoji = topPattern.type === 'migration_event' ? '🔄' : 
                            topPattern.confidence > 0.8 ? '🔴' : '🟡';
-      tgnAnalysis += `\n${patternEmoji} ${topPattern.type.replace(/_/g, ' ')}`;
+      tgnAnalysis += `\n${patternEmoji} ${topPattern.type?.replace(/_/g, ' ') || 'Unknown Pattern'}`;
     }
   }
   
@@ -250,7 +250,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     
     if (ml.topFactors && ml.topFactors.length > 0) {
       const topFactor = ml.topFactors[0];
-      const factorName = topFactor.name.replace(/([A-Z])/g, ' $1').trim();
+      const factorName = topFactor.name?.replace(/([A-Z])/g, ' $1').trim() || 'Unknown Factor';
       mlAnalysis += `\n• Top Risk: ${factorName} (${topFactor.impact > 0 ? '+' : ''}${topFactor.impact.toFixed(0)} pts)`;
     }
   }
