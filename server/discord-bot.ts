@@ -154,6 +154,23 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   addSectionField(embed, messageData.agedWallets, '⏰ Aged Wallet Risk');
   addSectionField(embed, messageData.gmgn, '📊 GMGN Intelligence');
   
+  // TGN & ML ANALYSIS - AI Models
+  if (messageData.tgnAnalysis) {
+    embed.addFields({
+      name: '🧠 Temporal GNN (Neural Network)',
+      value: messageData.tgnAnalysis.split('\n').slice(1).join('\n'), // Remove header
+      inline: true
+    });
+  }
+  
+  if (messageData.mlAnalysis) {
+    embed.addFields({
+      name: '🤖 ML Decision Tree (TypeScript)',
+      value: messageData.mlAnalysis.split('\n').slice(1).join('\n'), // Remove header
+      inline: true
+    });
+  }
+  
   // WALLET AGES - Prominent section for wallet age analysis
   if (messageData.walletAges) {
     embed.addFields({

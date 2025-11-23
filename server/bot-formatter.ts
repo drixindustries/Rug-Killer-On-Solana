@@ -55,6 +55,7 @@ export interface CompactMessageData {
   security: string;
   holders: string;
   tgnAnalysis?: string;
+  mlAnalysis?: string;
   market?: string;
   pumpFun?: string;
   floorInfo?: string;
@@ -228,6 +229,29 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
       const patternEmoji = topPattern.type === 'migration_event' ? '🔄' : 
                            topPattern.confidence > 0.8 ? '🔴' : '🟡';
       tgnAnalysis += `\n${patternEmoji} ${topPattern.type.replace(/_/g, ' ')}`;
+    }
+  }
+  
+  // ML DECISION TREE ANALYSIS
+  let mlAnalysis: string | undefined;
+  if ((analysis as any).mlScore) {
+    const ml = (analysis as any).mlScore;
+    const mlPercent = (ml.probability * 100).toFixed(1);
+    let mlEmoji = '✅';
+    
+    if (ml.probability > 0.70) {
+      mlEmoji = '🚨';
+    } else if (ml.probability > 0.40) {
+      mlEmoji = '⚠️';
+    }
+    
+    const mlConfidence = (ml.confidence * 100).toFixed(0);
+    mlAnalysis = `🤖 **ML Decision Tree** (TypeScript)\n${mlEmoji} Rug Risk: ${mlPercent}%\n• Confidence: ${mlConfidence}%\n• Model: ${ml.model}`;
+    
+    if (ml.topFactors && ml.topFactors.length > 0) {
+      const topFactor = ml.topFactors[0];
+      const factorName = topFactor.name.replace(/([A-Z])/g, ' $1').trim();
+      mlAnalysis += `\n• Top Risk: ${factorName} (${topFactor.impact > 0 ? '+' : ''}${topFactor.impact.toFixed(0)} pts)`;
     }
   }
   
@@ -543,7 +567,7 @@ Quick Links → [Solscan](https://solscan.io/token/${analysis.tokenAddress}) •
     tgnAnalysis,
     market,
     pumpFun,
-      floorInfo,
+    floorInfo,
     honeypot,
     funding,
     bundle,
@@ -555,6 +579,7 @@ Quick Links → [Solscan](https://solscan.io/token/${analysis.tokenAddress}) •
     agedWallets,
     walletAges,
     gmgn,
+    mlAnalysis,
     alerts,
     links
   };
@@ -583,6 +608,10 @@ export function toPlainText(data: CompactMessageData): string {
   
   if (data.tgnAnalysis) {
     message += `${data.tgnAnalysis}\n\n`;
+  }
+  
+  if (data.mlAnalysis) {
+    message += `${data.mlAnalysis}\n\n`;
   }
   
   if (data.market) {

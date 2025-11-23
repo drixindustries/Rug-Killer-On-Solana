@@ -50,6 +50,7 @@ const CondensedTokenHeader = lazy(() => import("@/components/condensed-token-hea
 const CondensedAlerts = lazy(() => import("@/components/condensed-alerts").then(m => ({ default: m.CondensedAlerts })));
 const CascadingAnalysisBars = lazy(() => import("@/components/cascading-analysis-bars").then(m => ({ default: m.CascadingAnalysisBars })));
 const TGNAnalysisCard = lazy(() => import("@/components/tgn-analysis-card").then(m => ({ default: m.TGNAnalysisCard })));
+const MLAnalysisCard = lazy(() => import("@/components/ml-analysis-card").then(m => ({ default: m.MLAnalysisCard })));
 
 // Loading fallback component for lazy-loaded components
 const ComponentLoader = () => <Skeleton className="h-48 w-full" />;
@@ -421,17 +422,27 @@ export default function Home() {
                     <CascadingAnalysisBars analysis={analysis} />
                   </Suspense>
 
-                  {/* Temporal GNN Analysis - Prominent Position */}
-                  {analysis.tgnResult && (
-                    <Suspense fallback={<ComponentLoader />}>
-                      <TGNAnalysisCard 
-                        tgnResult={analysis.tgnResult}
-                        isPreMigration={analysis.isPreMigration}
-                        migrationDetected={analysis.migrationDetected}
-                        systemWalletsFiltered={analysis.systemWalletsFiltered}
-                      />
-                    </Suspense>
-                  )}
+                  {/* AI Models - TGN & ML Decision Tree */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Temporal GNN Analysis */}
+                    {analysis.tgnResult && (
+                      <Suspense fallback={<ComponentLoader />}>
+                        <TGNAnalysisCard 
+                          tgnResult={analysis.tgnResult}
+                          isPreMigration={analysis.isPreMigration}
+                          migrationDetected={analysis.migrationDetected}
+                          systemWalletsFiltered={analysis.systemWalletsFiltered}
+                        />
+                      </Suspense>
+                    )}
+
+                    {/* ML Decision Tree */}
+                    {(analysis as any).mlScore && (
+                      <Suspense fallback={<ComponentLoader />}>
+                        <MLAnalysisCard mlScore={(analysis as any).mlScore} />
+                      </Suspense>
+                    )}
+                  </div>
 
                   {/* Detailed Charts Section - Collapsible/Below Bars */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
