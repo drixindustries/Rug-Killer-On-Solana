@@ -141,33 +141,7 @@ export class SolanaTokenAnalyzer {
           percentage: h.percentage || 0,
         })) || [],
         topHolderConcentration: holders?.topHolderConcentration || 0,
-        holderFiltering: holders?.holderFiltering || {
-          totals: {
-            lp: 0,
-            exchanges: 0,
-            protocols: 0,
-            bundled: 0,
-            total: 0,
-            degens: 0,
-            bots: 0,
-            smartMoney: 0,
-            snipers: 0,
-            aged: 0,
-            newWallets: 0,
-          },
-          excluded: [],
-          bundledDetection: {
-            suspiciousWallets: [],
-            bundleSupplyPct: 0,
-            clusters: [],
-          },
-          walletIntelligence: {
-            avgWalletAge: 0,
-            oldestWallet: 0,
-            newestWallet: 0,
-            suspiciousPatterns: [],
-          },
-        },
+        holderFiltering: this.buildHolderFiltering(holders),
         
         // Liquidity pool - calculate burn percentage
         liquidityPool: await this.calculateLiquidityPool(dex, pumpFun, tokenMintAddress),
@@ -252,6 +226,90 @@ export class SolanaTokenAnalyzer {
       console.error(`❌ [Analyzer] Error analyzing ${tokenMintAddress}:`, error.message);
       throw error;
     }
+  }
+
+  /**
+   * Build holder filtering metadata from holder analysis results
+   */
+  private buildHolderFiltering(holders: any): import('../shared/schema').HolderFilteringMetadata {
+    if (!holders) {
+      return {
+        totals: {
+          lp: 0,
+          exchanges: 0,
+          protocols: 0,
+          bundled: 0,
+          total: 0,
+          degens: 0,
+          bots: 0,
+          smartMoney: 0,
+          snipers: 0,
+          aged: 0,
+          newWallets: 0,
+        },
+        excluded: [],
+        bundledDetection: {
+          suspiciousWallets: [],
+          bundleSupplyPct: 0,
+          clusters: [],
+        },
+        walletIntelligence: {
+          avgWalletAge: 0,
+          oldestWallet: 0,
+          newestWallet: 0,
+          suspiciousPatterns: [],
+        },
+      };
+    }
+
+    // Count different types of filtered addresses
+    const lpCount = holders.top20Holders?.filter((h: any) => h.isLP).length || 0;
+    const exchangeCount = holders.exchangeHolderCount || 0;
+    const pumpFunFilteredCount = holders.pumpFunFilteredCount || 0;
+
+    // Build excluded addresses list (showing what was filtered out)
+    const excluded: Array<{
+      address: string;
+      reason: string;
+      percentage?: number;
+    }> = [];
+
+    // Add Pump.fun AMM info to excluded list if any were filtered
+    if (pumpFunFilteredCount > 0) {
+      excluded.push({
+        address: '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
+        reason: 'Pump.fun AMM / Bonding Curve',
+        percentage: holders.pumpFunFilteredPercent || 0,
+      });
+    }
+
+    return {
+      totals: {
+        lp: lpCount + pumpFunFilteredCount, // Include Pump.fun AMM as LP
+        exchanges: exchangeCount,
+        protocols: pumpFunFilteredCount, // Pump.fun counts as protocol
+        bundled: 0,
+        total: lpCount + exchangeCount + pumpFunFilteredCount,
+        degens: 0,
+        bots: 0,
+        smartMoney: 0,
+        snipers: 0,
+        aged: 0,
+        newWallets: 0,
+      },
+      excluded,
+      bundledDetection: {
+        suspiciousWallets: [],
+        bundleSupplyPct: 0,
+        clusters: [],
+      },
+      walletIntelligence: {
+        avgWalletAge: 0,
+        oldestWallet: 0,
+        newestWallet: 0,
+        suspiciousPatterns: [],
+      },
+    };
   }
 
     private detectFloor(dex: any, currentPrice: number): FloorData {
