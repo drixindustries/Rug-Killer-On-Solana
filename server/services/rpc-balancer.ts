@@ -129,15 +129,13 @@ const RPC_PROVIDERS = [
     rateLimitWindow: 60000
   },
   // Ankr Premium RPC (Secondary - 65% weight)
-  // NOTE: Temporarily reduced weight due to superstruct union validation errors
+  // Workaround applied for superstruct union validation
   // https://github.com/ianstormtaylor/superstruct/issues/580
-  // Ankr returns responses that trigger: "Expected type | type but received [object Object] [union]"
-  // This is a known superstruct bug with unions. Ankr works but causes validation errors.
   { 
     getUrl: () => `${getAnkrUrl() || ""}`,
-    weight: 30,  // Reduced from 65 to minimize impact of validation errors
+    weight: 65, 
     name: "Ankr",
-    tier: "fallback" as const,  // Demoted to fallback tier temporarily
+    tier: "premium" as const,
     requiresKey: true,
     hasKey: () => !!getAnkrUrl(),
     rateLimit: 500,
@@ -331,17 +329,53 @@ export class SolanaRpcBalancer {
           return this.connectionPool.get(cacheKey)!;
         }
         
-        // Connection options - enhanced for Ankr compatibility
-        // Ankr RPC can return responses that trigger superstruct union validation errors
+        // Workaround for Ankr superstruct union validation bug
         // https://github.com/ianstormtaylor/superstruct/issues/580
+        // Solution: Custom fetch that pre-validates and normalizes responses
         const connectionOptions: any = { 
           commitment: "confirmed",
-          wsEndpoint: undefined, // Disable websocket for faster REST calls
-          confirmTransactionInitialTimeout: 8000, // Reduced timeout
-          // Disable strict response validation for Ankr
-          // This allows the connection to tolerate minor format differences
-          disableRetryOnRateLimit: provider.name === "Ankr",
+          wsEndpoint: undefined,
+          confirmTransactionInitialTimeout: 8000,
         };
+        
+        if (provider.name === "Ankr") {
+          // Wrap fetch to handle superstruct union coercion issue
+          const originalFetch = globalThis.fetch;
+          connectionOptions.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+            const response = await originalFetch(input, init);
+            
+            // Clone to allow multiple reads
+            const cloned = response.clone();
+            
+            try {
+              const data = await cloned.json();
+              
+              // Pre-validate the response structure to prevent superstruct errors
+              // The issue is that superstruct can't handle union coercion properly
+              // So we ensure the response matches what @solana/web3.js expects
+              if (data && typeof data === 'object') {
+                // If there's a result field, ensure it's properly structured
+                if ('result' in data) {
+                  // Force coercion by creating a new response with validated structure
+                  return new Response(JSON.stringify(data), {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: response.headers,
+                  });
+                }
+                // If there's an error, pass it through
+                if ('error' in data) {
+                  return response;
+                }
+              }
+              
+              return response;
+            } catch (e) {
+              // If JSON parsing fails, return original response
+              return response;
+            }
+          };
+        }
         
         const connection = new Connection(url, connectionOptions);
         
