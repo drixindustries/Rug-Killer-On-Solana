@@ -140,15 +140,11 @@ export class HolderAnalysisService {
       const rpcEndpoint = connection.rpcEndpoint;
       console.log(`[HolderAnalysis DEBUG - getProgramAccounts] RPC endpoint: ${rpcEndpoint}`);
       
-      // Skip getProgramAccounts for providers that timeout or don't support it well
-      if (rpcEndpoint.includes('drpc.org')) {
-        console.log(`[HolderAnalysis DEBUG - getProgramAccounts] ⚠️ Skipping getProgramAccounts for dRPC (free tier timeout), using fallback`);
-        return null;
-      }
-      if (rpcEndpoint.includes('shyft.to')) {
-        console.log(`[HolderAnalysis DEBUG - getProgramAccounts] ⚠️ Skipping getProgramAccounts for Shyft (not supported), using fallback`);
-        return null;
-      }
+      // Add timeout for getProgramAccounts (3 seconds) to avoid hanging
+      const timeoutMs = 3000;
+      const timeoutPromise = new Promise<null>((_, reject) => 
+        setTimeout(() => reject(new Error('getProgramAccounts timeout')), timeoutMs)
+      );
       
       const mintPubkey = new PublicKey(tokenAddress);
 
@@ -183,19 +179,35 @@ export class HolderAnalysisService {
         return accounts;
       };
 
-      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Scanning TOKEN_PROGRAM_ID...`);
-      const classic = await scanProgram(TOKEN_PROGRAM_ID).catch((err) => {
-        console.log(`[HolderAnalysis DEBUG - getProgramAccounts] TOKEN_PROGRAM_ID scan error:`, err.message);
-        return [] as any[];
-      });
-      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] TOKEN_PROGRAM_ID found ${classic.length} accounts`);
-      
-      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Scanning TOKEN_2022_PROGRAM_ID...`);
-      const t2022 = await scanProgram(TOKEN_2022_PROGRAM_ID).catch((err) => {
-        console.log(`[HolderAnalysis DEBUG - getProgramAccounts] TOKEN_2022_PROGRAM_ID scan error:`, err.message);
-        return [] as any[];
-      });
-      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] TOKEN_2022_PROGRAM_ID found ${t2022.length} accounts`);
+      // Wrap scan operations in timeout to prevent hanging
+      const scanWithTimeout = async () => {
+        console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Scanning TOKEN_PROGRAM_ID...`);
+        const classic = await scanProgram(TOKEN_PROGRAM_ID).catch((err) => {
+          console.log(`[HolderAnalysis DEBUG - getProgramAccounts] TOKEN_PROGRAM_ID scan error:`, err.message);
+          return [] as any[];
+        });
+        console.log(`[HolderAnalysis DEBUG - getProgramAccounts] TOKEN_PROGRAM_ID found ${classic.length} accounts`);
+        
+        console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Scanning TOKEN_2022_PROGRAM_ID...`);
+        const t2022 = await scanProgram(TOKEN_2022_PROGRAM_ID).catch((err) => {
+          console.log(`[HolderAnalysis DEBUG - getProgramAccounts] TOKEN_2022_PROGRAM_ID scan error:`, err.message);
+          return [] as any[];
+        });
+        console.log(`[HolderAnalysis DEBUG - getProgramAccounts] TOKEN_2022_PROGRAM_ID found ${t2022.length} accounts`);
+        
+        return [...classic, ...t2022];
+      };
+
+      let all: any[];
+      try {
+        all = await Promise.race([scanWithTimeout(), timeoutPromise]) as any[];
+      } catch (error: any) {
+        if (error.message?.includes('timeout')) {
+          console.log(`[HolderAnalysis DEBUG - getProgramAccounts] ⏱️ Timeout after ${timeoutMs}ms, using fallback`);
+          return null;
+        }
+        throw error;
+      }
       
       const all = [...classic, ...t2022];
       console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Total accounts found: ${all.length}`);
