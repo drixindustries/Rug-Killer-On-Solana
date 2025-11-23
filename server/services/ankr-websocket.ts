@@ -50,9 +50,10 @@ export class AnkrWebSocketService extends EventEmitter {
       ? `https://rpc.ankr.com/solana/${ankrKey}` 
       : 'https://rpc.ankr.com/solana';
     
+    // Ankr WebSocket endpoint format: wss://rpc.ankr.com/solana/ws/{API_KEY}
     this.ankrWsUrl = ankrKey 
-      ? `wss://rpc.ankr.com/solana/${ankrKey}` 
-      : 'wss://rpc.ankr.com/solana';
+      ? `wss://rpc.ankr.com/solana/ws/${ankrKey}` 
+      : 'wss://rpc.ankr.com/solana/ws';
     
     this.enabled = !!ankrKey;
     

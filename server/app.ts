@@ -348,15 +348,12 @@ async function startServices() {
         const { ankrWebSocket } = await import('./services/ankr-websocket.ts');
         await ankrWebSocket.connect();
         
-        // Event listeners for integration with alpha-alerts
         ankrWebSocket.on('token_created', async (event) => {
           console.log(`[Ankr WebSocket] New token via Ankr: ${event.mint}`);
-          // Alpha alerts will handle this via its own event listeners
         });
         
         ankrWebSocket.on('alpha_wallet_trade', async (event) => {
           console.log(`[Ankr WebSocket] Alpha wallet activity: ${event.wallet.slice(0, 8)}... → ${event.mint}`);
-          // Alpha alerts can listen to this event
         });
         
         console.log('✅ Ankr WebSocket service started');
