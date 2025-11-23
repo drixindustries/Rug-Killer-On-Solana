@@ -285,7 +285,7 @@ export class HolderAnalysisService {
 
       const nonSystemEntries = Array.from(byOwner.entries()).reduce<Array<{ address: string; amountRaw: bigint }>>((acc, [address, amountRaw]) => {
         // Filter pump.fun bonding curve addresses (both main and associated)
-        if (address === bondingCurveAddress || address === associatedBondingCurveAddress) {
+        if ((bondingCurveAddress && address === bondingCurveAddress) || (associatedBondingCurveAddress && address === associatedBondingCurveAddress)) {
           console.log(`[HolderAnalysis] Filtered bonding curve holder: ${address.slice(0, 8)}... (${Number(amountRaw) / 1e9} tokens)`);
           pumpFunFilteredCount += 1;
           pumpFunFilteredRaw += amountRaw;
@@ -424,7 +424,7 @@ export class HolderAnalysisService {
         const ownerAddress = ownerLookup.get(acc.address.toBase58()) ?? acc.address.toBase58();
 
         // Filter pump.fun bonding curve addresses (both main and associated)
-        if (ownerAddress === bondingCurveAddress || ownerAddress === associatedBondingCurveAddress) {
+        if ((bondingCurveAddress && ownerAddress === bondingCurveAddress) || (associatedBondingCurveAddress && ownerAddress === associatedBondingCurveAddress)) {
           console.log(`[HolderAnalysis] Filtered bonding curve holder: ${ownerAddress.slice(0, 8)}... (${amountRaw / 1e9} tokens)`);
           pumpFunFilteredCount += 1;
           pumpFunFilteredRaw += amountRaw;
@@ -539,7 +539,7 @@ export class HolderAnalysisService {
         const ownerAddress = ownerLookup.get(acc.address.toBase58()) ?? acc.address.toBase58();
 
         // Filter pump.fun bonding curve addresses (both main and associated)
-        if (ownerAddress === bondingCurveAddress || ownerAddress === associatedBondingCurveAddress) {
+        if ((bondingCurveAddress && ownerAddress === bondingCurveAddress) || (associatedBondingCurveAddress && ownerAddress === associatedBondingCurveAddress)) {
           console.log(`[HolderAnalysis] Filtered bonding curve holder: ${ownerAddress.slice(0, 8)}... (${amountRaw / 1e9} tokens)`);
           pumpFunFilteredCount += 1;
           pumpFunFilteredRaw += amountRaw;
