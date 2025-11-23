@@ -98,15 +98,15 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   }
 
   // HEADER with age warning
-  let header = `${emoji} ${analysis.metadata.name} (${analysis.metadata.symbol})`;
+  let header = `${emoji} **${analysis.metadata.name}** (${analysis.metadata.symbol})`;
   if (isVeryNewToken) {
     header += ` ⚠️`;
   } else if (isNewToken) {
     header += ` 🆕`;
   }
   
-  // RISK SCORE
-  const riskScore = `🎯 **Risk Level:** ${analysis.riskLevel} (${analysis.riskScore}/100)\n_Higher score = Safer • Lower score = Higher risk_`;
+  // RISK SCORE - Simplified and cleaner
+  const riskScore = `**Risk:** ${analysis.riskLevel} (Score: ${analysis.riskScore}/100)`;
   
   // RUG SCORE (Rugcheck-style)
   let rugScoreText: string | undefined;
@@ -137,7 +137,6 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   let lpBurned = false;
   
   if (analysis.pumpFunData?.isPumpFun) {
-    // For Pump.fun tokens, check if bonded to Raydium
     const bondingCurve = analysis.pumpFunData.bondingCurve ?? 0;
     const isGraduated = bondingCurve >= 100 || analysis.pumpFunData.mayhemMode;
     
@@ -178,19 +177,9 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
                          '🔐 **Security**';
   
   let security = `${securityHeader}\n`;
-  security += `${mintRevoked ? '✅' : '❌'} Mint Revoked      `;
-  security += `${freezeRevoked ? '✅' : '❌'} Freeze Revoked      `;
-  security += `${lpBurned ? '✅' : '⚠️'} LP ${lpBurnText}\n`;
-  security += `${honeypotPassed ? '✅' : '❌'} Honeypot: ${honeypotPassed ? 'Passed' : 'FAILED'}      `;
-  security += `${taxClean ? '✅' : '⚠️'} Tax: ${buyTax}%/${sellTax}%      `;
-  security += `${analysis.metadata?.metadataLocked !== false ? '✅' : '⚠️'} Metadata: ${analysis.metadata?.metadataLocked !== false ? 'Locked' : 'Unlocked'}\n`;
-  
-  // Add Jito bundle status with package emoji
-  if (analysis.advancedBundleData) {
-    security += `${jitoBundleClean ? '✅' : '📦'} Jito Bundles: ${jitoBundleClean ? 'None detected' : `📦 ${analysis.advancedBundleData.suspiciousWallets.length} detected`}`;
-  } else {
-    security += `✅ Jito Bundles: None detected`;
-  }
+  security += `${mintRevoked ? '✅' : '❌'} Mint Revoked ${freezeRevoked ? '✅' : '❌'} Freeze Revoked ${lpBurned ? '✅' : '⚠️'} LP ${lpBurnText}\n`;
+  security += `${honeypotPassed ? '✅' : '❌'} Honeypot: Passed ${taxClean ? '✅' : '⚠️'} Tax: ${buyTax}%/${sellTax}%\n`;
+  security += `${jitoBundleClean ? '✅' : '📦'} Jito Bundles: ${jitoBundleClean ? 'None' : analysis.advancedBundleData?.suspiciousWallets.length || 0} • ${analysis.metadata?.metadataLocked !== false ? '✅' : '⚠️'} Metadata: Locked`;
   
   // HOLDERS - Enhanced 2025 format with clean filtering
   const holderCount = analysis.holderCount ?? 0;
@@ -199,25 +188,14 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   const devBoughtPct = analysis.pumpFunData?.devBought ?? 0;
   const bundledClusters = analysis.advancedBundleData?.suspiciousWallets?.length ?? 0;
   const systemWalletsFiltered = analysis.systemWalletsFiltered ?? 0;
-  const avgWalletAge = analysis.agedWalletData?.walletIntelligence?.avgWalletAge ?? 0;
   const agedWalletCount = analysis.agedWalletData?.walletIntelligence?.ageDistribution?.aged ?? 0;
   
-  // Calculate "real" holders (after filtering out Pump.fun, CEX, and Jito)
-  const realHolders = holderCount - systemWalletsFiltered;
-  const holderCountText = realHolders.toLocaleString();
+  // Use the ACTUAL holder count - holderCount already has system wallets filtered out
+  const holderCountText = holderCount.toLocaleString();
   
-  let holders = `👥 **Holders** (clean)\n`;
-  holders += `${holderCountText} real holders • Top 10: ${topHolderConc.toFixed(1)}% • Snipers: ${sniperPct.toFixed(0)}%\n`;
-  holders += `👨‍💻 Dev bought: ${devBoughtPct.toFixed(0)}% • ${bundledClusters > 0 ? '📦' : '✅'} Bundles: ${bundledClusters} • 👴 Aged: ${agedWalletCount}`;
-  
-  // Add ML scan status (TabNet + GNN)
-  if (bundledClusters === 0 && sniperPct < 10) {
-    holders += ` (Neural + GNN scan)`;
-  } else if (bundledClusters > 5 || sniperPct > 30) {
-    holders += ` (⚠️ GNN cluster detected)`;
-  } else {
-    holders += ` (TabNet scan)`;
-  }
+  let holders = `👥 **Holders**\n`;
+  holders += `${holderCountText} holders • Top 10: ${topHolderConc.toFixed(1)}% • Snipers: ${sniperPct.toFixed(0)}%\n`;
+  holders += `${devBoughtPct > 0 ? '⚠️' : '✅'} Dev bought: ${devBoughtPct.toFixed(0)}% • ${bundledClusters > 0 ? '📦' : '✅'} Bundles: ${bundledClusters} • 👴 Aged: ${agedWalletCount}`;
   
   // TEMPORAL GNN ANALYSIS
   let tgnAnalysis: string | undefined;
