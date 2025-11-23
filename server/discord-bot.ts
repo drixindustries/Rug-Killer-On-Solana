@@ -2437,7 +2437,38 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     }
     
     // ===================================================================
-    // PRIORITY 3: Handle $symbol mentions (cashtag injection)
+    // PRIORITY 3: Intelligent conversation participation (optional, natural)
+    // Rally chimes in when she has something relevant to add - not forced
+    // ===================================================================
+    
+    // Randomly respond to crypto conversations (5% chance to keep it natural)
+    // Only in channels where bot has been active recently or crypto terms are used
+    const shouldConsiderResponse = Math.random() < 0.05; // 5% of messages
+    
+    if (shouldConsiderResponse) {
+      const contextualResponse = rally.shouldRespondToConversation(text, message.channel.id);
+      
+      if (contextualResponse) {
+        // Throttle to prevent spam (60 seconds between unsolicited responses per channel)
+        const throttleKey = `conversation:${message.channel.id}`;
+        const now = Date.now();
+        const lastConvoResponse = lastResponded.get(throttleKey) || 0;
+        
+        if (now - lastConvoResponse > 60_000) {
+          lastResponded.set(throttleKey, now);
+          
+          // Add a small delay to make it feel more natural (1-3 seconds)
+          const naturalDelay = 1000 + Math.random() * 2000;
+          await new Promise(resolve => setTimeout(resolve, naturalDelay));
+          
+          await message.reply(contextualResponse.message);
+          return;
+        }
+      }
+    }
+    
+    // ===================================================================
+    // PRIORITY 4: Handle $symbol mentions (cashtag injection)
     // ===================================================================
     
     // Handle $symbol mentions (cashtag injection like Rick bot)

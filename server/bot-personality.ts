@@ -495,6 +495,128 @@ export class RallyPersonality {
   }
   
   // ========================================================================
+  // INTELLIGENT CONVERSATION PARTICIPATION
+  // ========================================================================
+  
+  /**
+   * Analyzes if Rally should naturally chime in on a conversation
+   * Returns response only when she has something genuinely relevant to add
+   */
+  shouldRespondToConversation(message: string, channelId: string): PersonalityResponse | null {
+    const lower = message.toLowerCase();
+    
+    // Skip very short messages (probably not worth commenting on)
+    if (message.length < 15) return null;
+    
+    // Skip if it's a command or looks technical
+    if (message.startsWith('!') || message.startsWith('/') || message.startsWith('0x')) return null;
+    
+    // ====================================================================
+    // CONTEXT 1: Rug/Scam Discussion - Rally's expertise zone
+    // ====================================================================
+    if (lower.match(/\b(rug|rugged|scam|honeypot|exit scam|got played|lost money|rekt)\b/)) {
+      const responses = [
+        "hate seeing this happen... want me to scan something before you ape next time?",
+        "that's exactly why i'm here. send me addresses before you buy, i'll catch the red flags",
+        "sorry that happened. i can help you avoid the next one though",
+        "this is way too common. let me check your next play before you send it",
+        "oof. next time ping me first? i'm pretty good at spotting these",
+      ];
+      return { message: this.getRandomItem(responses), tone: 'concerned' };
+    }
+    
+    // ====================================================================
+    // CONTEXT 2: FOMO/Aping Discussion - Gentle warning territory
+    // ====================================================================
+    if (lower.match(/\b(fomo|yolo|full send|aping|all in|sending it|fuck it)\b/)) {
+      const responses = [
+        "that energy is great but... paste the ca first? literally takes 5 seconds to scan",
+        "love the conviction but check the token first. fomo is how rugs get you",
+        "i respect the send mentality but let me peek at it real quick first",
+        "before you full send, want me to run it? catches stuff you might miss",
+      ];
+      return { message: this.getRandomItem(responses), tone: 'friendly' };
+    }
+    
+    // ====================================================================
+    // CONTEXT 3: "Is this safe?" - Direct expertise request
+    // ====================================================================
+    if (lower.match(/\b(safe|legit|legitimate|trust|good project|worth it)\?/)) {
+      const responses = [
+        "depends on what you're looking at. paste the contract and i'll tell you what i see",
+        "give me the address and i'll break it down for you",
+        "i can answer that but need the token address first",
+        "let me scan it and you tell me if my findings make you feel safe about it",
+      ];
+      return { message: this.getRandomItem(responses), tone: 'professional' };
+    }
+    
+    // ====================================================================
+    // CONTEXT 4: Wallet/Dev Discussion - Rally tracks this stuff
+    // ====================================================================
+    if (lower.match(/\b(dev|developer|team|wallet|founder|creator)\b/) && lower.match(/\b(sketchy|sus|suspicious|shady|dumping|selling)\b/)) {
+      const responses = [
+        "dev behavior matters a lot. i can check their wallet history if you want",
+        "yeah dev activity is a huge tell. got the token address? i'll audit the dev wallet",
+        "tracking devs is literally part of what i do. send me the ca",
+      ];
+      return { message: this.getRandomItem(responses), tone: 'professional' };
+    }
+    
+    // ====================================================================
+    // CONTEXT 5: LP/Liquidity Discussion - Rally's technical zone
+    // ====================================================================
+    if (lower.match(/\b(liquidity|lp|pool|locked|burned|unlocked)\b/)) {
+      const responses = [
+        "lp status is critical. unlocked = they can drain it whenever. want me to check?",
+        "i always check lp burn percentage. makes or breaks a token's safety",
+        "yeah liquidity concerns are valid. paste the address and i'll see what's up",
+      ];
+      return { message: this.getRandomItem(responses), tone: 'professional' };
+    }
+    
+    // ====================================================================
+    // CONTEXT 6: General Gem Hunting - Supportive but cautious
+    // ====================================================================
+    if (lower.match(/\b(gem|early|alpha|find|found|looking for)\b/)) {
+      const responses = [
+        "gem hunting is fun but scan everything first. seriously, everything",
+        "finding alpha is great. losing money to scams is not. let me help with the second part",
+        "early plays have the most risk. run them by me before you buy",
+        "i can help separate real gems from rug pulls if you want",
+      ];
+      return { message: this.getRandomItem(responses), tone: 'friendly' };
+    }
+    
+    // ====================================================================
+    // CONTEXT 7: Community/Vibes Discussion - Rally reads deeper
+    // ====================================================================
+    if (lower.match(/\b(community|vibes|energy|feeling|gut)\b/) && lower.match(/\b(good|bad|off|weird|strange)\b/)) {
+      const responses = [
+        "vibes matter but numbers don't lie. want me to check the actual metrics?",
+        "trust your gut but verify with data. that's where i come in",
+        "gut feelings are useful. i can back them up with hard analysis if you need",
+      ];
+      return { message: this.getRandomItem(responses), tone: 'friendly' };
+    }
+    
+    // ====================================================================
+    // CONTEXT 8: Market Timing Discussion - Rally's perspective
+    // ====================================================================
+    if (lower.match(/\b(too late|missed|early|perfect timing|right time)\b/)) {
+      const responses = [
+        "timing matters but safety matters more. being early on a rug is still losing money",
+        "rather be late and safe than early and rugged",
+        "don't let fomo make you skip due diligence. that's how they get you",
+      ];
+      return { message: this.getRandomItem(responses), tone: 'friendly' };
+    }
+    
+    // No relevant context - stay quiet
+    return null;
+  }
+  
+  // ========================================================================
   // UTILITY FUNCTIONS
   // ========================================================================
   
