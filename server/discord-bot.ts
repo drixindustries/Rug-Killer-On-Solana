@@ -2395,6 +2395,9 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       }
       return;
     }
+
+    // End of ! command handling block
+  }
     
     // ===================================================================
     // PRIORITY 2: Handle bot mentions/replies (personality responses)
@@ -2479,9 +2482,10 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     // Handle $symbol mentions (cashtag injection like Rick bot)
     // Triggers on messages like "$ZKSL is moving" or "$BONK to the moon"
     const symbolMatch = text.match(/\$([A-Za-z0-9]{2,15})/);
+
     if (symbolMatch) {
       const sym = symbolMatch[1].toUpperCase();
-      
+
       // Throttle to prevent spam (15 seconds per symbol per channel)
       const throttleKey = `${message.channelId}:${sym.toLowerCase()}`;
       const now = Date.now();
@@ -2489,25 +2493,27 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       if (now - last < 15_000) {
         return; // prevent spam within 15s for same symbol in channel
       }
-      
+
       // Try to resolve from cache first
       let resolved = nameCache.resolve(sym);
-      
+
       // If not cached, search DexScreener for the symbol
       if (!resolved) {
         try {
           const searchUrl = `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(sym)}`;
           const searchRes = await fetch(searchUrl, { signal: AbortSignal.timeout(5000) });
+
           if (searchRes.ok) {
             const searchData = await searchRes.json();
-            const solanaPair = searchData.pairs?.find((p: any) => 
-              p.chainId === 'solana' && 
+            const solanaPair = searchData.pairs?.find((p: any) =>
+              p.chainId === 'solana' &&
               (p.baseToken?.symbol?.toLowerCase() === sym.toLowerCase() ||
                p.quoteToken?.symbol?.toLowerCase() === sym.toLowerCase())
             );
+
             if (solanaPair) {
-              resolved = solanaPair.baseToken.symbol.toLowerCase() === sym.toLowerCase() 
-                ? solanaPair.baseToken.address 
+              resolved = solanaPair.baseToken.symbol.toLowerCase() === sym.toLowerCase()
+                ? solanaPair.baseToken.address
                 : solanaPair.quoteToken.address;
             }
           }
@@ -2515,10 +2521,10 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           // Silently fail search - just won't respond to uncached symbols
         }
       }
-      
+
       if (resolved) {
         lastResponded.set(throttleKey, now);
-        
+
         // Track this cashtag mention for trending calls
         try {
           const channelName = message.channel && 'name' in message.channel ? message.channel.name : 'DM';
@@ -2535,19 +2541,22 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         } catch (trackErr) {
           console.warn('[TrendingCalls] Failed to track cashtag:', trackErr);
         }
-        
+
         try {
           await message.channel.sendTyping();
           const analysis = await tokenAnalyzer.analyzeToken(resolved);
-          try { nameCache.remember(resolved, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
-          
-          // Update risk score in tracker
+
+          try {
+            nameCache.remember(resolved, analysis?.metadata?.symbol, analysis?.metadata?.name as any);
+          } catch {}
+
+          // Update risk score in tracker as best-effort work - no user-facing noise
           try {
             trendingCallsTracker.updateRiskScore(resolved, analysis.riskScore);
           } catch (updateErr) {
             console.warn('[TrendingCalls] Failed to update risk score:', updateErr);
           }
-          
+
           const embed = createAnalysisEmbed(analysis);
           await message.reply({ embeds: [embed] });
           return;
@@ -2555,6 +2564,8 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           // Silently fail - don't spam errors for cashtag mentions
           return;
         }
+      }
+
       // If symbol not found, silently ignore (don't spam "not recognized" messages)
     }
   }); // End of messageCreate handler

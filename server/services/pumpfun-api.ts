@@ -11,16 +11,117 @@ interface PumpFunInfo {
   };
 }
 
+// Circuit breaker to prevent hammering failing pump.fun API
+let pumpFunApiDown = false;
+let pumpFunApiDownUntil = 0;
+
+// Alternative API sources for pump.fun token detection
+async function tryDexScreener(tokenAddress: string): Promise<PumpFunInfo | null> {
+  try {
+    const response = await axios.get(`https://api.dexscreener.com/latest/dex/tokens/${tokenAddress}`, {
+      timeout: 5000,
+      headers: { 'Accept': 'application/json' }
+    });
+    
+    if (response.data?.pairs && response.data.pairs.length > 0) {
+      const pair = response.data.pairs[0];
+      
+      // Check if it's a pump.fun token by looking at the DEX
+      const isPumpFun = pair.dexId === 'raydium' && pair.chainId === 'solana';
+      
+      if (isPumpFun && pair.pairCreatedAt) {
+        console.log(`[Pump.fun] Detected via DexScreener: ${pair.baseToken?.name}`);
+        
+        // Estimate bonding curve progress from market cap
+        const marketCap = pair.fdv || pair.marketCap || 0;
+        const bondingCurve = Math.min((marketCap / 85000) * 100, 100); // ~85k target
+        
+        return {
+          isPumpFun: true,
+          devBought: 0, // Unknown via DexScreener
+          bondingCurve,
+          mayhemMode: bondingCurve >= 99
+        };
+      }
+    }
+  } catch (error: any) {
+    // Silent fail - try next source
+  }
+  return null;
+}
+
+async function tryGMGN(tokenAddress: string): Promise<PumpFunInfo | null> {
+  try {
+    const response = await axios.get(`https://gmgn.ai/defi/quotation/v1/tokens/sol/${tokenAddress}`, {
+      timeout: 5000,
+      headers: { 
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0'
+      }
+    });
+    
+    if (response.data?.data) {
+      const token = response.data.data.token;
+      
+      // Check if pump.fun by looking at creation source
+      if (token?.creation_tx || token?.is_show_alert) {
+        console.log(`[Pump.fun] Detected via GMGN: ${token.name}`);
+        
+        const marketCap = parseFloat(token.market_cap || '0');
+        const bondingCurve = Math.min((marketCap / 85000) * 100, 100);
+        
+        return {
+          isPumpFun: true,
+          devBought: parseFloat(token.top_10_holder_rate || '0'),
+          bondingCurve,
+          mayhemMode: bondingCurve >= 99
+        };
+      }
+    }
+  } catch (error: any) {
+    // Silent fail - try next source
+  }
+  return null;
+}
+
+async function checkAlternativeSources(tokenAddress: string): Promise<PumpFunInfo> {
+  // Try all alternative sources
+  const dexResult = await tryDexScreener(tokenAddress);
+  if (dexResult) return dexResult;
+  
+  const gmgnResult = await tryGMGN(tokenAddress);
+  if (gmgnResult) return gmgnResult;
+  
+  // If all fail, use RPC fallback
+  return checkPumpFunFallback(tokenAddress);
+}
+
 export async function checkPumpFun(tokenAddress: string): Promise<PumpFunInfo> {
-  // ACTUAL WORKING pump.fun API endpoint (November 2025)
-  // The official pump.fun frontend uses this endpoint
+  // Circuit breaker: Skip API if it's been failing
+  const now = Date.now();
+  if (pumpFunApiDown && now < pumpFunApiDownUntil) {
+    console.log(`[Pump.fun] API circuit breaker active, using alternative sources for ${tokenAddress}`);
+    // Try alternative sources first
+    return checkAlternativeSources(tokenAddress);
+  }
+  
+  console.log(`[Pump.fun] Checking token: ${tokenAddress}`);
+  
+  // STRATEGY 1: Try DexScreener first (most reliable)
+  const dexResult = await tryDexScreener(tokenAddress);
+  if (dexResult) return dexResult;
+  
+  // STRATEGY 2: Try GMGN.ai
+  const gmgnResult = await tryGMGN(tokenAddress);
+  if (gmgnResult) return gmgnResult;
+  
+  // STRATEGY 3: Try pump.fun API (often returns 530)
   const mainEndpoint = `https://frontend-api.pump.fun/coins/${tokenAddress}`;
   
   try {
-    console.log(`[Pump.fun] Checking token: ${tokenAddress}`);
     
     const response = await axios.get(mainEndpoint, {
-      timeout: 10000,
+      timeout: 5000, // Reduced timeout
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
         'Accept': 'application/json',
@@ -28,7 +129,7 @@ export async function checkPumpFun(tokenAddress: string): Promise<PumpFunInfo> {
         'Origin': 'https://pump.fun',
         'Referer': 'https://pump.fun/'
       },
-      validateStatus: (status) => status < 500,
+      validateStatus: (status) => status < 600, // Accept all non-fatal responses
     });
     
     if (response.status === 200 && response.data) {
@@ -91,19 +192,38 @@ export async function checkPumpFun(tokenAddress: string): Promise<PumpFunInfo> {
     
     if (response.status === 404) {
       console.log(`[Pump.fun] Token not found on pump.fun: ${tokenAddress}`);
+      // Reset circuit breaker on successful connection
+      pumpFunApiDown = false;
+    } else if (response.status >= 500) {
+      // 5xx errors - activate circuit breaker
+      console.log(`[Pump.fun] API unavailable (${response.status}), activating circuit breaker`);
+      pumpFunApiDown = true;
+      pumpFunApiDownUntil = Date.now() + 60000; // Skip API for 60 seconds
     }
     
   } catch (error: any) {
     if (error.code === 'ECONNABORTED') {
       console.log(`[Pump.fun] Request timeout for ${tokenAddress}`);
+      pumpFunApiDown = true;
+      pumpFunApiDownUntil = Date.now() + 30000; // Skip for 30 seconds
     } else if (error.response?.status === 404) {
       console.log(`[Pump.fun] Token not found on pump.fun: ${tokenAddress}`);
+      pumpFunApiDown = false; // Reset on successful connection
+    } else if (error.response?.status >= 500) {
+      console.log(`[Pump.fun] API error (${error.response?.status}):`, error.message);
+      pumpFunApiDown = true;
+      pumpFunApiDownUntil = Date.now() + 60000;
     } else {
       console.log(`[Pump.fun] API error:`, error.message);
     }
   }
   
-  // Fallback: Check using Solana RPC for pump.fun authority patterns
+  // Use RPC fallback
+  return checkPumpFunFallback(tokenAddress);
+}
+
+// RPC fallback function
+async function checkPumpFunFallback(tokenAddress: string): Promise<PumpFunInfo> {
   try {
     console.log(`[Pump.fun] Checking mint authority pattern for ${tokenAddress}...`);
     
