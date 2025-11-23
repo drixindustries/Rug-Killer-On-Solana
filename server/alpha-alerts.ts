@@ -324,6 +324,27 @@ export class AlphaAlertService {
     }
     
     const DIRECT = process.env.ALPHA_ALERTS_DIRECT_SEND === 'true';
+    
+    // Send to Discord webhook if configured
+    const DISCORD_WEBHOOK = process.env.ALPHA_DISCORD_WEBHOOK;
+    if (DIRECT && DISCORD_WEBHOOK && DISCORD_WEBHOOK !== 'SET_ME') {
+      try {
+        await fetch(DISCORD_WEBHOOK, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: `@everyone\n\n${message}`,
+            username: 'RugKiller Alpha Alerts',
+            allowed_mentions: { parse: ['everyone'] }
+          }),
+        });
+        console.log('[ALPHA ALERT] ✅ Discord webhook notification sent');
+      } catch (error) {
+        console.error('[ALPHA ALERT] Discord webhook notification failed:', error);
+      }
+    }
+    
+    // Send to Telegram if configured
     const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.ALPHA_TELEGRAM_BOT_TOKEN;
     const TELEGRAM_CHAT = process.env.ALPHA_TELEGRAM_CHAT_ID;
     if (DIRECT && TELEGRAM_TOKEN && TELEGRAM_CHAT) {
@@ -338,6 +359,7 @@ export class AlphaAlertService {
             parse_mode: 'Markdown',
           }),
         });
+        console.log('[ALPHA ALERT] ✅ Telegram notification sent');
       } catch (error) {
         console.error('[ALPHA ALERT] Telegram notification failed:', error);
       }

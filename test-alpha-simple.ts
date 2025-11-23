@@ -16,7 +16,7 @@ async function testAlphaAlert() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${DEBUG_TOKEN}`
+        'x-debug-token': DEBUG_TOKEN
       }
     });
 
@@ -45,7 +45,7 @@ async function testAlphaAlert() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${DEBUG_TOKEN}`
+        'x-debug-token': DEBUG_TOKEN
       },
       body: JSON.stringify({
         mint: testToken,
