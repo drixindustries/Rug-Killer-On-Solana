@@ -365,6 +365,42 @@ export class AlphaAlertService {
       }
     }
     
+    // Trigger automatic token scan if direct send is enabled
+    if (DIRECT && DISCORD_WEBHOOK && DISCORD_WEBHOOK !== 'SET_ME' && alert.mint) {
+      try {
+        console.log(`[ALPHA ALERT] Triggering automatic scan for token: ${alert.mint}`);
+        // Import analyzer and run scan
+        const { default: analyze } = await import('./analyzer.ts');
+        const analysisResult = await analyze({ address: alert.mint });
+        
+        // Build embed message using the same format as Discord bot
+        const { buildCompactMessage } = await import('./discord-bot.ts');
+        const messageData = buildCompactMessage(analysisResult);
+        
+        // Send scan results as follow-up message
+        const scanMessage = `**🔍 Automatic Scan Results**\n\n` +
+          `**Risk Level: ${analysisResult.riskLevel}** (Score: ${analysisResult.riskScore}/100)\n\n` +
+          `🤖 **AI Analysis**\n${messageData.aiVerdict}\n\n` +
+          `🔐 **Security**\n${messageData.security}\n\n` +
+          `👥 **Holders**\n${messageData.holders}\n\n` +
+          (messageData.market ? `💰 **Market**\n${messageData.market}\n\n` : '') +
+          (messageData.pumpFun ? `🎯 **Pump.fun**\n${messageData.pumpFun}\n\n` : '') +
+          `📊 Chart: https://dexscreener.com/solana/${alert.mint}`;
+        
+        await fetch(DISCORD_WEBHOOK, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: scanMessage,
+            username: 'RugKiller Auto-Scan'
+          }),
+        });
+        console.log('[ALPHA ALERT] ✅ Auto-scan results sent to Discord');
+      } catch (error) {
+        console.error('[ALPHA ALERT] Auto-scan failed:', error);
+      }
+    }
+    
     // Also trigger callbacks for extensibility
     console.log(`[ALPHA ALERTS] Triggering ${this.alertCallbacks.length} callback(s)`);
     for (const callback of this.alertCallbacks) {
