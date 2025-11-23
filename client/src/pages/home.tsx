@@ -271,12 +271,33 @@ export default function Home() {
   const analyzeMutation = useMutation({
     mutationFn: async (tokenAddress: string) => {
       try {
-        const response = await apiRequest("POST", "/api/analyze", { tokenAddress });
+        // Add 120 second timeout for analysis (new tokens can take time)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000);
+        
+        const response = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ tokenAddress }),
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: response.statusText }));
+          throw new Error(errorData.error || errorData.message || `Analysis failed: ${response.status}`);
+        }
+        
         const data = await response.json();
         console.log("[Analyze] Response received:", data);
         return data as TokenAnalysisResponse;
       } catch (error: any) {
         console.error("[Analyze] Error in mutationFn:", error);
+        if (error.name === 'AbortError') {
+          throw new Error('Analysis timed out. This token may be too new or experiencing indexing delays. Please try again in a few moments.');
+        }
         throw error;
       }
     },
@@ -289,7 +310,7 @@ export default function Home() {
       toast({
         variant: "destructive",
         title: "Analysis Failed",
-        description: error.message || "Failed to fetch",
+        description: error.message || "Failed to analyze token. Please try again.",
       });
     },
   });
