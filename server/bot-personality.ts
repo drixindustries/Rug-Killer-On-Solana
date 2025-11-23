@@ -429,7 +429,7 @@ export class RallyPersonality {
   
   getHelpMessage(): PersonalityResponse {
     return {
-      message: `hey, i\\'m rally. i scan solana tokens to help you avoid rugs.\n\n**what i check:**\n• mint/freeze authority - can they print tokens or lock wallets\n• liquidity - how much is burned/locked\n• holder distribution - is it concentrated or distributed\n• honeypots - can you actually sell\n• suspicious wallet patterns - bundling, aged wallets, coordination\n• whale activity - who\\'s buying/selling\n\n**how to use:**\njust paste a solana contract address. i\\'ll analyze it and tell you what i see.\n\nworks in channels or dms. i\\'m here whenever you need me`,
+      message: `hey, I'm rally. I scan Solana tokens to help you avoid rugs.\n\n**What I check:**\n• Mint/freeze authority - can they print tokens or lock wallets\n• Liquidity - how much is burned/locked\n• Holder distribution - is it concentrated or distributed\n• Honeypots - can you actually sell\n• Suspicious wallet patterns - bundling, aged wallets, coordination\n• Whale activity - who's buying/selling\n\n**How to use:**\nJust paste a Solana contract address. I'll analyze it and tell you what I see.\n\nWorks in channels or DMs. I'm here whenever you need me`,
       tone: 'friendly'
     };
   }
@@ -444,7 +444,7 @@ export class RallyPersonality {
     // Respond to "who are you"
     if (lowerMsg.includes('who are you') || lowerMsg.includes('what are you') || lowerMsg.includes('who is rally')) {
       return {
-        message: 'i\\'m rally. i scan solana tokens and help people avoid rugs.\n\ni check mint/freeze authority, liquidity locks, holder distribution, suspicious wallet patterns - basically everything that matters when you\\'re trying to figure out if something\\'s legit or if you\\'re about to lose your money.\n\njust paste a contract address and i\\'ll tell you what i see',
+        message: `i'm rally. i scan solana tokens and help people avoid rugs.\n\ni check mint/freeze authority, liquidity locks, holder distribution, suspicious wallet patterns - basically everything that matters when you're trying to figure out if something's legit or if you're about to lose your money.\n\njust paste a contract address and i'll tell you what i see`,
         tone: 'friendly'
       };
     }
@@ -452,9 +452,10 @@ export class RallyPersonality {
     // Respond to "how are you"  
     if (lowerMsg.includes('how are you') || lowerMsg.includes('how\'re you') || lowerMsg.includes('hows it going')) {
       const responses = [
-        'doing good. market\\'s been wild lately',
+        "doing good. market's been wild lately",
         'all good. you?',
-        'can\\'t complain. caught a few rugs today',\n        'pretty good. what\\'s up with you',
+        "can't complain. caught a few rugs today",
+        "pretty good. what's up with you",
         'solid. staying busy',
       ];
       return { message: this.getRandomItem(responses), tone: 'friendly' };
@@ -463,8 +464,8 @@ export class RallyPersonality {
     // Respond to market sentiment
     if (lowerMsg.includes('bullish') || lowerMsg.includes('pump') || lowerMsg.includes('moon')) {
       const responses = [
-        'bullish energy is great but still check what you\\'re buying',
-        'pumps are cool until they\\'re not. that\\'s why i\\'m here',
+        "bullish energy is great but still check what you're buying",
+        "pumps are cool until they're not. that's why I'm here",
         'love the optimism but dyor regardless of market sentiment',
       ];
       return { message: this.getRandomItem(responses), tone: 'friendly' };
@@ -473,19 +474,19 @@ export class RallyPersonality {
     if (lowerMsg.includes('bearish') || lowerMsg.includes('dump') || lowerMsg.includes('rekt')) {
       const responses = [
         'bear markets are when you need me most tbh. more scams show up',
-        'yeah market\\'s rough. at least i can help you avoid making it worse',
+        "yeah market's rough. at least I can help you avoid making it worse",
         'down bad? let me help you not go more down bad',
       ];
       return { message: this.getRandomItem(responses), tone: 'friendly' };
     }
     
     // Respond to praise
-    if (lowerMsg.includes('best bot') || lowerMsg.includes('love you') || lowerMsg.includes('you\'re awesome') || lowerMsg.includes('you\\'re the best')) {
+    if (lowerMsg.includes('best bot') || lowerMsg.includes('love you') || lowerMsg.includes("you're awesome") || lowerMsg.includes("you're the best")) {
       const responses = [
-        'appreciate that. means i\\'m doing my job',
+        "appreciate that. means i'm doing my job",
         'thanks. just trying to help people not lose money',
-        'glad i could help. that\\'s why i exist',
-        'thanks. you\\'re pretty cool too',
+        "glad i could help. that's why i exist",
+        "thanks. you're pretty cool too",
       ];
       return { message: this.getRandomItem(responses), tone: 'friendly' };
     }

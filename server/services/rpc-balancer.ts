@@ -128,12 +128,14 @@ const RPC_PROVIDERS = [
     rateLimit: 1000,
     rateLimitWindow: 60000
   },
-  // Ankr Premium RPC (Secondary - 65% weight)
-  // Workaround applied for superstruct union validation
+  // Ankr Premium RPC - Using direct HTTP client to bypass superstruct bug
+  // The @solana/web3.js library has a bug with superstruct validation
+  // that affects Ankr's response format. We bypass it with ankr-direct-client.ts
   // https://github.com/ianstormtaylor/superstruct/issues/580
+  // SOLUTION: Use AnkrDirectClient for direct JSON-RPC HTTP calls
   { 
     getUrl: () => `${getAnkrUrl() || ""}`,
-    weight: 65, 
+    weight: 65, // RE-ENABLED with direct HTTP client
     name: "Ankr",
     tier: "premium" as const,
     requiresKey: true,
@@ -484,47 +486,42 @@ export const rpcBalancer = new SolanaRpcBalancer(RPC_PROVIDERS);
 // Enhanced health check with concurrent testing and latency measurement
 const performHealthChecks = async () => {
   const healthChecks = rpcBalancer.providers.map(async (p) => {
+    // Skip disabled providers
+    if (p.weight === 0) {
+      console.log(`⏭️ ${p.name}: Disabled (weight=0)`);
+      return;
+    }
+    
     const startTime = Date.now();
     const url = p.getUrl();
     
-    // Apply custom fetch for Ankr to handle superstruct union validation bug
-    const connectionOptions: any = { 
-      commitment: "confirmed", 
-      wsEndpoint: undefined 
-    };
-    
+    // Use direct Ankr client to bypass superstruct bug
     if (p.name === "Ankr") {
-      const originalFetch = globalThis.fetch;
-      connectionOptions.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-        const response = await originalFetch(input, init);
-        try {
-          const text = await response.text();
-          const data = JSON.parse(text);
-          if (data && typeof data === 'object') {
-            const normalized = {
-              jsonrpc: data.jsonrpc || '2.0',
-              id: data.id,
-              ...(data.result !== undefined && { result: data.result }),
-              ...(data.error !== undefined && { error: data.error }),
-            };
-            return new Response(JSON.stringify(normalized), {
-              status: response.status,
-              statusText: response.statusText,
-              headers: response.headers,
-            });
-          }
-          return new Response(text, {
-            status: response.status,
-            statusText: response.statusText,
-            headers: response.headers,
-          });
-        } catch (e) {
-          return originalFetch(input, init);
-        }
-      };
+      try {
+        const { createAnkrClient } = await import('./ankr-direct-client');
+        const apiKey = url.split('/').pop() || '';
+        const ankrClient = createAnkrClient(apiKey);
+        
+        await ankrClient.getSlot();
+        const latency = Date.now() - startTime;
+        p.avgLatency = p.avgLatency ? (p.avgLatency + latency) / 2 : latency;
+        p.score = Math.min(100, p.score + 8);
+        p.consecutiveFails = 0;
+        p.lastHealthCheck = Date.now();
+        console.log(`✅ ${p.name}: ${latency}ms (direct HTTP client)`);
+        return;
+      } catch (error: any) {
+        const latency = Date.now() - startTime;
+        p.consecutiveFails++;
+        p.fails++;
+        p.score = Math.max(0, p.score - 15);
+        p.lastHealthCheck = Date.now();
+        console.log(`❌ ${p.name}: Failed (${error?.message}) - consecutive fails: ${p.consecutiveFails}`);
+        return;
+      }
     }
     
-    const conn = new Connection(url, connectionOptions);
+    const conn = new Connection(url, { commitment: "confirmed", wsEndpoint: undefined });
 
     // Helper to race a promise with timeout
     const withTimeout = async <T>(promise: Promise<T>, ms = 5000): Promise<T> => {
