@@ -267,3 +267,5 @@ export function CondensedTokenHeader({ analysis }: CondensedTokenHeaderProps) {
     </Card>
   );
 }
+
+export default CondensedTokenHeader;

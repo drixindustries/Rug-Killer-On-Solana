@@ -46,7 +46,7 @@ const NetworkAnalysisCard = lazy(() => import("@/components/network-analysis-car
 const WhaleDetectionCard = lazy(() => import("@/components/whale-detection-card").then(m => ({ default: m.WhaleDetectionCard })));
 const AgedWalletDetectionCard = lazy(() => import("@/components/aged-wallet-detection-card").then(m => ({ default: m.AgedWalletDetectionCard })));
 const FundingAnalysisCard = lazy(() => import("@/components/funding-analysis-card").then(m => ({ default: m.FundingAnalysisCard })));
-const CondensedTokenHeader = lazy(() => import("@/components/condensed-token-header").then(m => ({ default: m.CondensedTokenHeader })));
+const CondensedTokenHeader = lazy(() => import("@/components/condensed-token-header"));
 const CondensedAlerts = lazy(() => import("@/components/condensed-alerts").then(m => ({ default: m.CondensedAlerts })));
 const CascadingAnalysisBars = lazy(() => import("@/components/cascading-analysis-bars").then(m => ({ default: m.CascadingAnalysisBars })));
 const TGNAnalysisCard = lazy(() => import("@/components/tgn-analysis-card").then(m => ({ default: m.TGNAnalysisCard })));
