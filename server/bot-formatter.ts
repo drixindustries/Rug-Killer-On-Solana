@@ -150,10 +150,16 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
       lpBurnText = `${burnPercent.toFixed(0)}% BURNED`;
     }
   } else {
-    const burnPercent = analysis.liquidityPool?.burnPercentage ?? 0;
-    lpBurnPercent = burnPercent;
-    lpBurned = burnPercent >= 95;
-    lpBurnText = burnPercent > 0 ? `${burnPercent.toFixed(0)}% BURNED` : 'Unknown';
+    const burnPercent = analysis.liquidityPool?.burnPercentage;
+    if (burnPercent !== undefined && burnPercent !== null) {
+      lpBurnPercent = burnPercent;
+      lpBurned = burnPercent >= 95;
+      lpBurnText = `${burnPercent.toFixed(0)}% BURNED`;
+    } else {
+      lpBurnPercent = 0;
+      lpBurned = false;
+      lpBurnText = 'Checking...';
+    }
   }
   
   // Check for honeypot and tax
@@ -210,7 +216,8 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
       tgnEmoji = '⚠️';
     }
     
-    tgnAnalysis = `🧠 **Temporal GNN**\n${tgnEmoji} Rug Risk: ${rugPercent}%\n• Graph: ${tgn.graphMetrics.nodeCount} wallets, ${tgn.graphMetrics.edgeCount} txns\n• Confidence: ${(tgn.confidence * 100).toFixed(0)}%`;
+    const confidence = tgn.confidence ? (tgn.confidence * 100).toFixed(0) : 'N/A';
+    tgnAnalysis = `🧠 **Temporal GNN** ([What's this?](https://github.com/drixindustries/Rug-Killer-On-Solana/blob/main/docs/TEMPORAL_GNN.md))\n${tgnEmoji} Rug Risk: ${rugPercent}%\n• Graph: ${tgn.graphMetrics.nodeCount} wallets, ${tgn.graphMetrics.edgeCount} txns analyzed\n• Model Confidence: ${confidence}%`;
     
     if (analysis.isPreMigration) {
       tgnAnalysis += `\n⏳ Pre-Migration (Bonding Curve)`;

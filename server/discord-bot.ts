@@ -1026,7 +1026,8 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           }
           
           tgnText += `• Graph: ${tgn.graphMetrics.nodeCount} wallets, ${tgn.graphMetrics.edgeCount} transactions\n`;
-          tgnText += `• Confidence: ${(tgn.confidence * 100).toFixed(0)}%`;
+          const confidence = tgn.confidence ? (tgn.confidence * 100).toFixed(0) : 'N/A';
+          tgnText += `• Model Confidence: ${confidence}%\n• [What is Temporal GNN?](https://github.com/drixindustries/Rug-Killer-On-Solana/blob/main/docs/TEMPORAL_GNN.md)`;
           
           if (analysis.isPreMigration) {
             tgnText += `\n⏳ **Pre-Migration** (Pump.fun bonding curve)`;
