@@ -366,9 +366,8 @@ export class AlphaAlertService {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            content: `@everyone\n\n${message}`,
-            username: 'RugKiller Alpha Alerts',
-            allowed_mentions: { parse: ['everyone'] }
+            content: message,
+            username: 'RugKiller Alpha Alerts'
           }),
         });
         console.log('[ALPHA ALERT] ✅ Discord webhook notification sent');
