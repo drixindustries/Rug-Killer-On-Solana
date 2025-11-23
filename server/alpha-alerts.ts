@@ -299,6 +299,33 @@ export class AlphaAlertService {
       if (walletAddress) {
         summaryLines.push(`🔑 \`${walletAddress}\``);
       }
+      
+      // Add wallet PNL stats if available
+      const walletStats = alert.data?.walletStats;
+      if (walletStats) {
+        const pnlLines: string[] = [];
+        
+        if (walletStats.profitSol !== null && walletStats.profitSol !== undefined) {
+          const profitEmoji = walletStats.profitSol >= 0 ? '💰' : '📉';
+          const profitFormatted = Math.abs(walletStats.profitSol).toFixed(2);
+          pnlLines.push(`${profitEmoji} PNL: ${walletStats.profitSol >= 0 ? '+' : '-'}${profitFormatted} SOL`);
+        }
+        
+        if (walletStats.wins || walletStats.losses) {
+          const totalTrades = walletStats.wins + walletStats.losses;
+          pnlLines.push(`📊 W/L: ${walletStats.wins}/${walletStats.losses} (${totalTrades} trades)`);
+        }
+        
+        if (walletStats.winRate !== undefined) {
+          const winRateEmoji = walletStats.winRate >= 70 ? '🔥' : walletStats.winRate >= 50 ? '✅' : '⚠️';
+          pnlLines.push(`${winRateEmoji} Win Rate: ${walletStats.winRate}%`);
+        }
+        
+        if (pnlLines.length > 0) {
+          summaryLines.push(pnlLines.join(' | '));
+        }
+      }
+      
       summaryLines.push(`📍 CA: \`${alert.mint}\``);
       if (providerLabel) {
         summaryLines.push(`📡 Source: ${providerLabel}`);
@@ -860,13 +887,36 @@ export class AlphaAlertService {
       const walletInfo = caller ? `${caller.name} (${caller.wallet.slice(0, 8)}...)` : 'Unknown';
       console.log(`[Alpha Alerts] Checking token ${mint} from ${source} - Wallet: ${walletInfo}`);
       
+      // Fetch wallet PNL stats from database
+      let walletStats = null;
+      if (caller?.wallet) {
+        try {
+          const [wallet] = await db
+            .select()
+            .from(smartWallets)
+            .where(eq(smartWallets.walletAddress, caller.wallet))
+            .limit(1);
+          
+          if (wallet) {
+            walletStats = {
+              profitSol: wallet.profitSol ? parseFloat(wallet.profitSol) : null,
+              wins: wallet.wins || 0,
+              losses: wallet.losses || 0,
+              winRate: wallet.winRate || 0,
+            };
+          }
+        } catch (err) {
+          console.warn('[Alpha Alerts] Failed to fetch wallet stats:', err);
+        }
+      }
+      
       // Check if token passes quality filters
       const isQuality = await this.isQualityToken(mint);
       
       if (isQuality) {
         console.log(`[Alpha Alerts] ✅ Token ${mint} passed quality check - sending alert`);
         
-        // Send the alert with wallet information
+        // Send the alert with wallet information and PNL stats
         await this.sendAlert({
           type: 'caller_signal',
           mint,
@@ -876,7 +926,8 @@ export class AlphaAlertService {
             provider: source,
             wallet: caller?.wallet,
             walletName: caller?.name,
-            influenceScore: caller?.influenceScore
+            influenceScore: caller?.influenceScore,
+            walletStats
           }
         });
       } else {
