@@ -514,6 +514,7 @@ export class HolderAnalysisService {
       console.error('[HolderAnalysis] Helius fetch failed:', error);
       return null;
     }
+    */
   }
 
   /**
