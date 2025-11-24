@@ -18,6 +18,13 @@ export default function Home() {
   const { toast } = useToast();
   const [analysis, setAnalysis] = useState<TokenAnalysisResponse | null>(null);
 
+  const scrollToAnalyzer = () => {
+    const analyzerElement = document.getElementById("token-analyzer");
+    if (analyzerElement) {
+      analyzerElement.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
+
   const mutation = useMutation({
     mutationFn: async (address: string) => {
       const response = await apiRequest("POST", "/api/analyze", { address });
@@ -64,7 +71,7 @@ export default function Home() {
       <main className="container mx-auto px-4 py-8">
         {/* Hero Section */}
         <div className="text-center mb-12">
-          <MascotSpotlight />
+          <MascotSpotlight onScrollToAnalyzer={scrollToAnalyzer} />
           <h1 className="text-5xl font-bold text-white mb-4">
             Rug Killer Alpha Bot
           </h1>
@@ -73,7 +80,7 @@ export default function Home() {
           </p>
           
           {/* Token Input */}
-          <div className="max-w-2xl mx-auto">
+          <div id="token-analyzer" className="max-w-2xl mx-auto">
             <TokenInput 
               onAnalyze={handleAnalyze}
               isLoading={mutation.isPending}

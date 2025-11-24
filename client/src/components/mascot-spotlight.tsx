@@ -36,7 +36,11 @@ async function fetchMascotStats(): Promise<MascotHeroStats> {
   return (await response.json()) as MascotHeroStats;
 }
 
-export function MascotSpotlight() {
+type MascotSpotlightProps = {
+  onScrollToAnalyzer?: () => void;
+};
+
+export function MascotSpotlight({ onScrollToAnalyzer }: MascotSpotlightProps) {
   const { data: stats } = useQuery<MascotHeroStats>({
     queryKey: ["/api/alpha/hero-stats"],
     queryFn: fetchMascotStats,
@@ -53,8 +57,12 @@ export function MascotSpotlight() {
   }, [stats?.lastAlertAt]);
 
   const handleScrollToAnalyzer = () => {
-    const target = document.getElementById("token-input");
-    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (onScrollToAnalyzer) {
+      onScrollToAnalyzer();
+    } else {
+      const target = document.getElementById("token-analyzer");
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   };
 
   return (
