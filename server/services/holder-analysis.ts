@@ -145,8 +145,16 @@ export class HolderAnalysisService {
       const rpcEndpoint = connection.rpcEndpoint;
       console.log(`[HolderAnalysis DEBUG - getProgramAccounts] RPC endpoint: ${rpcEndpoint}`);
       
-      // Add timeout for getProgramAccounts (3 seconds) to avoid hanging
-      const timeoutMs = 3000;
+      // Skip if using free RPC endpoints that don't support getProgramAccounts
+      if (rpcEndpoint.includes('mainnet-beta.solana.com') || 
+          rpcEndpoint.includes('alchemy.com/v2/demo') ||
+          rpcEndpoint.includes('publicnode.com')) {
+        console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Skipping - free RPC doesn't support getProgramAccounts`);
+        return null;
+      }
+      
+      // Add timeout for getProgramAccounts (5 seconds for premium RPCs)
+      const timeoutMs = 5000;
       const timeoutPromise = new Promise<null>((_, reject) => 
         setTimeout(() => reject(new Error('getProgramAccounts timeout')), timeoutMs)
       );
@@ -612,14 +620,33 @@ export class HolderAnalysisService {
       const exchangeHolders = top20.filter(h => h.isExchange);
       const lpHolders = top20.filter(h => h.isLP);
 
-      // Use filteredAccounts.length as holder count - this represents ALL token accounts from getTokenLargestAccounts
-      // Note: This will be the total number of accounts returned by RPC (up to ~200), which is better than showing 0
-      const estimatedHolderCount = filteredAccounts.length;
-      console.log(`[HolderAnalysis DEBUG - RPC Fallback] Estimated holder count from filteredAccounts: ${estimatedHolderCount}`);
+      // Try to get actual holder count from Solscan API as last resort
+      let actualHolderCount = filteredAccounts.length;
+      try {
+        console.log(`[HolderAnalysis DEBUG - RPC Fallback] Fetching holder count from Solscan API...`);
+        const solscanResponse = await fetch(`https://api.solscan.io/v2/token/meta?address=${tokenAddress}`, {
+          signal: AbortSignal.timeout(3000),
+          headers: {
+            'Accept': 'application/json',
+          }
+        });
+        
+        if (solscanResponse.ok) {
+          const solscanData = await solscanResponse.json();
+          if (solscanData?.data?.holder) {
+            actualHolderCount = solscanData.data.holder;
+            console.log(`[HolderAnalysis DEBUG - RPC Fallback] ✅ Got holder count from Solscan: ${actualHolderCount}`);
+          }
+        }
+      } catch (err) {
+        console.log(`[HolderAnalysis DEBUG - RPC Fallback] Solscan API failed, using fallback count`);
+      }
+
+      console.log(`[HolderAnalysis DEBUG - RPC Fallback] Final holder count: ${actualHolderCount}`);
 
       return {
         tokenAddress,
-        holderCount: estimatedHolderCount,
+        holderCount: actualHolderCount,
         top20Holders: top20,
         topHolderConcentration: top10Concentration,
         exchangeHolderCount: exchangeHolders.length,
