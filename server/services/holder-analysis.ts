@@ -388,7 +388,7 @@ export class HolderAnalysisService {
     console.log(`[HolderAnalysis] Helius disabled - using Ankr RPC via rpcBalancer`);
     return null;
 
-    /* DISABLED CODE
+    /* DISABLED CODE - All code below is unreachable and commented out
     const heliusKey = process.env.HELIUS_API_KEY?.trim();
     if (!heliusKey) {
       return null; // Skip if no Helius key
@@ -397,7 +397,6 @@ export class HolderAnalysisService {
     try {
       // Helius provides enhanced getTokenAccounts with holder counts
       const connection = new Connection(`https://mainnet.helius-rpc.com/?api-key=${heliusKey}`, 'confirmed');
-    */
       
       // Try to get holder count via Helius enhanced API
       // Note: This is a paid feature - check Helius docs for availability
@@ -514,6 +513,7 @@ export class HolderAnalysisService {
       console.error('[HolderAnalysis] Helius fetch failed:', error);
       return null;
     }
+    END OF DISABLED CODE */
   }
 
   /**
