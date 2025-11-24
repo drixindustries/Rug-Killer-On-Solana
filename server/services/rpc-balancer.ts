@@ -105,7 +105,7 @@ const RPC_PROVIDERS = [
   // SOLUTION: Use AnkrDirectClient for direct JSON-RPC HTTP calls
   { 
     getUrl: () => `${getAnkrUrl() || ""}`,
-    weight: 50, // BALANCED: Still priority but allow faster fallbacks
+    weight: 100, // MAXIMUM PRIORITY: Primary RPC
     name: "Ankr",
     tier: "premium" as const,
     requiresKey: true,
@@ -113,17 +113,17 @@ const RPC_PROVIDERS = [
     rateLimit: 9500, // Premium tier limit
     rateLimitWindow: 60000
   },
-  // Helius Free RPC (Higher priority for speed despite limits)
-  { 
-    getUrl: () => `${getHeliusUrl() || ""}`,
-    weight: 25, // INCREASED: Fast when available
-    name: "Helius",
-    tier: "premium" as const, // Promoted for speed
-    requiresKey: true,
-    hasKey: () => !!getHeliusUrl(),
-    rateLimit: 30, // Conservative for free tier
-    rateLimitWindow: 60000
-  },
+  // Helius DISABLED - Using Ankr exclusively
+  // { 
+  //   getUrl: () => `${getHeliusUrl() || ""}`,
+  //   weight: 25,
+  //   name: "Helius",
+  //   tier: "premium" as const,
+  //   requiresKey: true,
+  //   hasKey: () => !!getHeliusUrl(),
+  //   rateLimit: 30,
+  //   rateLimitWindow: 60000
+  // },
   // Shyft Free RPC (Good speed/reliability balance)
   { 
     getUrl: () => `${getShyftUrl() || ""}`,

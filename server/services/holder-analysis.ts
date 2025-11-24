@@ -373,9 +373,14 @@ export class HolderAnalysisService {
 
   /**
    * Fetch holder data from Helius RPC
-   * Uses Helius-specific methods if API key available
+   * DISABLED - Using Ankr instead
    */
   private async fetchFromHelius(tokenAddress: string): Promise<HolderAnalysisResult | null> {
+    // DISABLED: Using Ankr RPC via rpcBalancer instead of Helius
+    console.log(`[HolderAnalysis] Helius disabled - using Ankr RPC via rpcBalancer`);
+    return null;
+
+    /* DISABLED CODE
     const heliusKey = process.env.HELIUS_API_KEY?.trim();
     if (!heliusKey) {
       return null; // Skip if no Helius key
@@ -384,6 +389,7 @@ export class HolderAnalysisService {
     try {
       // Helius provides enhanced getTokenAccounts with holder counts
       const connection = new Connection(`https://mainnet.helius-rpc.com/?api-key=${heliusKey}`, 'confirmed');
+    */
       
       // Try to get holder count via Helius enhanced API
       // Note: This is a paid feature - check Helius docs for availability
