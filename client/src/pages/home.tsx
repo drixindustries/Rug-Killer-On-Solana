@@ -1,974 +1,297 @@
-import { useState, useEffect, lazy, Suspense } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Header } from "@/components/header-new";
 import { Footer } from "@/components/footer";
 import { TokenInput } from "@/components/token-input";
 import { RiskScoreCard } from "@/components/risk-score-card";
 import { CriticalAlerts } from "@/components/critical-alerts";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TELEGRAM_BOT_LINK, DISCORD_SERVER_LINK } from "@/constants";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Copy, CheckCircle, ThumbsUp, ThumbsDown, Flag, Share2, MessageSquare, MessageCircle, AlertTriangle, Star, Trash2, Twitter, Send, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { formatDistanceToNow } from "date-fns";
-import { useAuth } from "@/hooks/useAuth";
-import type { TokenAnalysisResponse, TokenComment, CommunityVote, CommunityVoteSummary } from "@shared/schema";
-import { CONTRACT_ADDRESS } from "@/constants";
+import { AlertTriangle, Shield, TrendingUp, Users, Zap, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import type { TokenAnalysisResponse } from "@shared/schema";
 import { MascotSpotlight } from "@/components/mascot-spotlight";
-
-// Lazy load heavy components for better initial page load
-const MetricsGrid = lazy(() => import("@/components/metrics-grid"));
-const TopHoldersTable = lazy(() => import("@/components/top-holders-table"));
-const HolderDistributionChart = lazy(() => import("@/components/holder-distribution-chart"));
-const TransactionTimeline = lazy(() => import("@/components/transaction-timeline"));
-const TokenMetadataCard = lazy(() => import("@/components/token-metadata-card"));
-const RugcheckCard = lazy(() => import("@/components/rugcheck-card"));
-const GoPlusCard = lazy(() => import("@/components/goplus-card"));
-const MarketDataCard = lazy(() => import("@/components/market-data-card"));
-const BubbleMapsCard = lazy(() => import("@/components/bubblemaps-card"));
-const TokenInfoSidebar = lazy(() => import("@/components/token-info-sidebar"));
-const LiquidityBurnCard = lazy(() => import("@/components/liquidity-burn-card"));
-const HolderFilteringCard = lazy(() => import("@/components/holder-filtering-card"));
-const BundleVisualizationChart = lazy(() => import("@/components/bundle-visualization-chart"));
-const HoneypotCard = lazy(() => import("@/components/honeypot-card"));
-const BundleDetectionCard = lazy(() => import("@/components/bundle-detection-card"));
-const NetworkAnalysisCard = lazy(() => import("@/components/network-analysis-card"));
-const WhaleDetectionCard = lazy(() => import("@/components/whale-detection-card"));
-const AgedWalletDetectionCard = lazy(() => import("@/components/aged-wallet-detection-card"));
-const FundingAnalysisCard = lazy(() => import("@/components/funding-analysis-card"));
-const CondensedTokenHeader = lazy(() => import("@/components/condensed-token-header"));
-const CondensedAlerts = lazy(() => import("@/components/condensed-alerts"));
-const CascadingAnalysisBars = lazy(() => import("@/components/cascading-analysis-bars"));
-const TGNAnalysisCard = lazy(() => import("@/components/tgn-analysis-card"));
-const MLAnalysisCard = lazy(() => import("@/components/ml-analysis-card"));
-
-// Loading fallback component for lazy-loaded components
-const ComponentLoader = () => <Skeleton className="h-48 w-full" />;
 
 export default function Home() {
   const { toast } = useToast();
-  const { isAuthenticated, user } = useAuth();
   const [analysis, setAnalysis] = useState<TokenAnalysisResponse | null>(null);
-  const [currentTokenAddress, setCurrentTokenAddress] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("analysis");
-  const [commentText, setCommentText] = useState("");
-  const [commentRating, setCommentRating] = useState(0);
-  const [selectedVoteType, setSelectedVoteType] = useState<"safe" | "risky" | "scam" | null>(null);
-  const [voteConfidence, setVoteConfidence] = useState([3]);
-  const [reportModalOpen, setReportModalOpen] = useState(false);
-  const [reportType, setReportType] = useState("scam");
-  const [reportEvidence, setReportEvidence] = useState("");
-  const [reportSeverity, setReportSeverity] = useState([3]);
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: "Copied!",
-      description: "Contract address copied to clipboard",
-    });
-  };
-
-  // Fetch comments for the current token
-  const { data: comments, isLoading: commentsLoading } = useQuery<TokenComment[]>({
-    queryKey: ["/api/comments", currentTokenAddress],
-    enabled: !!currentTokenAddress && activeTab === "community",
-  });
-
-  // Fetch community votes summary
-  const { data: voteSummary, isLoading: voteSummaryLoading } = useQuery<CommunityVoteSummary>({
-    queryKey: ["/api/community-votes/summary", currentTokenAddress],
-    enabled: !!currentTokenAddress && activeTab === "community",
-  });
-
-  // Fetch current user's vote
-  const { data: userVote } = useQuery<CommunityVote>({
-    queryKey: ["/api/community-votes/user", currentTokenAddress],
-    enabled: !!currentTokenAddress && !!isAuthenticated && activeTab === "community",
-  });
-
-  // Submit community vote
-  const submitVoteMutation = useMutation({
-    mutationFn: async (data: { voteType: string; confidence: number }) => {
-      if (!currentTokenAddress) throw new Error("No token selected");
-      const response = await apiRequest("POST", "/api/community-votes", {
-        tokenAddress: currentTokenAddress,
-        voteType: data.voteType,
-        confidence: data.confidence,
-      });
+  const mutation = useMutation({
+    mutationFn: async (address: string) => {
+      const response = await apiRequest("POST", "/api/analyze", { address });
       return await response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/community-votes"] });
-      toast({
-        title: "Vote Submitted",
-        description: "Your vote has been recorded",
-      });
-      setSelectedVoteType(null);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to submit vote",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Submit comment
-  const submitCommentMutation = useMutation({
-    mutationFn: async (data: { commentText: string; rating: number }) => {
-      if (!currentTokenAddress) throw new Error("No token selected");
-      const response = await apiRequest("POST", "/api/comments", {
-        tokenAddress: currentTokenAddress,
-        commentText: data.commentText,
-        rating: data.rating || undefined,
-      });
-      return await response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/comments"] });
-      setCommentText("");
-      setCommentRating(0);
-      toast({
-        title: "Comment Posted",
-        description: "Your comment has been added",
-      });
-    },
-    onError: (error: Error) => {
-      const message = error.message || "Failed to post comment";
-      toast({
-        title: "Error",
-        description: message.includes("rate limit") 
-          ? "You're posting too fast. Please wait a moment."
-          : message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Delete comment
-  const deleteCommentMutation = useMutation({
-    mutationFn: async (commentId: string) => {
-      await apiRequest("DELETE", `/api/comments/${commentId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/comments"] });
-      toast({
-        title: "Comment Deleted",
-        description: "Your comment has been removed",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete comment",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Vote on comment
-  const voteCommentMutation = useMutation({
-    mutationFn: async (data: { commentId: string; voteType: "up" | "down" }) => {
-      const response = await apiRequest("POST", `/api/comments/${data.commentId}/vote`, {
-        voteType: data.voteType,
-      });
-      return await response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/comments"] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to vote",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Flag comment
-  const flagCommentMutation = useMutation({
-    mutationFn: async (commentId: string) => {
-      await apiRequest("POST", `/api/comments/${commentId}/flag`);
-    },
-    onSuccess: () => {
-      toast({
-        title: "Comment Flagged",
-        description: "This comment has been reported for review",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to flag comment",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Submit report
-  const submitReportMutation = useMutation({
-    mutationFn: async () => {
-      if (!currentTokenAddress) throw new Error("No token selected");
-      const response = await apiRequest("POST", "/api/reports", {
-        tokenAddress: currentTokenAddress,
-        reportType,
-        evidence: reportEvidence,
-        severityScore: reportSeverity[0],
-      });
-      return await response.json();
-    },
-    onSuccess: () => {
-      setReportModalOpen(false);
-      setReportType("scam");
-      setReportEvidence("");
-      setReportSeverity([3]);
-      toast({
-        title: "Report Submitted",
-        description: "Thank you for helping keep the community safe",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to submit report",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleShareTwitter = () => {
-    if (!currentTokenAddress) return;
-    const text = `Check out this token analysis on RugKiller: ${analysis?.metadata?.name || currentTokenAddress}`;
-    const url = window.location.href;
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, "_blank");
-  };
-
-  const handleShareTelegram = () => {
-    if (!currentTokenAddress) return;
-    const url = window.location.href;
-    window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}`, "_blank");
-  };
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast({
-      title: "Link Copied",
-      description: "Share link copied to clipboard",
-    });
-  };
-
-  const analyzeMutation = useMutation({
-    mutationFn: async (tokenAddress: string) => {
-      try {
-        // Add 120 second timeout for analysis (new tokens can take time)
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 120000);
-        
-        const response = await fetch("/api/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ tokenAddress }),
-          signal: controller.signal,
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ message: response.statusText }));
-          throw new Error(errorData.error || errorData.message || `Analysis failed: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log("[Analyze] Response received:", data);
-        return data as TokenAnalysisResponse;
-      } catch (error: any) {
-        console.error("[Analyze] Error in mutationFn:", error);
-        if (error.name === 'AbortError') {
-          throw new Error('Analysis timed out. This token may be too new or experiencing indexing delays. Please try again in a few moments.');
-        }
-        throw error;
-      }
     },
     onSuccess: (data) => {
-      console.log("[Analyze] Success, setting analysis data");
       setAnalysis(data);
+      toast({
+        title: "Analysis Complete",
+        description: "Token analysis finished successfully",
+      });
     },
     onError: (error: Error) => {
-      console.error("[Analyze] Error in onError handler:", error);
       toast({
-        variant: "destructive",
         title: "Analysis Failed",
-        description: error.message || "Failed to analyze token. Please try again.",
+        description: error.message || "Failed to analyze token",
+        variant: "destructive",
       });
     },
   });
 
   const handleAnalyze = (address: string) => {
-    setCurrentTokenAddress(address);
-    analyzeMutation.mutate(address);
+    mutation.mutate(address);
   };
 
-  const handleNewAnalysis = () => {
-    setAnalysis(null);
-    setCurrentTokenAddress(null);
-    analyzeMutation.reset();
+  const getRiskColor = (score: number) => {
+    if (score >= 80) return "text-red-500";
+    if (score >= 60) return "text-orange-500";
+    if (score >= 40) return "text-yellow-500";
+    return "text-green-500";
   };
 
-  // Auto-refresh every 5 minutes (300,000 ms) when token is analyzed
-  useEffect(() => {
-    if (!currentTokenAddress || !analysis) return;
-
-    const refreshInterval = setInterval(() => {
-      console.log(`Auto-refreshing analysis for ${currentTokenAddress}`);
-      analyzeMutation.mutate(currentTokenAddress);
-    }, 300000); // 5 minutes
-
-    return () => clearInterval(refreshInterval);
-  }, [currentTokenAddress, analysis]);
-
-  const isLoading = analyzeMutation.isPending;
-  const error = analyzeMutation.error;
+  const getRiskBadge = (score: number) => {
+    if (score >= 80) return <Badge variant="destructive">EXTREME RISK</Badge>;
+    if (score >= 60) return <Badge variant="destructive" className="bg-orange-500">HIGH RISK</Badge>;
+    if (score >= 40) return <Badge variant="outline" className="border-yellow-500 text-yellow-500">MODERATE RISK</Badge>;
+    return <Badge variant="outline" className="border-green-500 text-green-500">LOW RISK</Badge>;
+  };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <Header onNewAnalysis={analysis ? handleNewAnalysis : undefined} />
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+      <Header />
       
-      <main className="flex-1 relative">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
-          <div className="space-y-6 sm:space-y-8">
-            {!analysis && (
-              <>
-                <div className="text-center space-y-4 sm:space-y-6 py-8 sm:py-12 lg:py-16">
-                  <div className="space-y-3">
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">Rug Killer Alpha Bot</h1>
-                    <p className="text-base sm:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
-                      Made by trenchers, for trenchers.
-                    </p>
-                  </div>
-                </div>
-                <MascotSpotlight />
-              </>
-            )}
-
-            <div id="token-input" className="scroll-mt-32">
-              <TokenInput onAnalyze={handleAnalyze} isAnalyzing={isLoading} />
-            </div>
-
-            {/* BubbleMaps - Positioned directly below token input for better visibility */}
-            {analysis && (
-              <Suspense fallback={<ComponentLoader />}>
-                <BubbleMapsCard tokenAddress={analysis.tokenAddress} />
-              </Suspense>
-            )}
-
-            {isLoading && (
-              <div className="space-y-6">
-                <Card className="p-8">
-                  <div className="flex flex-col items-center space-y-4">
-                    <Skeleton className="h-24 w-24 rounded-full" />
-                    <Skeleton className="h-16 w-32" />
-                    <Skeleton className="h-4 w-48" />
-                  </div>
-                </Card>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2 space-y-6">
-                    <Skeleton className="h-48" />
-                    <Skeleton className="h-96" />
-                  </div>
-                  <div className="space-y-6">
-                    <Skeleton className="h-64" />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <Card className="p-6 border-destructive">
-                <p className="text-destructive font-semibold">Analysis Failed</p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  {error instanceof Error ? error.message : "Failed to analyze token. Please try again."}
-                </p>
-              </Card>
-            )}
-
-            {analysis && (
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-2 max-w-md">
-                  <TabsTrigger value="analysis" data-testid="tab-analysis">Analysis</TabsTrigger>
-                  <TabsTrigger value="community" data-testid="tab-community">Community</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="analysis" className="space-y-6">
-                  {/* Token Header - Compact Info */}
-                  <Suspense fallback={<ComponentLoader />}>
-                    <CondensedTokenHeader analysis={analysis} />
-                  </Suspense>
-
-                  {/* NEW: Cascading Analysis Bars - Primary Results */}
-                  <Suspense fallback={<ComponentLoader />}>
-                    <CascadingAnalysisBars analysis={analysis} />
-                  </Suspense>
-
-                  {/* AI Models - TGN & ML Decision Tree */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Temporal GNN Analysis */}
-                    {analysis.tgnResult && (
-                      <Suspense fallback={<ComponentLoader />}>
-                        <TGNAnalysisCard 
-                          tgnResult={analysis.tgnResult}
-                          isPreMigration={analysis.isPreMigration}
-                          migrationDetected={analysis.migrationDetected}
-                          systemWalletsFiltered={analysis.systemWalletsFiltered}
-                        />
-                      </Suspense>
-                    )}
-
-                    {/* ML Decision Tree */}
-                    {(analysis as any).mlScore && (
-                      <Suspense fallback={<ComponentLoader />}>
-                        <MLAnalysisCard mlScore={(analysis as any).mlScore} />
-                      </Suspense>
-                    )}
-                  </div>
-
-                  {/* Detailed Charts Section - Collapsible/Below Bars */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-                    {/* Left Column - Detailed Analysis */}
-                    <div className="lg:col-span-2 space-y-4">
-                      {/* Aged Wallet Chart */}
-                      {analysis.agedWalletData && (
-                        <Suspense fallback={<ComponentLoader />}>
-                          <AgedWalletDetectionCard data={analysis.agedWalletData} />
-                        </Suspense>
-                      )}
-
-                      {/* Honeypot Detection Card */}
-                      {analysis.honeypotDetection && (
-                        <Suspense fallback={<ComponentLoader />}>
-                          <HoneypotCard data={analysis.honeypotDetection} />
-                        </Suspense>
-                      )}
-
-                      {/* Funding Analysis */}
-                      {analysis.fundingAnalysis && (
-                        <Suspense fallback={<ComponentLoader />}>
-                          <FundingAnalysisCard fundingData={analysis.fundingAnalysis} />
-                        </Suspense>
-                      )}
-
-                      {/* Holder Analysis */}
-                      {analysis.holderFiltering && analysis.holderFiltering.totals.total > 0 && (
-                        <div className="space-y-4">
-                          <Suspense fallback={<ComponentLoader />}>
-                            <BundleVisualizationChart 
-                              filtering={analysis.holderFiltering}
-                              totalHolders={analysis.holderCount || 0}
-                            />
-                          </Suspense>
-                          <Suspense fallback={<ComponentLoader />}>
-                            <HolderFilteringCard filtering={analysis.holderFiltering} />
-                          </Suspense>
-                        </div>
-                      )}
-
-                      {/* Holder Distribution Chart */}
-                      {analysis.topHolders && analysis.topHolders.length > 0 && (
-                        <Suspense fallback={<ComponentLoader />}>
-                          <HolderDistributionChart
-                            holders={analysis.topHolders}
-                            totalConcentration={analysis.topHolderConcentration || 0}
-                          />
-                        </Suspense>
-                      )}
-                    </div>
-                    
-                    {/* Right Column - Compact Sidebar */}
-                    <div className="space-y-4">
-                      {/* Token Metadata */}
-                      <Suspense fallback={<ComponentLoader />}>
-                        <TokenMetadataCard 
-                          metadata={analysis.metadata}
-                          tokenAddress={analysis.tokenAddress}
-                          creationDate={analysis.creationDate}
-                        />
-                      </Suspense>
-
-                      {/* Top Holders */}
-                      {analysis.topHolders && analysis.topHolders.length > 0 && (
-                        <Suspense fallback={<ComponentLoader />}>
-                          <TopHoldersTable 
-                            holders={analysis.topHolders}
-                          />
-                        </Suspense>
-                      )}
-
-                      {/* Recent Transactions */}
-                      <Suspense fallback={<ComponentLoader />}>
-                        <TransactionTimeline transactions={analysis.recentTransactions || []} />
-                      </Suspense>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="community" className="space-y-6">
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Left Column - Community Verdict and Comments */}
-                    <div className="lg:col-span-2 space-y-6">
-                      {/* Community Vote Widget */}
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Community Verdict</CardTitle>
-                          <CardDescription>What do you think about this token?</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          {/* Vote Summary */}
-                          {voteSummaryLoading ? (
-                            <div className="flex items-center justify-center py-8">
-                              <Loader2 className="w-6 h-6 animate-spin" />
-                            </div>
-                          ) : voteSummary && Number(voteSummary.totalVotes) > 0 ? (
-                            <div className="space-y-3">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">Community Consensus:</span>
-                                <Badge variant={
-                                  voteSummary.consensus === "safe" ? "default" :
-                                  voteSummary.consensus === "risky" ? "secondary" :
-                                  "destructive"
-                                }>
-                                  {voteSummary.consensus?.toUpperCase() || "MIXED"}
-                                </Badge>
-                              </div>
-                              <div className="space-y-2">
-                                {(() => {
-                                  const safeWeight = Number(voteSummary.safeWeight) || 0;
-                                  const riskyWeight = Number(voteSummary.riskyWeight) || 0;
-                                  const scamWeight = Number(voteSummary.scamWeight) || 0;
-                                  const totalWeight = safeWeight + riskyWeight + scamWeight;
-                                  
-                                  const safePercent = totalWeight > 0 ? ((safeWeight / totalWeight) * 100).toFixed(1) : '0.0';
-                                  const riskyPercent = totalWeight > 0 ? ((riskyWeight / totalWeight) * 100).toFixed(1) : '0.0';
-                                  const scamPercent = totalWeight > 0 ? ((scamWeight / totalWeight) * 100).toFixed(1) : '0.0';
-                                  
-                                  return (
-                                    <>
-                                      <div className="flex items-center justify-between text-sm">
-                                        <span className="text-green-500">Safe</span>
-                                        <span>{safePercent}%</span>
-                                      </div>
-                                      <div className="flex items-center justify-between text-sm">
-                                        <span className="text-amber-500">Risky</span>
-                                        <span>{riskyPercent}%</span>
-                                      </div>
-                                      <div className="flex items-center justify-between text-sm">
-                                        <span className="text-destructive">Scam</span>
-                                        <span>{scamPercent}%</span>
-                                      </div>
-                                    </>
-                                  );
-                                })()}
-                                <p className="text-xs text-muted-foreground mt-2">{Number(voteSummary.totalVotes)} votes</p>
-                              </div>
-                            </div>
-                          ) : (
-                            <p className="text-sm text-muted-foreground py-4">No votes yet. Be the first to vote!</p>
-                          )}
-
-                          {isAuthenticated ? (
-                            <>
-                              {userVote ? (
-                                <div className="p-4 bg-muted rounded-md">
-                                  <p className="text-sm">
-                                    You voted: <Badge>{userVote.voteType.toUpperCase()}</Badge> (Confidence: {Number(userVote.confidence)}/5)
-                                  </p>
-                                </div>
-                              ) : (
-                                <div className="space-y-4">
-                                  <div className="flex flex-wrap gap-2">
-                                    <Button
-                                      variant={selectedVoteType === "safe" ? "default" : "outline"}
-                                      onClick={() => setSelectedVoteType("safe")}
-                                      data-testid="button-vote-safe"
-                                      className="flex-1"
-                                    >
-                                      Safe
-                                    </Button>
-                                    <Button
-                                      variant={selectedVoteType === "risky" ? "default" : "outline"}
-                                      onClick={() => setSelectedVoteType("risky")}
-                                      data-testid="button-vote-risky"
-                                      className="flex-1"
-                                    >
-                                      Risky
-                                    </Button>
-                                    <Button
-                                      variant={selectedVoteType === "scam" ? "destructive" : "outline"}
-                                      onClick={() => setSelectedVoteType("scam")}
-                                      data-testid="button-vote-scam"
-                                      className="flex-1"
-                                    >
-                                      Scam
-                                    </Button>
-                                  </div>
-
-                                  {selectedVoteType && (
-                                    <div className="space-y-3">
-                                      <div>
-                                        <Label htmlFor="confidence-slider">Confidence: {voteConfidence[0]}/5</Label>
-                                        <Slider
-                                          id="confidence-slider"
-                                          min={1}
-                                          max={5}
-                                          step={1}
-                                          value={voteConfidence}
-                                          onValueChange={setVoteConfidence}
-                                          data-testid="slider-confidence"
-                                          className="mt-2"
-                                        />
-                                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                          <span>Low</span>
-                                          <span>High</span>
-                                        </div>
-                                      </div>
-                                      <Button
-                                        onClick={() => submitVoteMutation.mutate({ voteType: selectedVoteType, confidence: voteConfidence[0] })}
-                                        disabled={submitVoteMutation.isPending}
-                                        data-testid="button-submit-vote"
-                                        className="w-full"
-                                      >
-                                        {submitVoteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                        Submit Vote
-                                      </Button>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <p className="text-sm text-muted-foreground">Sign in to vote</p>
-                          )}
-                        </CardContent>
-                      </Card>
-
-                      {/* Comments Section */}
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <MessageSquare className="w-5 h-5" />
-                            Community Comments
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                          {/* Comment Form */}
-                          {isAuthenticated && (
-                            <div className="space-y-4 pb-6 border-b">
-                              <div>
-                                <Label htmlFor="comment-rating">Your Rating (Optional)</Label>
-                                <div className="flex gap-1 mt-2">
-                                  {[1, 2, 3, 4, 5].map((rating) => (
-                                    <Button
-                                      key={rating}
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => setCommentRating(rating)}
-                                      data-testid={`select-comment-rating-${rating}`}
-                                    >
-                                      <Star
-                                        className={`w-5 h-5 ${rating <= commentRating ? "fill-primary text-primary" : "text-muted-foreground"}`}
-                                      />
-                                    </Button>
-                                  ))}
-                                </div>
-                              </div>
-                              <div>
-                                <Label htmlFor="comment-text">Your Comment</Label>
-                                <Textarea
-                                  id="comment-text"
-                                  placeholder="Share your thoughts about this token..."
-                                  value={commentText}
-                                  onChange={(e) => setCommentText(e.target.value)}
-                                  data-testid="input-comment-text"
-                                  className="mt-2"
-                                  rows={3}
-                                />
-                              </div>
-                              <Button
-                                onClick={() => submitCommentMutation.mutate({ commentText, rating: commentRating })}
-                                disabled={!commentText.trim() || submitCommentMutation.isPending}
-                                data-testid="button-submit-comment"
-                              >
-                                {submitCommentMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                Post Comment
-                              </Button>
-                            </div>
-                          )}
-
-                          {/* Comments List */}
-                          {commentsLoading ? (
-                            <div className="flex items-center justify-center py-8">
-                              <Loader2 className="w-6 h-6 animate-spin" />
-                            </div>
-                          ) : !comments || comments.length === 0 ? (
-                            <div className="text-center py-8">
-                              <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
-                              <p className="text-muted-foreground">No comments yet. Be the first!</p>
-                            </div>
-                          ) : (
-                            <div className="space-y-4" data-testid="list-comments">
-                              {comments.map((comment) => (
-                                <div
-                                  key={comment.id}
-                                  className="p-4 bg-muted rounded-md space-y-2"
-                                  data-testid={`comment-${comment.id}`}
-                                >
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="flex items-center gap-2">
-                                      <Avatar className="w-8 h-8">
-                                        <AvatarFallback>{comment.userId.slice(0, 2).toUpperCase()}</AvatarFallback>
-                                      </Avatar>
-                                      <div>
-                                        <p className="text-sm font-medium">{comment.userId.slice(0, 8)}...</p>
-                                        <p className="text-xs text-muted-foreground">
-                                          {comment.createdAt ? formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true }) : "Just now"}
-                                        </p>
-                                      </div>
-                                    </div>
-                                    {comment.rating && (
-                                      <div className="flex gap-0.5">
-                                        {Array.from({ length: Number(comment.rating) }).map((_, i) => (
-                                          <Star key={i} className="w-3 h-3 fill-primary text-primary" />
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                  <p className="text-sm">{comment.commentText}</p>
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => voteCommentMutation.mutate({ commentId: comment.id, voteType: "up" })}
-                                      disabled={voteCommentMutation.isPending}
-                                      data-testid={`button-upvote-${comment.id}`}
-                                    >
-                                      <ThumbsUp className="w-3 h-3 mr-1" />
-                                      {Number(comment.upvoteCount || 0)}
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => voteCommentMutation.mutate({ commentId: comment.id, voteType: "down" })}
-                                      disabled={voteCommentMutation.isPending}
-                                      data-testid={`button-downvote-${comment.id}`}
-                                    >
-                                      <ThumbsDown className="w-3 h-3 mr-1" />
-                                      {Number(comment.downvoteCount || 0)}
-                                    </Button>
-                                    {isAuthenticated && (
-                                      <>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => flagCommentMutation.mutate(comment.id)}
-                                          disabled={flagCommentMutation.isPending}
-                                          data-testid={`button-flag-${comment.id}`}
-                                        >
-                                          <Flag className="w-3 h-3" />
-                                        </Button>
-                                        {comment.userId === user?.id && (
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => deleteCommentMutation.mutate(comment.id)}
-                                            disabled={deleteCommentMutation.isPending}
-                                            data-testid={`button-delete-${comment.id}`}
-                                          >
-                                            <Trash2 className="w-3 h-3 text-destructive" />
-                                          </Button>
-                                        )}
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Right Column - Share and Report */}
-                    <div className="space-y-6">
-                      {/* Share Analysis */}
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <Share2 className="w-5 h-5" />
-                            Share Analysis
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                          <Button
-                            variant="outline"
-                            className="w-full justify-start"
-                            onClick={handleShareTwitter}
-                            data-testid="button-share-twitter"
-                          >
-                            <Twitter className="w-4 h-4 mr-2" />
-                            Share on Twitter
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-start"
-                            onClick={handleShareTelegram}
-                            data-testid="button-share-telegram"
-                          >
-                            <Send className="w-4 h-4 mr-2" />
-                            Share on Telegram
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-start"
-                            onClick={handleCopyLink}
-                            data-testid="button-copy-link"
-                          >
-                            <Copy className="w-4 h-4 mr-2" />
-                            Copy Link
-                          </Button>
-                        </CardContent>
-                      </Card>
-
-                      {/* Report Token */}
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <AlertTriangle className="w-5 h-5" />
-                            Report Issues
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <Dialog open={reportModalOpen} onOpenChange={setReportModalOpen}>
-                            <DialogTrigger asChild>
-                              <Button variant="destructive" className="w-full" data-testid="button-report-token">
-                                Report This Token
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent data-testid="modal-report">
-                              <DialogHeader>
-                                <DialogTitle>Report Token</DialogTitle>
-                                <DialogDescription>
-                                  Help protect the community by reporting suspicious activity
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                <div>
-                                  <Label htmlFor="report-type">Report Type</Label>
-                                  <Select value={reportType} onValueChange={setReportType}>
-                                    <SelectTrigger id="report-type" data-testid="select-report-type">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="scam">Scam</SelectItem>
-                                      <SelectItem value="honeypot">Honeypot</SelectItem>
-                                      <SelectItem value="soft_rug">Soft Rug</SelectItem>
-                                      <SelectItem value="other">Other</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div>
-                                  <Label htmlFor="evidence">Evidence/Details</Label>
-                                  <Textarea
-                                    id="evidence"
-                                    placeholder="Provide details about why you're reporting this token..."
-                                    value={reportEvidence}
-                                    onChange={(e) => setReportEvidence(e.target.value)}
-                                    data-testid="input-evidence"
-                                    rows={4}
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor="severity">Severity: {reportSeverity[0]}/5</Label>
-                                  <Slider
-                                    id="severity"
-                                    min={1}
-                                    max={5}
-                                    step={1}
-                                    value={reportSeverity}
-                                    onValueChange={setReportSeverity}
-                                    data-testid="slider-severity"
-                                    className="mt-2"
-                                  />
-                                </div>
-                              </div>
-                              <DialogFooter>
-                                <Button variant="outline" onClick={() => setReportModalOpen(false)}>
-                                  Cancel
-                                </Button>
-                                <Button
-                                  variant="destructive"
-                                  onClick={() => submitReportMutation.mutate()}
-                                  disabled={!reportEvidence.trim() || submitReportMutation.isPending}
-                                  data-testid="button-submit-report"
-                                >
-                                  {submitReportMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                  Submit Report
-                                </Button>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
-            )}
+      <main className="container mx-auto px-4 py-8">
+        {/* Hero Section */}
+        <div className="text-center mb-12">
+          <MascotSpotlight />
+          <h1 className="text-5xl font-bold text-white mb-4">
+            Rug Killer Alpha Bot
+          </h1>
+          <p className="text-xl text-gray-400 mb-8">
+            Advanced Solana token analysis powered by AI and machine learning
+          </p>
+          
+          {/* Token Input */}
+          <div className="max-w-2xl mx-auto">
+            <TokenInput 
+              onAnalyze={handleAnalyze}
+              isLoading={mutation.isPending}
+            />
           </div>
         </div>
-      </main>
 
-      {/* TELEGRAM & DISCORD BOT LINKS - BOTTOM CORNER AS REQUESTED MULTIPLE TIMES! */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <div className="flex flex-col gap-3">
-          <a
-            href={TELEGRAM_BOT_LINK}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition-all hover:scale-105 group"
-            title="Rug Killer Telegram Bot"
-            aria-label="Open Rug Killer Telegram Bot in a new tab"
-          >
-            <Send className="h-6 w-6" />
-            <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-2 py-1 rounded text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-              Telegram Bot
-            </span>
-          </a>
-          <a
-            href={DISCORD_SERVER_LINK}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-purple-500 hover:bg-purple-600 text-white p-3 rounded-full shadow-lg transition-all hover:scale-105 group"
-            title="Rug Killer Discord Bot"
-            aria-label="Open Rug Killer Discord bot invite in a new tab"
-          >
-            <MessageCircle className="h-6 w-6" />
-            <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-2 py-1 rounded text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-              Discord Bot
-            </span>
-          </a>
-        </div>
-      </div>
+        {/* Analysis Results */}
+        {analysis && (
+          <div className="space-y-6">
+            {/* Risk Score Header */}
+            <Card className="bg-gray-900 border-gray-800">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-2xl text-white">
+                      {analysis.tokenInfo?.symbol || "Token"} Analysis
+                    </CardTitle>
+                    <CardDescription className="text-gray-400">
+                      {analysis.tokenInfo?.name || "Unknown Token"}
+                    </CardDescription>
+                  </div>
+                  <div className="text-right">
+                    <div className={`text-4xl font-bold ${getRiskColor(analysis.riskScore)}`}>
+                      {analysis.riskScore}%
+                    </div>
+                    {getRiskBadge(analysis.riskScore)}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="text-center p-4 bg-gray-800 rounded-lg">
+                    <Shield className="w-6 h-6 mx-auto mb-2 text-blue-500" />
+                    <div className="text-sm text-gray-400">Safety Score</div>
+                    <div className="text-xl font-bold text-white">
+                      {analysis.safetyScore ? `${analysis.safetyScore}%` : "N/A"}
+                    </div>
+                  </div>
+                  <div className="text-center p-4 bg-gray-800 rounded-lg">
+                    <TrendingUp className="w-6 h-6 mx-auto mb-2 text-green-500" />
+                    <div className="text-sm text-gray-400">Liquidity</div>
+                    <div className="text-xl font-bold text-white">
+                      ${analysis.dexscreener?.liquidity?.usd?.toLocaleString() || "0"}
+                    </div>
+                  </div>
+                  <div className="text-center p-4 bg-gray-800 rounded-lg">
+                    <Users className="w-6 h-6 mx-auto mb-2 text-purple-500" />
+                    <div className="text-sm text-gray-400">Holders</div>
+                    <div className="text-xl font-bold text-white">
+                      {analysis.holderCount || 0}
+                    </div>
+                  </div>
+                  <div className="text-center p-4 bg-gray-800 rounded-lg">
+                    <Zap className="w-6 h-6 mx-auto mb-2 text-yellow-500" />
+                    <div className="text-sm text-gray-400">Market Cap</div>
+                    <div className="text-xl font-bold text-white">
+                      ${analysis.dexscreener?.marketCap?.toLocaleString() || "0"}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Critical Alerts */}
+            {analysis.alerts && analysis.alerts.length > 0 && (
+              <CriticalAlerts alerts={analysis.alerts} />
+            )}
+
+            {/* Risk Factors */}
+            <Card className="bg-gray-900 border-gray-800">
+              <CardHeader>
+                <CardTitle className="text-white">Risk Analysis</CardTitle>
+                <CardDescription className="text-gray-400">
+                  Detailed breakdown of risk factors
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Holder Concentration */}
+                  <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      {analysis.topHolderConcentration && analysis.topHolderConcentration > 50 ? (
+                        <XCircle className="w-5 h-5 text-red-500" />
+                      ) : (
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      )}
+                      <div>
+                        <div className="text-white font-medium">Holder Concentration</div>
+                        <div className="text-sm text-gray-400">
+                          Top holders control {analysis.topHolderConcentration?.toFixed(1)}% of supply
+                        </div>
+                      </div>
+                    </div>
+                    <Badge variant={analysis.topHolderConcentration && analysis.topHolderConcentration > 50 ? "destructive" : "outline"}>
+                      {analysis.topHolderConcentration?.toFixed(1)}%
+                    </Badge>
+                  </div>
+
+                  {/* Liquidity Check */}
+                  <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      {analysis.dexscreener?.liquidity?.usd && analysis.dexscreener.liquidity.usd > 5000 ? (
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      ) : (
+                        <AlertCircle className="w-5 h-5 text-yellow-500" />
+                      )}
+                      <div>
+                        <div className="text-white font-medium">Liquidity Status</div>
+                        <div className="text-sm text-gray-400">
+                          {analysis.dexscreener?.liquidity?.usd 
+                            ? `$${analysis.dexscreener.liquidity.usd.toLocaleString()} liquidity available`
+                            : "No liquidity data available"}
+                        </div>
+                      </div>
+                    </div>
+                    <Badge variant={analysis.dexscreener?.liquidity?.usd && analysis.dexscreener.liquidity.usd > 5000 ? "outline" : "destructive"}>
+                      {analysis.dexscreener?.liquidity?.usd ? "Adequate" : "Low"}
+                    </Badge>
+                  </div>
+
+                  {/* Bundle Detection */}
+                  {analysis.bundleDetection && (
+                    <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        {analysis.bundleDetection.detected ? (
+                          <AlertTriangle className="w-5 h-5 text-red-500" />
+                        ) : (
+                          <CheckCircle className="w-5 h-5 text-green-500" />
+                        )}
+                        <div>
+                          <div className="text-white font-medium">Bundle Detection</div>
+                          <div className="text-sm text-gray-400">
+                            {analysis.bundleDetection.detected 
+                              ? `${analysis.bundleDetection.suspiciousWallets} suspicious wallets detected`
+                              : "No suspicious bundle activity detected"}
+                          </div>
+                        </div>
+                      </div>
+                      <Badge variant={analysis.bundleDetection.detected ? "destructive" : "outline"}>
+                        {analysis.bundleDetection.detected ? "DETECTED" : "CLEAN"}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Honeypot Check */}
+                  {analysis.honeypotData && (
+                    <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        {analysis.honeypotData.isHoneypot ? (
+                          <XCircle className="w-5 h-5 text-red-500" />
+                        ) : (
+                          <CheckCircle className="w-5 h-5 text-green-500" />
+                        )}
+                        <div>
+                          <div className="text-white font-medium">Honeypot Check</div>
+                          <div className="text-sm text-gray-400">
+                            {analysis.honeypotData.isHoneypot 
+                              ? "This token appears to be a honeypot"
+                              : "No honeypot indicators detected"}
+                          </div>
+                        </div>
+                      </div>
+                      <Badge variant={analysis.honeypotData.isHoneypot ? "destructive" : "outline"}>
+                        {analysis.honeypotData.isHoneypot ? "HONEYPOT" : "SAFE"}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Token Information */}
+            {analysis.tokenInfo && (
+              <Card className="bg-gray-900 border-gray-800">
+                <CardHeader>
+                  <CardTitle className="text-white">Token Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-sm text-gray-400">Name</div>
+                      <div className="text-white font-medium">{analysis.tokenInfo.name}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-400">Symbol</div>
+                      <div className="text-white font-medium">{analysis.tokenInfo.symbol}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-400">Total Supply</div>
+                      <div className="text-white font-medium">
+                        {analysis.tokenInfo.supply ? analysis.tokenInfo.supply.toLocaleString() : "N/A"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-400">Decimals</div>
+                      <div className="text-white font-medium">{analysis.tokenInfo.decimals || "N/A"}</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* No Analysis State */}
+        {!analysis && !mutation.isPending && (
+          <div className="text-center py-16">
+            <Shield className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+            <h3 className="text-xl font-semibold text-gray-400 mb-2">
+              Ready to Analyze
+            </h3>
+            <p className="text-gray-500">
+              Enter a Solana token address above to start the analysis
+            </p>
+          </div>
+        )}
+      </main>
 
       <Footer />
     </div>
