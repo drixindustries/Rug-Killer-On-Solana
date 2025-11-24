@@ -6,16 +6,18 @@
  * - Update wallet performance metrics
  * - Aggregate wallets from external sources
  * - Clean up inactive/low-performing wallets
+ * - Refresh stats for alpha alert wallets
  */
 
 import { getWalletDiscoveryService } from './services/wallet-discovery';
 import { getExternalWalletService } from './services/external-wallet-sources';
 import { db } from './db';
-import { kolWallets } from '../shared/schema';
+import { kolWallets, smartWallets } from '../shared/schema';
 import { and, eq, or, lt, lte } from 'drizzle-orm';
 
 export class WalletDiscoveryScheduler {
   private discoveryInterval: NodeJS.Timeout | null = null;
+  private statsRefreshInterval: NodeJS.Timeout | null = null;
   private isRunning = false;
 
   /**
@@ -30,13 +32,23 @@ export class WalletDiscoveryScheduler {
     this.isRunning = true;
     console.log('[Wallet Scheduler] Starting wallet discovery scheduler...');
 
-    // Run immediately on startup
+    // Run discovery immediately on startup
     this.runDiscoveryJob().catch(console.error);
 
-    // Then run every 6 hours
+    // Run discovery every 6 hours
     this.discoveryInterval = setInterval(() => {
       this.runDiscoveryJob().catch(console.error);
     }, 6 * 60 * 60 * 1000);
+
+    // Refresh alpha wallet stats every hour
+    this.statsRefreshInterval = setInterval(() => {
+      this.refreshAlphaWalletStats().catch(console.error);
+    }, 60 * 60 * 1000);
+
+    // Also run stats refresh immediately (after 5 min delay to let system stabilize)
+    setTimeout(() => {
+      this.refreshAlphaWalletStats().catch(console.error);
+    }, 5 * 60 * 1000);
   }
 
   /**
@@ -48,6 +60,11 @@ export class WalletDiscoveryScheduler {
     if (this.discoveryInterval) {
       clearInterval(this.discoveryInterval);
       this.discoveryInterval = null;
+    }
+
+    if (this.statsRefreshInterval) {
+      clearInterval(this.statsRefreshInterval);
+      this.statsRefreshInterval = null;
     }
 
     console.log('[Wallet Scheduler] Stopped');
@@ -136,6 +153,59 @@ export class WalletDiscoveryScheduler {
   }
 
   /**
+   * Refresh stats for all active alpha alert wallets
+   * Runs every hour to keep win rates up-to-date
+   */
+  private async refreshAlphaWalletStats(): Promise<void> {
+    console.log('[Wallet Scheduler] Refreshing alpha wallet stats...');
+    const startTime = Date.now();
+
+    try {
+      // Get all active wallets from smartWallets table
+      const activeWallets = await db
+        .select()
+        .from(smartWallets)
+        .where(eq(smartWallets.isActive, true));
+
+      console.log(`[Wallet Scheduler] Found ${activeWallets.length} active wallets to refresh`);
+
+      const discoveryService = getWalletDiscoveryService();
+      let refreshed = 0;
+      let failed = 0;
+
+      for (const wallet of activeWallets) {
+        try {
+          // Calculate fresh performance stats
+          const performance = await discoveryService.analyzeWalletPerformance(wallet.walletAddress);
+          
+          // Update database with fresh stats
+          await db.update(smartWallets)
+            .set({
+              profitSol: performance.profitSol.toFixed(9),
+              wins: performance.wins,
+              losses: performance.losses,
+              winRate: Math.round(performance.winRate * 100),
+              lastActiveAt: performance.lastActiveAt,
+              updatedAt: new Date(),
+            })
+            .where(eq(smartWallets.id, wallet.id));
+
+          refreshed++;
+          console.log(`[Wallet Scheduler] ✓ ${wallet.displayName}: ${Math.round(performance.winRate * 100)}% WR (${performance.wins}W/${performance.losses}L)`);
+        } catch (err) {
+          failed++;
+          console.warn(`[Wallet Scheduler] ✗ Failed to refresh ${wallet.displayName}:`, err);
+        }
+      }
+
+      const duration = Date.now() - startTime;
+      console.log(`[Wallet Scheduler] Stats refresh complete: ${refreshed} success, ${failed} failed (${duration}ms)`);
+    } catch (error) {
+      console.error('[Wallet Scheduler] Stats refresh error:', error);
+    }
+  }
+
+  /**
    * Recalculate influence scores based on recent performance
    */
   private async updateInfluenceScores(): Promise<void> {
@@ -173,7 +243,8 @@ export class WalletDiscoveryScheduler {
   getStatus() {
     return {
       isRunning: this.isRunning,
-      nextRun: this.discoveryInterval ? 'Every 6 hours' : 'Not scheduled',
+      discoveryInterval: this.discoveryInterval ? 'Every 6 hours' : 'Not scheduled',
+      statsRefreshInterval: this.statsRefreshInterval ? 'Every hour' : 'Not scheduled',
     };
   }
 }

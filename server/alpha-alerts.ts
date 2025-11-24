@@ -10,6 +10,7 @@ import { rpcBalancer } from './services/rpc-balancer.js';
 import { TemporalGNNDetector, type TGNResult } from './temporal-gnn-detector.js';
 import { MigrationDetector, getMigrationDetector, type MigrationEvent } from './migration-detector.js';
 import { HolderAnalysisService, type HolderAnalysisResult } from './services/holder-analysis.js';
+import { getWalletDiscoveryService } from './services/wallet-discovery.js';
 
 interface AlphaAlert {
   type: 'new_token' | 'whale_buy' | 'caller_signal';
@@ -887,7 +888,7 @@ export class AlphaAlertService {
       const walletInfo = caller ? `${caller.name} (${caller.wallet.slice(0, 8)}...)` : 'Unknown';
       console.log(`[Alpha Alerts] Checking token ${mint} from ${source} - Wallet: ${walletInfo}`);
       
-      // Fetch wallet PNL stats from database
+      // Fetch wallet PNL stats from database with on-demand calculation
       let walletStats = null;
       if (caller?.wallet) {
         try {
@@ -897,16 +898,59 @@ export class AlphaAlertService {
             .where(eq(smartWallets.walletAddress, caller.wallet))
             .limit(1);
           
-          if (wallet) {
+          if (wallet && wallet.winRate && wallet.winRate > 0) {
+            // Use cached stats if they exist and are valid
             walletStats = {
               profitSol: wallet.profitSol ? parseFloat(wallet.profitSol) : null,
               wins: wallet.wins || 0,
               losses: wallet.losses || 0,
               winRate: wallet.winRate || 0,
             };
+            console.log(`[Alpha Alerts] Using cached stats for ${caller.name}: ${wallet.winRate}% WR`);
+          } else {
+            // Calculate stats on-demand if not in DB or stale
+            console.log(`[Alpha Alerts] Calculating fresh stats for ${caller.name}...`);
+            const discoveryService = getWalletDiscoveryService();
+            const performance = await discoveryService.analyzeWalletPerformance(caller.wallet);
+            
+            walletStats = {
+              profitSol: performance.profitSol,
+              wins: performance.wins,
+              losses: performance.losses,
+              winRate: Math.round(performance.winRate * 100), // Convert to percentage
+            };
+            
+            // Cache the calculated stats in database
+            if (wallet) {
+              await db.update(smartWallets)
+                .set({
+                  profitSol: performance.profitSol.toFixed(9),
+                  wins: performance.wins,
+                  losses: performance.losses,
+                  winRate: Math.round(performance.winRate * 100),
+                  lastActiveAt: new Date(),
+                  updatedAt: new Date(),
+                })
+                .where(eq(smartWallets.walletAddress, caller.wallet));
+            } else {
+              await db.insert(smartWallets).values({
+                walletAddress: caller.wallet,
+                displayName: caller.name,
+                profitSol: performance.profitSol.toFixed(9),
+                wins: performance.wins,
+                losses: performance.losses,
+                winRate: Math.round(performance.winRate * 100),
+                influenceScore: caller.influenceScore || 50,
+                source: 'alpha-alerts',
+                isActive: true,
+                lastActiveAt: new Date(),
+              });
+            }
+            
+            console.log(`[Alpha Alerts] Calculated ${caller.name}: ${walletStats.winRate}% WR (${walletStats.wins}W/${walletStats.losses}L)`);
           }
         } catch (err) {
-          console.warn('[Alpha Alerts] Failed to fetch wallet stats:', err);
+          console.warn('[Alpha Alerts] Failed to fetch/calculate wallet stats:', err);
         }
       }
       
