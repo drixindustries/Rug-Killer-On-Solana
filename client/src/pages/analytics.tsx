@@ -545,7 +545,7 @@ export default function Analytics() {
                           <div>
                             <p className="text-xs text-muted-foreground">Total Analyzed</p>
                             <p className="text-xl font-bold" data-testid="text-7d-total">
-                              {Number(riskInsights.last7Days.totalAnalyzed).toLocaleString()}
+                              {(riskInsights.last7Days.totalAnalyzed ?? 0).toLocaleString()}
                             </p>
                           </div>
                           <div>
@@ -577,7 +577,7 @@ export default function Analytics() {
                           <div>
                             <p className="text-xs text-muted-foreground">Total Analyzed</p>
                             <p className="text-xl font-bold" data-testid="text-30d-total">
-                              {Number(riskInsights.last30Days.totalAnalyzed).toLocaleString()}
+                              {(riskInsights.last30Days.totalAnalyzed ?? 0).toLocaleString()}
                             </p>
                           </div>
                           <div>
@@ -750,7 +750,7 @@ export default function Analytics() {
                       <div>
                         <p className="text-sm text-muted-foreground">Coverage</p>
                         <p className="text-xl font-bold" data-testid="text-7d-coverage">
-                          {Number(performance.last7Days.coverage).toLocaleString()}
+                          {(performance.last7Days.coverage ?? 0).toLocaleString()}
                         </p>
                       </div>
                       <div>
@@ -801,7 +801,7 @@ export default function Analytics() {
                       <div>
                         <p className="text-sm text-muted-foreground">Coverage</p>
                         <p className="text-xl font-bold" data-testid="text-30d-coverage">
-                          {Number(performance.last30Days.coverage).toLocaleString()}
+                          {(performance.last30Days.coverage ?? 0).toLocaleString()}
                         </p>
                       </div>
                       <div>

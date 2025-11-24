@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Copy, ShieldCheck, ShieldAlert, ShieldX, AlertTriangle, ExternalLink, Users, Coins, TrendingUp, Calendar, Droplet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { RiskLevel, TokenAnalysisResponse } from "@shared/schema";
+import { formatNumber as safeFormatNumber, formatCurrency, formatPercent, getNumber } from "@/lib/format";
 
 interface CondensedTokenHeaderProps {
   analysis: TokenAnalysisResponse;
@@ -40,7 +41,10 @@ export function CondensedTokenHeader({ analysis }: CondensedTokenHeaderProps) {
     }
   };
 
-  const formatNumber = (num: number, decimals: number = 0) => {
+  const formatNumber = (num: number | null | undefined, decimals: number = 0) => {
+    if (num === null || num === undefined || isNaN(num)) {
+      return "0";
+    }
     const actualValue = num / Math.pow(10, decimals);
     if (actualValue >= 1e9) return `${(actualValue / 1e9).toFixed(2)}B`;
     if (actualValue >= 1e6) return `${(actualValue / 1e6).toFixed(2)}M`;
@@ -127,7 +131,7 @@ export function CondensedTokenHeader({ analysis }: CondensedTokenHeaderProps) {
             rel="noopener noreferrer"
             className="text-lg font-semibold hover:text-primary transition-colors inline-flex items-center gap-1"
           >
-            {analysis.holderCount.toLocaleString()}
+            {safeFormatNumber(analysis.holderCount)}
             <ExternalLink className="h-3 w-3" />
           </a>
         </div>
