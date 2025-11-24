@@ -201,8 +201,9 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   const holderCountText = holderCount.toLocaleString();
   
   let holders = `👥 **Holders**\n`;
-  holders += `${holderCountText} holders • Top 10: ${topHolderConc.toFixed(1)}% • Snipers: ${sniperPct.toFixed(0)}%\n`;
-  holders += `${devBoughtPct > 0 ? '⚠️' : '✅'} Dev bought: ${devBoughtPct.toFixed(0)}% • ${bundledClusters > 0 ? '📦' : '✅'} Bundles: ${bundledClusters} • 👴 Aged: ${agedWalletCount}`;
+  holders += `[${holderCountText} holders](https://solscan.io/token/${analysis.tokenAddress}#holders) • Top 10: ${topHolderConc.toFixed(1)}% • Snipers: ${sniperPct.toFixed(0)}%\n`;
+  holders += `${devBoughtPct > 0 ? '⚠️' : '✅'} Dev bought: ${devBoughtPct.toFixed(0)}% • ${bundledClusters > 0 ? '📦' : '✅'} Bundles: ${bundledClusters} • 👴 Aged: ${agedWalletCount}\n`;
+  holders += `🔗 [View Top 20](https://solscan.io/token/${analysis.tokenAddress}#holders)`;
   
   // TEMPORAL GNN ANALYSIS
   let tgnAnalysis: string | undefined;
