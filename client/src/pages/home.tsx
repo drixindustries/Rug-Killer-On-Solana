@@ -13,6 +13,21 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, Shield, TrendingUp, Users, Zap, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import type { TokenAnalysisResponse } from "@shared/schema";
 import { MascotSpotlight } from "@/components/mascot-spotlight";
+import MetricsGrid from "@/components/metrics-grid";
+import TopHoldersTable from "@/components/top-holders-table";
+import TokenMetadataCard from "@/components/token-metadata-card";
+import RugcheckCard from "@/components/rugcheck-card";
+import GoPlusCard from "@/components/goplus-card";
+import MarketDataCard from "@/components/market-data-card";
+import LiquidityBurnCard from "@/components/liquidity-burn-card";
+import HoneypotCard from "@/components/honeypot-card";
+import BundleDetectionCard from "@/components/bundle-detection-card";
+import NetworkAnalysisCard from "@/components/network-analysis-card";
+import WhaleDetectionCard from "@/components/whale-detection-card";
+import AgedWalletDetectionCard from "@/components/aged-wallet-detection-card";
+import FundingAnalysisCard from "@/components/funding-analysis-card";
+import TGNAnalysisCard from "@/components/tgn-analysis-card";
+import MLAnalysisCard from "@/components/ml-analysis-card";
 
 export default function Home() {
   const { toast } = useToast();
@@ -91,197 +106,84 @@ export default function Home() {
         {/* Analysis Results */}
         {analysis && (
           <div className="space-y-6">
-            {/* Risk Score Header */}
-            <Card className="bg-gray-900 border-gray-800">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-2xl text-white">
-                      {analysis.tokenInfo?.symbol || "Token"} Analysis
-                    </CardTitle>
-                    <CardDescription className="text-gray-400">
-                      {analysis.tokenInfo?.name || "Unknown Token"}
-                    </CardDescription>
-                  </div>
-                  <div className="text-right">
-                    <div className={`text-4xl font-bold ${getRiskColor(analysis.riskScore)}`}>
-                      {analysis.riskScore}%
-                    </div>
-                    {getRiskBadge(analysis.riskScore)}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="text-center p-4 bg-gray-800 rounded-lg">
-                    <Shield className="w-6 h-6 mx-auto mb-2 text-blue-500" />
-                    <div className="text-sm text-gray-400">Safety Score</div>
-                    <div className="text-xl font-bold text-white">
-                      {analysis.safetyScore ? `${analysis.safetyScore}%` : "N/A"}
-                    </div>
-                  </div>
-                  <div className="text-center p-4 bg-gray-800 rounded-lg">
-                    <TrendingUp className="w-6 h-6 mx-auto mb-2 text-green-500" />
-                    <div className="text-sm text-gray-400">Liquidity</div>
-                    <div className="text-xl font-bold text-white">
-                      ${analysis.dexscreener?.liquidity?.usd?.toLocaleString() || "0"}
-                    </div>
-                  </div>
-                  <div className="text-center p-4 bg-gray-800 rounded-lg">
-                    <Users className="w-6 h-6 mx-auto mb-2 text-purple-500" />
-                    <div className="text-sm text-gray-400">Holders</div>
-                    <div className="text-xl font-bold text-white">
-                      {analysis.holderCount || 0}
-                    </div>
-                  </div>
-                  <div className="text-center p-4 bg-gray-800 rounded-lg">
-                    <Zap className="w-6 h-6 mx-auto mb-2 text-yellow-500" />
-                    <div className="text-sm text-gray-400">Market Cap</div>
-                    <div className="text-xl font-bold text-white">
-                      ${analysis.dexscreener?.marketCap?.toLocaleString() || "0"}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Risk Score Card */}
+            <RiskScoreCard analysis={analysis} />
 
             {/* Critical Alerts */}
             {analysis.alerts && analysis.alerts.length > 0 && (
               <CriticalAlerts alerts={analysis.alerts} />
             )}
 
-            {/* Risk Factors */}
-            <Card className="bg-gray-900 border-gray-800">
-              <CardHeader>
-                <CardTitle className="text-white">Risk Analysis</CardTitle>
-                <CardDescription className="text-gray-400">
-                  Detailed breakdown of risk factors
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Holder Concentration */}
-                  <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      {analysis.topHolderConcentration && analysis.topHolderConcentration > 50 ? (
-                        <XCircle className="w-5 h-5 text-red-500" />
-                      ) : (
-                        <CheckCircle className="w-5 h-5 text-green-500" />
-                      )}
-                      <div>
-                        <div className="text-white font-medium">Holder Concentration</div>
-                        <div className="text-sm text-gray-400">
-                          Top holders control {analysis.topHolderConcentration?.toFixed(1)}% of supply
-                        </div>
-                      </div>
-                    </div>
-                    <Badge variant={analysis.topHolderConcentration && analysis.topHolderConcentration > 50 ? "destructive" : "outline"}>
-                      {analysis.topHolderConcentration?.toFixed(1)}%
-                    </Badge>
-                  </div>
+            {/* Metrics Grid */}
+            <MetricsGrid analysis={analysis} />
 
-                  {/* Liquidity Check */}
-                  <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      {analysis.dexscreener?.liquidity?.usd && analysis.dexscreener.liquidity.usd > 5000 ? (
-                        <CheckCircle className="w-5 h-5 text-green-500" />
-                      ) : (
-                        <AlertCircle className="w-5 h-5 text-yellow-500" />
-                      )}
-                      <div>
-                        <div className="text-white font-medium">Liquidity Status</div>
-                        <div className="text-sm text-gray-400">
-                          {analysis.dexscreener?.liquidity?.usd 
-                            ? `$${analysis.dexscreener.liquidity.usd.toLocaleString()} liquidity available`
-                            : "No liquidity data available"}
-                        </div>
-                      </div>
-                    </div>
-                    <Badge variant={analysis.dexscreener?.liquidity?.usd && analysis.dexscreener.liquidity.usd > 5000 ? "outline" : "destructive"}>
-                      {analysis.dexscreener?.liquidity?.usd ? "Adequate" : "Low"}
-                    </Badge>
-                  </div>
+            {/* AI/ML Analysis Cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {analysis.tgnAnalysis && (
+                <TGNAnalysisCard data={analysis.tgnAnalysis} />
+              )}
+              {analysis.mlPrediction && (
+                <MLAnalysisCard data={analysis.mlPrediction} />
+              )}
+            </div>
 
-                  {/* Bundle Detection */}
-                  {analysis.bundleDetection && (
-                    <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        {analysis.bundleDetection.detected ? (
-                          <AlertTriangle className="w-5 h-5 text-red-500" />
-                        ) : (
-                          <CheckCircle className="w-5 h-5 text-green-500" />
-                        )}
-                        <div>
-                          <div className="text-white font-medium">Bundle Detection</div>
-                          <div className="text-sm text-gray-400">
-                            {analysis.bundleDetection.detected 
-                              ? `${analysis.bundleDetection.suspiciousWallets} suspicious wallets detected`
-                              : "No suspicious bundle activity detected"}
-                          </div>
-                        </div>
-                      </div>
-                      <Badge variant={analysis.bundleDetection.detected ? "destructive" : "outline"}>
-                        {analysis.bundleDetection.detected ? "DETECTED" : "CLEAN"}
-                      </Badge>
-                    </div>
-                  )}
+            {/* Advanced Detection Cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {analysis.bundleDetection && (
+                <BundleDetectionCard data={analysis.bundleDetection} />
+              )}
+              {analysis.networkAnalysis && (
+                <NetworkAnalysisCard data={analysis.networkAnalysis} />
+              )}
+              {analysis.whaleDetection && (
+                <WhaleDetectionCard data={analysis.whaleDetection} />
+              )}
+              {analysis.agedWalletDetection && (
+                <AgedWalletDetectionCard data={analysis.agedWalletDetection} />
+              )}
+            </div>
 
-                  {/* Honeypot Check */}
-                  {analysis.honeypotData && (
-                    <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        {analysis.honeypotData.isHoneypot ? (
-                          <XCircle className="w-5 h-5 text-red-500" />
-                        ) : (
-                          <CheckCircle className="w-5 h-5 text-green-500" />
-                        )}
-                        <div>
-                          <div className="text-white font-medium">Honeypot Check</div>
-                          <div className="text-sm text-gray-400">
-                            {analysis.honeypotData.isHoneypot 
-                              ? "This token appears to be a honeypot"
-                              : "No honeypot indicators detected"}
-                          </div>
-                        </div>
-                      </div>
-                      <Badge variant={analysis.honeypotData.isHoneypot ? "destructive" : "outline"}>
-                        {analysis.honeypotData.isHoneypot ? "HONEYPOT" : "SAFE"}
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Funding Analysis */}
+            {analysis.fundingAnalysis && (
+              <FundingAnalysisCard data={analysis.fundingAnalysis} />
+            )}
 
-            {/* Token Information */}
-            {analysis.tokenInfo && (
-              <Card className="bg-gray-900 border-gray-800">
-                <CardHeader>
-                  <CardTitle className="text-white">Token Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-sm text-gray-400">Name</div>
-                      <div className="text-white font-medium">{analysis.tokenInfo.name}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-400">Symbol</div>
-                      <div className="text-white font-medium">{analysis.tokenInfo.symbol}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-400">Total Supply</div>
-                      <div className="text-white font-medium">
-                        {analysis.tokenInfo.supply ? analysis.tokenInfo.supply.toLocaleString() : "N/A"}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-400">Decimals</div>
-                      <div className="text-white font-medium">{analysis.tokenInfo.decimals || "N/A"}</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+            {/* Token Metadata & Market Data */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {analysis.tokenInfo && (
+                <TokenMetadataCard metadata={analysis.tokenInfo} />
+              )}
+              {analysis.dexscreener && (
+                <MarketDataCard data={analysis.dexscreener} />
+              )}
+            </div>
+
+            {/* Security Checks */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {analysis.honeypotData && (
+                <HoneypotCard data={analysis.honeypotData} />
+              )}
+              {analysis.liquidityPool && (
+                <LiquidityBurnCard data={analysis.liquidityPool} />
+              )}
+            </div>
+
+            {/* External Security Data */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {analysis.rugcheckData && (
+                <RugcheckCard data={analysis.rugcheckData} tokenAddress={analysis.tokenInfo?.address || ""} />
+              )}
+              {analysis.goPlusData && (
+                <GoPlusCard data={analysis.goPlusData} />
+              )}
+            </div>
+
+            {/* Top Holders */}
+            {analysis.topHolders && analysis.topHolders.length > 0 && (
+              <TopHoldersTable 
+                holders={analysis.topHolders}
+                totalSupply={analysis.tokenInfo?.supply || 0}
+              />
             )}
           </div>
         )}
