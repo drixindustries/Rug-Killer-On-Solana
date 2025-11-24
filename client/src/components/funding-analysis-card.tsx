@@ -8,7 +8,18 @@ interface FundingAnalysisCardProps {
 }
 
 export function FundingAnalysisCard({ fundingData }: FundingAnalysisCardProps) {
-  const { suspiciousFunding, totalSuspiciousPercentage, fundingSourceBreakdown, walletFunding, fundingPatterns } = fundingData;
+  // Add null checks and default values
+  if (!fundingData) {
+    return null;
+  }
+
+  const { 
+    suspiciousFunding = false, 
+    totalSuspiciousPercentage = 0, 
+    fundingSourceBreakdown = {}, 
+    walletFunding = [], 
+    fundingPatterns = [] 
+  } = fundingData || {};
 
   // Categorize sources
   const cexSources = ['Binance', 'Coinbase', 'OKX', 'Bybit'];

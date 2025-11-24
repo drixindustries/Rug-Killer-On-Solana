@@ -400,7 +400,8 @@ export class HolderAnalysisService {
 
       const totalSupplyRaw = Number(mintInfo.supply);
       const decimals = mintInfo.decimals;
-      const lookupCount = Math.min(200, validAccounts.length);
+      // Reduced from 200 to 50 to minimize RPC calls and avoid rate limits
+      const lookupCount = Math.min(50, validAccounts.length);
       const ownerLookup = await this.resolveTokenAccountOwners(
         connection,
         validAccounts.slice(0, lookupCount).map(acc => acc.address)
@@ -513,12 +514,32 @@ export class HolderAnalysisService {
       const mintInfo = await getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID)
         .catch(() => getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID));
 
-      const largestAccounts = await connection.getTokenLargestAccounts(mintPubkey, 'confirmed');
+      // Retry logic for getTokenLargestAccounts with rate limit handling
+      let largestAccounts;
+      let retries = 0;
+      const maxRetries = 2; // Reduced retries to fail faster
+      
+      while (retries <= maxRetries) {
+        try {
+          largestAccounts = await connection.getTokenLargestAccounts(mintPubkey, 'confirmed');
+          break; // Success, exit retry loop
+        } catch (error: any) {
+          if (error.message?.includes('429') && retries < maxRetries) {
+            retries++;
+            const delay = Math.min(1000 * retries, 2000); // Cap at 2 seconds
+            console.log(`[HolderAnalysis] Rate limited, retry ${retries}/${maxRetries} after ${delay}ms`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          } else {
+            throw error; // Give up after max retries or non-429 error
+          }
+        }
+      }
       const validAccounts = largestAccounts.value.filter(acc => Number(acc.amount) > 0);
 
       const totalSupplyRaw = Number(mintInfo.supply);
       const decimals = mintInfo.decimals;
-      const lookupCount = Math.min(200, validAccounts.length);
+      // Reduced from 200 to 50 to minimize RPC calls and avoid rate limits
+      const lookupCount = Math.min(50, validAccounts.length);
       const ownerLookup = await this.resolveTokenAccountOwners(
         connection,
         validAccounts.slice(0, lookupCount).map(acc => acc.address)
@@ -643,10 +664,16 @@ export class HolderAnalysisService {
       chunks.push(tokenAccounts.slice(i, i + chunkSize));
     }
 
-    // Fetch all chunks concurrently (max 10 concurrent to avoid overwhelming RPC)
-    const maxConcurrent = 10;
+    // Fetch all chunks with reduced concurrency to avoid rate limits (max 3 concurrent)
+    const maxConcurrent = 3; // Reduced from 10 to 3 to avoid 429 errors
     for (let i = 0; i < chunks.length; i += maxConcurrent) {
       const batchChunks = chunks.slice(i, i + maxConcurrent);
+      
+      // Add small delay between batches to respect rate limits
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
       const results = await Promise.all(
         batchChunks.map(chunk => 
           connection.getMultipleAccountsInfo(chunk, 'confirmed')

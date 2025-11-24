@@ -247,11 +247,15 @@ export class SolanaTokenAnalyzer {
         }
       }
       
-      // FUNDING SOURCE ANALYSIS - Detect coordinated funding & fresh wallets
-      if (holders && holders.top20Holders.length > 0 && !options.skipExternal) {
+      // FUNDING SOURCE ANALYSIS - TEMPORARILY DISABLED
+      // Skipping due to RPC rate limits on free endpoints causing timeouts
+      // Re-enable when premium RPC endpoints (Helius/QuickNode) are configured
+      if (false && holders && holders.top20Holders.length > 0 && !options.skipExternal) {
         try {
           console.log(`[Analyzer] Running funding source analysis...`);
-          const fundingResult = await fundingAnalyzer.analyzeFundingSources(
+          
+          // Add 10 second timeout to prevent hanging on rate limits
+          const fundingPromise = fundingAnalyzer.analyzeFundingSources(
             tokenMintAddress,
             holders.top20Holders.map(h => ({
               address: h.address,
@@ -263,20 +267,32 @@ export class SolanaTokenAnalyzer {
             }))
           );
           
-          response.fundingAnalysis = fundingResult;
+          const timeoutPromise = new Promise<any>((resolve) => 
+            setTimeout(() => {
+              console.log('[Analyzer] Funding analysis timeout - skipping');
+              resolve(null);
+            }, 10000)
+          );
           
-          if (fundingResult.suspiciousFunding) {
-            console.log(`[Analyzer] 🚨 SUSPICIOUS FUNDING DETECTED:`);
-            console.log(`  - Total suspicious: ${fundingResult.totalSuspiciousPercentage.toFixed(1)}%`);
-            console.log(`  - Patterns: ${fundingResult.fundingPatterns.length}`);
-            fundingResult.fundingSourceBreakdown && Object.entries(fundingResult.fundingSourceBreakdown).forEach(([source, pct]) => {
-              console.log(`  - ${source}: ${pct.toFixed(1)}%`);
-            });
+          const fundingResult = await Promise.race([fundingPromise, timeoutPromise]);
+          
+          if (fundingResult) {
+            response.fundingAnalysis = fundingResult;
+            
+            if (fundingResult.suspiciousFunding) {
+              console.log(`[Analyzer] 🚨 SUSPICIOUS FUNDING DETECTED:`);
+              console.log(`  - Total suspicious: ${fundingResult.totalSuspiciousPercentage.toFixed(1)}%`);
+              console.log(`  - Patterns: ${fundingResult.fundingPatterns.length}`);
+              fundingResult.fundingSourceBreakdown && Object.entries(fundingResult.fundingSourceBreakdown).forEach(([source, pct]) => {
+                console.log(`  - ${source}: ${pct.toFixed(1)}%`);
+              });
+            }
           }
         } catch (fundingError) {
           console.error('[Analyzer] Funding analysis failed:', fundingError);
         }
       }
+      console.log(`[Analyzer] ⚠️ Funding analysis temporarily disabled (RPC rate limits)`);
       
       // Run ML scorer for additional risk assessment
       try {

@@ -103,8 +103,18 @@ export class FundingSourceAnalyzer {
     try {
       console.log(`[Funding Analysis] Analyzing ${topHolders.length} wallets...`);
       
-      // Analyze each wallet's funding history
-      for (const holder of topHolders.slice(0, 20)) {
+      // Analyze only top 10 wallets to reduce API calls and prevent rate limiting
+      const walletsToAnalyze = topHolders.slice(0, 10);
+      
+      // Analyze each wallet's funding history with rate limiting
+      for (let i = 0; i < walletsToAnalyze.length; i++) {
+        const holder = walletsToAnalyze[i];
+        
+        // Add delay between requests to avoid rate limiting (150ms between wallets)
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 150));
+        }
+        
         const funding = await this.analyzeWalletFunding(holder.address);
         walletFunding.push(funding);
 
@@ -164,10 +174,10 @@ export class FundingSourceAnalyzer {
       const connection = rpcBalancer.getConnection();
       const pubkey = new PublicKey(walletAddress);
 
-      // Get wallet creation time and early transactions
+      // Get wallet creation time and early transactions (reduced limit to avoid rate limits)
       const signatures = await connection.getSignaturesForAddress(
         pubkey,
-        { limit: 50 },
+        { limit: 20 },
         'confirmed'
       );
 
@@ -181,14 +191,17 @@ export class FundingSourceAnalyzer {
       const walletAgeHours = (Date.now() / 1000 - walletCreationTime) / 3600;
       const isRecentlyCreated = walletAgeHours < (this.FRESH_WALLET_THRESHOLD_DAYS * 24);
 
-      // Analyze first few transactions for funding patterns
-      const earlySignatures = signatures.slice(-10); // First 10 transactions
+      // Analyze first few transactions for funding patterns (reduced from 10 to 3 to avoid rate limits)
+      const earlySignatures = signatures.slice(-3); // First 3 transactions only
       let fundingSource: string | null = null;
       let fundingSourceType: 'exchange' | 'swap' | 'bridge' | 'dex' | 'unknown' = 'unknown';
       let riskLevel: 'HIGH_RISK' | 'MEDIUM_RISK' | 'LOW_RISK' | 'UNKNOWN' = 'UNKNOWN';
 
       for (const sig of earlySignatures) {
         try {
+          // Add small delay between transaction fetches to avoid rate limits
+          await new Promise(resolve => setTimeout(resolve, 50));
+          
           const tx = await connection.getTransaction(sig.signature, {
             maxSupportedTransactionVersion: 0
           });

@@ -145,7 +145,7 @@ export default function Home() {
 
             {/* Funding Analysis */}
             {analysis.fundingAnalysis && (
-              <FundingAnalysisCard data={analysis.fundingAnalysis} />
+              <FundingAnalysisCard fundingData={analysis.fundingAnalysis} />
             )}
 
             {/* Token Metadata & Market Data */}

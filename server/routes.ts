@@ -501,10 +501,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[API] Analyzing token: ${tokenAddress} for IP: ${clientIP} (${clientData.count}/10)`);
 
       try {
-        // Add 25 second timeout to prevent hanging
+        // Add 35 second timeout to prevent hanging (increased for rate-limited APIs)
         const analysisPromise = tokenAnalyzer.analyzeToken(tokenAddress);
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Analysis timeout after 25s')), 25000)
+          setTimeout(() => reject(new Error('Analysis timeout after 35s')), 35000)
         );
         
         const analysis = await Promise.race([analysisPromise, timeoutPromise]) as any;
