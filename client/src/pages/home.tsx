@@ -27,7 +27,7 @@ export default function Home() {
 
   const mutation = useMutation({
     mutationFn: async (address: string) => {
-      const response = await apiRequest("POST", "/api/analyze", { address });
+      const response = await apiRequest("POST", "/api/analyze", { tokenAddress: address });
       return await response.json();
     },
     onSuccess: (data) => {
@@ -83,7 +83,7 @@ export default function Home() {
           <div id="token-analyzer" className="max-w-2xl mx-auto">
             <TokenInput 
               onAnalyze={handleAnalyze}
-              isLoading={mutation.isPending}
+              isAnalyzing={mutation.isPending}
             />
           </div>
         </div>
