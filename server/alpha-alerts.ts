@@ -898,7 +898,7 @@ export class AlphaAlertService {
             .where(eq(smartWallets.walletAddress, caller.wallet))
             .limit(1);
           
-          if (wallet && wallet.winRate && wallet.winRate > 0) {
+          if (wallet && wallet.winRate !== null && wallet.winRate !== undefined) {
             // Use cached stats if they exist and are valid
             walletStats = {
               profitSol: wallet.profitSol ? parseFloat(wallet.profitSol) : null,
