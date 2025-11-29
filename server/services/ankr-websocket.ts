@@ -53,10 +53,15 @@ export class AnkrWebSocketService extends EventEmitter {
       ? `https://rpc.ankr.com/solana/${ankrKey}` 
       : 'https://rpc.ankr.com/solana';
     
-    // Ankr WebSocket endpoint format: wss://rpc.ankr.com/solana/ws/{API_KEY}
-    this.ankrWsUrl = ankrKey 
-      ? `wss://rpc.ankr.com/solana/ws/${ankrKey}` 
-      : 'wss://rpc.ankr.com/solana/ws';
+    // Prefer explicit override if provided
+    const wsOverride = process.env.ANKR_WS_URL;
+    // Default Ankr WebSocket endpoint format: wss://rpc.ankr.com/solana/ws/{API_KEY}
+    // Some plans use premium routes; allow override via ANKR_WS_URL
+    this.ankrWsUrl = wsOverride
+      ? wsOverride
+      : (ankrKey 
+        ? `wss://rpc.ankr.com/solana/ws/${ankrKey}` 
+        : 'wss://rpc.ankr.com/solana/ws');
     
     this.enabled = !!ankrKey;
     
@@ -87,6 +92,7 @@ export class AnkrWebSocketService extends EventEmitter {
         : 'https://rpc.ankr.com/solana';
       
       console.log('[Ankr WebSocket] Connecting to:', httpUrl.replace(/\/[^/]+$/, '/***'));
+      console.log('[Ankr WebSocket] wsEndpoint:', (this.ankrWsUrl || '').replace(/\/.+\//, 'wss://***/'));
       
       this.connection = new Connection(httpUrl, {
         commitment: 'confirmed',

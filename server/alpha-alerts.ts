@@ -402,9 +402,9 @@ export class AlphaAlertService {
     if (DIRECT && DISCORD_WEBHOOK && DISCORD_WEBHOOK !== 'SET_ME' && alert.mint) {
       try {
         console.log(`[ALPHA ALERT] Triggering automatic scan for token: ${alert.mint}`);
-        // Import analyzer and run scan
-        const { default: analyze } = await import('./analyzer.js');
-        const analysisResult = await analyze({ address: alert.mint });
+        // Import analyzer and run scan (use SolanaTokenAnalyzer singleton)
+        const { tokenAnalyzer } = await import('./solana-analyzer.js');
+        const analysisResult = await tokenAnalyzer.analyzeToken(alert.mint);
         
         // Build embed message using the same format as Discord bot
         const { buildCompactMessage } = await import('./discord-bot.js');

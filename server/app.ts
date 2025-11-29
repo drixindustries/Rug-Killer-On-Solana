@@ -332,7 +332,8 @@ async function startServices() {
     }
 
     // Ankr WebSocket service - Real-time monitoring via Ankr RPC
-    if (process.env.ANKR_API_KEY) {
+    // Only start if explicitly enabled to avoid 401 spam when quota is exhausted
+    if (process.env.ANKR_API_KEY && process.env.ENABLE_ANKR_WS === 'true') {
       try {
         const { ankrWebSocket } = await import('./services/ankr-websocket.ts');
         await ankrWebSocket.connect();
@@ -349,6 +350,8 @@ async function startServices() {
       } catch (err: any) {
         console.warn('⚠️ Ankr WebSocket service failed:', err.message);
       }
+    } else if (process.env.ANKR_API_KEY) {
+      console.log('ℹ️ Ankr WebSocket disabled (set ENABLE_ANKR_WS=true to enable)');
     }
 
     // Pump.fun WebSocket removed - Helius/Ankr services handle all token detection
