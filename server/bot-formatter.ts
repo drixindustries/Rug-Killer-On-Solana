@@ -194,7 +194,7 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   // Show Unknown when jito bundle detection is unavailable/inconclusive
   const jitoDataUnavailable = !analysis.jitoBundleData && !analysis.advancedBundleData;
   if (jitoDataUnavailable) {
-    security += `❓ Jito Bundles: Unknown • ${analysis.metadata?.metadataLocked !== false ? '✅' : '⚠️'} Metadata: Locked`;
+    security += `❓ Jito Bundles: Unknown (data unavailable) • ${analysis.metadata?.metadataLocked !== false ? '✅' : '⚠️'} Metadata: Locked`;
   } else if (jitoBundleClean) {
     security += `✅ Jito Bundles: None • ${analysis.metadata?.metadataLocked !== false ? '✅' : '⚠️'} Metadata: Locked`;
   } else {
