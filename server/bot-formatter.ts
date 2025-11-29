@@ -191,7 +191,11 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   security += `${honeypotPassed ? '✅' : '❌'} Honeypot: Passed ${taxClean ? '✅' : '⚠️'} Tax: ${buyTax}%/${sellTax}%\n`;
   
   // Jito Bundles line with optional link to Jito explorer
-  if (jitoBundleClean) {
+  // Show Unknown when jito bundle detection is unavailable/inconclusive
+  const jitoDataUnavailable = !analysis.jitoBundleData && !analysis.advancedBundleData;
+  if (jitoDataUnavailable) {
+    security += `❓ Jito Bundles: Unknown • ${analysis.metadata?.metadataLocked !== false ? '✅' : '⚠️'} Metadata: Locked`;
+  } else if (jitoBundleClean) {
     security += `✅ Jito Bundles: None • ${analysis.metadata?.metadataLocked !== false ? '✅' : '⚠️'} Metadata: Locked`;
   } else {
     const bundleEmoji = hasJitoBundle && analysis.jitoBundleData?.confidence === 'HIGH' ? '🔴' : '📦';
