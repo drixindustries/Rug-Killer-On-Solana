@@ -103,7 +103,7 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(color)
     .setTitle(`${messageData.header} ⚠️ ${messageData.age}`)
-    .setDescription(`**Risk Level: ${analysis.riskLevel}** (Score: ${analysis.riskScore}/100)\n_Higher score = Safer token • Lower score = Higher risk_`)
+    .setDescription(`**Risk Level: ${analysis.riskLevel}** (Score: ${analysis.riskScore}/100)\n_Short rule: higher = safer; lower = riskier_`)
     .setFooter({ text: `Contract: ${analysis.tokenAddress}` })
     .setTimestamp()
     .setImage(`https://dd.dexscreener.com/ds-data/tokens/solana/${analysis.tokenAddress}.png?size=lg&t=${Date.now()}`);

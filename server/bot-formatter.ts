@@ -251,7 +251,8 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     const bcPct = sumPct(h => h.isBondingCurve);
     holders += `↪️ Exchange: ${exchPct.toFixed(2)}% • LP: ${lpPct.toFixed(2)}% • Bonding Curve: ${bcPct.toFixed(2)}%\n`;
   } else {
-    holders += `↪️ Top 20 summary: Unknown (data unavailable)\n`;
+    // Keep it concise when data isn't available
+    holders += `↪️ Top 20: Unknown (data unavailable)\n`;
   }
   
   // Summary metrics
@@ -510,7 +511,8 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   let bundle: string | undefined;
   const jitoDataUnavailableForSection = !analysis.jitoBundleData && !analysis.advancedBundleData;
   if (jitoDataUnavailableForSection) {
-    bundle = `❓ **JITO BUNDLES**\n• Status: Unknown (data unavailable)`;
+    // Hide verbose bundle section when unknown; keep single-line status above
+    bundle = '';
   } else if (analysis.jitoBundleData?.isBundle) {
     const jb = analysis.jitoBundleData;
     
