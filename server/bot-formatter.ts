@@ -171,10 +171,13 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   const buyTax = analysis.honeypotDetection?.taxes?.buyTax ?? 0;
   const sellTax = analysis.honeypotDetection?.taxes?.sellTax ?? 0;
   
-  // Check for Jito bundles
-  const jitoBundleClean = !analysis.advancedBundleData || 
+  // Check for Jito bundles - prioritize Jito-specific detection
+  const hasJitoBundle = analysis.jitoBundleData?.isBundle && analysis.jitoBundleData.confidence !== 'LOW';
+  const bundleCount = hasJitoBundle ? (analysis.jitoBundleData?.bundleActivity?.bundleCount ?? 1) : 
+                      (analysis.advancedBundleData?.suspiciousWallets?.length ?? 0);
+  const jitoBundleClean = !hasJitoBundle && (!analysis.advancedBundleData || 
                           (analysis.advancedBundleData.bundleScore < 20 && 
-                           analysis.advancedBundleData.bundledSupplyPercent < 5);
+                           analysis.advancedBundleData.bundledSupplyPercent < 5));
   
   // PERFECT/ALL GREEN indicator (2025 ultimate format)
   const allGreen = mintRevoked && freezeRevoked && lpBurned && honeypotPassed && taxClean;
@@ -186,7 +189,14 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   let security = `${securityHeader}\n`;
   security += `${mintRevoked ? '✅' : '❌'} Mint Revoked ${freezeRevoked ? '✅' : '❌'} Freeze Revoked ${lpBurned ? '✅' : '⚠️'} LP ${lpBurnText}\n`;
   security += `${honeypotPassed ? '✅' : '❌'} Honeypot: Passed ${taxClean ? '✅' : '⚠️'} Tax: ${buyTax}%/${sellTax}%\n`;
-  security += `${jitoBundleClean ? '✅' : '📦'} Jito Bundles: ${jitoBundleClean ? 'None' : analysis.advancedBundleData?.suspiciousWallets.length || 0} • ${analysis.metadata?.metadataLocked !== false ? '✅' : '⚠️'} Metadata: Locked`;
+  
+  // Jito Bundles line with optional link to Jito explorer
+  if (jitoBundleClean) {
+    security += `✅ Jito Bundles: None • ${analysis.metadata?.metadataLocked !== false ? '✅' : '⚠️'} Metadata: Locked`;
+  } else {
+    const bundleEmoji = hasJitoBundle && analysis.jitoBundleData?.confidence === 'HIGH' ? '🔴' : '📦';
+    security += `${bundleEmoji} Jito Bundles: [${bundleCount} detected](https://solscan.io/account/${analysis.tokenAddress}?cluster=mainnet#transactions) • ${analysis.metadata?.metadataLocked !== false ? '✅' : '⚠️'} Metadata: Locked`;
+  }
   
   // HOLDERS - Enhanced 2025 format with clean filtering
   const holderCount = analysis.holderCount ?? 0;
@@ -511,7 +521,9 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
       bundle += `• Signals: ${signals.join(', ')}\n`;
     }
     
-    bundle += `_MEV bundle may indicate coordinated launch_`;
+    // Add link to view transactions on Solscan
+    bundle += `\n📊 [View Transactions on Solscan](https://solscan.io/account/${analysis.tokenAddress}?cluster=mainnet#transactions)`;
+    bundle += `\n_MEV bundle may indicate coordinated launch_`;
   } else if (analysis.advancedBundleData) {
     // Fallback to timing-based bundle detection
     const bd = analysis.advancedBundleData;
