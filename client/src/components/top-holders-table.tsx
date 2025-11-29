@@ -38,10 +38,17 @@ export function TopHoldersTable({ holders, tokenMint, totalHolders }: TopHolders
 
   // Sort by percentage desc for consistent ordering
   const orderedHolders = [...holders].sort((a, b) => b.percentage - a.percentage);
-  const compactTop20 = orderedHolders.slice(0, 20).map((h, idx) => {
+  const compactTop20List = orderedHolders.slice(0, 20).map((h, idx) => {
     const shortAddr = `${h.address.slice(0,4)}…${h.address.slice(-4)}`;
-    return `${idx+1}. ${shortAddr} (${h.percentage.toFixed(2)}%)`;
+    const tag = (h as any).label || ((h as any).isExchange ? 'Exchange' : (h as any).isLP ? 'LP' : (h as any).isBondingCurve ? 'Bonding Curve' : undefined);
+    return `${idx+1}. ${shortAddr} (${h.percentage.toFixed(2)}%${tag ? `, ${tag}` : ''})`;
   }).join("\n");
+
+  // Aggregate tag summaries across top 20
+  const sumPct = (pred: (h: HolderInfo) => boolean) => orderedHolders.slice(0,20).filter(pred).reduce((s, h) => s + h.percentage, 0);
+  const exchPct = sumPct(h => (h as any).isExchange);
+  const lpPct = sumPct(h => (h as any).isLP);
+  const bcPct = sumPct(h => (h as any).isBondingCurve);
 
   return (
     <Card className="p-3 sm:p-4 lg:p-6" data-testid="card-top-holders">
@@ -79,8 +86,15 @@ export function TopHoldersTable({ holders, tokenMint, totalHolders }: TopHolders
           {tokenMint && (
             <a href={solscanHoldersUrl(tokenMint)} target="_blank" rel="noopener noreferrer" className="underline text-blue-600 dark:text-blue-400">Solscan</a>
           )}
-          <div className="mt-1">
-            {holders.length > 0 ? compactTop20 : <span className="text-muted-foreground">Unknown (data unavailable)</span>}
+          <div className="mt-1 whitespace-pre-line">
+            {holders.length > 0 ? compactTop20List : <span className="text-muted-foreground">Unknown (data unavailable)</span>}
+          </div>
+          <div className="mt-2 text-xs text-muted-foreground">
+            {holders.length > 0 ? (
+              <span>
+                Exchange: {exchPct.toFixed(2)}% • LP: {lpPct.toFixed(2)}% • Bonding Curve: {bcPct.toFixed(2)}%
+              </span>
+            ) : null}
           </div>
         </div>
       </div>

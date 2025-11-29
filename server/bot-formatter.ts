@@ -230,13 +230,26 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   holders += `🔗 **Top 20 Holders**: https://solscan.io/token/${analysis.tokenAddress}#holders\n`;
   // Inline compact summary if data is available (render all 20)
   if (analysis.top20Holders && analysis.top20Holders.length > 0) {
-    const compact = analysis.top20Holders.slice(0, 20).map((h: any, idx: number) => {
+    // Sort by percentage desc for consistent ordering, then take top 20
+    const ordered = [...analysis.top20Holders].sort((a: any, b: any) => {
+      const ap = typeof a.percentage === 'number' ? a.percentage : parseFloat(a.percentage || '0') || 0;
+      const bp = typeof b.percentage === 'number' ? b.percentage : parseFloat(b.percentage || '0') || 0;
+      return bp - ap;
+    }).slice(0, 20);
+    const compact = ordered.map((h: any, idx: number) => {
       const pct = typeof h.percentage === 'number' ? `${h.percentage.toFixed(2)}%` : (h.percentage || '—');
-      const tag = h.label || (h.isExchange ? 'Exchange' : h.isLP ? 'LP' : undefined);
+      const tag = h.label || (h.isExchange ? 'Exchange' : h.isLP ? 'LP' : h.isBondingCurve ? 'Bonding Curve' : undefined);
       const shortAddr = h.owner ? `${h.owner.slice(0,4)}…${h.owner.slice(-4)}` : 'unknown';
       return `${idx+1}. ${shortAddr} (${pct}${tag ? `, ${tag}` : ''})`;
     }).join('\n');
     holders += compact + "\n";
+
+    // Aggregate tag summaries across top 20
+    const sumPct = (pred: (h: any) => boolean) => ordered.filter(pred).reduce((s: number, h: any) => s + (typeof h.percentage === 'number' ? h.percentage : parseFloat(h.percentage || '0') || 0), 0);
+    const exchPct = sumPct(h => h.isExchange);
+    const lpPct = sumPct(h => h.isLP);
+    const bcPct = sumPct(h => h.isBondingCurve);
+    holders += `↪️ Exchange: ${exchPct.toFixed(2)}% • LP: ${lpPct.toFixed(2)}% • Bonding Curve: ${bcPct.toFixed(2)}%\n`;
   } else {
     holders += `↪️ Top 20 summary: Unknown (data unavailable)\n`;
   }
