@@ -373,6 +373,31 @@ export interface BundleDetectionData {
   risks: string[];
 }
 
+// Jito Bundle Detection Data (MEV Bundle Analysis)
+export interface JitoBundleData {
+  isBundle: boolean;
+  bundleId?: string;
+  status?: 'ACCEPTED' | 'PROCESSED' | 'FINALIZED' | 'REJECTED' | 'DROPPED' | 'UNKNOWN';
+  tipAmount?: number; // Lamports paid to Jito tip account
+  tipAmountSol?: number; // Tip amount in SOL for display
+  tipAccount?: string; // Jito tip account address
+  slotLanded?: number; // Slot where bundle landed
+  validatorIdentity?: string; // Validator that processed bundle
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  signals: {
+    hasJitoTip: boolean;
+    tipAccountMatch: boolean;
+    consecutiveTxsInSlot: boolean;
+    highPriorityFee: boolean;
+  };
+  bundleActivity?: {
+    hasBundleActivity: boolean;
+    bundleCount: number;
+    totalTipAmount: number;
+  };
+  detectedAt: number;
+}
+
 // Network Analysis Data (Bubblemaps)
 export interface NetworkAnalysisData {
   networkRiskScore: number; // 0-100
@@ -683,6 +708,7 @@ export interface TokenAnalysisResponse {
   liquidityMonitor?: LiquidityMonitorData; // Real-time liquidity tracking
   holderTracking?: HolderTrackingData; // Top holder sell-off detection
   fundingAnalysis?: FundingAnalysisData; // Wallet funding source analysis
+  jitoBundleData?: JitoBundleData; // NEW: Jito MEV bundle detection
   
   // Temporal GNN Detection (2025)
   tgnResult?: TGNResult; // Temporal graph analysis with 0.958-0.966 F1-score

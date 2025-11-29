@@ -462,9 +462,58 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     }
   }
   
-  // BUNDLE DETECTION (Always show if data exists)
+  // JITO BUNDLE DETECTION (MEV Bundle Analysis)
   let bundle: string | undefined;
-  if (analysis.advancedBundleData) {
+  if (analysis.jitoBundleData?.isBundle) {
+    const jb = analysis.jitoBundleData;
+    
+    // Status emoji
+    const statusEmoji = {
+      'FINALIZED': '✅',
+      'PROCESSED': '⚡',
+      'ACCEPTED': '🔄',
+      'REJECTED': '❌',
+      'DROPPED': '⚠️',
+      'UNKNOWN': '❓'
+    }[jb.status || 'UNKNOWN'];
+    
+    // Confidence emoji
+    const confidenceEmoji = {
+      'HIGH': '🔴',
+      'MEDIUM': '🟡',
+      'LOW': '🟢'
+    }[jb.confidence];
+    
+    bundle = `${confidenceEmoji} **JITO BUNDLE DETECTED** ${statusEmoji}\n`;
+    
+    if (jb.status) {
+      bundle += `• Status: ${jb.status}\n`;
+    }
+    
+    if (jb.tipAmountSol && jb.tipAmountSol > 0) {
+      bundle += `• Tip Paid: ${jb.tipAmountSol.toFixed(6)} SOL\n`;
+    }
+    
+    if (jb.bundleActivity) {
+      bundle += `• Bundles Found: ${jb.bundleActivity.bundleCount}\n`;
+      if (jb.bundleActivity.totalTipAmount > 0) {
+        bundle += `• Total Tips: ${(jb.bundleActivity.totalTipAmount / 1e9).toFixed(6)} SOL\n`;
+      }
+    }
+    
+    // Signal breakdown
+    const signals = [];
+    if (jb.signals.hasJitoTip) signals.push('Jito Tip ✅');
+    if (jb.signals.highPriorityFee) signals.push('High Fee 📈');
+    if (jb.signals.consecutiveTxsInSlot) signals.push('Clustered 🎯');
+    
+    if (signals.length > 0) {
+      bundle += `• Signals: ${signals.join(', ')}\n`;
+    }
+    
+    bundle += `_MEV bundle may indicate coordinated launch_`;
+  } else if (analysis.advancedBundleData) {
+    // Fallback to timing-based bundle detection
     const bd = analysis.advancedBundleData;
     const bundleEmoji = bd.bundleScore >= 60 ? '🔴' : bd.bundleScore >= 40 ? '🟠' : bd.bundleScore >= 20 ? '🟡' : '✅';
     const bundleStatus = bd.bundleScore >= 60 ? 'CRITICAL' : bd.bundleScore >= 40 ? 'HIGH RISK' : bd.bundleScore >= 20 ? 'CAUTION' : 'SAFE';

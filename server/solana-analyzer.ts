@@ -25,6 +25,7 @@ import { getMigrationDetector } from "./migration-detector.js";
 import { mlScorer } from "./services/ml-scorer.js";
 import { fundingAnalyzer } from "./services/funding-source-analyzer.js";
 import { redisCache } from "./services/redis-cache.js";
+import { getBundleMonitor } from "./services/jito-bundle-monitor.js";
 
 export class SolanaTokenAnalyzer {
   private dexScreener: DexScreenerService;
@@ -244,6 +245,86 @@ export class SolanaTokenAnalyzer {
         } catch (tgnError) {
           console.error('[Analyzer] TGN analysis failed:', tgnError);
           response.tgnResult = undefined;
+        }
+      }
+
+      // JITO BUNDLE DETECTION - Analyze recent transactions for MEV bundles
+      if (!options.skipExternal) {
+        try {
+          console.log(`[Analyzer] Running Jito bundle detection for ${tokenMintAddress}...`);
+          
+          const connection = rpcBalancer.getConnection();
+          const bundleMonitor = getBundleMonitor(connection);
+          
+          // Fetch recent transactions to analyze for bundle activity
+          const signatures = await connection.getSignaturesForAddress(
+            new PublicKey(tokenMintAddress),
+            { limit: 50 }, // Check last 50 transactions
+            'confirmed'
+          );
+          
+          if (signatures.length > 0) {
+            // Analyze bundle activity across recent transactions
+            const bundleActivity = await bundleMonitor.detectBundleActivity(
+              signatures.map(sig => sig.signature)
+            );
+            
+            if (bundleActivity.hasBundleActivity) {
+              console.log(`[Analyzer] 🎯 JITO BUNDLE DETECTED:`);
+              console.log(`  - Bundle count: ${bundleActivity.bundleCount}`);
+              console.log(`  - Total tips: ${(bundleActivity.totalTipAmount / 1e9).toFixed(6)} SOL`);
+              
+              // Get detailed detection for the first bundle found
+              const firstBundle = bundleActivity.detections.find(d => d.isBundle);
+              
+              if (firstBundle) {
+                response.jitoBundleData = {
+                  isBundle: true,
+                  bundleId: firstBundle.bundleId,
+                  status: firstBundle.status,
+                  tipAmount: firstBundle.tipAmount,
+                  tipAmountSol: firstBundle.tipAmount ? firstBundle.tipAmount / 1e9 : undefined,
+                  tipAccount: firstBundle.tipAccount,
+                  slotLanded: firstBundle.slotLanded,
+                  validatorIdentity: firstBundle.validatorIdentity,
+                  confidence: firstBundle.confidence,
+                  signals: firstBundle.signals,
+                  bundleActivity: {
+                    hasBundleActivity: true,
+                    bundleCount: bundleActivity.bundleCount,
+                    totalTipAmount: bundleActivity.totalTipAmount,
+                  },
+                  detectedAt: Date.now(),
+                };
+                
+                // Add bundle manipulation risk flag if high confidence
+                if (firstBundle.confidence === 'HIGH') {
+                  response.redFlags.push({
+                    type: 'bundle_manipulation',
+                    severity: 'high',
+                    title: 'Jito Bundle Detected',
+                    description: `Token launch used Jito MEV bundles (${bundleActivity.bundleCount} detected). This may indicate coordinated buying or priority access manipulation.`,
+                  });
+                }
+              }
+            } else {
+              console.log(`[Analyzer] No Jito bundle activity detected`);
+              response.jitoBundleData = {
+                isBundle: false,
+                confidence: 'LOW',
+                signals: {
+                  hasJitoTip: false,
+                  tipAccountMatch: false,
+                  consecutiveTxsInSlot: false,
+                  highPriorityFee: false,
+                },
+                detectedAt: Date.now(),
+              };
+            }
+          }
+        } catch (bundleError: any) {
+          console.error('[Analyzer] Jito bundle detection failed:', bundleError.message);
+          response.jitoBundleData = undefined;
         }
       }
       
