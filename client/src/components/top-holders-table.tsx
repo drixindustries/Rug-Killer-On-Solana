@@ -4,11 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Copy, Check, ExternalLink } from "lucide-react";
 import type { HolderInfo } from "@shared/schema";
 
-interface TopHoldersTableProps {
+interface HoldersSummaryProps {
+  tokenMint?: string;
+  totalHolders?: number; // if not provided, fallback to holders.length or Unknown
+}
+
+interface TopHoldersTableProps extends HoldersSummaryProps {
   holders: HolderInfo[];
 }
 
-export function TopHoldersTable({ holders }: TopHoldersTableProps) {
+export function TopHoldersTable({ holders, tokenMint, totalHolders }: TopHoldersTableProps) {
   const [showAll, setShowAll] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
 
@@ -29,10 +34,56 @@ export function TopHoldersTable({ holders }: TopHoldersTableProps) {
   };
 
   const solscanUrl = (address: string) => `https://solscan.io/account/${address}`;
+  const solscanHoldersUrl = (mint: string) => `https://solscan.io/token/${mint}#holders`;
+
+  // Sort by percentage desc for consistent ordering
+  const orderedHolders = [...holders].sort((a, b) => b.percentage - a.percentage);
+  const compactTop20 = orderedHolders.slice(0, 20).map((h, idx) => {
+    const shortAddr = `${h.address.slice(0,4)}…${h.address.slice(-4)}`;
+    return `${idx+1}. ${shortAddr} (${h.percentage.toFixed(2)}%)`;
+  }).join("\n");
 
   return (
     <Card className="p-3 sm:p-4 lg:p-6" data-testid="card-top-holders">
       <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Top Holders</h2>
+
+      {/* Summary header: Total Holders + Solscan link + inline Top 20 */}
+      <div className="mb-4 space-y-2">
+        <div className="text-sm">
+          {typeof totalHolders === 'number' ? (
+            <span>
+              <span className="font-semibold">Total Holders:</span> {totalHolders}
+              {tokenMint && (
+                <>
+                  {" "}
+                  <a href={solscanHoldersUrl(tokenMint)} target="_blank" rel="noopener noreferrer" className="underline text-blue-600 dark:text-blue-400">(Solscan)</a>
+                </>
+              )}
+            </span>
+          ) : holders.length > 0 ? (
+            <span>
+              <span className="font-semibold">Total Holders:</span> {holders.length}
+              {tokenMint && (
+                <>
+                  {" "}
+                  <a href={solscanHoldersUrl(tokenMint)} target="_blank" rel="noopener noreferrer" className="underline text-blue-600 dark:text-blue-400">(Solscan)</a>
+                </>
+              )}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">Total Holders: Unknown (data unavailable)</span>
+          )}
+        </div>
+        <div className="text-xs whitespace-pre-line">
+          <span className="font-semibold">Top 20 Holders:</span>{" "}
+          {tokenMint && (
+            <a href={solscanHoldersUrl(tokenMint)} target="_blank" rel="noopener noreferrer" className="underline text-blue-600 dark:text-blue-400">Solscan</a>
+          )}
+          <div className="mt-1">
+            {holders.length > 0 ? compactTop20 : <span className="text-muted-foreground">Unknown (data unavailable)</span>}
+          </div>
+        </div>
+      </div>
       
       <div>
         <table className="w-full">
