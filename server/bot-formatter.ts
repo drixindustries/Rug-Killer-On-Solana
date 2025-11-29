@@ -187,14 +187,14 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
                          '🔐 **Security**';
   
   let security = `${securityHeader}\n`;
-  security += `${mintRevoked ? '✅' : '❌'} Mint Revoked ${freezeRevoked ? '✅' : '❌'} Freeze Revoked ${lpBurned ? '✅' : '⚠️'} LP ${lpBurnText}\n`;
-  security += `${honeypotPassed ? '✅' : '❌'} Honeypot: Passed ${taxClean ? '✅' : '⚠️'} Tax: ${buyTax}%/${sellTax}%\n`;
+  security += `${mintRevoked ? '✅' : '❌'} Mint Revoked • ${freezeRevoked ? '✅' : '❌'} Freeze Revoked • ${lpBurned ? '✅' : '⚠️'} LP ${lpBurnText}\n`;
+  security += `${honeypotPassed ? '✅' : '❌'} Honeypot: ${honeypotPassed ? 'Passed' : 'Possible'} • ${taxClean ? '✅' : '⚠️'} Tax: ${buyTax}%/${sellTax}%\n`;
   
   // Jito Bundles line with optional link to Jito explorer
   // Show Unknown when jito bundle detection is unavailable/inconclusive
   const jitoDataUnavailable = !analysis.jitoBundleData && !analysis.advancedBundleData;
   if (jitoDataUnavailable) {
-    security += `❓ Jito Bundles: Unknown (data unavailable) • ${analysis.metadata?.metadataLocked !== false ? '✅' : '⚠️'} Metadata: Locked`;
+    security += `❓ Jito Bundles: Unknown • ${analysis.metadata?.metadataLocked !== false ? '✅' : '⚠️'} Metadata: Locked`;
   } else if (jitoBundleClean) {
     security += `✅ Jito Bundles: None • ${analysis.metadata?.metadataLocked !== false ? '✅' : '⚠️'} Metadata: Locked`;
   } else {
@@ -252,12 +252,12 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     holders += `↪️ Exchange: ${exchPct.toFixed(2)}% • LP: ${lpPct.toFixed(2)}% • Bonding Curve: ${bcPct.toFixed(2)}%\n`;
   } else {
     // Keep it concise when data isn't available
-    holders += `↪️ Top 20: Unknown (data unavailable)\n`;
+    holders += `↪️ Top 20: Unknown\n`;
   }
   
   // Summary metrics
-  holders += `• Top 10 Concentration: ${topHolderConc.toFixed(1)}% • Snipers: ${sniperPct.toFixed(0)}%\n`;
-  holders += `${devBoughtPct > 0 ? '⚠️' : '✅'} Dev bought: ${devBoughtPct.toFixed(0)}% • ${bundledClusters > 0 ? '📦' : '✅'} Bundles: ${bundledClusters} • 👴 Aged: ${agedWalletCount}`;
+  holders += `• Top 10: ${topHolderConc.toFixed(1)}% • Snipers: ${sniperPct.toFixed(0)}%\n`;
+  holders += `${devBoughtPct > 0 ? '⚠️' : '✅'} Dev: ${devBoughtPct.toFixed(0)}% • ${bundledClusters > 0 ? '📦' : '✅'} Bundles: ${bundledClusters} • 👴 Aged: ${agedWalletCount}`;
   
   // TEMPORAL GNN ANALYSIS
   let tgnAnalysis: string | undefined;
