@@ -228,6 +228,18 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   
   // Section 2: Top 20 Holders (separate line and link)
   holders += `🔗 **Top 20 Holders**: https://solscan.io/token/${analysis.tokenAddress}#holders\n`;
+  // Inline compact summary if data is available (first 5 entries for brevity)
+  if (analysis.top20Holders && analysis.top20Holders.length > 0) {
+    const compact = analysis.top20Holders.slice(0, 5).map((h: any, idx: number) => {
+      const pct = typeof h.percentage === 'number' ? `${h.percentage.toFixed(2)}%` : (h.percentage || '—');
+      const tag = h.label || (h.isExchange ? 'Exchange' : h.isLP ? 'LP' : undefined);
+      const shortAddr = h.owner ? `${h.owner.slice(0,4)}…${h.owner.slice(-4)}` : 'unknown';
+      return `${idx+1}. ${shortAddr} (${pct}${tag ? `, ${tag}` : ''})`;
+    }).join('\n');
+    holders += compact + "\n";
+  } else {
+    holders += `↪️ Top 20 summary: Unknown (data unavailable)\n`;
+  }
   
   // Summary metrics
   holders += `• Top 10 Concentration: ${topHolderConc.toFixed(1)}% • Snipers: ${sniperPct.toFixed(0)}%\n`;
