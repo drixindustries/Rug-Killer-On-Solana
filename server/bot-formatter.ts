@@ -478,7 +478,10 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   
   // JITO BUNDLE DETECTION (MEV Bundle Analysis)
   let bundle: string | undefined;
-  if (analysis.jitoBundleData?.isBundle) {
+  const jitoDataUnavailableForSection = !analysis.jitoBundleData && !analysis.advancedBundleData;
+  if (jitoDataUnavailableForSection) {
+    bundle = `❓ **JITO BUNDLES**\n• Status: Unknown (data unavailable)`;
+  } else if (analysis.jitoBundleData?.isBundle) {
     const jb = analysis.jitoBundleData;
     
     // Status emoji
