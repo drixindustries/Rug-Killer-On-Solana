@@ -83,23 +83,45 @@ export function useWallet() {
       console.log('[Wallet] Challenge received, requesting signature...');
 
       const encodedMessage = new TextEncoder().encode(challengeData.challenge);
-      const signedMessage = await window.solana.signMessage(encodedMessage, "utf8");
+      // Phantom expects a Uint8Array; omit encoding when passing bytes
+      const signedMessage = await window.solana.signMessage(encodedMessage);
       console.log('[Wallet] Message signed successfully');
       
       const signatureBase58 = bs58.encode(signedMessage.signature);
 
       // Use public login endpoint
       console.log('[Wallet] Submitting login request...');
-      const loginResponse = await apiRequest("POST", "/api/wallet/login", {
+      let loginResponse = await apiRequest("POST", "/api/wallet/login", {
         walletAddress: publicKey,
         signature: signatureBase58,
         challenge: challengeData.challenge,
       });
 
-      const loginData = await loginResponse.json();
+      let loginData = await loginResponse.json();
       console.log('[Wallet] Login response received');
 
-      if (loginData.user) {
+      // If challenge is invalid/expired/used, automatically fetch a fresh challenge and retry once
+      if (!loginResponse.ok && typeof loginData?.message === 'string' && (
+        loginData.message.includes('Invalid challenge') ||
+        loginData.message.includes('expired') ||
+        loginData.message.includes('already been used')
+      )) {
+        console.warn('[Wallet] Challenge issue detected. Retrying with a fresh challenge...');
+        const freshChallengeResp = await apiRequest("GET", `/api/wallet/login-challenge?walletAddress=${publicKey}`);
+        const freshChallenge = await freshChallengeResp.json();
+        const freshMsg = new TextEncoder().encode(freshChallenge.challenge);
+        const freshSig = await window.solana.signMessage(freshMsg);
+        const freshSigB58 = bs58.encode(freshSig.signature);
+        loginResponse = await apiRequest("POST", "/api/wallet/login", {
+          walletAddress: publicKey,
+          signature: freshSigB58,
+          challenge: freshChallenge.challenge,
+        });
+        loginData = await loginResponse.json();
+        console.log('[Wallet] Login response (retry) received');
+      }
+
+      if (loginResponse.ok && loginData.user) {
         console.log('[Wallet] Login successful!');
         toast({
           title: "Logged In Successfully!",
@@ -124,7 +146,8 @@ export function useWallet() {
       if (error.message?.includes('User rejected')) {
         errorMessage = "You rejected the wallet connection request.";
       } else if (error.message?.includes('403')) {
-        errorMessage = "Signature verification failed. Please try again.";
+        // Surface server-provided reason when available
+        errorMessage = error?.response?.message || "Signature verification failed. Please try again.";
       } else if (error.message?.includes('401')) {
         errorMessage = "Authentication failed. Please refresh and try again.";
       } else if (error.message?.includes('500')) {
