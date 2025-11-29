@@ -511,6 +511,8 @@ export default function Home() {
                         <Suspense fallback={<ComponentLoader />}>
                           <TopHoldersTable 
                             holders={analysis.topHolders}
+                            tokenMint={analysis.tokenInfo?.address || analysis.tokenAddress || ""}
+                            totalHolders={typeof analysis.holderCount === 'number' ? analysis.holderCount : undefined}
                           />
                         </Suspense>
                       )}
