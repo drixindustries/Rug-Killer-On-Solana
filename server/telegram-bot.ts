@@ -31,7 +31,7 @@ function formatAnalysis(analysis: TokenAnalysisResponse, compact: boolean = fals
     
 🎯 Risk Score: **${analysis.riskScore}/100** (${analysis.riskLevel})
 📊 Holders: ${analysis.holderCount ?? 0}
-💧 Top 10 Concentration: ${(analysis.topHolderConcentration ?? 0).toFixed(2)}%
+💧 Top 10: ${(analysis.topHolderConcentration ?? 0).toFixed(2)}%
 
 Use /execute ${analysis.tokenAddress.slice(0, 8)}... for full analysis`;
   }
@@ -166,7 +166,7 @@ function createTelegramBot(botToken: string): Telegraf {
       try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
       
       let message = `📊 **TOP 20 HOLDERS - ${analysis.metadata.symbol}**\n\n`;
-      message += `Total Top 10 Concentration: **${(analysis.topHolderConcentration ?? 0).toFixed(2)}%**\n\n`;
+      message += `Total Top 10: **${(analysis.topHolderConcentration ?? 0).toFixed(2)}%**\n\n`;
       
       analysis.topHolders.slice(0, 20).forEach((holder, index) => {
         message += `${index + 1}. \`${formatAddress(holder.address)}\` - ${holder.percentage.toFixed(2)}%\n`;
@@ -196,7 +196,7 @@ function createTelegramBot(botToken: string): Telegraf {
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
       try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
       let message = `📊 **TOP ${n} HOLDERS - ${analysis.metadata.symbol}**\n\n`;
-      message += `Top 10 Concentration: **${(analysis.topHolderConcentration ?? 0).toFixed(2)}%**\n\n`;
+      message += `Top 10: **${(analysis.topHolderConcentration ?? 0).toFixed(2)}%**\n\n`;
       analysis.topHolders.slice(0, n).forEach((h, i) => {
         message += `${i + 1}. \`${formatAddress(h.address)}\` - ${h.percentage.toFixed(2)}%\n`;
       });
@@ -788,11 +788,9 @@ function createTelegramBot(botToken: string): Telegraf {
       message += `🔐 **SECURITY**\n`;
       const a_mint = analysis1.mintAuthority?.hasAuthority ? '❌' : '✅';
       const b_mint = analysis2.mintAuthority?.hasAuthority ? '❌' : '✅';
-      message += `Mint Revoked: A ${a_mint} | B ${b_mint}\n`;
-
       const a_freeze = analysis1.freezeAuthority?.hasAuthority ? '❌' : '✅';
       const b_freeze = analysis2.freezeAuthority?.hasAuthority ? '❌' : '✅';
-      message += `Freeze Revoked: A ${a_freeze} | B ${b_freeze}\n\n`;
+      message += `Mint: A ${a_mint} | B ${b_mint} • Freeze: A ${a_freeze} | B ${b_freeze}\n\n`;
       
       // Overall recommendation
       message += `━━━━━━━━━━━━━━━━\n`;

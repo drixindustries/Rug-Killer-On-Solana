@@ -635,7 +635,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         const embed = new EmbedBuilder()
           .setColor(0x3498db)
           .setTitle(`📊 Top 20 Holders - ${analysis.metadata.symbol}`)
-          .setDescription(`Total Top 10 Concentration: **${analysis.topHolderConcentration.toFixed(2)}%**`)
+          .setDescription(`Total Top 10: **${analysis.topHolderConcentration.toFixed(2)}%**`)
           .setTimestamp();
         
         // Split holders into 3 fields (Discord has 1024 char limit per field)
@@ -1257,8 +1257,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         const b_mint = analysis2.mintAuthority?.hasAuthority && !analysis2.mintAuthority?.isRevoked ? '❌' : '✅';
         const a_freeze = analysis1.freezeAuthority?.hasAuthority && !analysis1.freezeAuthority?.isRevoked ? '❌' : '✅';
         const b_freeze = analysis2.freezeAuthority?.hasAuthority && !analysis2.freezeAuthority?.isRevoked ? '❌' : '✅';
-        let security = `Mint Revoked: A ${a_mint} | B ${b_mint}\n`;
-        security += `Freeze Revoked: A ${a_freeze} | B ${b_freeze}`;
+        let security = `Mint: A ${a_mint} | B ${b_mint} • Freeze: A ${a_freeze} | B ${b_freeze}`;
         
         embed.addFields({ name: '🔐 Security', value: security });
         
@@ -1352,7 +1351,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         const embed = new EmbedBuilder()
           .setColor(0x3498db)
           .setTitle(`📊 Top ${Math.min(n, 50)} Holders - ${analysis.metadata.symbol}`)
-          .setDescription(`Top 10 Concentration: **${analysis.topHolderConcentration.toFixed(2)}%**`)
+          .setDescription(`Top 10: **${analysis.topHolderConcentration.toFixed(2)}%**`)
           .setTimestamp();
         analysis.topHolders.slice(0, Math.min(n, 50)).forEach((h, idx) => {
           embed.addFields({ name: `#${idx + 1}` , value: `\`${formatAddress(h.address)}\` - ${h.percentage.toFixed(2)}%`, inline: false });
@@ -2064,7 +2063,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         const embed = new EmbedBuilder()
           .setColor('#3498db')
           .setTitle(`🏆 Top 20 Holders`)
-          .setDescription(`Total Holders: ${holders.holderCount}\nTop 10 Concentration: ${holders.topHolderConcentration.toFixed(1)}%`)
+          .setDescription(`Total Holders: ${holders.holderCount}\nTop 10: ${holders.topHolderConcentration.toFixed(1)}%`)
           .setFooter({ text: `Token: ${tokenAddress}` });
         
         const top20Text = holders.top20Holders.slice(0, 20).map((h, idx) => 
