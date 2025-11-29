@@ -361,7 +361,9 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     let floorInfo: string | undefined;
     if (analysis.floorData?.hasFloor) {
       const floor = analysis.floorData;
-      const floorPrice = floor.floorPrice?.toFixed(8) ?? 'N/A';
+      // Sanitize floor price: if invalid or negative, show N/A
+      const rawFloor = typeof floor.floorPrice === 'number' ? floor.floorPrice : null;
+      const floorPrice = rawFloor !== null && rawFloor > 0 ? rawFloor.toFixed(8) : 'N/A';
       const confidence = floor.floorConfidence ?? 0;
       const priceVsFloor = floor.currentPriceVsFloor ?? 0;
       const currentPrice = analysis.dexscreenerData?.pairs?.[0]?.priceUsd ? parseFloat(analysis.dexscreenerData.pairs[0].priceUsd) : null;
@@ -370,15 +372,19 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
       
       // Show current price vs floor with visual indicator
       const vsFloorEmoji = priceVsFloor > 100 ? '🚀' : priceVsFloor > 50 ? '📈' : priceVsFloor > 0 ? '✅' : '⚠️';
-      floorText += `${vsFloorEmoji} Current vs Floor: ${priceVsFloor >= 0 ? '+' : ''}${priceVsFloor.toFixed(0)}%\n`;
+      // Clamp extreme vs-floor outputs and show N/A when not sensible
+      const vsVal = Number.isFinite(priceVsFloor) ? Math.max(-100, Math.min(1000, priceVsFloor)) : null;
+      floorText += `${vsFloorEmoji} Current vs Floor: ${vsVal === null ? 'N/A' : (vsVal >= 0 ? '+' : '') + vsVal.toFixed(0)}%\n`;
       floorText += `• Floor Price: $${floorPrice} (${confidence > 95 ? '99%' : confidence + '%'} confidence, F1: 0.${confidence > 95 ? '982' : '974'})\n`;
       
       // Show support levels with buy density
       if (floor.supportLevels && floor.supportLevels.length > 0) {
         floorText += `• Next Support Levels:\n`;
         floor.supportLevels.slice(0, 3).forEach((level, idx) => {
-          const priceChange = currentPrice ? (((level.priceUsd - currentPrice) / currentPrice) * 100).toFixed(0) : 'N/A';
-          floorText += `  ${idx + 1}. $${level.priceUsd.toFixed(8)} (${priceChange}%) • ${level.percentOfTotalBuys}% of buys\n`;
+          const pctDelta = currentPrice ? ((level.priceUsd - currentPrice) / currentPrice) * 100 : null;
+          const priceChange = pctDelta !== null && Number.isFinite(pctDelta) ? `${pctDelta.toFixed(0)}%` : 'N/A';
+          const levelPrice = level.priceUsd > 0 ? `$${level.priceUsd.toFixed(8)}` : '$N/A';
+          floorText += `  ${idx + 1}. ${levelPrice} (${priceChange}) • ${level.percentOfTotalBuys}% of buys\n`;
         });
       }
       
