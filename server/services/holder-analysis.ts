@@ -24,7 +24,7 @@ import { EXCHANGE_WALLETS, isExchangeWallet } from '../exchange-whitelist.js';
 import { getKnownAddressInfo, getPumpFunBondingCurveAddress, getPumpFunAssociatedBondingCurveAddress } from '../known-addresses.js';
 import { isPumpFunAmm } from '../pumpfun-whitelist.js';
 import { isMeteoraAmm } from '../meteora-whitelist.js';
-import { isSystemWallet, isPumpFunBondingCurve, getSystemWalletType, filterHoldersWithStats } from '../pumpfun-system-wallets';
+import { isSystemWallet, isPumpFunBondingCurve, getSystemWalletType, filterHoldersWithStats, isDexProgramAccount } from '../pumpfun-system-wallets';
 import { isPumpFunAmmWallet } from './pumpfun-amm-detector.js';
 import { batchDetectExchanges, isKnownOrAutoExchange, getExchangeLabel } from './exchange-auto-detector.js';
 import bs58 from 'bs58';
@@ -462,6 +462,15 @@ export class HolderAnalysisService {
           systemWalletsFiltered += 1;
           systemWalletsFilteredRaw += amountRaw;
           if (isPumpFunBondingCurve(ownerAddress)) isPreMigration = true;
+          continue;
+        }
+
+        // Auto-detect DEX program-derived accounts (vaults/routers) and whitelist them
+        const isDexProgram = await isDexProgramAccount(connection, ownerAddress).catch(() => false);
+        if (isDexProgram) {
+          systemWalletsFiltered += 1;
+          systemWalletsFilteredRaw += amountRaw;
+          console.log(`[HolderAnalysis] Auto-whitelisted DEX program account: ${ownerAddress.slice(0, 8)}...`);
           continue;
         }
 

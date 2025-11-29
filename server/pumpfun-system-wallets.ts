@@ -49,6 +49,31 @@ export const RAYDIUM_AUTHORITIES = new Set([
 ]);
 
 /**
+ * Known DEX/AMM program IDs for auto-detection of program-derived addresses
+ * If a holder address is owned by one of these programs, it's likely a vault/router
+ */
+export const DEX_PROGRAM_IDS = new Set([
+  // Raydium
+  '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', // Raydium AMM v4
+  '5quBtoiQqxF9Jv6KYKctB59NT3gtJD2Y65kdnB1Uev3h', // Raydium Concentrated Liquidity
+  'CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK', // Raydium CLMM
+  
+  // Orca
+  '9W959DqEETiGZocYWCQPaJ6sBmUzgfxXfqGeTEdp3aQP', // Orca Whirlpools
+  'whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc', // Orca Whirlpools v2
+  
+  // Meteora
+  'LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo', // Meteora DLMM
+  'Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB', // Meteora Pools
+  
+  // Lifinity
+  'EewxydAPCCVuNEyrVN68PuSYdQ7wKn27V9Gjeoi8dy3S', // Lifinity v2
+  
+  // Pump.fun
+  '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P', // Pump.fun program
+]);
+
+/**
  * Major CEX hot/deposit wallets
  * Often appear in top holders but aren't real users
  */
@@ -117,6 +142,41 @@ export const SYSTEM_WALLET_DENYLIST = new Set([
  */
 export function isSystemWallet(address: string): boolean {
   return SYSTEM_WALLET_DENYLIST.has(address);
+}
+
+/**
+ * Auto-detect if an address is a program-derived address (PDA) owned by a known DEX
+ * This dynamically whitelists vaults/routers without requiring manual updates
+ * 
+ * @param connection Solana connection
+ * @param address Wallet address to check
+ * @returns Promise<boolean> true if it's a DEX program-derived address
+ */
+export async function isDexProgramAccount(
+  connection: any, // Connection from @solana/web3.js
+  address: string
+): Promise<boolean> {
+  try {
+    const { PublicKey } = await import('@solana/web3.js');
+    const pubkey = new PublicKey(address);
+    
+    // Fetch account info to check owner
+    const accountInfo = await connection.getAccountInfo(pubkey);
+    if (!accountInfo) return false;
+    
+    const owner = accountInfo.owner.toString();
+    
+    // If owned by a known DEX program, it's a system account
+    if (DEX_PROGRAM_IDS.has(owner)) {
+      console.log(`[AUTO-WHITELIST] Detected DEX program account: ${address} (owned by ${owner})`);
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    // On error (invalid address, RPC failure), assume not a program account
+    return false;
+  }
 }
 
 /**
@@ -267,8 +327,10 @@ export default {
   CEX_DEPOSIT_WALLETS,
   SOLANA_SYSTEM_ACCOUNTS,
   SYSTEM_WALLET_DENYLIST,
+  DEX_PROGRAM_IDS,
   isSystemWallet,
   isPumpFunBondingCurve,
+  isDexProgramAccount,
   detectNewVaults,
   getSystemWalletType,
   filterSystemWallets,
