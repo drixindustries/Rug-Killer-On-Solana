@@ -182,7 +182,8 @@ export default function Home() {
             {analysis.topHolders && analysis.topHolders.length > 0 && (
               <TopHoldersTable 
                 holders={analysis.topHolders}
-                totalSupply={analysis.tokenInfo?.supply || 0}
+                tokenMint={analysis.tokenInfo?.address || analysis.tokenAddress || ""}
+                totalHolders={typeof analysis.holderCount === 'number' ? analysis.holderCount : undefined}
               />
             )}
           </div>
