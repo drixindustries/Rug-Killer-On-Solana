@@ -8,7 +8,31 @@ interface BundleDetectionCardProps {
 }
 
 export function BundleDetectionCard({ data }: BundleDetectionCardProps) {
-  if (!data || data.bundleScore < 20) {
+  // Unknown state when data is unavailable
+  if (!data) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Bundle Detection
+          </CardTitle>
+          <CardDescription>Jito timing analysis</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <TrendingUp className="h-5 w-5" />
+            <span className="font-medium">Unknown (data unavailable)</span>
+          </div>
+          <p className="text-sm text-muted-foreground mt-2">
+            Bundle analysis data is not currently available
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+  // Clean state when bundleScore indicates no activity
+  if (data.bundleScore < 20) {
     return (
       <Card>
         <CardHeader>
