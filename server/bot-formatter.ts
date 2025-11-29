@@ -215,18 +215,21 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   const holderCountText = holderCount.toLocaleString();
   
   let holders = `👥 **Holders**\n`;
-  // Section 1: Total Holders
+  // Section 1: Total Holders (separate line and link)
+  holders += `🔗 **Total Holders**: `;
   if (holderCount === 0) {
     const isPumpFun = analysis.pumpFunData?.isPumpFun;
     const ageMinutes = analysis.ageMinutes ?? 0;
     const zeroReason = isPumpFun ? 'Bonding Curve Active (pre-migration)' : (ageMinutes < 10 ? 'Awaiting first buyers' : 'Data unavailable');
-    holders += `• Total Holders: ${zeroReason}\n`;
+    holders += `${zeroReason}\n`;
   } else {
-    holders += `• Total Holders: [${holderCountText}](https://solscan.io/token/${analysis.tokenAddress}#holders)\n`;
+    holders += `[${holderCountText}](https://solscan.io/token/${analysis.tokenAddress}#holders)\n`;
   }
   
-  // Section 2: Top 20 Holders
-  holders += `• Top 20 Holders: https://solscan.io/token/${analysis.tokenAddress}#holders\n`;
+  // Section 2: Top 20 Holders (separate line and link)
+  holders += `🔗 **Top 20 Holders**: https://solscan.io/token/${analysis.tokenAddress}#holders\n`;
+  
+  // Summary metrics
   holders += `• Top 10 Concentration: ${topHolderConc.toFixed(1)}% • Snipers: ${sniperPct.toFixed(0)}%\n`;
   holders += `${devBoughtPct > 0 ? '⚠️' : '✅'} Dev bought: ${devBoughtPct.toFixed(0)}% • ${bundledClusters > 0 ? '📦' : '✅'} Bundles: ${bundledClusters} • 👴 Aged: ${agedWalletCount}`;
   
