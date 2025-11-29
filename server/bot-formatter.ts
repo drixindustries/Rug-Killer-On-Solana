@@ -228,9 +228,9 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   
   // Section 2: Top 20 Holders (separate line and link)
   holders += `🔗 **Top 20 Holders**: https://solscan.io/token/${analysis.tokenAddress}#holders\n`;
-  // Inline compact summary if data is available (first 5 entries for brevity)
+  // Inline compact summary if data is available (render all 20)
   if (analysis.top20Holders && analysis.top20Holders.length > 0) {
-    const compact = analysis.top20Holders.slice(0, 5).map((h: any, idx: number) => {
+    const compact = analysis.top20Holders.slice(0, 20).map((h: any, idx: number) => {
       const pct = typeof h.percentage === 'number' ? `${h.percentage.toFixed(2)}%` : (h.percentage || '—');
       const tag = h.label || (h.isExchange ? 'Exchange' : h.isLP ? 'LP' : undefined);
       const shortAddr = h.owner ? `${h.owner.slice(0,4)}…${h.owner.slice(-4)}` : 'unknown';
