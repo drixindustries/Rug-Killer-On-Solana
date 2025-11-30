@@ -83,8 +83,8 @@ export function useWallet() {
       console.log('[Wallet] Challenge received, requesting signature...');
 
       const encodedMessage = new TextEncoder().encode(challengeData.challenge);
-      // Phantom expects a Uint8Array; omit encoding when passing bytes
-      const signedMessage = await window.solana.signMessage(encodedMessage);
+      // Phantom expects a Uint8Array and "utf8" encoding parameter
+      const signedMessage = await window.solana.signMessage(encodedMessage, "utf8");
       console.log('[Wallet] Message signed successfully');
       
       const signatureBase58 = bs58.encode(signedMessage.signature);
@@ -110,7 +110,7 @@ export function useWallet() {
         const freshChallengeResp = await apiRequest("GET", `/api/wallet/login-challenge?walletAddress=${publicKey}`);
         const freshChallenge = await freshChallengeResp.json();
         const freshMsg = new TextEncoder().encode(freshChallenge.challenge);
-        const freshSig = await window.solana.signMessage(freshMsg);
+        const freshSig = await window.solana.signMessage(freshMsg, "utf8");
         const freshSigB58 = bs58.encode(freshSig.signature);
         loginResponse = await apiRequest("POST", "/api/wallet/login", {
           walletAddress: publicKey,

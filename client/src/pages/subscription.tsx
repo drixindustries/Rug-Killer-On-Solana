@@ -83,8 +83,8 @@ export default function SubscriptionPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/subscription/status'] });
       setRedemptionCode("");
       toast({
-        title: "Success!",
-        description: data.message,
+        title: "🎉 Code Redeemed Successfully!",
+        description: `${data.message} To access the Telegram and Discord bots, use the /redeem command with your code in each bot.`,
       });
     },
     onError: (error: any) => {
@@ -163,6 +163,60 @@ export default function SubscriptionPage() {
               </Badge>
             </div>
           )}
+        </div>
+
+        {/* Redeem Code Box - Prominent Position */}
+        <div className="mb-12 max-w-2xl mx-auto">
+          <Card className="border-2 border-primary shadow-lg" data-testid="card-redeem-code">
+            <CardHeader className="text-center pb-4">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Gift className="w-6 h-6 text-primary" />
+                <CardTitle className="text-2xl">Have a Redemption Code?</CardTitle>
+              </div>
+              <CardDescription className="text-base">
+                Redeem your access code for instant lifetime access to the website, Telegram bot, and Discord bot
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-3">
+                <Input
+                  placeholder="ENTER-YOUR-CODE-HERE"
+                  value={redemptionCode}
+                  onChange={(e) => setRedemptionCode(e.target.value.toUpperCase())}
+                  disabled={redeemCodeMutation.isPending}
+                  className="font-mono text-center text-lg h-12"
+                  data-testid="input-redeem-code"
+                />
+                <Button
+                  onClick={() => redemptionCode && redeemCodeMutation.mutate(redemptionCode)}
+                  disabled={!redemptionCode || redeemCodeMutation.isPending}
+                  size="lg"
+                  className="px-8"
+                  data-testid="button-redeem-code"
+                >
+                  {redeemCodeMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Redeeming...
+                    </>
+                  ) : (
+                    'Redeem'
+                  )}
+                </Button>
+              </div>
+              <div className="mt-4 p-4 bg-muted rounded-lg space-y-2">
+                <p className="text-sm font-semibold text-center">
+                  ✨ What you'll get:
+                </p>
+                <ul className="text-xs text-muted-foreground space-y-1">
+                  <li>✅ Instant website access with unlimited token analysis</li>
+                  <li>✅ Full Telegram bot access - use <code className="bg-background px-1 rounded">/redeem YOUR_CODE</code></li>
+                  <li>✅ Full Discord bot access - use <code className="bg-background px-1 rounded">/redeem YOUR_CODE</code></li>
+                  <li>✅ All premium features including alerts, smart money tracking, and more</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
@@ -326,46 +380,6 @@ export default function SubscriptionPage() {
           </div>
         )}
 
-        {/* Subscription Code Redemption */}
-        <div className="mt-12 max-w-2xl mx-auto">
-          <Card data-testid="card-redeem-code">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Gift className="w-5 h-5 text-primary" />
-                <CardTitle>Redeem Subscription Code</CardTitle>
-              </div>
-              <CardDescription>
-                Have a lifetime access code? Enter it here to activate your subscription.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-3">
-                <Input
-                  placeholder="Enter code"
-                  value={redemptionCode}
-                  onChange={(e) => setRedemptionCode(e.target.value.toUpperCase())}
-                  disabled={redeemCodeMutation.isPending}
-                  className="font-mono"
-                  data-testid="input-redeem-code"
-                />
-                <Button
-                  onClick={() => redemptionCode && redeemCodeMutation.mutate(redemptionCode)}
-                  disabled={!redemptionCode || redeemCodeMutation.isPending}
-                  data-testid="button-redeem-code"
-                >
-                  {redeemCodeMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Redeeming...
-                    </>
-                  ) : (
-                    'Redeem'
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
         {/* Close page container */}
         </div>
       </main>

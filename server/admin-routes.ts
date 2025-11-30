@@ -96,4 +96,121 @@ router.get('/db-status', async (req: Request, res: Response) => {
   }
 });
 
+// Generate redemption codes
+router.post('/codes/generate', async (req: Request, res: Response) => {
+  try {
+    const token = req.query.token || req.headers.authorization?.replace('Bearer ', '');
+    if (token !== ADMIN_TOKEN) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { tier = 'lifetime', maxUses = 1, expiresInDays = null, codePrefix = 'RUG' } = req.body;
+
+    // Generate a random code
+    const randomPart = Math.random().toString(36).substring(2, 10).toUpperCase();
+    const code = `${codePrefix}-${randomPart}`;
+
+    // Calculate expiration date if specified
+    let expiresAt = null;
+    if (expiresInDays) {
+      expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + expiresInDays);
+    }
+
+    // Insert into database
+    const result = await pool.query(`
+      INSERT INTO subscription_codes (code, tier, max_uses, is_active, expires_at)
+      VALUES ($1, $2, $3, true, $4)
+      RETURNING *
+    `, [code, tier, maxUses, expiresAt]);
+
+    res.json({
+      success: true,
+      code: result.rows[0],
+      message: `Code ${code} created successfully`
+    });
+
+  } catch (error: any) {
+    console.error('[Code Generation] Error:', error);
+    res.status(500).json({
+      error: error.message,
+      code: error.code,
+    });
+  }
+});
+
+// List all redemption codes
+router.get('/codes/list', async (req: Request, res: Response) => {
+  try {
+    const token = req.query.token || req.headers.authorization?.replace('Bearer ', '');
+    if (token !== ADMIN_TOKEN) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const result = await pool.query(`
+      SELECT 
+        c.*,
+        COUNT(r.id) as redemption_count,
+        ARRAY_AGG(r.user_id) FILTER (WHERE r.user_id IS NOT NULL) as redeemed_by
+      FROM subscription_codes c
+      LEFT JOIN code_redemptions r ON c.id = r.code_id
+      GROUP BY c.id
+      ORDER BY c.created_at DESC
+      LIMIT 50
+    `);
+
+    res.json({
+      success: true,
+      codes: result.rows,
+      total: result.rows.length
+    });
+
+  } catch (error: any) {
+    console.error('[Code List] Error:', error);
+    res.status(500).json({
+      error: error.message,
+      code: error.code,
+    });
+  }
+});
+
+// Deactivate a code
+router.post('/codes/deactivate', async (req: Request, res: Response) => {
+  try {
+    const token = req.query.token || req.headers.authorization?.replace('Bearer ', '');
+    if (token !== ADMIN_TOKEN) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ error: 'Code is required' });
+    }
+
+    const result = await pool.query(`
+      UPDATE subscription_codes
+      SET is_active = false, updated_at = NOW()
+      WHERE code = $1
+      RETURNING *
+    `, [code]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Code not found' });
+    }
+
+    res.json({
+      success: true,
+      code: result.rows[0],
+      message: `Code ${code} deactivated successfully`
+    });
+
+  } catch (error: any) {
+    console.error('[Code Deactivate] Error:', error);
+    res.status(500).json({
+      error: error.message,
+      code: error.code,
+    });
+  }
+});
+
 export default router;
