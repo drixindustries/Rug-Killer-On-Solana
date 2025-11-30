@@ -1294,16 +1294,24 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       } else if (interaction.commandName === 'trending') {
         await interaction.deferReply();
         
-        const response = await fetch('https://api.dexscreener.com/latest/dex/tokens/solana');
+        // Fetch top Solana pairs by volume from DexScreener
+        const response = await fetch('https://api.dexscreener.com/latest/dex/search?q=SOL', {
+          headers: { 'Accept': 'application/json' }
+        });
         
         if (!response.ok) {
-          throw new Error('Failed to fetch trending data');
+          const embed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('❌ Error')
+            .setDescription('Failed to fetch trending data from DexScreener.')
+            .setTimestamp();
+          
+          await interaction.editReply({ embeds: [embed] });
+          return;
         }
         
         const data = await response.json();
-        const pairs = data.pairs || [];
-        
-        const trending = pairs
+        const trending = (data.pairs || [])
           .filter((p: any) => p.chainId === 'solana')
           .sort((a: any, b: any) => (b.volume?.h24 || 0) - (a.volume?.h24 || 0))
           .slice(0, 10);
