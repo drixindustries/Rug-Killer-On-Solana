@@ -363,13 +363,48 @@ export class AlphaAlertService {
         summaryLines.push(`🛰️ ${sourceUrl}`);
       }
 
-      message = `🚨 **SMART MONEY BUY: ${walletName}**\n\n${summaryLines.join('\n')}`;
+      message = `🚨 **ALPHA ALERT: ${walletName}**\n\n${summaryLines.join('\n')}`;
+    }
+    
+    // Fetch token info from DexScreener for image and enhanced metadata
+    let tokenInfo: any = null;
+    let tokenImageUrl: string | null = null;
+    let enrichedTokenSymbol = alert.data?.tokenSymbol || 'Unknown';
+    let enrichedTokenName = alert.data?.tokenName;
+    
+    try {
+      const dexResponse = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${alert.mint}`);
+      if (dexResponse.ok) {
+        const dexData = await dexResponse.json();
+        if (dexData.pairs && dexData.pairs.length > 0) {
+          const pair = dexData.pairs[0];
+          tokenInfo = pair.info;
+          
+          // Get token image from DexScreener
+          if (pair.info?.imageUrl) {
+            tokenImageUrl = pair.info.imageUrl;
+          }
+          
+          // Enrich token symbol/name if not already set
+          if (pair.baseToken?.symbol) {
+            enrichedTokenSymbol = pair.baseToken.symbol;
+          }
+          if (pair.baseToken?.name && !enrichedTokenName) {
+            enrichedTokenName = pair.baseToken.name;
+          }
+        }
+      }
+    } catch (error) {
+      console.log('[ALPHA ALERT] Failed to fetch token info from DexScreener:', error);
     }
     
     // Create embed data for rich formatting
     const embedData = alert.type === 'caller_signal' ? {
-      title: `🚨 Smart Money Alert`,
+      title: `🚨 Alpha Alert`,
+      description: `**${enrichedTokenSymbol}**${enrichedTokenName && enrichedTokenName !== enrichedTokenSymbol ? ` (${enrichedTokenName})` : ''}`,
       color: alert.data?.influenceScore >= 80 ? 0xFFD700 : 0xFF6600, // Gold for high influence, orange otherwise
+      thumbnail: tokenImageUrl ? { url: tokenImageUrl } : undefined,
+      image: tokenImageUrl ? { url: `https://dd.dexscreener.com/ds-data/tokens/solana/${alert.mint}.png?size=lg&t=${Date.now()}` } : undefined,
       fields: [
         {
           name: '👤 Wallet',
@@ -382,8 +417,8 @@ export class AlphaAlertService {
           inline: true
         }] : []),
         {
-          name: '🪙 Token',
-          value: `${alert.data?.tokenSymbol || 'Unknown'}${alert.data?.tokenName && alert.data.tokenName !== alert.data?.tokenSymbol ? ` (${alert.data.tokenName})` : ''}\n\`${alert.mint}\``,
+          name: '📍 Contract',
+          value: `\`${alert.mint}\``,
           inline: false
         },
         ...(alert.data?.amountToken || alert.data?.amountUsd ? [{
