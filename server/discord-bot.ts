@@ -437,6 +437,10 @@ const commands = [
     .setDescription('Show a quick chart link')
     .addStringOption(option => option.setName('address').setDescription('Token address').setRequired(true)),
   new SlashCommandBuilder()
+    .setName('graderepo')
+    .setDescription('Grade a GitHub repository (0-100% confidence)')
+    .addStringOption(option => option.setName('url').setDescription('GitHub repository URL (e.g., https://github.com/owner/repo)').setRequired(true)),
+  new SlashCommandBuilder()
     .setName('smartwallet')
     .setDescription('Manage Smart Money wallet DB (admin)')
     .addSubcommand(sc => sc.setName('add')
@@ -545,7 +549,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             },
             {
               name: '🔥 NEW Popular Commands',
-              value: '`/price <address>` - Quick price\n`/rugcheck <address>` - Instant rug scan\n`/liquidity <address>` - LP analysis\n`/compare <token1> <token2>` - Compare tokens\n`/trending` - Top tokens by volume\n`/exchanges <address>` - Exchange presence\n`/whitelist stats|check` - Exchange whitelist tools\n`/pumpfun <address>` - Pump.fun view\n`/chart <address>` - Chart link'
+              value: '`/price <address>` - Quick price\n`/rugcheck <address>` - Instant rug scan\n`/liquidity <address>` - LP analysis\n`/compare <token1> <token2>` - Compare tokens\n`/trending` - Top tokens by volume\n`/exchanges <address>` - Exchange presence\n`/graderepo <url>` - Grade GitHub repo (0-100%)\n`/whitelist stats|check` - Exchange whitelist tools\n`/pumpfun <address>` - Pump.fun view\n`/chart <address>` - Chart link'
             },
             {
               name: '🔔 Personal Tools',
@@ -1908,6 +1912,104 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           .setFooter({ text: `Token: ${formatAddress(tokenAddress)}` })
           .setTimestamp();
         await interaction.reply({ embeds: [embed], ephemeral: false });
+      } else if (interaction.commandName === 'graderepo') {
+        const githubUrl = interaction.options.getString('url', true);
+        console.log(`[Discord /graderepo] User ${interaction.user.tag} grading: ${githubUrl}`);
+        
+        await interaction.deferReply();
+        
+        try {
+          // Import the analyzer
+          const { githubAnalyzer } = await import('./services/github-repo-analyzer.js');
+          const result = await githubAnalyzer.gradeRepository(githubUrl);
+          
+          console.log(`[Discord /graderepo] Analysis complete for ${githubUrl}`);
+          
+          if (!result.found) {
+            const errorEmbed = new EmbedBuilder()
+              .setColor(0xff0000)
+              .setTitle('❌ Repository Not Found')
+              .setDescription(result.error || 'Invalid GitHub URL or inaccessible repository')
+              .setTimestamp();
+            
+            await interaction.editReply({ embeds: [errorEmbed] });
+            return;
+          }
+          
+          const m = result.metrics!;
+          
+          // Determine color based on grade
+          let color = 0x808080; // Gray default
+          if (result.confidenceScore >= 85) color = 0x00ff00; // Green
+          else if (result.confidenceScore >= 70) color = 0xffff00; // Yellow
+          else if (result.confidenceScore >= 55) color = 0xff8800; // Orange
+          else color = 0xff0000; // Red
+          
+          const embed = new EmbedBuilder()
+            .setColor(color)
+            .setTitle(`📊 GitHub Repository Grade: ${result.grade}`)
+            .setURL(m.url)
+            .setDescription(`**${m.owner}/${m.repo}**\n${result.recommendation}`)
+            .addFields(
+              {
+                name: '🎯 Confidence Score',
+                value: `**${result.confidenceScore}/100**`,
+                inline: true
+              },
+              {
+                name: '⭐ Community',
+                value: `${m.stars.toLocaleString()} stars\n${m.forks.toLocaleString()} forks\n${m.contributors} contributors`,
+                inline: true
+              },
+              {
+                name: '💻 Tech Stack',
+                value: `${m.language || 'Mixed'}${m.isSolanaProject ? ' (Solana)' : ''}\n${m.commits.toLocaleString()} commits\nLast: ${m.lastCommitDate?.toLocaleDateString() || 'Unknown'}`,
+                inline: true
+              },
+              {
+                name: '📊 Score Breakdown',
+                value: 
+                  `🔒 Security: ${result.securityScore}/30\n` +
+                  `⚡ Activity: ${result.activityScore}/25\n` +
+                  `🌟 Popularity: ${result.popularityScore}/20\n` +
+                  `💚 Health: ${result.healthScore}/15` +
+                  (result.solanaScore > 0 ? `\n🚀 Solana: ${result.solanaScore}/10` : ''),
+                inline: false
+              }
+            )
+            .setTimestamp();
+          
+          if (result.strengths.length > 0) {
+            embed.addFields({
+              name: '✅ Strengths',
+              value: result.strengths.slice(0, 5).join('\n').slice(0, 1024),
+              inline: false
+            });
+          }
+          
+          if (result.risks.length > 0) {
+            embed.addFields({
+              name: '⚠️ Risks',
+              value: result.risks.slice(0, 5).join('\n').slice(0, 1024),
+              inline: false
+            });
+          }
+          
+          embed.setFooter({ text: `Analyzed at ${result.analyzedAt.toLocaleString()}` });
+          
+          await interaction.editReply({ embeds: [embed] });
+          console.log(`[Discord /graderepo] Reply sent for ${githubUrl}`);
+        } catch (error: any) {
+          console.error(`[Discord /graderepo] Error for ${githubUrl}:`, error);
+          
+          const errorEmbed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('❌ Analysis Failed')
+            .setDescription(`Failed to analyze repository: ${error.message || 'Unknown error'}`)
+            .setTimestamp();
+          
+          await interaction.editReply({ embeds: [errorEmbed] });
+        }
       } else if (interaction.commandName === 'smartwallet') {
         const sc = interaction.options.getSubcommand();
         const member = interaction.member as any;
@@ -2693,7 +2795,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
 
     // Smart Money relay listener
     try {
-      const { smartMoneyRelay } = require('./services/smart-money-relay.ts');
+      const { smartMoneyRelay } = await import('./services/smart-money-relay.js');
       smartMoneyRelay.onEvent(async (evt: any) => {
         try {
           const targets = await storage.getSmartTargets();

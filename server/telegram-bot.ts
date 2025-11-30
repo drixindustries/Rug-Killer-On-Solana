@@ -65,6 +65,7 @@ function createTelegramBot(botToken: string): Telegraf {
     { command: 'compare', description: 'Compare 2 tokens - /compare <addr1> <addr2>' },
     { command: 'trending', description: 'Show trending tokens by volume' },
     { command: 'exchanges', description: 'Exchange presence - /exchanges <address>' },
+    { command: 'graderepo', description: 'Grade GitHub repo (0-100%) - /graderepo <url>' },
     { command: 'exchange_add', description: 'Add exchange wallet (admin) - /exchange_add <wallet>' },
     { command: 'pumpfun', description: 'Pump.fun view - /pumpfun <address>' },
     { command: 'chart', description: 'Chart links - /chart <address>' },
@@ -114,6 +115,7 @@ function createTelegramBot(botToken: string): Telegraf {
       '/compare <addr1> <addr2> - Compare tokens\n' +
       '/trending - Trending tokens\n' +
       '/exchanges <address> - Exchange presence\n' +
+      '/graderepo <github-url> - Grade GitHub repo (0-100%)\n' +
       '/pumpfun <address> - Pump.fun view\n' +
       '/chart <address> - Chart links\n\n' +
       '**Personal Tools:**\n' +
@@ -892,6 +894,38 @@ function createTelegramBot(botToken: string): Telegraf {
       await ctx.reply(message, { parse_mode: 'Markdown' });
     } catch (e) {
       ctx.reply('❌ Error fetching exchange stats.');
+    }
+  });
+
+  // /graderepo - GitHub Repository Grading
+  bot.command('graderepo', async (ctx) => {
+    const args = (ctx.message?.text || '').split(' ').filter(Boolean);
+    if (args.length < 2) {
+      return ctx.reply(
+        '❌ Please provide a GitHub repository URL.\n\n' +
+        '**Example:**\n' +
+        '`/graderepo https://github.com/solana-labs/solana`\n' +
+        '`/graderepo owner/repo`',
+        { parse_mode: 'Markdown' }
+      );
+    }
+    
+    const githubUrl = args[1];
+    
+    try {
+      await ctx.reply('🔍 Analyzing GitHub repository... This may take a moment.');
+      
+      // Import the analyzer
+      const { githubAnalyzer } = await import('./services/github-repo-analyzer.js');
+      const result = await githubAnalyzer.gradeRepository(githubUrl);
+      
+      // Format the result for Telegram
+      const message = githubAnalyzer.formatForDisplay(result);
+      
+      await ctx.reply(message, { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } });
+    } catch (error) {
+      console.error('Telegram bot graderepo error:', error);
+      ctx.reply('❌ Error analyzing GitHub repository. Please check the URL and try again.');
     }
   });
 

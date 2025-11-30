@@ -97,33 +97,18 @@ function getAnkrUrl(): string | undefined {
 }
 
 const RPC_PROVIDERS = [
-  // Ankr Premium RPC - PAID SUBSCRIPTION (PRIMARY BUT BALANCED)
-  // Using direct HTTP client to bypass superstruct bug
-  // The @solana/web3.js library has a bug with superstruct validation
-  // that affects Ankr's response format. We bypass it with ankr-direct-client.ts
-  // https://github.com/ianstormtaylor/superstruct/issues/580
-  // SOLUTION: Use AnkrDirectClient for direct JSON-RPC HTTP calls
+  // Helius Premium RPC - FREE TIER (PRIMARY)
+  // Main RPC provider with generous free tier
   { 
-    getUrl: () => `${getAnkrUrl() || ""}`,
+    getUrl: () => `${getHeliusUrl() || ""}`,
     weight: 100, // MAXIMUM PRIORITY: Primary RPC
-    name: "Ankr",
+    name: "Helius",
     tier: "premium" as const,
     requiresKey: true,
-    hasKey: () => !!getAnkrUrl(),
-    rateLimit: 9500, // Premium tier limit
-    rateLimitWindow: 60000
+    hasKey: () => !!getHeliusUrl(),
+    rateLimit: 30, // Free tier limit per second
+    rateLimitWindow: 1000
   },
-  // Helius DISABLED - Using Ankr exclusively
-  // { 
-  //   getUrl: () => `${getHeliusUrl() || ""}`,
-  //   weight: 25,
-  //   name: "Helius",
-  //   tier: "premium" as const,
-  //   requiresKey: true,
-  //   hasKey: () => !!getHeliusUrl(),
-  //   rateLimit: 30,
-  //   rateLimitWindow: 60000
-  // },
   // Shyft Free RPC (Good speed/reliability balance)
   { 
     getUrl: () => `${getShyftUrl() || ""}`,
@@ -135,6 +120,17 @@ const RPC_PROVIDERS = [
     rateLimit: 100, // Conservative for free tier
     rateLimitWindow: 60000
   },
+  // Ankr DISABLED - Free quota exhausted
+  // { 
+  //   getUrl: () => `${getAnkrUrl() || ""}`,
+  //   weight: 100,
+  //   name: "Ankr",
+  //   tier: "premium" as const,
+  //   requiresKey: true,
+  //   hasKey: () => !!getAnkrUrl(),
+  //   rateLimit: 9500,
+  //   rateLimitWindow: 60000
+  // },
   // PUBLIC FALLBACKS (tested and working 2025-11-23)
   { 
     getUrl: () => "https://api.mainnet-beta.solana.com",

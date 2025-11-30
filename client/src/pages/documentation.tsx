@@ -3,7 +3,7 @@ import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, Shield, Zap, TrendingUp, Lock, Database, Bot, Wallet, Code, AlertTriangle, CheckCircle } from "lucide-react";
+import { Download, Shield, Zap, TrendingUp, Lock, Database, Bot, Wallet, Code, AlertTriangle, CheckCircle, BookOpen } from "lucide-react";
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { CONTRACT_ADDRESS } from "@/constants";
 import { MascotCallout } from "@/components/mascot-callout";
@@ -464,17 +464,26 @@ export default function Documentation() {
               Complete guide to using Rug Killer Alpha Bot's token analysis platform, Discord/Telegram bots, and API
             </p>
             
-            <PDFDownloadLink
-              document={<DocumentationPDF />}
-              fileName="rug-killer-alpha-bot-documentation.pdf"
-            >
-              {({ loading }) => (
-                <Button size="lg" variant="outline" disabled={loading} data-testid="button-download-pdf">
-                  <Download className="h-4 w-4 mr-2" />
-                  {loading ? 'Generating PDF...' : 'Download PDF'}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <a href="https://rugkiller.gitbook.io/docs" target="_blank" rel="noopener noreferrer">
+                <Button size="lg" data-testid="button-view-gitbook">
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  View GitBook Docs
                 </Button>
-              )}
-            </PDFDownloadLink>
+              </a>
+              
+              <PDFDownloadLink
+                document={<DocumentationPDF />}
+                fileName="rug-killer-alpha-bot-documentation.pdf"
+              >
+                {({ loading }) => (
+                  <Button size="lg" variant="outline" disabled={loading} data-testid="button-download-pdf">
+                    <Download className="h-4 w-4 mr-2" />
+                    {loading ? 'Generating PDF...' : 'Download PDF'}
+                  </Button>
+                )}
+              </PDFDownloadLink>
+            </div>
           </div>
 
           <MascotCallout />

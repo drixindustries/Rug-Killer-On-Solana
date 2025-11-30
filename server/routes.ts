@@ -595,6 +595,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GitHub Repository Grading Endpoint
+  app.post("/api/grade-repo", async (req, res) => {
+    try {
+      const { githubUrl } = req.body;
+      
+      if (!githubUrl || typeof githubUrl !== 'string') {
+        return res.status(400).json({
+          message: "Invalid request",
+          error: "Please provide a 'githubUrl' field with a valid GitHub repository URL"
+        });
+      }
+      
+      // Rate limiting
+      const clientIP = req.ip || req.connection.remoteAddress;
+      const rateLimitKey = `github:${clientIP}`;
+      const now = Date.now();
+      const g: any = globalThis as any;
+      if (!g.rateLimitStore) {
+        g.rateLimitStore = new Map();
+      }
+      
+      const clientData = g.rateLimitStore.get(rateLimitKey) || { count: 0, resetTime: now + 60000 };
+      
+      if (now > clientData.resetTime) {
+        clientData.count = 0;
+        clientData.resetTime = now + 60000;
+      }
+      
+      if (clientData.count >= 5) { // 5 GitHub requests per minute per IP
+        return res.status(429).json({
+          message: "Rate Limit Reached",
+          error: "Too many GitHub analysis requests. Please try again in a few moments.",
+          retryAfter: Math.ceil((clientData.resetTime - now) / 1000)
+        });
+      }
+      
+      clientData.count++;
+      g.rateLimitStore.set(rateLimitKey, clientData);
+      
+      console.log(`[GitHub Grade API] Analyzing repo: ${githubUrl} for IP: ${clientIP} (${clientData.count}/5)`);
+      
+      // Import and use the analyzer
+      const { githubAnalyzer } = await import('./services/github-repo-analyzer.js');
+      const result = await githubAnalyzer.gradeRepository(githubUrl);
+      
+      res.json(result);
+      
+    } catch (error: any) {
+      console.error("GitHub repo grading error:", error);
+      res.status(500).json({
+        message: "Internal server error",
+        error: error.message || "Failed to grade repository."
+      });
+    }
+  });
+
   // Solana Streams Webhook Receiver (Helius-compatible)
   if (process.env.ENABLE_SOLANA_STREAM_WEBHOOK === 'true') {
     // Middleware to capture raw body for HMAC verification

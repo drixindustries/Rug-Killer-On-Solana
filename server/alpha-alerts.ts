@@ -883,7 +883,7 @@ export class AlphaAlertService {
 
       // Pump.fun tokens are detected via webhooks (no separate WebSocket needed)
 
-      console.log('[Alpha Alerts] ✅ Webhook listeners registered (Helius + Ankr)');
+      console.log('[Alpha Alerts] ✅ Webhook listeners registered (Helius)');
     } catch (error) {
       console.warn('[Alpha Alerts] Some webhook services unavailable:', error);
     }
