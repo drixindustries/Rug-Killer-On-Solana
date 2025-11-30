@@ -96,6 +96,7 @@ function createTelegramBot(botToken: string): Telegraf {
     ,{ command: 'smartwallet_activate', description: 'Reactivate smart wallet - /smartwallet_activate <wallet>' }
     ,{ command: 'smartwallet_list', description: 'List active smart wallets - /smartwallet_list [limit]' }
     ,{ command: 'smartwallet_view', description: 'View smart wallet details - /smartwallet_view <wallet>' }
+    ,{ command: 'redeem', description: 'Redeem access code - /redeem <code>' }
   ]).catch((err) => {
     console.warn('⚠️ Failed to set Telegram bot commands (silenced):', (err as any)?.message || String(err));
   });
@@ -103,7 +104,7 @@ function createTelegramBot(botToken: string): Telegraf {
   // Middleware: Access control check
   bot.use(async (ctx, next) => {
     // Skip access control for these commands
-    const freeCommands = ['start', 'linkwallet', 'trial', 'access'];
+    const freeCommands = ['start', 'linkwallet', 'trial', 'access', 'redeem'];
     const command = ctx.message && 'text' in ctx.message ? ctx.message.text.split(' ')[0].replace('/', '') : '';
     
     if (freeCommands.includes(command)) {
@@ -167,7 +168,8 @@ function createTelegramBot(botToken: string): Telegraf {
       '**Access Commands:**\n' +
       '/linkwallet <address> - Link wallet for token-gating\n' +
       '/trial - Check trial status\n' +
-      '/access - View access level\n\n' +
+      '/access - View access level\n' +
+      '/redeem <code> - Redeem access code\n\n' +
       '**Admin/Community:**\n' +
       '/report <wallet> <reason>\n' +
       '/blackliststats • /blacklisttop [limit]\n' +
@@ -288,6 +290,40 @@ function createTelegramBot(botToken: string): Telegraf {
     } catch (error: any) {
       console.error('Telegram access error:', error);
       ctx.reply(`❌ Error checking access: ${error.message || 'Unknown error'}`);
+    }
+  });
+  
+  // /redeem command
+  bot.command('redeem', async (ctx) => {
+    const args = (ctx.message?.text || '').split(' ');
+    if (args.length < 2) {
+      return ctx.reply('❌ Please provide an access code.\n\nExample: `/redeem YOUR_CODE_HERE`', { parse_mode: 'Markdown' });
+    }
+    
+    const code = args.slice(1).join(' '); // In case code has spaces
+    
+    try {
+      const accessControl = getAccessControlService(connection);
+      const isGroupContext = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+      const checkId = isGroupContext ? String(ctx.chat?.id) : String(ctx.from?.id);
+      
+      const result = await accessControl.redeemAccessCode(checkId, 'telegram', code, isGroupContext);
+      
+      let message = result.success ? '🎉 **Access Code Redeemed!**\n\n' : '❌ **Invalid Code**\n\n';
+      message += `${result.message}\n`;
+      
+      if (result.success) {
+        message += '\n✨ **What You Get:**\n';
+        message += '• Lifetime access to all bot features\n';
+        message += '• No expiration date\n';
+        message += '• Never locked out\n';
+        message += '• Full premium access';
+      }
+      
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (error: any) {
+      console.error('Telegram redeem error:', error);
+      ctx.reply(`❌ Error redeeming code: ${error.message || 'Unknown error'}`);
     }
   });
   

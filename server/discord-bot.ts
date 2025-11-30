@@ -479,6 +479,10 @@ const commands = [
   new SlashCommandBuilder()
     .setName('access')
     .setDescription('View your current access level and upgrade options'),
+  new SlashCommandBuilder()
+    .setName('redeem')
+    .setDescription('Redeem an access code for lifetime access')
+    .addStringOption(option => option.setName('code').setDescription('Your access code').setRequired(true)),
 ].map(command => command.toJSON());
 
 // ============================================================================
@@ -526,7 +530,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       const accessCheck = await accessControl.checkAccess(checkId, 'discord', isGroupContext);
       
       // Allow help and linkwallet commands without access
-      const freeCommands = ['help', 'linkwallet', 'trial'];
+      const freeCommands = ['help', 'linkwallet', 'trial', 'access', 'redeem'];
       
       if (!accessCheck.hasAccess && !freeCommands.includes(interaction.commandName)) {
         const deniedEmbed = new EmbedBuilder()
@@ -608,7 +612,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             },
             {
               name: '🔐 Access & Membership',
-              value: '`/linkwallet <address>` - Link wallet for token-gating\n`/trial` - Check trial status\n`/access` - View access level'
+              value: '`/linkwallet <address>` - Link wallet for token-gating\n`/trial` - Check trial status\n`/access` - View access level\n`/redeem <code>` - Redeem access code'
             },
             {
               name: '🧰 Admin/Community',
@@ -2140,6 +2144,38 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             .setColor(0xff0000)
             .setTitle('❌ Error')
             .setDescription(`Failed to check access: ${error.message || 'Unknown error'}`);
+          await interaction.editReply({ embeds: [errorEmbed] });
+        }
+      
+      } else if (interaction.commandName === 'redeem') {
+        const code = interaction.options.getString('code', true);
+        await interaction.deferReply({ ephemeral: true });
+        
+        try {
+          const accessControl = getAccessControlService(connection);
+          const isGroupContext = !!interaction.guildId;
+          const checkId = isGroupContext ? interaction.guildId! : interaction.user.id;
+          
+          const result = await accessControl.redeemAccessCode(checkId, 'discord', code, isGroupContext);
+          
+          const embed = new EmbedBuilder()
+            .setColor(result.success ? 0x00ff00 : 0xff0000)
+            .setTitle(result.success ? '🎉 Access Code Redeemed!' : '❌ Invalid Code')
+            .setDescription(result.message);
+          
+          if (result.success) {
+            embed.addFields({
+              name: '✨ What You Get',
+              value: '• Lifetime access to all bot features\n• No expiration date\n• Never locked out\n• Full premium access'
+            });
+          }
+          
+          await interaction.editReply({ embeds: [embed] });
+        } catch (error: any) {
+          const errorEmbed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('❌ Error')
+            .setDescription(`Failed to redeem code: ${error.message || 'Unknown error'}`);
           await interaction.editReply({ embeds: [errorEmbed] });
         }
       

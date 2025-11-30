@@ -29,6 +29,77 @@ export class AccessControlService {
   }
 
   /**
+   * Redeem a master access code (admin bypass)
+   */
+  async redeemAccessCode(userId: string, platform: 'discord' | 'telegram', code: string, isGroup: boolean = false): Promise<{ success: boolean; message: string }> {
+    const MASTER_CODE = process.env.ADMIN_ACCESS_CODE || 'RUG_KILLER_ELITE_2025';
+    
+    if (code !== MASTER_CODE) {
+      return {
+        success: false,
+        message: 'Invalid access code'
+      };
+    }
+
+    const identifier = isGroup ? `${platform}_group:${userId}` : `${platform}:${userId}`;
+
+    try {
+      // Grant permanent access (expires in year 2099)
+      const permanentExpiry = new Date('2099-12-31');
+      
+      // Check if record exists
+      const existing = await db
+        .select()
+        .from(userAccessControl)
+        .where(sql`${userAccessControl.identifier} = ${identifier}`)
+        .limit(1);
+
+      if (existing.length > 0) {
+        // Update existing record
+        await db
+          .update(userAccessControl)
+          .set({
+            accessType: 'paid',
+            membershipExpiresAt: permanentExpiry,
+            trialEndsAt: permanentExpiry,
+            whopMembershipId: 'ADMIN_CODE_REDEEMED',
+            lastValidatedAt: new Date(),
+            updatedAt: new Date()
+          })
+          .where(sql`${userAccessControl.identifier} = ${identifier}`);
+      } else {
+        // Create new record
+        await db
+          .insert(userAccessControl)
+          .values({
+            identifier,
+            isGroup,
+            accessType: 'paid',
+            membershipExpiresAt: permanentExpiry,
+            trialEndsAt: permanentExpiry,
+            whopMembershipId: 'ADMIN_CODE_REDEEMED',
+            lastValidatedAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+      }
+
+      console.log(`[AccessControl] Admin code redeemed for ${identifier}`);
+
+      return {
+        success: true,
+        message: '✅ Lifetime access granted! You will never be locked out.'
+      };
+    } catch (error) {
+      console.error('[AccessControl] Error redeeming code:', error);
+      return {
+        success: false,
+        message: 'Error processing code. Please try again.'
+      };
+    }
+  }
+
+  /**
    * Check if a user/group has access to the bot
    */
   async checkAccess(
