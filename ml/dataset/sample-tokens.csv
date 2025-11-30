@@ -1,0 +1,9 @@
+topHolderPercent,top10Concentration,holderCount,liquidityUSD,poolLocked,poolBurned,mintEnabled,freezeEnabled,ageHours,volume24h,txns24h,priceChange24h,buyPressure,isPumpFun,bondingCurve,hasWebsite,hasTwitter,hasTelegram,outcome
+42.3,78.5,37,5200,false,false,true,false,3,420,180,-55,0.28,true,35,false,false,false,1
+15.2,41.7,312,88000,true,false,false,false,96,152000,8200,65,0.62,false,100,true,true,true,0
+33.1,66.9,54,12000,false,false,true,true,12,2100,640,-35,0.32,true,72,false,true,false,1
+55.0,85.2,22,3100,false,false,true,true,1.5,150,90,-70,0.18,true,12,false,false,false,1
+21.4,58.3,128,45000,true,true,false,false,240,30500,4100,12,0.55,false,100,true,true,false,0
+29.9,49.0,86,23000,false,false,false,false,36,5100,990,-5,0.48,false,100,true,false,false,0
+38.7,75.1,33,6400,false,false,true,false,4,760,260,-40,0.27,true,45,false,false,false,1
+10.5,32.0,540,150000,true,true,false,false,360,502000,12000,5,0.58,false,100,true,true,true,0

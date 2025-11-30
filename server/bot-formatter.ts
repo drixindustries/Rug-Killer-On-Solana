@@ -302,11 +302,34 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     
     const mlConfidence = (ml.confidence * 100).toFixed(0);
     mlAnalysis = `🤖 **ML Decision Tree** (TypeScript)\n${mlEmoji} Rug Risk: ${mlPercent}%\n• Confidence: ${mlConfidence}%\n• Model: ${ml.model}`;
+    if (ml.externalWeightsApplied) {
+      const genDate = ml.weightsGeneratedAt ? String(ml.weightsGeneratedAt).split('T')[0] : 'dynamic';
+      mlAnalysis += `\n• Weights: ${ml.weightsVersion || 'dynamic'} @ ${genDate}`;
+    } else {
+      mlAnalysis += `\n• Weights: base v1.0`;
+    }
     
     if (ml.topFactors && ml.topFactors.length > 0) {
-      const topFactor = ml.topFactors[0];
-      const factorName = topFactor.name?.replace(/([A-Z])/g, ' $1').trim() || 'Unknown Factor';
-      mlAnalysis += `\n• Top Risk: ${factorName} (${topFactor.impact > 0 ? '+' : ''}${topFactor.impact.toFixed(0)} pts)`;
+      // topFactors entries have shape { factor, impact }
+      const sorted = ml.topFactors.slice().sort((a: any, b: any) => Math.abs(b.impact) - Math.abs(a.impact));
+      const topFactor = sorted[0];
+      const factorLabel = (topFactor.factor || '').replace(/([A-Z])/g, ' $1').trim() || 'Unknown Signal';
+      mlAnalysis += `\n• Top Risk: ${factorLabel} (${topFactor.impact > 0 ? '+' : ''}${topFactor.impact.toFixed(0)} pts)`;
+      // Show mitigating factor (largest negative impact) if present
+      const mitigations = sorted.filter(f => f.impact < 0);
+      if (mitigations.length > 0) {
+        const bestMitigation = mitigations[0];
+        const mitLabel = (bestMitigation.factor || '').replace(/([A-Z])/g, ' $1').trim();
+        mlAnalysis += `\n• Mitigation: ${mitLabel} (${bestMitigation.impact.toFixed(0)} pts)`;
+      }
+      // Optional second tier risk contributors
+      const secondary = sorted.slice(1, 3).filter(f => f.impact > 0);
+      if (secondary.length > 0) {
+        const secText = secondary.map(f => `${(f.factor || '').split(' ').slice(0,4).join(' ')} (${f.impact.toFixed(0)}pts)`).join(', ');
+        mlAnalysis += `\n• Other Factors: ${secText}`;
+      }
+    } else {
+      mlAnalysis += `\n• Top Risk: Data Unavailable`;
     }
   }
   

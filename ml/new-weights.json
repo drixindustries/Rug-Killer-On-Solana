@@ -1,0 +1,25 @@
+{
+  "generatedAt": "2025-11-30T00:00:00.000Z",
+  "meanOutcome": 0.45,
+  "featureWeights": {
+    "topHolderPercent": 12.5,
+    "top10Concentration": 15.3,
+    "holderCount": -8.4,
+    "liquidityUSD": -10.2,
+    "poolLocked": -18.0,
+    "poolBurned": -22.0,
+    "mintEnabled": 24.0,
+    "freezeEnabled": 19.0,
+    "ageHours": 6.1,
+    "volume24h": -5.7,
+    "txns24h": -4.3,
+    "priceChange24h": 7.8,
+    "buyPressure": 5.2,
+    "bondingCurve": 3.5,
+    "isPumpFun": 4.0,
+    "hasWebsite": -2.0,
+    "hasTwitter": -3.0,
+    "hasTelegram": -2.5
+  },
+  "notes": "Placeholder weights; replace by running training script on real dataset"
+}
