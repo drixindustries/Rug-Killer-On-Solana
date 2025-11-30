@@ -1,4 +1,5 @@
 import { Client, GatewayIntentBits, EmbedBuilder, SlashCommandBuilder, REST, Routes, ChannelType, PermissionFlagsBits } from 'discord.js';
+import { PublicKey } from '@solana/web3.js';
 import { tokenAnalyzer } from './solana-analyzer';
 import { storage } from './storage';
 import type { TokenAnalysisResponse } from '../shared/schema';
@@ -13,6 +14,9 @@ import { holderAnalysis } from './services/holder-analysis';
 import { DexScreenerService } from './dexscreener-service';
 import { getCreatorWallet } from './creator-wallet';
 import { smartMoneyRelay } from './services/smart-money-relay.ts';
+import { getAccessControlService } from './services/access-control.js';
+import { getWhopService } from './services/whop-service.js';
+import { connection } from './solana-connection.js';
 
 // Instantiate shared service singletons needed in command handlers
 const dexScreener = new DexScreenerService();
@@ -465,6 +469,16 @@ const commands = [
       .setDescription('View smart wallet details')
       .addStringOption(o => o.setName('wallet').setDescription('Wallet address').setRequired(true))
     ),
+  new SlashCommandBuilder()
+    .setName('linkwallet')
+    .setDescription('Link your Solana wallet for token-gated access (10M+ tokens)')
+    .addStringOption(option => option.setName('address').setDescription('Your Solana wallet address').setRequired(true)),
+  new SlashCommandBuilder()
+    .setName('trial')
+    .setDescription('Check your trial status and access options'),
+  new SlashCommandBuilder()
+    .setName('access')
+    .setDescription('View your current access level and upgrade options'),
 ].map(command => command.toJSON());
 
 // ============================================================================
@@ -504,6 +518,43 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     if (!interaction.isChatInputCommand()) return;
     
     try {
+      // Access control check
+      const accessControl = getAccessControlService(connection);
+      const isGroupContext = !!interaction.guildId;
+      const checkId = isGroupContext ? interaction.guildId! : interaction.user.id;
+      
+      const accessCheck = await accessControl.checkAccess(checkId, 'discord', isGroupContext);
+      
+      // Allow help and linkwallet commands without access
+      const freeCommands = ['help', 'linkwallet', 'trial'];
+      
+      if (!accessCheck.hasAccess && !freeCommands.includes(interaction.commandName)) {
+        const deniedEmbed = new EmbedBuilder()
+          .setColor(0xff6b6b)
+          .setTitle('🔒 Access Required')
+          .setDescription(accessCheck.reason)
+          .addFields(
+            {
+              name: '🎁 Get Access',
+              value: '**Option 1:** Hold 10M+ RUG KILLER tokens\n**Option 2:** Subscribe via Whop\n**Option 3:** Add bot to your server group'
+            },
+            {
+              name: '🔗 Link Your Wallet',
+              value: 'Use `/linkwallet <address>` to enable token-gating access'
+            }
+          );
+        
+        if (accessCheck.upgradeUrl) {
+          deniedEmbed.addFields({
+            name: '💳 Subscribe Now',
+            value: `[Click here to upgrade](${accessCheck.upgradeUrl})`
+          });
+        }
+        
+        await interaction.reply({ embeds: [deniedEmbed], ephemeral: true });
+        return;
+      }
+      
       const platformUserId = `discord:${interaction.user.id}`;
       // Build admin allowlist from multiple env vars for compatibility
       const adminEnvVars = [
@@ -554,6 +605,10 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             {
               name: '🔔 Personal Tools',
               value: '`/watch <address>` add • `/unwatch <address>` remove • `/watchlist` show\n`/alert <address> above|below <price>` set price alert'
+            },
+            {
+              name: '🔐 Access & Membership',
+              value: '`/linkwallet <address>` - Link wallet for token-gating\n`/trial` - Check trial status\n`/access` - View access level'
             },
             {
               name: '🧰 Admin/Community',
@@ -1920,6 +1975,174 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           .setFooter({ text: `Token: ${formatAddress(tokenAddress)}` })
           .setTimestamp();
         await interaction.reply({ embeds: [embed], ephemeral: false });
+      
+      } else if (interaction.commandName === 'linkwallet') {
+        const walletAddress = interaction.options.getString('address', true);
+        await interaction.deferReply({ ephemeral: true });
+        
+        try {
+          // Validate Solana address
+          try {
+            new PublicKey(walletAddress);
+          } catch {
+            const errorEmbed = new EmbedBuilder()
+              .setColor(0xff0000)
+              .setTitle('❌ Invalid Wallet Address')
+              .setDescription('Please provide a valid Solana wallet address.');
+            await interaction.editReply({ embeds: [errorEmbed] });
+            return;
+          }
+          
+          const accessControl = getAccessControlService(connection);
+          const success = await accessControl.linkWallet(interaction.user.id, 'discord', walletAddress);
+          
+          if (success) {
+            // Check token balance immediately
+            const accessCheck = await accessControl.checkAccess(interaction.user.id, 'discord', false);
+            
+            const embed = new EmbedBuilder()
+              .setColor(accessCheck.hasAccess && accessCheck.accessType === 'token_holder' ? 0x00ff00 : 0xffaa00)
+              .setTitle(accessCheck.hasAccess && accessCheck.accessType === 'token_holder' ? '✅ Wallet Linked & Access Granted!' : '🔗 Wallet Linked')
+              .setDescription(`Linked wallet: \`${formatAddress(walletAddress)}\``)
+              .addFields({
+                name: 'Access Status',
+                value: accessCheck.hasAccess && accessCheck.accessType === 'token_holder' 
+                  ? '🎉 You have access! (10M+ tokens detected)'
+                  : `⚠️ Requires 10M+ RUG KILLER tokens for access\n\n${accessCheck.reason}`
+              })
+              .setTimestamp();
+            
+            await interaction.editReply({ embeds: [embed] });
+          } else {
+            throw new Error('Failed to link wallet');
+          }
+        } catch (error: any) {
+          const errorEmbed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('❌ Linking Failed')
+            .setDescription(`Error: ${error.message || 'Unknown error'}`);
+          await interaction.editReply({ embeds: [errorEmbed] });
+        }
+      
+      } else if (interaction.commandName === 'trial') {
+        await interaction.deferReply({ ephemeral: true });
+        
+        try {
+          const accessControl = getAccessControlService(connection);
+          const isGroupContext = !!interaction.guildId;
+          const checkId = isGroupContext ? interaction.guildId! : interaction.user.id;
+          const accessCheck = await accessControl.checkAccess(checkId, 'discord', isGroupContext);
+          
+          const embed = new EmbedBuilder()
+            .setColor(accessCheck.hasAccess ? 0x00ff00 : 0xff6b6b)
+            .setTitle(isGroupContext ? '👥 Group Access Status' : '🎁 Trial Status')
+            .setDescription(accessCheck.reason)
+            .addFields({
+              name: 'Current Access',
+              value: accessCheck.hasAccess ? '✅ Active' : '❌ Expired/Denied',
+              inline: true
+            }, {
+              name: 'Access Type',
+              value: accessCheck.accessType.replace(/_/g, ' ').toUpperCase(),
+              inline: true
+            });
+          
+          if (accessCheck.trialEndsAt) {
+            embed.addFields({
+              name: 'Trial Ends',
+              value: accessCheck.trialEndsAt.toLocaleDateString(),
+              inline: true
+            });
+          }
+          
+          if (!accessCheck.hasAccess) {
+            embed.addFields({
+              name: '🎁 Get Access',
+              value: '**Option 1:** Hold 10M+ RUG KILLER tokens (use `/linkwallet`)\n**Option 2:** Subscribe via Whop\n**Option 3:** Add bot to your Discord server'
+            });
+            
+            if (accessCheck.upgradeUrl) {
+              embed.addFields({
+                name: '💳 Subscribe Now',
+                value: `[Click here to upgrade](${accessCheck.upgradeUrl})`
+              });
+            }
+          }
+          
+          await interaction.editReply({ embeds: [embed] });
+        } catch (error: any) {
+          const errorEmbed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('❌ Error')
+            .setDescription(`Failed to check trial status: ${error.message || 'Unknown error'}`);
+          await interaction.editReply({ embeds: [errorEmbed] });
+        }
+      
+      } else if (interaction.commandName === 'access') {
+        await interaction.deferReply({ ephemeral: true });
+        
+        try {
+          const accessControl = getAccessControlService(connection);
+          const whopService = getWhopService();
+          const isGroupContext = !!interaction.guildId;
+          const checkId = isGroupContext ? interaction.guildId! : interaction.user.id;
+          const accessCheck = await accessControl.checkAccess(checkId, 'discord', isGroupContext);
+          
+          const embed = new EmbedBuilder()
+            .setColor(accessCheck.hasAccess ? 0x00ff00 : 0xff6b6b)
+            .setTitle('🔐 Your Access Level')
+            .setDescription(accessCheck.reason)
+            .addFields(
+              {
+                name: 'Status',
+                value: accessCheck.hasAccess ? '✅ Active' : '❌ No Active Access',
+                inline: true
+              },
+              {
+                name: 'Type',
+                value: accessCheck.accessType.replace(/_/g, ' ').toUpperCase(),
+                inline: true
+              }
+            );
+          
+          if (accessCheck.trialEndsAt) {
+            embed.addFields({
+              name: '⏰ Trial Expires',
+              value: accessCheck.trialEndsAt.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              }),
+              inline: false
+            });
+          }
+          
+          // Show upgrade options
+          embed.addFields({
+            name: '🎯 Access Options',
+            value: '**🪙 Token Holder** - Hold 10M+ RUG KILLER tokens\n' +
+                   '**💳 Premium** - Subscribe via Whop for unlimited access\n' +
+                   '**👥 Group** - Add bot to Discord/Telegram group\n\n' +
+                   'Use `/linkwallet <address>` to enable token-gated access'
+          });
+          
+          if (!accessCheck.hasAccess && whopService.isConfigured() && accessCheck.upgradeUrl) {
+            embed.addFields({
+              name: '💎 Upgrade to Premium',
+              value: `[Subscribe Now](${accessCheck.upgradeUrl})`
+            });
+          }
+          
+          await interaction.editReply({ embeds: [embed] });
+        } catch (error: any) {
+          const errorEmbed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('❌ Error')
+            .setDescription(`Failed to check access: ${error.message || 'Unknown error'}`);
+          await interaction.editReply({ embeds: [errorEmbed] });
+        }
+      
       } else if (interaction.commandName === 'graderepo') {
         const githubUrl = interaction.options.getString('url', true);
         console.log(`[Discord /graderepo] User ${interaction.user.tag} grading: ${githubUrl}`);

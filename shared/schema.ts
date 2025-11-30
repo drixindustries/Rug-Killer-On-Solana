@@ -1595,3 +1595,25 @@ export const scanHistory = pgTable("scan_history", {
 
 export type ScanHistory = typeof scanHistory.$inferSelect;
 export type InsertScanHistory = typeof scanHistory.$inferInsert;
+
+// User Access Control (Whop + Token Gating + Trials)
+export const userAccessControl = pgTable("user_access_control", {
+  id: serial("id").primaryKey(),
+  identifier: varchar("identifier", { length: 255 }).notNull().unique(), // discord:123 or telegram:456 or discord_group:789
+  isGroup: boolean("is_group").default(false).notNull(),
+  accessType: varchar("access_type", { length: 50 }).default("trial"), // trial, token_holder, paid, denied
+  walletAddress: varchar("wallet_address", { length: 44 }),
+  trialEndsAt: timestamp("trial_ends_at"),
+  membershipExpiresAt: timestamp("membership_expires_at"),
+  lastValidatedAt: timestamp("last_validated_at"),
+  whopMembershipId: varchar("whop_membership_id", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  identifierIdx: uniqueIndex("user_access_identifier_idx").on(table.identifier),
+  accessTypeIdx: index("user_access_type_idx").on(table.accessType),
+  trialEndsIdx: index("user_access_trial_ends_idx").on(table.trialEndsAt),
+}));
+
+export type UserAccessControl = typeof userAccessControl.$inferSelect;
+export type InsertUserAccessControl = typeof userAccessControl.$inferInsert;

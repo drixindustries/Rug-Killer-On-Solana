@@ -1,5 +1,6 @@
 import { Telegraf, Context } from 'telegraf';
 import { message } from 'telegraf/filters';
+import { PublicKey } from '@solana/web3.js';
 import { tokenAnalyzer } from './solana-analyzer';
 import { storage } from './storage';
 import type { TokenAnalysisResponse } from '../shared/schema';
@@ -13,6 +14,9 @@ import { trendingCallsTracker } from './trending-calls-tracker';
 import { holderAnalysis } from './services/holder-analysis';
 import { DexScreenerService } from './dexscreener-service';
 import { getCreatorWallet } from './creator-wallet';
+import { getAccessControlService } from './services/access-control.js';
+import { getWhopService } from './services/whop-service.js';
+import { connection } from './solana-connection.js';
 
 const dexScreener = new DexScreenerService();
 const creatorWalletService = getCreatorWallet();
@@ -96,6 +100,45 @@ function createTelegramBot(botToken: string): Telegraf {
     console.warn('⚠️ Failed to set Telegram bot commands (silenced):', (err as any)?.message || String(err));
   });
   
+  // Middleware: Access control check
+  bot.use(async (ctx, next) => {
+    // Skip access control for these commands
+    const freeCommands = ['start', 'linkwallet', 'trial', 'access'];
+    const command = ctx.message && 'text' in ctx.message ? ctx.message.text.split(' ')[0].replace('/', '') : '';
+    
+    if (freeCommands.includes(command)) {
+      return next();
+    }
+    
+    try {
+      const accessControl = getAccessControlService(connection);
+      const isGroupContext = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+      const checkId = isGroupContext ? String(ctx.chat?.id) : String(ctx.from?.id);
+      
+      const accessCheck = await accessControl.checkAccess(checkId, 'telegram', isGroupContext);
+      
+      if (!accessCheck.hasAccess) {
+        let message = `🔒 **Access Required**\n\n${accessCheck.reason}\n\n`;
+        message += '**Get Access:**\n';
+        message += '🪙 Hold 10M+ RUG KILLER tokens (use /linkwallet)\n';
+        message += '💳 Subscribe via Whop\n';
+        message += '👥 Add bot to your Telegram group\n\n';
+        message += 'Use /linkwallet <address> to enable token-gated access';
+        
+        if (accessCheck.upgradeUrl) {
+          message += `\n\n[💎 Subscribe Now](${accessCheck.upgradeUrl})`;
+        }
+        
+        await ctx.reply(message, { parse_mode: 'Markdown' });
+        return; // Block command execution
+      }
+    } catch (error) {
+      console.error('[Telegram Access Control] Error:', error);
+    }
+    
+    return next();
+  });
+  
   // /start command
   bot.command('start', async (ctx) => {
     const help = rally.getHelpMessage();
@@ -121,6 +164,10 @@ function createTelegramBot(botToken: string): Telegraf {
       '**Personal Tools:**\n' +
       '/watch <address> • /unwatch <address> • /watchlist\n' +
       '/alert <address> above|below <price>\n\n' +
+      '**Access Commands:**\n' +
+      '/linkwallet <address> - Link wallet for token-gating\n' +
+      '/trial - Check trial status\n' +
+      '/access - View access level\n\n' +
       '**Admin/Community:**\n' +
       '/report <wallet> <reason>\n' +
       '/blackliststats • /blacklisttop [limit]\n' +
@@ -128,6 +175,120 @@ function createTelegramBot(botToken: string): Telegraf {
       'Send any token address for quick analysis!',
       { parse_mode: 'Markdown' }
     );
+  });
+  
+  // /linkwallet command
+  bot.command('linkwallet', async (ctx) => {
+    const args = (ctx.message?.text || '').split(' ');
+    if (args.length < 2) {
+      return ctx.reply('❌ Please provide your Solana wallet address.\n\nExample: `/linkwallet YourWalletAddressHere`', { parse_mode: 'Markdown' });
+    }
+    
+    const walletAddress = args[1];
+    
+    try {
+      // Validate Solana address
+      try {
+        new PublicKey(walletAddress);
+      } catch {
+        return ctx.reply('❌ Invalid Solana wallet address. Please check and try again.');
+      }
+      
+      const accessControl = getAccessControlService(connection);
+      const success = await accessControl.linkWallet(String(ctx.from?.id), 'telegram', walletAddress);
+      
+      if (success) {
+        // Check token balance immediately
+        const accessCheck = await accessControl.checkAccess(String(ctx.from?.id), 'telegram', false);
+        
+        let message = `🔗 **Wallet Linked**\n\n`;
+        message += `Address: \`${formatAddress(walletAddress)}\`\n\n`;
+        
+        if (accessCheck.hasAccess && accessCheck.accessType === 'token_holder') {
+          message += '🎉 **Access Granted!**\n10M+ tokens detected. You now have full access!';
+        } else {
+          message += `⚠️ **Access Status:** ${accessCheck.reason}\n\n`;
+          message += 'You need 10M+ RUG KILLER tokens for access.';
+        }
+        
+        await ctx.reply(message, { parse_mode: 'Markdown' });
+      } else {
+        throw new Error('Failed to link wallet');
+      }
+    } catch (error: any) {
+      console.error('Telegram linkwallet error:', error);
+      ctx.reply(`❌ Error linking wallet: ${error.message || 'Unknown error'}`);
+    }
+  });
+  
+  // /trial command
+  bot.command('trial', async (ctx) => {
+    try {
+      const accessControl = getAccessControlService(connection);
+      const isGroupContext = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+      const checkId = isGroupContext ? String(ctx.chat?.id) : String(ctx.from?.id);
+      const accessCheck = await accessControl.checkAccess(checkId, 'telegram', isGroupContext);
+      
+      let message = isGroupContext ? '👥 **Group Access Status**\n\n' : '🎁 **Trial Status**\n\n';
+      message += `${accessCheck.reason}\n\n`;
+      message += `**Current Access:** ${accessCheck.hasAccess ? '✅ Active' : '❌ Expired/Denied'}\n`;
+      message += `**Access Type:** ${accessCheck.accessType.replace(/_/g, ' ').toUpperCase()}\n`;
+      
+      if (accessCheck.trialEndsAt) {
+        message += `**Trial Ends:** ${accessCheck.trialEndsAt.toLocaleDateString()}\n`;
+      }
+      
+      if (!accessCheck.hasAccess) {
+        message += '\n**Get Access:**\n';
+        message += '🪙 Hold 10M+ RUG KILLER tokens (use /linkwallet)\n';
+        message += '💳 Subscribe via Whop\n';
+        message += '👥 Add bot to your Telegram group';
+        
+        if (accessCheck.upgradeUrl) {
+          message += `\n\n[💎 Subscribe Now](${accessCheck.upgradeUrl})`;
+        }
+      }
+      
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (error: any) {
+      console.error('Telegram trial error:', error);
+      ctx.reply(`❌ Error checking trial status: ${error.message || 'Unknown error'}`);
+    }
+  });
+  
+  // /access command
+  bot.command('access', async (ctx) => {
+    try {
+      const accessControl = getAccessControlService(connection);
+      const whopService = getWhopService();
+      const isGroupContext = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+      const checkId = isGroupContext ? String(ctx.chat?.id) : String(ctx.from?.id);
+      const accessCheck = await accessControl.checkAccess(checkId, 'telegram', isGroupContext);
+      
+      let message = '🔐 **Your Access Level**\n\n';
+      message += `${accessCheck.reason}\n\n`;
+      message += `**Status:** ${accessCheck.hasAccess ? '✅ Active' : '❌ No Active Access'}\n`;
+      message += `**Type:** ${accessCheck.accessType.replace(/_/g, ' ').toUpperCase()}\n`;
+      
+      if (accessCheck.trialEndsAt) {
+        message += `**Trial Expires:** ${accessCheck.trialEndsAt.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}\n`;
+      }
+      
+      message += '\n**Access Options:**\n';
+      message += '🪙 **Token Holder** - Hold 10M+ RUG KILLER tokens\n';
+      message += '💳 **Premium** - Subscribe via Whop for unlimited access\n';
+      message += '👥 **Group** - Add bot to Telegram group\n\n';
+      message += 'Use /linkwallet <address> to enable token-gated access';
+      
+      if (!accessCheck.hasAccess && whopService.isConfigured() && accessCheck.upgradeUrl) {
+        message += `\n\n[💎 Upgrade to Premium](${accessCheck.upgradeUrl})`;
+      }
+      
+      await ctx.reply(message, { parse_mode: 'Markdown' });
+    } catch (error: any) {
+      console.error('Telegram access error:', error);
+      ctx.reply(`❌ Error checking access: ${error.message || 'Unknown error'}`);
+    }
   });
   
   // /execute command - Full analysis
