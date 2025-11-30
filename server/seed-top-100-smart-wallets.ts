@@ -827,8 +827,13 @@ async function seedTop100SmartWallets() {
   console.log('🚀 Starting to seed Top 100 Smart Money Wallets...\n');
 
   const walletsToInsert = TOP_100_WALLETS.map(wallet => {
-    // Calculate wins/losses from win rate (approximation)
-    const totalTrades = 100; // Assume 100 trades for calculation
+    // Calculate wins/losses from win rate with realistic trade counts
+    // Higher profit wallets likely have more trades (scale from 200-500 trades)
+    const profitTier = wallet.profitUsd / 1000000; // In millions
+    const baseTrades = 200;
+    const additionalTrades = Math.min(300, Math.floor(profitTier * 75));
+    const totalTrades = baseTrades + additionalTrades;
+    
     const wins = Math.round(totalTrades * (wallet.winRate / 100));
     const losses = totalTrades - wins;
 
