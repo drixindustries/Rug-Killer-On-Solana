@@ -29,7 +29,7 @@ export class AccessControlService {
   }
 
   /**
-   * Redeem a master access code (admin bypass)
+   * Redeem a one-time master access code (admin bypass)
    */
   async redeemAccessCode(userId: string, platform: 'discord' | 'telegram', code: string, isGroup: boolean = false): Promise<{ success: boolean; message: string }> {
     const MASTER_CODE = process.env.ADMIN_ACCESS_CODE || 'RUG_KILLER_ELITE_2025';
@@ -41,13 +41,27 @@ export class AccessControlService {
       };
     }
 
-    const identifier = isGroup ? `${platform}_group:${userId}` : `${platform}:${userId}`;
-
     try {
+      // Check if code has already been used by ANYONE
+      const alreadyUsed = await db
+        .select()
+        .from(userAccessControl)
+        .where(sql`${userAccessControl.whopMembershipId} = 'ADMIN_CODE_REDEEMED'`)
+        .limit(1);
+
+      if (alreadyUsed.length > 0) {
+        return {
+          success: false,
+          message: '❌ This code has already been redeemed and cannot be used again.'
+        };
+      }
+
+      const identifier = isGroup ? `${platform}_group:${userId}` : `${platform}:${userId}`;
+
       // Grant permanent access (expires in year 2099)
       const permanentExpiry = new Date('2099-12-31');
       
-      // Check if record exists
+      // Check if user already has a record
       const existing = await db
         .select()
         .from(userAccessControl)
@@ -84,11 +98,11 @@ export class AccessControlService {
           });
       }
 
-      console.log(`[AccessControl] Admin code redeemed for ${identifier}`);
+      console.log(`[AccessControl] ONE-TIME admin code redeemed for ${identifier}`);
 
       return {
         success: true,
-        message: '✅ Lifetime access granted! You will never be locked out.'
+        message: '✅ Lifetime access granted! You will never be locked out.\n\n⚠️ This code is now burned and cannot be used again.'
       };
     } catch (error) {
       console.error('[AccessControl] Error redeeming code:', error);

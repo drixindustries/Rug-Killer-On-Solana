@@ -1,8 +1,10 @@
 # Admin Access Code - Private
 
-## 🔑 Your Master Access Code
+## 🔑 Your One-Time Master Access Code
 
 **Default Code:** `RUG_KILLER_ELITE_2025`
+
+⚠️ **ONE-TIME USE ONLY** - Once redeemed, this code is burned and cannot be used again by anyone!
 
 This code grants **lifetime access** to the bot - you'll never be locked out!
 
@@ -37,21 +39,25 @@ If `ADMIN_ACCESS_CODE` is not set, it defaults to: `RUG_KILLER_ELITE_2025`
 
 ## Security Notes
 
-🔒 **Keep this code private!** Anyone with this code gets lifetime access.
+🔒 **Keep this code private!** Anyone who redeems it first gets lifetime access.
 
-🔐 **One-time use per user/group** - Once redeemed, the user/group gets permanent access. The same code can be redeemed by multiple users.
+🔐 **TRUE ONE-TIME USE** - Once redeemed by ANYONE, the code is permanently burned. No one else can use it ever again.
 
-💡 **Recommended:** Set a custom `ADMIN_ACCESS_CODE` in Railway for production.
+💡 **Important:** Redeem this code immediately on your account before anyone else does!
+
+💡 **To generate new codes:** Change `ADMIN_ACCESS_CODE` in Railway to a new value.
 
 ## Command Details
 
 The `/redeem` command:
 - Works without trial or access requirements
 - Can be used even if trial expired
+- **ONE-TIME USE** - Checks if code already redeemed before allowing
 - Updates database to grant permanent access
 - Sets `accessType` to `'paid'`
 - Sets `membershipExpiresAt` to `2099-12-31`
 - Logs redemption with identifier `ADMIN_CODE_REDEEMED`
+- Returns error if code already used by anyone
 
 ## Testing
 
