@@ -104,11 +104,10 @@ router.post('/codes/generate', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { tier = 'lifetime', maxUses = 1, expiresInDays = null, codePrefix = 'RUG' } = req.body;
+    const { tier = 'lifetime', maxUses = 1, expiresInDays = null, codePrefix = 'RUG', code: customCode } = req.body;
 
-    // Generate a random code
-    const randomPart = Math.random().toString(36).substring(2, 10).toUpperCase();
-    const code = `${codePrefix}-${randomPart}`;
+    // Use custom code if provided, otherwise generate random
+    const code = customCode || `${codePrefix}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
 
     // Calculate expiration date if specified
     let expiresAt = null;
