@@ -438,8 +438,8 @@ const commands = [
     .addStringOption(option => option.setName('address').setDescription('Token address').setRequired(true)),
   new SlashCommandBuilder()
     .setName('graderepo')
-    .setDescription('Grade a GitHub repository (0-100% confidence)')
-    .addStringOption(option => option.setName('url').setDescription('GitHub repository URL (e.g., https://github.com/owner/repo)').setRequired(true)),
+    .setDescription('Grade any GitHub repository with AI-powered analysis (0-100%)')
+    .addStringOption(option => option.setName('url').setDescription('GitHub repository URL (e.g., https://github.com/solana-labs/solana)').setRequired(true)),
   new SlashCommandBuilder()
     .setName('smartwallet')
     .setDescription('Manage Smart Money wallet DB (admin)')
