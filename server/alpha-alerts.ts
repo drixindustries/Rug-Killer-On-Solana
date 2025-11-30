@@ -294,65 +294,76 @@ export class AlphaAlertService {
       // Prominently display who bought
       const walletName = alert.data?.walletName || alert.source;
       const influenceScore = alert.data?.influenceScore;
-      const walletEmoji = influenceScore && influenceScore >= 80 ? '⭐' : '👤';
+      const walletEmoji = influenceScore && influenceScore >= 80 ? '⭐' : '💼';
       
-      summaryLines.push(`${walletEmoji} **${walletName}** ${influenceScore ? `(Influence: ${influenceScore}/100)` : ''}`);
-      if (walletAddress) {
-        summaryLines.push(`🔑 \`${walletAddress}\``);
-      }
-      
-      // Add wallet PNL stats if available
+      // Add wallet PNL stats if available (moved to header)
       const walletStats = alert.data?.walletStats;
+      let walletStatsLine = '';
       if (walletStats) {
-        const pnlLines: string[] = [];
         const wins = walletStats.wins || 0;
         const losses = walletStats.losses || 0;
         const totalTrades = wins + losses;
+        
+        // Build compact stats for header
+        const statParts: string[] = [];
         if (walletStats.profitSol !== null && walletStats.profitSol !== undefined) {
           const profitEmoji = walletStats.profitSol >= 0 ? '💰' : '📉';
           const profitFormatted = Math.abs(walletStats.profitSol).toFixed(2);
-          const avgPerTrade = totalTrades > 0 ? (walletStats.profitSol / totalTrades).toFixed(2) : null;
-          pnlLines.push(`${profitEmoji} PNL: ${walletStats.profitSol >= 0 ? '+' : '-'}${profitFormatted} SOL${avgPerTrade ? ` (avg ${avgPerTrade} SOL/trade)` : ''}`);
-        }
-        if (totalTrades > 0) {
-          pnlLines.push(`📊 W/L: ${wins}/${losses} (${totalTrades} trades)`);
+          statParts.push(`${profitEmoji} PNL: ${walletStats.profitSol >= 0 ? '+' : '-'}${profitFormatted} SOL (avg ${totalTrades > 0 ? (walletStats.profitSol / totalTrades).toFixed(2) : '0.00'} SOL/trade)`);
         }
         if (walletStats.winRate !== undefined) {
           const winRateEmoji = walletStats.winRate >= 70 ? '🔥' : walletStats.winRate >= 50 ? '✅' : '⚠️';
-          const winRateDisplay = Number.isFinite(walletStats.winRate) ? `${walletStats.winRate.toFixed ? walletStats.winRate.toFixed(1) : walletStats.winRate}%` : 'n/a';
-          pnlLines.push(`${winRateEmoji} Win Rate: ${winRateDisplay}`);
+          const winRateDisplay = Number.isFinite(walletStats.winRate) ? `${walletStats.winRate.toFixed ? walletStats.winRate.toFixed(1) : walletStats.winRate}%` : '0.0%';
+          statParts.push(`${winRateEmoji} Win Rate: ${winRateDisplay}`);
         }
-        if (pnlLines.length > 0) {
-          summaryLines.push(pnlLines.join(' | '));
+        if (totalTrades > 0) {
+          statParts.push(`📊 W/L: ${wins}/${losses} (${totalTrades} trades)`);
+        }
+        if (statParts.length > 0) {
+          walletStatsLine = '\n' + statParts.join(' | ');
         }
       }
       
+      summaryLines.push(`${walletEmoji} **${walletName}** ${influenceScore ? `(Influence: ${influenceScore}/100)` : ''}${walletStatsLine}`);
+      
       summaryLines.push(`📍 CA: \`${alert.mint}\``);
+      
+      if (walletAddress) {
+        summaryLines.push(`🔑 ${shortWallet}`);
+      }
+      
       if (providerLabel) {
         summaryLines.push(`📡 Source: ${providerLabel}`);
       }
-      if (tokenSymbol) {
-        summaryLines.push(`🏷️ Token: ${tokenSymbol}${tokenName ? ` (${tokenName})` : ''}`);
-      }
+      
+      // Token info and purchase amount on same line
       const formattedSize = formatValue(amountToken, amountToken > 1 ? 2 : 4);
       const formattedUsd = formatValue(amountUsd, amountUsd > 1000 ? 0 : 2);
-      if (formattedSize || formattedUsd) {
-        summaryLines.push(`🛒 Bought: ${formattedSize ? `${formattedSize} tokens` : ''}${formattedSize && formattedUsd ? ' • ' : ''}${formattedUsd ? `$${formattedUsd}` : ''}`);
+      const buyInfo = formattedSize || formattedUsd ? `🛒 Bought: ${formattedSize ? `${formattedSize} tokens` : ''}${formattedSize && formattedUsd ? ' • ' : ''}${formattedUsd ? `$${formattedUsd}` : ''}` : null;
+      
+      if (tokenSymbol) {
+        summaryLines.push(`🏷️ ${tokenSymbol}${tokenName ? ` (${tokenName})` : ''}${buyInfo ? ` • ${buyInfo}` : ''}`);
+      } else if (buyInfo) {
+        summaryLines.push(buyInfo);
       }
+      
       if (gmgnLines) {
         summaryLines.push(gmgnLines);
       }
-      if (txHash) {
-        summaryLines.push(`🧾 Tx: \`${txHash}\``);
-      }
+      
       summaryLines.push(`🔗 https://pump.fun/${alert.mint}`);
       summaryLines.push(`💎 https://dexscreener.com/solana/${alert.mint}`);
       summaryLines.push(`🔍 https://solscan.io/token/${alert.mint}`);
+      
+      if (txHash) {
+        summaryLines.push(`🧾 https://solscan.io/tx/${txHash}`);
+      }
+      
       if (sourceUrl) {
-        summaryLines.push(`🛰️ Trace: ${sourceUrl}`);
+        summaryLines.push(`🛰️ ${sourceUrl}`);
       }
 
-      message = `🚨 **SMART MONEY BUY: ${alert.source}**\n\n${summaryLines.join('\n')}`;
+      message = `🚨 **SMART MONEY BUY: ${walletName}**\n\n${summaryLines.join('\n')}`;
     }
     
     const DIRECT = process.env.ALPHA_ALERTS_DIRECT_SEND === 'true';
