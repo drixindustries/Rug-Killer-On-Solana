@@ -12,6 +12,7 @@ import { trendingCallsTracker } from './trending-calls-tracker';
 import { holderAnalysis } from './services/holder-analysis';
 import { DexScreenerService } from './dexscreener-service';
 import { getCreatorWallet } from './creator-wallet';
+import { smartMoneyRelay } from './services/smart-money-relay.ts';
 
 // Instantiate shared service singletons needed in command handlers
 const dexScreener = new DexScreenerService();

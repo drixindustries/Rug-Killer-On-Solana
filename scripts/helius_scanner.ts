@@ -9,7 +9,7 @@ import { PublicKey } from '@solana/web3.js';
 // Use existing analyzer from server
 // Note: tsx can run ESM/TS across workspace; path is relative to repo root
 import { tokenAnalyzer } from '../server/solana-analyzer.ts';
-import { smartMoneyRelay, getDirective } from '../server/services/smart-money-relay.ts';
+import { smartMoneyRelay, getDirective } from '../server/services/smart-money-relay.js';
 
 dotenv.config();
 
