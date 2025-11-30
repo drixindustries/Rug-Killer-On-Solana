@@ -2749,7 +2749,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
   }); // End of messageCreate handler
   
   // Ready event (using clientReady for Discord.js v14+)
-  client.once('clientReady' as any, () => {
+  client.once('clientReady' as any, async () => {
     console.log(`✅ Discord bot logged in as ${client.user?.tag}`);
     registerCommands();
     
