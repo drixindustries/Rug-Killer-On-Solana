@@ -305,23 +305,23 @@ export class AlphaAlertService {
       const walletStats = alert.data?.walletStats;
       if (walletStats) {
         const pnlLines: string[] = [];
-        
+        const wins = walletStats.wins || 0;
+        const losses = walletStats.losses || 0;
+        const totalTrades = wins + losses;
         if (walletStats.profitSol !== null && walletStats.profitSol !== undefined) {
           const profitEmoji = walletStats.profitSol >= 0 ? '💰' : '📉';
           const profitFormatted = Math.abs(walletStats.profitSol).toFixed(2);
-          pnlLines.push(`${profitEmoji} PNL: ${walletStats.profitSol >= 0 ? '+' : '-'}${profitFormatted} SOL`);
+          const avgPerTrade = totalTrades > 0 ? (walletStats.profitSol / totalTrades).toFixed(2) : null;
+          pnlLines.push(`${profitEmoji} PNL: ${walletStats.profitSol >= 0 ? '+' : '-'}${profitFormatted} SOL${avgPerTrade ? ` (avg ${avgPerTrade} SOL/trade)` : ''}`);
         }
-        
-        if (walletStats.wins || walletStats.losses) {
-          const totalTrades = walletStats.wins + walletStats.losses;
-          pnlLines.push(`📊 W/L: ${walletStats.wins}/${walletStats.losses} (${totalTrades} trades)`);
+        if (totalTrades > 0) {
+          pnlLines.push(`📊 W/L: ${wins}/${losses} (${totalTrades} trades)`);
         }
-        
         if (walletStats.winRate !== undefined) {
           const winRateEmoji = walletStats.winRate >= 70 ? '🔥' : walletStats.winRate >= 50 ? '✅' : '⚠️';
-          pnlLines.push(`${winRateEmoji} Win Rate: ${walletStats.winRate}%`);
+          const winRateDisplay = Number.isFinite(walletStats.winRate) ? `${walletStats.winRate.toFixed ? walletStats.winRate.toFixed(1) : walletStats.winRate}%` : 'n/a';
+          pnlLines.push(`${winRateEmoji} Win Rate: ${winRateDisplay}`);
         }
-        
         if (pnlLines.length > 0) {
           summaryLines.push(pnlLines.join(' | '));
         }
@@ -335,12 +335,9 @@ export class AlphaAlertService {
         summaryLines.push(`🏷️ Token: ${tokenSymbol}${tokenName ? ` (${tokenName})` : ''}`);
       }
       const formattedSize = formatValue(amountToken, amountToken > 1 ? 2 : 4);
-      if (formattedSize) {
-        summaryLines.push(`🪙 Size: ${formattedSize} tokens`);
-      }
       const formattedUsd = formatValue(amountUsd, amountUsd > 1000 ? 0 : 2);
-      if (formattedUsd) {
-        summaryLines.push(`💵 USD: $${formattedUsd}`);
+      if (formattedSize || formattedUsd) {
+        summaryLines.push(`🛒 Bought: ${formattedSize ? `${formattedSize} tokens` : ''}${formattedSize && formattedUsd ? ' • ' : ''}${formattedUsd ? `$${formattedUsd}` : ''}`);
       }
       if (gmgnLines) {
         summaryLines.push(gmgnLines);
@@ -350,6 +347,7 @@ export class AlphaAlertService {
       }
       summaryLines.push(`🔗 https://pump.fun/${alert.mint}`);
       summaryLines.push(`💎 https://dexscreener.com/solana/${alert.mint}`);
+      summaryLines.push(`🔍 https://solscan.io/token/${alert.mint}`);
       if (sourceUrl) {
         summaryLines.push(`🛰️ Trace: ${sourceUrl}`);
       }
