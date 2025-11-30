@@ -189,6 +189,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
 
+    // Debug: send Smart Money test via internal relay (direct to bot channels)
+    app.post('/api/debug/smart-money/test', requireDebugToken, async (req, res) => {
+      try {
+        const { smartMoneyRelay, getDirective } = await import('./services/smart-money-relay.ts');
+        const { tokenMint, symbol, wallet } = req.body || {};
+
+        const eliteWallets = [
+          {
+            address: wallet || '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+            winrate: 82,
+            profit: 750000,
+            directive: getDirective(82, 750000)
+          }
+        ];
+
+        smartMoneyRelay.publish({
+          tokenMint: tokenMint || 'pump1234567890abcdefghijklmnopqrstuv',
+          symbol: symbol || 'TEST',
+          ageMinutes: 5,
+          walletCount: eliteWallets.length,
+          eliteWallets,
+          allSample: eliteWallets.map(w => w.address.slice(0, 8) + '...'),
+          analysis: {
+            riskScore: 40,
+            holderCount: 200,
+            topConcentration: 28,
+            agedWalletRisk: 0,
+            suspiciousFundingPct: 0,
+            bundled: false,
+          },
+          timestamp: Date.now(),
+        });
+
+        res.json({ ok: true, dispatched: true, wallets: eliteWallets.length });
+      } catch (err: any) {
+        res.status(500).json({ ok: false, error: err?.message || String(err) });
+      }
+    });
+
     // Public test endpoint for alpha alerts (no auth required)
     app.get('/api/alpha-test', async (_req, res) => {
       try {

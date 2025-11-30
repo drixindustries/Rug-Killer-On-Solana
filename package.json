@@ -11,7 +11,10 @@
         "start": "cross-env NODE_ENV=production node dist/prod.js",
         "pumpfun:sync": "tsx scripts/fetch-pumpfun-amm.ts",
         "add-pumpfun-wallet": "tsx scripts/add-pumpfun-wallet.ts",
-        "sync-helius": "tsx scripts/sync-helius-wallets.ts"
+        "sync-helius": "tsx scripts/sync-helius-wallets.ts",
+            "seed:smart-wallets": "tsx server/seed-top-100-smart-wallets.ts",
+                "test:smart-wallets": "tsx test-smart-money-wallets.ts",
+                "get-telegram-chatid": "tsx get-telegram-chatid.ts"
     },
     "dependencies": {
         "@duneanalytics/client-sdk": "^0.3.4",

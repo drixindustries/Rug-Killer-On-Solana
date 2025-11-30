@@ -389,7 +389,8 @@ const commands = [
       )
     )
     .addSubcommand(sc => sc.setName('clearchannel').setDescription('Clear the configured Smart Money alert channel'))
-    .addSubcommand(sc => sc.setName('where').setDescription('Show the configured Smart Money alert channel')),
+    .addSubcommand(sc => sc.setName('where').setDescription('Show the configured Smart Money alert channel'))
+    .addSubcommand(sc => sc.setName('test').setDescription('Send a test Smart Money alert')),
   new SlashCommandBuilder()
     .setName('holders')
     .setDescription('Show top N holders')
@@ -1476,7 +1477,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             try {
               console.log(`[Discord /alpha setchannel] Setting alpha target - Guild: ${interaction.guildId} | Channel: ${channel.id}`);
               await storage.setAlphaTarget({ platform: 'discord', groupId: interaction.guildId, channelId: channel.id });
-              await interaction.editReply({ content: `✅ Alpha alerts will be sent to <#${channel.id}> (@everyone).` });
+              await interaction.editReply({ content: `✅ Alpha alerts will be sent to <#${channel.id}>.` });
             } catch (err: any) {
               console.error('[Discord /alpha setchannel] Error:', err);
               await interaction.editReply({ content: `❌ Failed to set channel: ${err?.message || 'Unknown error'}` });
@@ -1539,7 +1540,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           return;
         }
         await interaction.deferReply({ ephemeral: true });
-        if (!interaction.guildId) {
+        if (!interaction.guildId && sub !== 'test') {
           await interaction.editReply({ content: '❌ This command must be used in a server.' });
           return;
         }
@@ -1550,13 +1551,46 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             return;
           }
           await storage.setSmartTarget({ platform: 'discord', groupId: interaction.guildId, channelId: channel.id });
-          await interaction.editReply({ content: `✅ Smart Money calls will be sent to <#${channel.id}> (@everyone).` });
+          await interaction.editReply({ content: `✅ Smart Money calls will be sent to <#${channel.id}>.` });
         } else if (sub === 'clearchannel') {
           await storage.clearSmartTarget('discord', interaction.guildId);
           await interaction.editReply({ content: '🧹 Cleared this server\'s Smart Money alert channel.' });
         } else if (sub === 'where') {
           const cfg = await storage.getSmartTarget('discord', interaction.guildId);
           await interaction.editReply({ content: cfg ? `📍 Smart Money calls go to <#${cfg.channelId}>` : 'ℹ️ No Smart Money channel configured for this server.' });
+        } else if (sub === 'test') {
+          // Publish a mock smart money event through the relay
+          const mockEvent = {
+            tokenMint: 'pump1234567890abcdefghijklmnopqrstuv',
+            tokenSymbol: 'TEST',
+            tokenName: 'Test Token',
+            wallets: [
+              {
+                address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+                winrate: 82.5,
+                profit: 750000,
+                directive: 'PRIORITY WATCH',
+              },
+              {
+                address: '5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1',
+                winrate: 78.0,
+                profit: 600000,
+                directive: 'HIGH WATCH',
+              },
+            ],
+            source: 'helius-webhook',
+            timestamp: Date.now(),
+          };
+          
+          smartMoneyRelay.publish(mockEvent);
+          
+          await interaction.editReply({ 
+            content: `🧪 **Test Smart Money Alert Sent**\n\n` +
+              `Token: \`${mockEvent.tokenSymbol}\` (\`${mockEvent.tokenMint}\`)\n` +
+              `Wallets: ${mockEvent.wallets.length}\n` +
+              `Top Directive: ${mockEvent.wallets[0].directive}\n\n` +
+              `Check your configured Smart Money channels for the alert.`
+          });
         }
       } else if (interaction.commandName === 'whitelist') {
         const subcommand = interaction.options.getSubcommand(false) ?? 'stats';
@@ -1867,9 +1901,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           await interaction.deferReply();
           try {
             const added = await storage.upsertSmartWallet({ walletAddress: wallet, displayName: name, influenceScore: influence, source: 'manual', isActive: true });
-            await interaction.editReply(`✅ Smart wallet added: \`${formatAddress(wallet)}\` (${name}) with influence ${influence}`);
-            const alphaService = getAlphaAlertService();
-            alphaService.addCaller(wallet, name);
+            await interaction.editReply(`✅ Smart wallet added: \`${formatAddress(wallet)}\` (${name}) with influence ${influence}\n\n⚠️ Note: This is for Smart Money tracking only. Use \`/alpha add\` to add alpha callers.`);
           } catch (e: any) {
             await interaction.editReply(`❌ Failed: ${e.message}`);
           }
@@ -1879,8 +1911,6 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           try {
             await storage.setSmartWalletActive(wallet, false);
             await interaction.editReply(`✅ Smart wallet deactivated: \`${formatAddress(wallet)}\``);
-            const alphaService = getAlphaAlertService();
-            alphaService.removeCaller(wallet);
           } catch (e: any) {
             await interaction.editReply(`❌ Failed: ${e.message}`);
           }
@@ -1890,8 +1920,6 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           try {
             const w = await storage.setSmartWalletActive(wallet, true);
             await interaction.editReply(`✅ Smart wallet re-activated: \`${formatAddress(wallet)}\``);
-            const alphaService = getAlphaAlertService();
-            alphaService.addCaller(wallet, w.displayName || 'Trader');
           } catch (e: any) {
             await interaction.editReply(`❌ Failed: ${e.message}`);
           }
@@ -2613,29 +2641,19 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       alphaService.onAlert(async (alert, message) => {
         try {
           console.log(`[Discord Bot] Alpha alert received - Type: ${alert.type} | Mint: ${alert.mint} | Source: ${alert.source}`);
-          // Get all alpha alert targets and filter for Discord
           const allTargets = await storage.getAlphaTargets();
-          console.log(`[Discord Bot] Total alpha targets: ${allTargets.length}`);
           const discordTargets = allTargets.filter(t => t.platform === 'discord');
-          console.log(`[Discord Bot] Discord targets: ${discordTargets.length}`);
-          
           if (discordTargets.length === 0) {
             console.log(`[Discord Bot] ⚠️ No Discord targets configured. Use /alpha setchannel to configure.`);
           }
-          
           for (const target of discordTargets) {
             try {
-              console.log(`[Discord Bot] Attempting to send to channel ${target.channelId} in guild ${target.groupId}`);
               const channel = await client.channels.fetch(target.channelId);
               if (channel && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement)) {
-                // Send the alpha alert message
                 await (channel as any).send({
-                  content: `@everyone\n\n${message}`,
-                  allowedMentions: { parse: ['everyone'] }
+                  content: `${message}`,
+                  allowedMentions: { parse: [] }
                 });
-                console.log(`[Discord Bot] ✅ Alert sent successfully to channel ${target.channelId}`);
-              } else {
-                console.log(`[Discord Bot] ⚠️ Channel ${target.channelId} not found or wrong type`);
               }
             } catch (channelError) {
               console.error(`[Discord Bot] Failed to send alpha alert to channel ${target.channelId}:`, channelError);
@@ -2646,6 +2664,55 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         }
       });
       console.log('✅ Alpha alert callback registered for Discord');
+    }
+
+    // Smart Money relay listener
+    try {
+      const { smartMoneyRelay } = require('./services/smart-money-relay.ts');
+      smartMoneyRelay.onEvent(async (evt: any) => {
+        try {
+          const targets = await storage.getSmartTargets();
+          const discordTargets = targets.filter(t => t.platform === 'discord');
+          // Fallback env channels if DB empty
+          const extraEnv = (process.env.SMART_MONEY_CHANNEL_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+          const targetChannelIds = [
+            ...discordTargets.map(t => t.channelId),
+            ...extraEnv
+          ].filter((v, i, arr) => arr.indexOf(v) === i);
+
+          if (targetChannelIds.length === 0) {
+            console.log('[SmartMoneyRelay] No smart money channels configured. Use /smart setchannel or SMART_MONEY_CHANNEL_IDS env.');
+            return;
+          }
+
+            const header = `🧠 **SMART MONEY DETECTED** — ${evt.symbol || 'Unknown'} (${evt.tokenMint.slice(0,6)}… )`;
+          const ageLine = `Age: ${evt.ageMinutes.toFixed(1)}m | Elite: ${evt.eliteWallets.length}/${evt.walletCount}`;
+          const walletLines = evt.eliteWallets.map((w: any) => {
+            const short = `${w.address.slice(0,6)}…${w.address.slice(-4)}`;
+            return `• ${short} • ${w.winrate.toFixed(1)}% win • $${Math.round(w.profit).toLocaleString()} • ${w.directive}`;
+          });
+          const analysis = evt.analysis ? `\nRisk: ${evt.analysis.riskScore} | Holders: ${evt.analysis.holderCount} | Top10: ${evt.analysis.topConcentration?.toFixed?.(2) ?? evt.analysis.topConcentration}% | AgedRisk: ${evt.analysis.agedWalletRisk} | Funding: ${evt.analysis.suspiciousFundingPct?.toFixed?.(1) ?? evt.analysis.suspiciousFundingPct}% | Bundled: ${evt.analysis.bundled ? 'Yes' : 'No'}` : '';
+          const legend = 'Directives: PRIORITY WATCH > HIGH WATCH > ACCUMULATION SIGNAL > EARLY WATCH > INFO';
+          const links = `Pump.fun: https://pump.fun/${evt.tokenMint}\nDexscreener: https://dexscreener.com/solana/${evt.tokenMint}\nSolscan: https://solscan.io/token/${evt.tokenMint}`;
+          const message = [header, ageLine, '', 'Elite Wallets:', ...walletLines, analysis, '', legend, '', links].join('\n');
+
+          for (const channelId of targetChannelIds) {
+            try {
+              const channel = await client.channels.fetch(channelId);
+              if (channel && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement)) {
+                await (channel as any).send({ content: message, allowedMentions: { parse: [] } });
+              }
+            } catch (err) {
+              console.error('[SmartMoneyRelay] Failed to send smart money alert to channel', channelId, err);
+            }
+          }
+        } catch (err) {
+          console.error('[SmartMoneyRelay] Error handling smart money event:', err);
+        }
+      });
+      console.log('✅ Smart Money relay listener registered');
+    } catch (err) {
+      console.error('[SmartMoneyRelay] Failed to register listener:', err);
     }
   });
   

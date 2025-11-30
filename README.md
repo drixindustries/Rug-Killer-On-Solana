@@ -34,7 +34,14 @@
 - **40+ CEX Wallets Filtered** - Binance, OKX, Bybit, etc.
 - **Smart Insights** - Actionable recommendations
 - **Discord/Telegram Alerts** - Real-time notifications
-- **Wallet Age Safety Score** - 0-100 scoring system to detect aged wallet manipulation
+
+### Aged Wallet & Farming Detection (NEW!)
+- **Tiered Age Detection** - 90 days to 2+ years with risk scoring
+- **Coordinated Buy Patterns** - Detects synchronized purchases within 1-minute windows
+- **Funding Source Analysis** - Tracks Swopshop, FixedFloat, and other high-risk services
+- **Similar Amount Detection** - Flags uniform buy amounts (automated scripts)
+- **No-Sell Behavior** - Identifies fake volume holders who never sell
+- **Research-Backed** - Inspired by degenfrends/solana-rugchecker, 1f1n/Dragon, and community research
 
 ### Modern UI
 - Beautiful dark mode interface
@@ -90,6 +97,7 @@ Visit \http://localhost:5173\
 - [Quick Start Guide](docs/QUICK_START.md)
 - [API Reference](docs/API.md)
 - [Advanced Rug Detection](docs/ADVANCED_RUG_DETECTION.md)
+- [Aged Wallet & Farming Detection](docs/AGED_WALLET_DETECTION.md) ⭐ NEW!
 - [Pump.fun Integration](docs/QUICKSTART_PUMPFUN.md)
 - [Railway Deployment](DEPLOYMENT.md)
 - [RPC Setup Guide](RPC_SETUP_GUIDE.md)

@@ -14,7 +14,14 @@
  * - Coordinated buys from wallets with similar age patterns
  * - Wallets funded from same source before buying
  * 
+ * Research References:
+ * - degenfrends/solana-rugchecker: Holder concentration & rug scoring
+ * - 1f1n/Dragon: Profitable wallet tracking & bundled buy detection
+ * - 0xthi/solana-rug-pull-checker: Age-based risk scoring
+ * - Solana StackExchange: Transaction pagination for accurate aging
+ * 
  * Created: Nov 15, 2025
+ * Enhanced: Nov 29, 2025 (Added tiered age detection & similar amount detection)
  */
 
 import { Connection, PublicKey } from "@solana/web3.js";
@@ -41,14 +48,28 @@ export interface AgedWalletDetectionResult {
     similarAges: boolean;
     coordinatedBuys: boolean;
     noSells: boolean;
+    similarBuyAmounts: boolean; // NEW: Uniform buy amounts
+  };
+  ageTiers: {
+    extreme: number; // 2+ years
+    high: number; // 400+ days
+    medium: number; // 180+ days
+    low: number; // 90+ days
   };
   risks: string[];
 }
 
 export class AgedWalletDetector {
-  private readonly MIN_WALLET_AGE_DAYS = 400; // Wallet must be at least 400 days old
+  // Age-based risk tiers (inspired by degenfrends/solana-rugchecker)
+  private readonly MIN_WALLET_AGE_DAYS = 400; // Wallet must be at least 400 days old (high risk)
+  private readonly EXTREME_WALLET_AGE_DAYS = 730; // 2+ years = extreme risk if first buy
+  private readonly MEDIUM_WALLET_AGE_DAYS = 180; // 6 months = moderate concern
+  private readonly LOW_WALLET_AGE_DAYS = 90; // 3 months = minor concern
+  
+  // Pattern detection thresholds
   private readonly SIMILAR_AGE_WINDOW_DAYS = 7; // Wallets created within 7 days of each other
   private readonly COORDINATED_BUY_WINDOW_MS = 60000; // 1 minute window for coordinated buys
+  private readonly SIMILAR_AMOUNT_THRESHOLD = 0.20; // 20% variance = suspicious uniformity
   
   /**
    * Analyze token holders for aged wallet manipulation
@@ -71,15 +92,23 @@ export class AgedWalletDetector {
         buyerAddresses.map(address => this.analyzeWallet(connection, address, tokenAddress))
       );
       
-      // Filter for suspicious aged wallets
+      // Filter for suspicious aged wallets with tiered age detection
       const now = Date.now();
+      const ageTiers = { extreme: 0, high: 0, medium: 0, low: 0 };
+      
       for (const analysis of walletAnalyses) {
         if (!analysis) continue;
         
         const walletAgeDays = (now - analysis.firstTransactionDate) / (1000 * 60 * 60 * 24);
         
-        // Flag if: wallet is old (400+ days) but just bought this token
-        if (walletAgeDays >= this.MIN_WALLET_AGE_DAYS && analysis.totalTransactions > 10) {
+        // Track age distribution
+        if (walletAgeDays >= this.EXTREME_WALLET_AGE_DAYS) ageTiers.extreme++;
+        else if (walletAgeDays >= this.MIN_WALLET_AGE_DAYS) ageTiers.high++;
+        else if (walletAgeDays >= this.MEDIUM_WALLET_AGE_DAYS) ageTiers.medium++;
+        else if (walletAgeDays >= this.LOW_WALLET_AGE_DAYS) ageTiers.low++;
+        
+        // Flag if: wallet is old (90+ days) but just bought this token
+        if (walletAgeDays >= this.LOW_WALLET_AGE_DAYS && analysis.totalTransactions > 10) {
           suspiciousAgedWallets.push({
             wallet: analysis.wallet,
             walletAge: walletAgeDays,
@@ -102,8 +131,17 @@ export class AgedWalletDetector {
         0
       );
       
-      // Generate risk score based on patterns
+      // Generate risk score based on patterns and age tiers
       let riskScore = 0;
+      
+      // Score based on age tier distribution (2+ year old wallets are most suspicious)
+      if (ageTiers.extreme >= 5) {
+        riskScore += 50;
+        risks.push(`${ageTiers.extreme} wallets 2+ years old buying for first time - EXTREME RISK`);
+      } else if (ageTiers.extreme >= 3) {
+        riskScore += 35;
+        risks.push(`${ageTiers.extreme} very old wallets (2+ years) detected`);
+      }
       
       if (suspiciousAgedWallets.length >= 10) {
         riskScore += 40;
@@ -133,6 +171,11 @@ export class AgedWalletDetector {
         risks.push('Aged wallets have only buys, no sells - fake volume holders');
       }
       
+      if (patterns.similarBuyAmounts) {
+        riskScore += 25;
+        risks.push('Aged wallets bought similar amounts - automated/scripted behavior');
+      }
+      
       if (totalFakeVolumePercent > 20) {
         riskScore += 20;
         risks.push(`${totalFakeVolumePercent.toFixed(1)}% of supply in aged wallets - significant fake volume`);
@@ -144,6 +187,7 @@ export class AgedWalletDetector {
         totalFakeVolumePercent,
         riskScore: Math.min(100, riskScore),
         patterns,
+        ageTiers,
         risks,
       };
       
@@ -223,6 +267,7 @@ export class AgedWalletDetector {
     similarAges: boolean;
     coordinatedBuys: boolean;
     noSells: boolean;
+    similarBuyAmounts: boolean;
   } {
     if (wallets.length < 3) {
       return {
@@ -230,6 +275,7 @@ export class AgedWalletDetector {
         similarAges: false,
         coordinatedBuys: false,
         noSells: false,
+        similarBuyAmounts: false,
       };
     }
     
@@ -260,11 +306,27 @@ export class AgedWalletDetector {
     // Check if all wallets only have buys (no sells)
     const noSells = wallets.filter(w => w.hasOnlyBuys).length >= wallets.length * 0.8;
     
+    // NEW: Check for similar buy amounts (inspired by 1f1n/Dragon repo)
+    let similarBuyAmounts = false;
+    const validAmounts = wallets.filter(w => w.buyAmount > 0).map(w => w.buyAmount);
+    if (validAmounts.length >= 5) {
+      const sortedAmounts = [...validAmounts].sort((a, b) => a - b);
+      const median = sortedAmounts[Math.floor(sortedAmounts.length / 2)];
+      
+      // Check if 80%+ of buys are within 20% of median (suspicious uniformity)
+      const similarCount = validAmounts.filter(amt => 
+        Math.abs(amt - median) / median <= this.SIMILAR_AMOUNT_THRESHOLD
+      ).length;
+      
+      similarBuyAmounts = similarCount / validAmounts.length >= 0.80;
+    }
+    
     return {
       sameFundingSource,
       similarAges,
       coordinatedBuys,
       noSells,
+      similarBuyAmounts,
     };
   }
   
@@ -279,8 +341,18 @@ export class AgedWalletDetector {
         similarAges: false,
         coordinatedBuys: false,
         noSells: false,
+        similarBuyAmounts: false,
+      },
+      ageTiers: {
+        extreme: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
       },
       risks: [],
     };
   }
 }
+
+// Export singleton
+export const agedWalletDetector = new AgedWalletDetector();

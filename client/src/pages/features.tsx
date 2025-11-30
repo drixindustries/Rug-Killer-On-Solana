@@ -575,6 +575,166 @@ export default function Features() {
         </div>
       </section>
 
+      <section className="mb-16">
+        <div className="text-center mb-8">
+          <Badge className="mb-4" data-testid="badge-open-source">Open Source References</Badge>
+          <h2 className="text-3xl font-bold mb-2">Research-Backed Detection</h2>
+          <p className="text-muted-foreground">Our algorithms are inspired by cutting-edge open-source research</p>
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Card data-testid="card-github-degenfrends">
+            <CardHeader>
+              <Shield className="h-8 w-8 mb-2 text-purple-500" />
+              <CardTitle>Rug Detection</CardTitle>
+              <CardDescription>degenfrends/solana-rugchecker</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>TypeScript library for rug detection via holder analysis and liquidity checks.</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                asChild
+              >
+                <a 
+                  href="https://github.com/degenfrends/solana-rugchecker" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  View on GitHub →
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-github-dragon">
+            <CardHeader>
+              <Users className="h-8 w-8 mb-2 text-blue-500" />
+              <CardTitle>Wallet Tracking</CardTitle>
+              <CardDescription>1f1n/Dragon</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>Multi-chain tool for scraping profitable wallets and detecting bundled buys.</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                asChild
+              >
+                <a 
+                  href="https://github.com/1f1n/Dragon" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  View on GitHub →
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-github-0xthi">
+            <CardHeader>
+              <AlertTriangle className="h-8 w-8 mb-2 text-orange-500" />
+              <CardTitle>Risk Scoring</CardTitle>
+              <CardDescription>0xthi/solana-rug-pull-checker</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>Token legitimacy scoring using Raydium SDK and Dexscreener integration.</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                asChild
+              >
+                <a 
+                  href="https://github.com/0xthi/solana-rug-pull-checker" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  View on GitHub →
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-github-archiesnipes">
+            <CardHeader>
+              <Zap className="h-8 w-8 mb-2 text-yellow-500" />
+              <CardTitle>New Token Monitor</CardTitle>
+              <CardDescription>archiesnipes/solana-new-token-monitor</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>Real-time monitor for new Solana tokens via RPC websockets.</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                asChild
+              >
+                <a 
+                  href="https://github.com/archiesnipes/solana-new-token-monitor" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  View on GitHub →
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-github-safuco">
+            <CardHeader>
+              <Eye className="h-8 w-8 mb-2 text-green-500" />
+              <CardTitle>Token Analyzer</CardTitle>
+              <CardDescription>safuco/solana-token-analyzer</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>Node.js tool for deep token analysis including honeypot simulation.</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                asChild
+              >
+                <a 
+                  href="https://github.com/safuco/solana-token-analyzer" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  View on GitHub →
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-github-stackexchange">
+            <CardHeader>
+              <Wallet className="h-8 w-8 mb-2 text-indigo-500" />
+              <CardTitle>Wallet Age Detection</CardTitle>
+              <CardDescription>Solana StackExchange</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>Community-driven code for calculating wallet age via transaction pagination.</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                asChild
+              >
+                <a 
+                  href="https://solana.stackexchange.com" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  View Community →
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
       <div className="text-center py-12 bg-primary/5 rounded-lg">
         <h2 className="text-3xl font-bold mb-4">Ready to Trade Safely?</h2>
         <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">

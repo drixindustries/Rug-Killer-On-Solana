@@ -10,7 +10,13 @@
  * Based on Nova's detection example:
  * "$PEKO is bundled with fresh wallets funded by Swopshop (42%) and FixedFloat (10.5%)"
  * 
+ * Research References:
+ * - 1f1n/Dragon: Multi-chain wallet profiling & funding source tracking
+ * - degenfrends/solana-rugchecker: Holder funding correlation analysis
+ * - Community reports: Swopshop/FixedFloat as top scammer funding sources
+ * 
  * Created: Nov 15, 2025
+ * Enhanced: Nov 29, 2025 (Added GitHub research references)
  */
 
 import { Connection, PublicKey } from "@solana/web3.js";

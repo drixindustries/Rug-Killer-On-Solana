@@ -1140,8 +1140,7 @@ function createTelegramBot(botToken: string): Telegraf {
     const influence = parseInt(args[args.length - 1]) || 60;
     try {
       await storage.upsertSmartWallet({ walletAddress: wallet, displayName: name, influenceScore: influence, source: 'manual', isActive: true });
-      await ctx.reply(`✅ Smart wallet added: \`${formatAddress(wallet)}\` (${name}) with influence ${influence}`, { parse_mode: 'Markdown' });
-      getAlphaAlertService().addCaller(wallet, name);
+      await ctx.reply(`✅ Smart wallet added: \`${formatAddress(wallet)}\` (${name}) with influence ${influence}\n\n⚠️ Note: This is for Smart Money tracking only. Use \`/alpha_add\` to add alpha callers.`, { parse_mode: 'Markdown' });
     } catch (e: any) {
       await ctx.reply(`❌ Failed: ${e.message}`);
     }
@@ -1154,7 +1153,6 @@ function createTelegramBot(botToken: string): Telegraf {
     try {
       await storage.setSmartWalletActive(wallet, false);
       await ctx.reply(`✅ Smart wallet deactivated: \`${formatAddress(wallet)}\``, { parse_mode: 'Markdown' });
-      getAlphaAlertService().removeCaller(wallet);
     } catch (e: any) {
       await ctx.reply(`❌ Failed: ${e.message}`);
     }
@@ -1167,7 +1165,6 @@ function createTelegramBot(botToken: string): Telegraf {
     try {
       const w = await storage.setSmartWalletActive(wallet, true);
       await ctx.reply(`✅ Smart wallet re-activated: \`${formatAddress(wallet)}\``, { parse_mode: 'Markdown' });
-      getAlphaAlertService().addCaller(wallet, w.displayName || 'Trader');
     } catch (e: any) {
       await ctx.reply(`❌ Failed: ${e.message}`);
     }
@@ -1719,15 +1716,11 @@ export async function startTelegramBot() {
     } else {
       alphaService.onAlert(async (alert, message) => {
         try {
-          // Get all alpha alert targets and filter for Telegram
           const allTargets = await storage.getAlphaTargets();
           const telegramTargets = allTargets.filter(t => t.platform === 'telegram');
-          
           for (const target of telegramTargets) {
             try {
-              await botInstance!.telegram.sendMessage(target.channelId, message, { 
-                parse_mode: 'Markdown'
-              });
+              await botInstance!.telegram.sendMessage(target.channelId, message, { parse_mode: 'Markdown' });
             } catch (chatError) {
               console.error(`[Telegram Bot] Failed to send alpha alert to chat ${target.channelId}:`, chatError);
             }
@@ -1737,6 +1730,52 @@ export async function startTelegramBot() {
         }
       });
       console.log('✅ Alpha alert callback registered for Telegram');
+    }
+
+    // Smart Money relay listener for Telegram
+    try {
+      const { smartMoneyRelay } = await import('./services/smart-money-relay.ts');
+      smartMoneyRelay.onEvent(async (evt: any) => {
+        try {
+          const targets = await storage.getSmartTargets();
+          const telegramTargets = targets.filter(t => t.platform === 'telegram');
+          // Fallback env chat IDs
+          const extraEnv = (process.env.SMART_MONEY_TELEGRAM_CHAT_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+          const targetChatIds = [
+            ...telegramTargets.map(t => t.channelId),
+            ...extraEnv
+          ].filter((v, i, arr) => arr.indexOf(v) === i);
+
+          if (targetChatIds.length === 0) {
+            console.log('[SmartMoneyRelay] No smart money Telegram chats configured. Use /smart_here or SMART_MONEY_TELEGRAM_CHAT_IDS env.');
+            return;
+          }
+
+          const header = `🧠 *SMART MONEY DETECTED* — ${evt.symbol || 'Unknown'} (${evt.tokenMint.slice(0,6)}…)`;
+          const ageLine = `Age: ${evt.ageMinutes.toFixed(1)}m | Elite: ${evt.eliteWallets.length}/${evt.walletCount}`;
+          const walletLines = evt.eliteWallets.map((w: any) => {
+            const short = `${w.address.slice(0,6)}…${w.address.slice(-4)}`;
+            return `• ${short} • ${w.winrate.toFixed(1)}% win • $${Math.round(w.profit).toLocaleString()} • ${w.directive}`;
+          });
+          const analysis = evt.analysis ? `\nRisk: ${evt.analysis.riskScore} | Holders: ${evt.analysis.holderCount} | Top10: ${evt.analysis.topConcentration?.toFixed?.(2) ?? evt.analysis.topConcentration}% | AgedRisk: ${evt.analysis.agedWalletRisk} | Funding: ${evt.analysis.suspiciousFundingPct?.toFixed?.(1) ?? evt.analysis.suspiciousFundingPct}% | Bundled: ${evt.analysis.bundled ? 'Yes' : 'No'}` : '';
+          const legend = 'Directives: PRIORITY WATCH > HIGH WATCH > ACCUMULATION SIGNAL > EARLY WATCH > INFO';
+          const links = `[Pump.fun](https://pump.fun/${evt.tokenMint}) | [Dexscreener](https://dexscreener.com/solana/${evt.tokenMint}) | [Solscan](https://solscan.io/token/${evt.tokenMint})`;
+          const message = [header, ageLine, '', 'Elite Wallets:', ...walletLines, analysis, '', legend, '', links].join('\n');
+
+          for (const chatId of targetChatIds) {
+            try {
+              await botInstance!.telegram.sendMessage(chatId, message, { parse_mode: 'Markdown', disable_web_page_preview: true });
+            } catch (err) {
+              console.error('[SmartMoneyRelay] Failed to send smart money alert to Telegram chat', chatId, err);
+            }
+          }
+        } catch (err) {
+          console.error('[SmartMoneyRelay] Error handling smart money event in Telegram:', err);
+        }
+      });
+      console.log('✅ Smart Money relay listener registered for Telegram');
+    } catch (err) {
+      console.error('[SmartMoneyRelay] Failed to register Telegram listener:', err);
     }
     
     // Clear any pending updates from previous instance to avoid 409 conflicts
