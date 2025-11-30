@@ -5,7 +5,7 @@ import type { TokenAnalysisResponse } from '../shared/schema';
 import { buildCompactMessage, formatNumber, getRiskEmoji, formatAddress } from './bot-formatter';
 import { getAlphaAlertService } from './alpha-alerts';
 import { checkBlacklist, reportWallet, getBlacklistStats, getTopFlaggedWallets } from './ai-blacklist';
-import { EXCHANGE_WALLETS, LAST_UPDATED as EXCHANGE_LAST_UPDATED, WHITELIST_VERSION as EXCHANGE_WHITELIST_VERSION, getExchangeStats, isExchangeWallet } from './exchange-whitelist';
+import { EXCHANGE_WALLETS, LAST_UPDATED as EXCHANGE_LAST_UPDATED, WHITELIST_VERSION as EXCHANGE_WHITELIST_VERSION, getExchangeStats, isExchangeWallet, addExchangeWallet } from './exchange-whitelist';
 import { nameCache } from './name-cache';
 import { rally } from './bot-personality';
 import { trendingCallsTracker } from './trending-calls-tracker';
@@ -404,6 +404,9 @@ const commands = [
       .setDescription('Show whitelist stats and sample wallets'))
     .addSubcommand(sc => sc.setName('check')
       .setDescription('Check if a wallet is whitelisted')
+      .addStringOption(o => o.setName('wallet').setDescription('Wallet address').setRequired(true)))
+    .addSubcommand(sc => sc.setName('add')
+      .setDescription('Add a wallet to the exchange whitelist (admin only)')
       .addStringOption(o => o.setName('wallet').setDescription('Wallet address').setRequired(true))),
   new SlashCommandBuilder()
     .setName('exchanges')
@@ -1612,7 +1615,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             })
             .setFooter({ text: `Version ${EXCHANGE_WHITELIST_VERSION} • Updated ${EXCHANGE_LAST_UPDATED}` });
           await interaction.editReply({ embeds: [embed] });
-        } else {
+        } else if (subcommand === 'stats') {
           await interaction.deferReply();
           const total = EXCHANGE_WALLETS.size;
           const sampleSize = Math.min(total, 10);
@@ -1641,6 +1644,27 @@ function createDiscordClient(botToken: string, clientId: string): Client {
               }
             );
           await interaction.editReply({ embeds: [embed] });
+        } else if (subcommand === 'add') {
+          await interaction.deferReply({ ephemeral: true });
+          if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+            await interaction.editReply({ content: '⛔ Admin only. You need Administrator permission to modify the whitelist.' });
+            return;
+          }
+          const walletInput = interaction.options.getString('wallet', true).trim();
+          const result = addExchangeWallet(walletInput);
+          if ((result as any).error) {
+            await interaction.editReply({ content: `❌ Failed to add: ${(result as any).error}` });
+            return;
+          }
+            if (result.already) {
+              await interaction.editReply({ content: `ℹ️ Wallet \`${formatAddress(walletInput)}\` is already whitelisted. (Total: ${result.size})` });
+              return;
+            }
+            if (result.added) {
+              await interaction.editReply({ content: `✅ Added wallet \`${formatAddress(walletInput)}\` to exchange whitelist. New size: ${result.size}` });
+            } else {
+              await interaction.editReply({ content: '❌ Unknown failure adding wallet.' });
+            }
         }
       } else if (interaction.commandName === 'exchanges') {
         const tokenAddress = interaction.options.getString('address', true);

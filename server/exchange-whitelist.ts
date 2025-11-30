@@ -6,6 +6,8 @@
  * Updated: November 15, 2025
  * Source: Solscan labels, CoinCarp rich lists, community-verified data
  */
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import path from 'path';
 
 export const EXCHANGE_WALLETS = new Set<string>([
   // Binance (hot/cold - ~55% market share)
@@ -147,3 +149,58 @@ export async function updateExchangeWhitelist(): Promise<void> {
 export const WHITELIST_VERSION = "1.0.0";
 export const LAST_UPDATED = "2025-11-15";
 export const WHITELIST_SIZE = EXCHANGE_WALLETS.size;
+
+// ---------------------------------------------------------------------------
+// Manual Whitelist Persistence (runtime additions survive restarts)
+// ---------------------------------------------------------------------------
+
+const MANUAL_WHITELIST_DIR = path.resolve(process.cwd(), 'data');
+const MANUAL_WHITELIST_FILE = path.join(MANUAL_WHITELIST_DIR, 'manual-exchange-whitelist.json');
+
+function loadManualExchangeWhitelist() {
+  try {
+    if (existsSync(MANUAL_WHITELIST_FILE)) {
+      const raw = readFileSync(MANUAL_WHITELIST_FILE, 'utf-8');
+      const list: string[] = JSON.parse(raw);
+      for (const addr of list) {
+        if (addr && typeof addr === 'string') EXCHANGE_WALLETS.add(addr);
+      }
+      if (list.length) {
+        console.log(`[ExchangeWhitelist] Loaded ${list.length} manual additions (total: ${EXCHANGE_WALLETS.size}).`);
+      }
+    }
+  } catch (e) {
+    console.error('[ExchangeWhitelist] Failed to load manual whitelist file:', (e as any)?.message || e);
+  }
+}
+
+function persistManualWhitelist() {
+  try {
+    if (!existsSync(MANUAL_WHITELIST_DIR)) mkdirSync(MANUAL_WHITELIST_DIR, { recursive: true });
+    const manual = Array.from(EXCHANGE_WALLETS);
+    writeFileSync(MANUAL_WHITELIST_FILE, JSON.stringify(manual, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('[ExchangeWhitelist] Failed to persist manual whitelist:', (e as any)?.message || e);
+  }
+}
+
+loadManualExchangeWhitelist();
+
+/**
+ * Manually add an exchange wallet to the whitelist.
+ * Returns status object for UI feedback.
+ */
+export function addExchangeWallet(address: string) {
+  const trimmed = address.trim();
+  if (!trimmed || trimmed.length < 32) {
+    return { added: false, already: false, size: EXCHANGE_WALLETS.size, error: 'Invalid address length' };
+  }
+  if (EXCHANGE_WALLETS.has(trimmed)) {
+    return { added: false, already: true, size: EXCHANGE_WALLETS.size };
+  }
+  EXCHANGE_WALLETS.add(trimmed);
+  persistManualWhitelist();
+  return { added: true, already: false, size: EXCHANGE_WALLETS.size };
+}
+
+export function getManualWhitelistPath() { return MANUAL_WHITELIST_FILE; }

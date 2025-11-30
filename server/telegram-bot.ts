@@ -65,6 +65,7 @@ function createTelegramBot(botToken: string): Telegraf {
     { command: 'compare', description: 'Compare 2 tokens - /compare <addr1> <addr2>' },
     { command: 'trending', description: 'Show trending tokens by volume' },
     { command: 'exchanges', description: 'Exchange presence - /exchanges <address>' },
+    { command: 'exchange_add', description: 'Add exchange wallet (admin) - /exchange_add <wallet>' },
     { command: 'pumpfun', description: 'Pump.fun view - /pumpfun <address>' },
     { command: 'chart', description: 'Chart links - /chart <address>' },
     { command: 'watch', description: 'Add to watchlist - /watch <address>' },
@@ -891,6 +892,26 @@ function createTelegramBot(botToken: string): Telegraf {
       await ctx.reply(message, { parse_mode: 'Markdown' });
     } catch (e) {
       ctx.reply('❌ Error fetching exchange stats.');
+    }
+  });
+
+  // /exchange_add - manually whitelist an exchange wallet (admin only)
+  bot.command('exchange_add', async (ctx) => {
+    if (!(await isChatAdminOrEnv(ctx))) return ctx.reply('⛔ Admins only.');
+    const args = (ctx.message?.text || '').split(' ').filter(Boolean);
+    if (args.length < 2) {
+      return ctx.reply('❌ Usage: /exchange_add <wallet>');
+    }
+    const wallet = args[1].trim();
+    try {
+      const { addExchangeWallet } = await import('./exchange-whitelist');
+      const result: any = addExchangeWallet(wallet);
+      if (result.error) return ctx.reply(`❌ Failed: ${result.error}`);
+      if (result.already) return ctx.reply(`ℹ️ Already whitelisted: ${wallet}`);
+      if (result.added) return ctx.reply(`✅ Added to exchange whitelist. New size: ${result.size}`);
+      ctx.reply('❌ Unknown failure adding wallet.');
+    } catch (e) {
+      ctx.reply('❌ Error adding wallet to whitelist.');
     }
   });
 
