@@ -1769,13 +1769,25 @@ export async function startTelegramBot() {
     if (!botRelay) {
       console.log('⏭️ Skipping Telegram alpha alert bot relay (direct send active)');
     } else {
-      alphaService.onAlert(async (alert, message) => {
+      alphaService.onAlert(async (alert, message, embedData) => {
         try {
           const allTargets = await storage.getAlphaTargets();
           const telegramTargets = allTargets.filter(t => t.platform === 'telegram');
           for (const target of telegramTargets) {
             try {
-              await botInstance!.telegram.sendMessage(target.channelId, message, { parse_mode: 'Markdown' });
+              // Format embed data for Telegram if available
+              let formattedMessage = message;
+              if (embedData) {
+                formattedMessage = `*${embedData.title}*\n\n`;
+                for (const field of embedData.fields) {
+                  formattedMessage += `*${field.name}*\n${field.value}\n\n`;
+                }
+              }
+              
+              await botInstance!.telegram.sendMessage(target.channelId, formattedMessage, { 
+                parse_mode: 'Markdown',
+                disable_web_page_preview: false
+              });
             } catch (chatError) {
               console.error(`[Telegram Bot] Failed to send alpha alert to chat ${target.channelId}:`, chatError);
             }

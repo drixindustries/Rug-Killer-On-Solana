@@ -2773,7 +2773,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     if (!botRelay) {
       console.log('⏭️ Skipping Discord alpha alert bot relay (direct send active)');
     } else {
-      alphaService.onAlert(async (alert, message) => {
+      alphaService.onAlert(async (alert, message, embedData) => {
         try {
           console.log(`[Discord Bot] Alpha alert received - Type: ${alert.type} | Mint: ${alert.mint} | Source: ${alert.source}`);
           const allTargets = await storage.getAlphaTargets();
@@ -2785,10 +2785,31 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             try {
               const channel = await client.channels.fetch(target.channelId);
               if (channel && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement)) {
-                await (channel as any).send({
-                  content: `${message}`,
+                const messagePayload: any = {
                   allowedMentions: { parse: [] }
-                });
+                };
+                
+                // Use embed if available, otherwise fallback to text
+                if (embedData) {
+                  const embed = new EmbedBuilder()
+                    .setColor(embedData.color)
+                    .setTitle(embedData.title)
+                    .setTimestamp();
+                  
+                  for (const field of embedData.fields) {
+                    embed.addFields({
+                      name: field.name,
+                      value: field.value,
+                      inline: field.inline || false
+                    });
+                  }
+                  
+                  messagePayload.embeds = [embed];
+                } else {
+                  messagePayload.content = message;
+                }
+                
+                await (channel as any).send(messagePayload);
               }
             } catch (channelError) {
               console.error(`[Discord Bot] Failed to send alpha alert to channel ${target.channelId}:`, channelError);

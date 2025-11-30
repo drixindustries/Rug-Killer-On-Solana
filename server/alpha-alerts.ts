@@ -232,7 +232,7 @@ export class AlphaAlertService {
   }
 
   // Register callback for alerts; includes formatted message for convenience
-  onAlert(callback: (alert: AlphaAlert, message: string) => void): void {
+  onAlert(callback: (alert: AlphaAlert, message: string, embedData?: any) => void): void {
     this.alertCallbacks.push(callback);
   }
 
@@ -366,19 +366,61 @@ export class AlphaAlertService {
       message = `🚨 **SMART MONEY BUY: ${walletName}**\n\n${summaryLines.join('\n')}`;
     }
     
+    // Create embed data for rich formatting
+    const embedData = alert.type === 'caller_signal' ? {
+      title: `🚨 Smart Money Alert`,
+      color: alert.data?.influenceScore >= 80 ? 0xFFD700 : 0xFF6600, // Gold for high influence, orange otherwise
+      fields: [
+        {
+          name: '👤 Wallet',
+          value: `**${alert.data?.walletName || alert.source}**${alert.data?.influenceScore ? ` (${alert.data.influenceScore}/100)` : ''}\n\`${alert.data?.wallet ? `${alert.data.wallet.slice(0,6)}...${alert.data.wallet.slice(-4)}` : 'Unknown'}\``,
+          inline: true
+        },
+        ...(alert.data?.walletStats ? [{
+          name: '📊 Performance',
+          value: `Win Rate: ${alert.data.walletStats.winRate?.toFixed(1) || 0}%\nPNL: ${alert.data.walletStats.profitSol >= 0 ? '+' : ''}${alert.data.walletStats.profitSol?.toFixed(2) || 0} SOL\nTrades: ${(alert.data.walletStats.wins || 0) + (alert.data.walletStats.losses || 0)}`,
+          inline: true
+        }] : []),
+        {
+          name: '🪙 Token',
+          value: `${alert.data?.tokenSymbol || 'Unknown'}${alert.data?.tokenName && alert.data.tokenName !== alert.data?.tokenSymbol ? ` (${alert.data.tokenName})` : ''}\n\`${alert.mint}\``,
+          inline: false
+        },
+        ...(alert.data?.amountToken || alert.data?.amountUsd ? [{
+          name: '💰 Purchase',
+          value: `${alert.data.amountToken ? `${Number(alert.data.amountToken).toLocaleString(undefined, {maximumFractionDigits: 4})} tokens` : ''}${alert.data.amountToken && alert.data.amountUsd ? ' • ' : ''}${alert.data.amountUsd ? `$${Number(alert.data.amountUsd).toLocaleString(undefined, {maximumFractionDigits: 2})}` : ''}`,
+          inline: true
+        }] : []),
+        {
+          name: '🔗 Quick Links',
+          value: `[Pump.fun](https://pump.fun/${alert.mint}) • [DexScreener](https://dexscreener.com/solana/${alert.mint}) • [Solscan](https://solscan.io/token/${alert.mint})${alert.data?.txHash ? ` • [Tx](https://solscan.io/tx/${alert.data.txHash})` : ''}`,
+          inline: false
+        }
+      ],
+      timestamp: new Date().toISOString()
+    } : null;
+    
     const DIRECT = process.env.ALPHA_ALERTS_DIRECT_SEND === 'true';
     
     // Send to Discord webhook if configured
     const DISCORD_WEBHOOK = process.env.ALPHA_DISCORD_WEBHOOK;
     if (DIRECT && DISCORD_WEBHOOK && DISCORD_WEBHOOK !== 'SET_ME') {
       try {
+        const payload: any = {
+          username: 'RugKiller Alpha Alerts',
+          avatar_url: 'https://i.imgur.com/AfFp7pu.png'
+        };
+        
+        if (embedData) {
+          payload.embeds = [embedData];
+        } else {
+          payload.content = message;
+        }
+        
         await fetch(DISCORD_WEBHOOK, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: message,
-            username: 'RugKiller Alpha Alerts'
-          }),
+          body: JSON.stringify(payload),
         });
         console.log('[ALPHA ALERT] ✅ Discord webhook notification sent');
       } catch (error) {
@@ -447,7 +489,7 @@ export class AlphaAlertService {
     console.log(`[ALPHA ALERTS] Triggering ${this.alertCallbacks.length} callback(s)`);
     for (const callback of this.alertCallbacks) {
       try {
-        await callback(alert, message);
+        await callback(alert, message, embedData);
         console.log(`[ALPHA ALERTS] ✅ Callback executed successfully`);
       } catch (error) {
         console.error('[ALPHA ALERT] Callback error:', error);
