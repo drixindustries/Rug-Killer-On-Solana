@@ -1004,7 +1004,7 @@ export class AlphaAlertService {
                 winRate: Math.round(heliusStats.winRate),
               };
               
-              console.log(`[Alpha Alerts] ✅ Helius stats for ${caller.name}: ${walletStats.winRate}% WR (${walletStats.wins}W/${walletStats.losses}L), PNL: ${walletStats.profitSol.toFixed(2)} SOL`);
+              console.log(`[Alpha Alerts] ✅ ${heliusStats.source?.toUpperCase() || 'API'} stats for ${caller.name}: ${walletStats.winRate}% WR (${walletStats.wins}W/${walletStats.losses}L), PNL: ${walletStats.profitSol.toFixed(2)} SOL`);
               
               // Update database with fresh stats
               if (wallet) {
@@ -1033,7 +1033,7 @@ export class AlphaAlertService {
                 });
               }
             } else {
-              console.log(`[Alpha Alerts] ⚠️ Helius returned insufficient data (${heliusStats?.totalTrades || 0} trades), using DB/defaults`);
+              console.log(`[Alpha Alerts] ⚠️ ${heliusStats?.source?.toUpperCase() || 'API'} returned insufficient data (${heliusStats?.totalTrades || 0} trades), using DB/defaults`);
             }
           }
           

@@ -1,13 +1,16 @@
 /**
- * Helius Wallet Performance Tracker
+ * Wallet Performance Tracker with Multi-Provider Support
  * 
- * Uses Helius Enhanced Transactions API to calculate accurate wallet stats:
+ * Primary: Helius Enhanced Transactions API
+ * Fallback: Moralis Wallet API
+ * 
+ * Uses multiple data sources to calculate accurate wallet stats:
  * - Win rate (profitable vs unprofitable trades)
  * - Total profit/loss in SOL
  * - Trade count
  * 
- * Much more accurate than raw RPC parsing since Helius pre-processes
- * transaction data and provides swap detection.
+ * Much more accurate than raw RPC parsing since these APIs pre-process
+ * transaction data and provide swap detection.
  */
 
 export interface WalletStats {
@@ -17,32 +20,63 @@ export interface WalletStats {
   profitSol: number;
   totalTrades: number;
   lastActiveAt: Date;
+  source?: string; // Which API provided the data
 }
 
 export class HeliusWalletStatsService {
   private readonly HELIUS_API_KEY: string;
-  private readonly BASE_URL = 'https://api-mainnet.helius-rpc.com/v0';
+  private readonly MORALIS_API_KEY: string;
+  private readonly HELIUS_BASE_URL = 'https://api-mainnet.helius-rpc.com/v0';
+  private readonly MORALIS_BASE_URL = 'https://solana-gateway.moralis.io';
   private readonly TIMEOUT_MS = 15000;
   private readonly SOL_PRICE = 200; // Approximate SOL price for USD conversion
 
-  constructor(apiKey?: string) {
-    this.HELIUS_API_KEY = apiKey || process.env.HELIUS_API_KEY || '';
-    if (!this.HELIUS_API_KEY) {
-      console.warn('[HeliusWalletStats] No API key configured - stats will be unavailable');
+  constructor(heliusKey?: string, moralisKey?: string) {
+    this.HELIUS_API_KEY = heliusKey || process.env.HELIUS_API_KEY || '';
+    this.MORALIS_API_KEY = moralisKey || process.env.MORALIS_API_KEY || '';
+    
+    if (!this.HELIUS_API_KEY && !this.MORALIS_API_KEY) {
+      console.warn('[WalletStats] No API keys configured - stats will be unavailable');
+    } else {
+      const providers = [];
+      if (this.HELIUS_API_KEY) providers.push('Helius');
+      if (this.MORALIS_API_KEY) providers.push('Moralis');
+      console.log(`[WalletStats] Initialized with providers: ${providers.join(', ')}`);
     }
   }
 
   /**
-   * Calculate wallet performance stats using Helius Enhanced Transactions API
+   * Calculate wallet performance stats using available APIs
+   * Tries Helius first, falls back to Moralis
    */
   async getWalletStats(walletAddress: string, limit: number = 200): Promise<WalletStats | null> {
-    if (!this.HELIUS_API_KEY) {
-      console.warn('[HeliusWalletStats] Cannot fetch stats - no API key');
-      return null;
+    // Try Helius first (more detailed transaction data)
+    if (this.HELIUS_API_KEY) {
+      const heliusStats = await this.getHeliusStats(walletAddress, limit);
+      if (heliusStats) {
+        return { ...heliusStats, source: 'helius' };
+      }
     }
 
+    // Fall back to Moralis
+    if (this.MORALIS_API_KEY) {
+      console.log('[WalletStats] Helius unavailable, trying Moralis...');
+      const moralisStats = await this.getMoralisStats(walletAddress, limit);
+      if (moralisStats) {
+        return { ...moralisStats, source: 'moralis' };
+      }
+    }
+
+    console.warn('[WalletStats] All providers failed or unavailable');
+    return null;
+  }
+
+  /**
+   * Get wallet stats from Helius Enhanced Transactions API
+   */
+  private async getHeliusStats(walletAddress: string, limit: number): Promise<WalletStats | null> {
     try {
-      const url = `${this.BASE_URL}/addresses/${walletAddress}/transactions?api-key=${this.HELIUS_API_KEY}&limit=${limit}`;
+      const url = `${this.HELIUS_BASE_URL}/addresses/${walletAddress}/transactions?api-key=${this.HELIUS_API_KEY}&limit=${limit}`;
       
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), this.TIMEOUT_MS);
@@ -50,22 +84,60 @@ export class HeliusWalletStatsService {
       const response = await fetch(url, { signal: controller.signal });
       clearTimeout(timeout);
 
-      if (!response.ok) {
-        if (response.status === 429) {
-          console.warn('[HeliusWalletStats] Rate limited');
-        } else if (response.status === 402) {
-          console.warn('[HeliusWalletStats] Insufficient Helius credits');
+  /**
+   * Analyze Helius transactions to calculate win rate and profit
+   */
+  private analyzeHeliusTransactions(transactions: any[], walletAddress: string): WalletStats {
+          console.warn('[WalletStats] Insufficient Helius credits');
         }
         return null;
       }
 
       const transactions = await response.json();
-      return this.analyzeTransactions(transactions, walletAddress);
+      return this.analyzeHeliusTransactions(transactions, walletAddress);
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.warn('[HeliusWalletStats] Request timeout');
+        console.warn('[WalletStats] Helius request timeout');
       } else {
-        console.error('[HeliusWalletStats] Error fetching wallet stats:', error.message);
+        console.error('[WalletStats] Helius error:', error.message);
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Get wallet stats from Moralis Wallet API
+   */
+  private async getMoralisStats(walletAddress: string, limit: number): Promise<WalletStats | null> {
+    try {
+      const url = `${this.MORALIS_BASE_URL}/account/mainnet/${walletAddress}/portfolio`;
+      
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.TIMEOUT_MS);
+
+      const response = await fetch(url, {
+        headers: {
+          'X-API-Key': this.MORALIS_API_KEY,
+          'Accept': 'application/json'
+        },
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          console.warn('[WalletStats] Moralis rate limited');
+        }
+        return null;
+      }
+
+      const data = await response.json();
+      return this.analyzeMoralisPortfolio(data, walletAddress);
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.warn('[WalletStats] Moralis request timeout');
+      } else {
+        console.error('[WalletStats] Moralis error:', error.message);
       }
       return null;
     }
@@ -166,10 +238,47 @@ export class HeliusWalletStatsService {
   }
 
   /**
-   * Check if Helius API is configured and available
+   * Analyze Moralis portfolio data to calculate stats
+   */
+  private analyzeMoralisPortfolio(data: any, walletAddress: string): WalletStats {
+    let wins = 0;
+    let losses = 0;
+    let totalProfitSol = 0;
+
+    // Moralis provides portfolio data with profit/loss information
+    const tokens = data.tokens || [];
+    
+    for (const token of tokens) {
+      // Check if token has realized PNL data
+      const realizedPnl = token.realized_pnl_usd || 0;
+      
+      if (realizedPnl > 0) {
+        wins++;
+        totalProfitSol += realizedPnl / this.SOL_PRICE; // Convert USD to SOL approximation
+      } else if (realizedPnl < 0) {
+        losses++;
+        totalProfitSol += realizedPnl / this.SOL_PRICE;
+      }
+    }
+
+    const totalTrades = wins + losses;
+    const winRate = totalTrades > 0 ? (wins / totalTrades) * 100 : 0;
+
+    return {
+      wins,
+      losses,
+      winRate,
+      profitSol: totalProfitSol,
+      totalTrades,
+      lastActiveAt: new Date(),
+    };
+  }
+
+  /**
+   * Check if any wallet stats API is configured and available
    */
   isAvailable(): boolean {
-    return !!this.HELIUS_API_KEY;
+    return !!(this.HELIUS_API_KEY || this.MORALIS_API_KEY);
   }
 }
 
