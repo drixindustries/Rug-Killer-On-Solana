@@ -409,12 +409,12 @@ export class AlphaAlertService {
       fields: [
         {
           name: '👤 Wallet',
-          value: `**${alert.data?.walletName || alert.source}**${alert.data?.influenceScore ? ` (${alert.data.influenceScore}/100)` : ''}\n\`${alert.data?.wallet ? `${alert.data.wallet.slice(0,6)}...${alert.data.wallet.slice(-4)}` : 'Unknown'}\``,
+          value: `${alert.data?.walletName || alert.source} **(${alert.data?.influenceScore || 50}/100)**\n\`${alert.data?.wallet ? `${alert.data.wallet.slice(0,6)}...${alert.data.wallet.slice(-4)}` : 'Unknown'}\``,
           inline: true
         },
         ...(alert.data?.walletStats ? [{
           name: '📊 Performance',
-          value: `Win Rate: ${(alert.data.walletStats.winRate || 0).toFixed(1)}%\nPNL: ${alert.data.walletStats.profitSol >= 0 ? '+' : ''}${(alert.data.walletStats.profitSol || 0).toFixed(2)} SOL\nTrades: ${(alert.data.walletStats.wins || 0) + (alert.data.walletStats.losses || 0)}`,
+          value: `**Win Rate: ${(alert.data.walletStats.winRate || 0)}%**\n**PNL:** ${alert.data.walletStats.profitSol >= 0 ? '+' : ''}${(alert.data.walletStats.profitSol || 0).toFixed(2)} SOL\n**Trades:** ${(alert.data.walletStats.wins || 0) + (alert.data.walletStats.losses || 0)}`,
           inline: true
         }] : []),
         {
@@ -927,7 +927,10 @@ export class AlphaAlertService {
         );
         if (matchedCaller) {
           console.log('[Alpha Alerts] Monitored wallet activity:', event);
-          await this.checkTokenForAlphaWallets(event.mint, 'Large Transfer', matchedCaller);
+          await this.checkTokenForAlphaWallets(event.mint, 'Large Transfer', matchedCaller, {
+            amountToken: event.amount,
+            txHash: event.signature,
+          });
         }
       });
 
@@ -970,7 +973,7 @@ export class AlphaAlertService {
   /**
    * Check if a newly detected token involves any alpha wallets
    */
-  private async checkTokenForAlphaWallets(mint: string, source: string, caller?: AlphaCallerConfig): Promise<void> {
+  private async checkTokenForAlphaWallets(mint: string, source: string, caller?: AlphaCallerConfig, txData?: { amountToken?: number; amountUsd?: number; txHash?: string }): Promise<void> {
     try {
       const walletInfo = caller ? `${caller.name} (${caller.wallet.slice(0, 8)}...)` : 'Unknown';
       console.log(`[Alpha Alerts] Checking token ${mint} from ${source} - Wallet: ${walletInfo}`);
@@ -1095,7 +1098,7 @@ export class AlphaAlertService {
       if (isQuality) {
         console.log(`[Alpha Alerts] ✅ Token ${mint} passed quality check - sending alert`);
         
-        // Send the alert with wallet information and PNL stats
+        // Send the alert with wallet information, PNL stats, and transaction data
         await this.sendAlert({
           type: 'caller_signal',
           mint,
@@ -1106,7 +1109,10 @@ export class AlphaAlertService {
             wallet: caller?.wallet,
             walletName: caller?.name,
             influenceScore: caller?.influenceScore,
-            walletStats
+            walletStats,
+            amountToken: txData?.amountToken,
+            amountUsd: txData?.amountUsd,
+            txHash: txData?.txHash,
           }
         });
       } else {
