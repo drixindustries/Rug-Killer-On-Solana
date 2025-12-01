@@ -259,13 +259,17 @@ export class HeliusWebhookService extends EventEmitter {
 
         // Check for smart money wallet activity
         if (tx.tokenTransfers && tx.tokenTransfers.length > 0) {
-          await this.handleSmartMoneyDetection(tx);
+          try {
+            await this.handleSmartMoneyDetection(tx);
+          } catch (smError: any) {
+            console.error('[Helius Webhook] Smart money detection error:', smError?.message || String(smError));
+          }
         }
 
         // Emit raw transaction event
         this.emit('transaction', tx);
-      } catch (error) {
-        console.error('[Helius Webhook] Transaction processing error:', error);
+      } catch (error: any) {
+        console.error('[Helius Webhook] Transaction processing error:', error?.message || String(error));
       }
     }
   }
@@ -386,21 +390,24 @@ export class HeliusWebhookService extends EventEmitter {
         )
         .limit(50);
 
-      if (smartMoneyWallets.length === 0) return;
+      // Filter out any wallets with missing walletAddress from query results
+      const validSmartWallets = smartMoneyWallets.filter(w => w && w.walletAddress);
+      
+      if (validSmartWallets.length === 0) return;
 
-      console.log(`[Helius Webhook] 🧠 Smart money detected: ${smartMoneyWallets.length} wallets in transaction ${tx.signature.slice(0, 8)}...`);
+      console.log(`[Helius Webhook] 🧠 Smart money detected: ${validSmartWallets.length} wallets in transaction ${tx.signature.slice(0, 8)}...`);
 
       // Group transfers by token mint
-      const tokenMints = new Map<string, typeof smartMoneyWallets>();
+      const tokenMints = new Map<string, typeof validSmartWallets>();
       for (const transfer of tx.tokenTransfers || []) {
-        const smartWallet = smartMoneyWallets.find(w =>
-          w && w.walletAddress && (
-            w.walletAddress === transfer.fromUserAccount ||
-            w.walletAddress === transfer.toUserAccount
-          )
+        if (!transfer || !transfer.mint) continue;
+        
+        const smartWallet = validSmartWallets.find(w =>
+          w.walletAddress === transfer.fromUserAccount ||
+          w.walletAddress === transfer.toUserAccount
         );
 
-        if (smartWallet && smartWallet.walletAddress && transfer.mint) {
+        if (smartWallet) {
           if (!tokenMints.has(transfer.mint)) {
             tokenMints.set(transfer.mint, []);
           }
@@ -410,15 +417,16 @@ export class HeliusWebhookService extends EventEmitter {
 
       // Publish smart money event for each token
       for (const [mint, wallets] of tokenMints.entries()) {
-        // Filter out wallets with missing walletAddress and map to eliteWallets
-        const eliteWallets = wallets
-          .filter(w => w && w.walletAddress)
-          .map(w => ({
-            address: w.walletAddress!,
-            winrate: w.winrate || 0,
-            profit: w.profitLoss || 0,
-            directive: getDirective(w.winrate || 0, w.profitLoss || 0),
-          }));
+        // Map to eliteWallets (already filtered for valid walletAddress)
+        const eliteWallets = wallets.map(w => ({
+          address: w.walletAddress,
+          winrate: typeof w.winrate === 'number' ? w.winrate : 0,
+          profit: typeof w.profitLoss === 'number' ? w.profitLoss : 0,
+          directive: getDirective(
+            typeof w.winrate === 'number' ? w.winrate : 0, 
+            typeof w.profitLoss === 'number' ? w.profitLoss : 0
+          ),
+        }));
 
         // Skip if no valid wallets after filtering
         if (eliteWallets.length === 0) continue;
@@ -435,8 +443,13 @@ export class HeliusWebhookService extends EventEmitter {
 
         console.log(`[Helius Webhook] 📢 Published smart money alert for token ${mint.slice(0, 8)}... (${eliteWallets.length} wallets)`);
       }
-    } catch (error) {
-      console.error('[Helius Webhook] Handle smart money detection error:', error);
+    } catch (error: any) {
+      // Don't spam logs with full stack traces - just log the message
+      const errMsg = error?.message || String(error);
+      if (!errMsg.includes('Cannot read properties of undefined')) {
+        console.error('[Helius Webhook] Smart money detection error:', errMsg);
+      }
+      // Error already handled - transaction continues processing
     }
   }
 
