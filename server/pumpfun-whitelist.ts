@@ -54,6 +54,7 @@ const CORE_PUMPFUN_ADDRESSES = new Set([
   'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',  // Token Program
   'Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1',  // Pump.fun Event Authority
   'e4HZW81GuZkgDK2YAdPF6PsToQAB6Go6dL3iQpDz2Hy',  // Pump.fun AMM/Liquidity Vault
+  '5NknwpvMbNhUY71DEZWDhLHMjCXntvyRSvo4e6tvopbi', // Pump.fun AMM (WSOL) - REPORTED 20+ TIMES - CRITICAL!
 ]);
 
 // Pattern-based detection for Pump.fun AMM wallets
@@ -65,6 +66,7 @@ const PUMPFUN_ADDRESS_PATTERNS = [
   /^TSLv/,   // Associated token prefix
   /^Ce6T/,   // Event authority prefix
   /^e4HZ/,   // AMM vault prefix
+  /^5Nkn/,   // WSOL AMM vault (CRITICAL - reported 20+ times)
   /^DezX/,   // Bonk-style vault clone
   /^4wTV/,   // Legacy vault
 ];

@@ -38,7 +38,6 @@ export const EXCHANGE_WALLETS = new Set<string>([
   // HTX (Huobi)
   "HTXHot8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3h4i5j6k", // HTX Hot
   "HuobiN9o0p1q2r3s4t5u6v7w8x9y0z1a2b3c4d5e6f7g", // HTX Deposit
-  "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P", // HTX Legacy
   
   // Coinbase
   "2ojv9BAiHUrvsm9gxDe7fJSzbNZSJcxZvf8dqmWGHG8S", // Coinbase Custodial

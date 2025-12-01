@@ -20,6 +20,9 @@ export const PUMPFUN_BONDING_CURVE_VAULTS = new Set([
   // Main vault (Nov 2025 - most active)
   '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
   
+  // WSOL AMM vault - CRITICAL (reported 20+ times)
+  '5NknwpvMbNhUY71DEZWDhLHMjCXntvyRSvo4e6tvopbi',
+  
   // Secondary vault
   'CebN5WGQ8pE9jZ9X6TwhJqbuPBqW7YQ3u6oKDPzcePet',
   
