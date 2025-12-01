@@ -257,6 +257,11 @@ export class HeliusWebhookService extends EventEmitter {
           await this.handleTokenTransfer(tx);
         }
 
+        // Check for smart money wallet activity
+        if (tx.tokenTransfers && tx.tokenTransfers.length > 0) {
+          await this.handleSmartMoneyDetection(tx);
+        }
+
         // Emit raw transaction event
         this.emit('transaction', tx);
       } catch (error) {
@@ -328,6 +333,88 @@ export class HeliusWebhookService extends EventEmitter {
       }
     } catch (error) {
       console.error('[Helius Webhook] Handle token transfer error:', error);
+    }
+  }
+
+  /**
+   * Check if transaction involves smart money wallets and trigger alerts
+   */
+  private async handleSmartMoneyDetection(tx: HeliusTransactionWebhook): Promise<void> {
+    try {
+      const { db, smartWallets, kolWallets } = await import('../db.ts');
+      const { eq, or } = await import('drizzle-orm');
+      const { smartMoneyRelay, getDirective } = await import('./smart-money-relay.ts');
+      
+      // Extract all wallet addresses from transfers
+      const walletAddresses = new Set<string>();
+      for (const transfer of tx.tokenTransfers || []) {
+        if (transfer.fromUserAccount) walletAddresses.add(transfer.fromUserAccount);
+        if (transfer.toUserAccount) walletAddresses.add(transfer.toUserAccount);
+      }
+
+      if (walletAddresses.size === 0) return;
+
+      // Query database for smart money wallets
+      const walletsArray = Array.from(walletAddresses);
+      const smartMoneyWallets = await db
+        .select({
+          walletAddress: smartWallets.walletAddress,
+          displayName: smartWallets.displayName,
+          influenceScore: smartWallets.influenceScore,
+          winrate: smartWallets.winrate,
+          profitLoss: smartWallets.profitLoss,
+        })
+        .from(smartWallets)
+        .where(
+          or(
+            ...walletsArray.map(addr => eq(smartWallets.walletAddress, addr))
+          )
+        )
+        .limit(50);
+
+      if (smartMoneyWallets.length === 0) return;
+
+      console.log(`[Helius Webhook] 🧠 Smart money detected: ${smartMoneyWallets.length} wallets in transaction ${tx.signature.slice(0, 8)}...`);
+
+      // Group transfers by token mint
+      const tokenMints = new Map<string, typeof smartMoneyWallets>();
+      for (const transfer of tx.tokenTransfers || []) {
+        const smartWallet = smartMoneyWallets.find(w =>
+          w.walletAddress === transfer.fromUserAccount ||
+          w.walletAddress === transfer.toUserAccount
+        );
+
+        if (smartWallet && transfer.mint) {
+          if (!tokenMints.has(transfer.mint)) {
+            tokenMints.set(transfer.mint, []);
+          }
+          tokenMints.get(transfer.mint)!.push(smartWallet);
+        }
+      }
+
+      // Publish smart money event for each token
+      for (const [mint, wallets] of tokenMints.entries()) {
+        const eliteWallets = wallets.map(w => ({
+          address: w.walletAddress,
+          winrate: w.winrate || 0,
+          profit: w.profitLoss || 0,
+          directive: getDirective(w.winrate || 0, w.profitLoss || 0),
+        }));
+
+        smartMoneyRelay.publish({
+          tokenMint: mint,
+          symbol: undefined, // Will be enriched by bot
+          ageMinutes: 0,
+          walletCount: eliteWallets.length,
+          eliteWallets,
+          allSample: eliteWallets.map(w => w.address.slice(0, 8) + '...'),
+          timestamp: tx.timestamp || Date.now(),
+        });
+
+        console.log(`[Helius Webhook] 📢 Published smart money alert for token ${mint.slice(0, 8)}... (${eliteWallets.length} wallets)`);
+      }
+    } catch (error) {
+      console.error('[Helius Webhook] Handle smart money detection error:', error);
     }
   }
 
