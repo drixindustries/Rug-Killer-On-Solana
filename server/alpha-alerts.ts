@@ -287,7 +287,7 @@ export class AlphaAlertService {
       const sourceUrl = typeof alert.data?.sourceUrl === 'string' ? alert.data.sourceUrl : undefined;
 
       const formatValue = (value: number, fraction: number) => {
-        if (!Number.isFinite(value) || value <= 0) return undefined;
+        if (value === null || value === undefined || !Number.isFinite(value) || isNaN(value) || value <= 0) return undefined;
         return value.toLocaleString(undefined, { maximumFractionDigits: fraction });
       };
 
@@ -309,13 +309,18 @@ export class AlphaAlertService {
         // Build compact stats for header
         const statParts: string[] = [];
         if (walletStats.profitSol !== null && walletStats.profitSol !== undefined) {
-          const profitEmoji = walletStats.profitSol >= 0 ? '💰' : '📉';
-          const profitFormatted = Math.abs(walletStats.profitSol).toFixed(2);
-          statParts.push(`${profitEmoji} PNL: ${walletStats.profitSol >= 0 ? '+' : '-'}${profitFormatted} SOL (avg ${totalTrades > 0 ? (walletStats.profitSol / totalTrades).toFixed(2) : '0.00'} SOL/trade)`);
+          const profitValue = Number(walletStats.profitSol);
+          if (Number.isFinite(profitValue) && !isNaN(profitValue)) {
+            const profitEmoji = profitValue >= 0 ? '💰' : '📉';
+            const profitFormatted = Math.abs(profitValue).toFixed(2);
+            const avgTrade = totalTrades > 0 && Number.isFinite(profitValue / totalTrades) ? (profitValue / totalTrades).toFixed(2) : '0.00';
+            statParts.push(`${profitEmoji} PNL: ${profitValue >= 0 ? '+' : '-'}${profitFormatted} SOL (avg ${avgTrade} SOL/trade)`);
+          }
         }
-        if (walletStats.winRate !== undefined) {
-          const winRateEmoji = walletStats.winRate >= 70 ? '🔥' : walletStats.winRate >= 50 ? '✅' : '⚠️';
-          const winRateDisplay = Number.isFinite(walletStats.winRate) ? `${walletStats.winRate.toFixed ? walletStats.winRate.toFixed(1) : walletStats.winRate}%` : '0.0%';
+        if (walletStats.winRate !== undefined && walletStats.winRate !== null) {
+          const winRateValue = Number(walletStats.winRate);
+          const winRateEmoji = winRateValue >= 70 ? '🔥' : winRateValue >= 50 ? '✅' : '⚠️';
+          const winRateDisplay = Number.isFinite(winRateValue) && !isNaN(winRateValue) ? `${winRateValue.toFixed(1)}%` : '0.0%';
           statParts.push(`${winRateEmoji} Win Rate: ${winRateDisplay}`);
         }
         if (totalTrades > 0) {
@@ -433,7 +438,7 @@ export class AlphaAlertService {
         },
         ...(alert.data?.walletStats ? [{
           name: '📊 Performance',
-          value: `**Win Rate:** ${(alert.data.walletStats.winRate || 0).toFixed(1)}%\n**PNL:** ${alert.data.walletStats.profitSol >= 0 ? '+' : ''}${(alert.data.walletStats.profitSol || 0).toFixed(2)} SOL\n**Trades:** ${(alert.data.walletStats.wins || 0) + (alert.data.walletStats.losses || 0)}`,
+          value: `**Win Rate:** ${typeof alert.data.walletStats.winRate === 'number' && !isNaN(alert.data.walletStats.winRate) ? alert.data.walletStats.winRate.toFixed(1) : '0.0'}%\n**PNL:** ${typeof alert.data.walletStats.profitSol === 'number' && !isNaN(alert.data.walletStats.profitSol) ? (alert.data.walletStats.profitSol >= 0 ? '+' : '') + alert.data.walletStats.profitSol.toFixed(2) : '0.00'} SOL\n**Trades:** ${(alert.data.walletStats.wins || 0) + (alert.data.walletStats.losses || 0)}`,
           inline: true
         }] : []),
         {
@@ -443,7 +448,16 @@ export class AlphaAlertService {
         },
         ...(alert.data?.amountToken || alert.data?.amountSol || alert.data?.amountUsd ? [{
           name: '💰 Purchase',
-          value: `${alert.data.amountToken ? `${Number(alert.data.amountToken).toLocaleString(undefined, {maximumFractionDigits: 2})} tokens` : ''}${alert.data.amountToken && alert.data.amountSol ? ' • ' : ''}${alert.data.amountSol ? `${Number(alert.data.amountSol).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})} SOL` : ''}${(alert.data.amountToken || alert.data.amountSol) && alert.data.amountUsd ? ' • ' : ''}${alert.data.amountUsd ? `$${Number(alert.data.amountUsd).toLocaleString(undefined, {maximumFractionDigits: 2})}` : ''}`,
+          value: (() => {
+            const formatAmount = (val: any, opts: any) => {
+              const num = Number(val);
+              return (val !== null && val !== undefined && Number.isFinite(num) && !isNaN(num)) ? num.toLocaleString(undefined, opts) : null;
+            };
+            const tokenStr = alert.data.amountToken ? `${formatAmount(alert.data.amountToken, {maximumFractionDigits: 2}) || '0'} tokens` : '';
+            const solStr = alert.data.amountSol ? `${formatAmount(alert.data.amountSol, {minimumFractionDigits: 2, maximumFractionDigits: 4}) || '0.00'} SOL` : '';
+            const usdStr = alert.data.amountUsd ? `$${formatAmount(alert.data.amountUsd, {maximumFractionDigits: 2}) || '0.00'}` : '';
+            return [tokenStr, solStr, usdStr].filter(s => s).join(' • ') || 'Unknown';
+          })(),
           inline: true
         }] : []),
         {
