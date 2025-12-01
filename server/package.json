@@ -1,12 +1,12 @@
 {
   "name": "rug-killer-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "tsx index.ts",
     "build": "echo 'No build needed - using tsx runtime'",
-    "start": "tsx index.ts",
+    "start": "NODE_OPTIONS='--max-old-space-size=4096' tsx index.ts",
     "migrate": "tsx migrate.ts",
     "seed:social": "tsx seed-demo-profiles.ts",
     "db:seed:dune": "tsx seed-dune-wallets.ts",
