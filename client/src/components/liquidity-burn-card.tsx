@@ -2,22 +2,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Flame, CheckCircle, XCircle, AlertTriangle, ExternalLink } from "lucide-react";
+import type { LiquidityPoolStatus } from "@shared/schema";
 
 interface LiquidityBurnCardProps {
-  burnPercentage: number;
-  lpMintAddress?: string;
-  lpReserve?: number;
-  actualSupply?: number;
-  isBurned: boolean;
+  data: LiquidityPoolStatus;
 }
 
-export function LiquidityBurnCard({ 
-  burnPercentage, 
-  lpMintAddress, 
-  lpReserve,
-  actualSupply,
-  isBurned 
-}: LiquidityBurnCardProps) {
+export function LiquidityBurnCard({ data }: LiquidityBurnCardProps) {
+  // Extract properties with safe defaults
+  const burnPercentage = typeof data.burnPercentage === 'number' ? data.burnPercentage : 0;
+  const lpMintAddress = data.lpMintAddress;
+  const lpReserve = data.lpReserve;
+  const actualSupply = data.actualSupply;
+  const isBurned = data.isBurned || false;
   const getBurnStatus = () => {
     if (isBurned || burnPercentage >= 99.99) {
       return {
@@ -85,7 +82,7 @@ export function LiquidityBurnCard({
           {status.icon}
           <div className="ml-6 flex-1">
             <div className={`text-5xl font-bold ${status.color}`} data-testid="text-burn-percentage">
-              {(typeof burnPercentage === 'number' ? burnPercentage.toFixed(2) : '0.00')}%
+              {(typeof burnPercentage === 'number' && !isNaN(burnPercentage) ? burnPercentage.toFixed(2) : '0.00')}%
             </div>
             <div className="text-sm text-muted-foreground mt-1">
               LP Tokens Burned
@@ -137,7 +134,7 @@ export function LiquidityBurnCard({
         {(lpReserve !== undefined || actualSupply !== undefined) && (
           <div className="space-y-2 pt-2 border-t">
             <p className="text-sm font-semibold">Technical Details:</p>
-            {lpReserve !== undefined && (
+            {lpReserve !== undefined && lpReserve !== null && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">LP Reserve:</span>
                 <span className="font-mono" data-testid="text-lp-reserve">
@@ -145,7 +142,7 @@ export function LiquidityBurnCard({
                 </span>
               </div>
             )}
-            {actualSupply !== undefined && (
+            {actualSupply !== undefined && actualSupply !== null && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Actual Supply:</span>
                 <span className="font-mono" data-testid="text-actual-supply">

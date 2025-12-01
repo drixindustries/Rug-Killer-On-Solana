@@ -159,7 +159,7 @@ export function TokenMetadataCard({ metadata, tokenAddress, creationDate }: Toke
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">Total Supply</span>
             <span className="text-sm font-semibold" data-testid="text-token-supply">
-              {metadata?.supply && metadata?.decimals 
+              {metadata?.supply !== null && metadata?.supply !== undefined && metadata?.decimals !== null && metadata?.decimals !== undefined
                 ? (metadata.supply / Math.pow(10, metadata.decimals)).toLocaleString()
                 : "Unknown"}
             </span>

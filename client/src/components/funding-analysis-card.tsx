@@ -27,14 +27,17 @@ export function FundingAnalysisCard({ fundingData }: FundingAnalysisCardProps) {
 
   const cexFunding = Object.entries(fundingSourceBreakdown)
     .filter(([source]) => cexSources.includes(source))
+    .filter(([, percentage]) => typeof percentage === 'number' && !isNaN(percentage))
     .sort(([, a], [, b]) => b - a);
 
   const swapFunding = Object.entries(fundingSourceBreakdown)
     .filter(([source]) => swapSources.includes(source))
+    .filter(([, percentage]) => typeof percentage === 'number' && !isNaN(percentage))
     .sort(([, a], [, b]) => b - a);
 
   const otherFunding = Object.entries(fundingSourceBreakdown)
     .filter(([source]) => !cexSources.includes(source) && !swapSources.includes(source))
+    .filter(([, percentage]) => typeof percentage === 'number' && !isNaN(percentage))
     .sort(([, a], [, b]) => b - a);
 
   const freshWallets = walletFunding.filter(w => w.isRecentlyCreated);

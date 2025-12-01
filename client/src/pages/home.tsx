@@ -151,10 +151,17 @@ export default function Home() {
             {/* Token Metadata & Market Data */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {analysis.tokenInfo && (
-                <TokenMetadataCard metadata={analysis.tokenInfo} />
+                <TokenMetadataCard 
+                  metadata={analysis.tokenInfo} 
+                  tokenAddress={analysis.tokenInfo?.address || analysis.tokenAddress || ""} 
+                  creationDate={analysis.creationDate}
+                />
               )}
               {analysis.dexscreener && (
-                <MarketDataCard data={analysis.dexscreener} />
+                <MarketDataCard 
+                  data={analysis.dexscreener} 
+                  tokenAddress={analysis.tokenInfo?.address || analysis.tokenAddress || ""}
+                />
               )}
             </div>
 
