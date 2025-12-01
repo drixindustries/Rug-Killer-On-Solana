@@ -1022,10 +1022,20 @@ export class AlphaAlertService {
             .where(eq(smartWallets.walletAddress, caller.wallet))
             .limit(1);
           
+          if (wallet) {
+            console.log(`[Alpha Alerts] DB stats for ${caller.name}: WR=${wallet.winRate}% (${wallet.wins}W/${wallet.losses}L), PNL=${wallet.profitSol} SOL, source=${wallet.source}`);
+          } else {
+            console.log(`[Alpha Alerts] No DB entry found for ${caller.name}`);
+          }
+          
           // Check if we should refresh stats from Helius
           const heliusStatsService = getHeliusWalletStatsService();
           const hasStaleStats = wallet && (!wallet.winRate || wallet.winRate === 0) && (wallet.wins || 0) + (wallet.losses || 0) > 50;
           const shouldUseHelius = heliusStatsService.isAvailable() && (!wallet || hasStaleStats);
+          
+          if (shouldUseHelius) {
+            console.log(`[Alpha Alerts] Will fetch from Helius for ${caller.name} (hasStaleStats=${hasStaleStats}, noWallet=${!wallet})`);
+          }
           
           if (shouldUseHelius) {
             // Try to get fresh stats from Helius
@@ -1075,14 +1085,55 @@ export class AlphaAlertService {
           }
           
           // Fall back to database stats if Helius didn't work or wasn't needed
-          if (!walletStats && wallet && wallet.winRate !== null && wallet.winRate !== undefined) {
-            walletStats = {
-              profitSol: wallet.profitSol ? parseFloat(wallet.profitSol) : 0,
-              wins: wallet.wins || 0,
-              losses: wallet.losses || 0,
-              winRate: wallet.winRate || 0,
-            };
-            console.log(`[Alpha Alerts] Using cached stats for ${caller.name}: ${wallet.winRate}% WR (${wallet.wins}W/${wallet.losses}L), PNL: ${walletStats.profitSol.toFixed(2)} SOL`);
+          if (!walletStats && wallet) {
+            // Validate we have meaningful stats from database
+            const hasValidStats = (wallet.wins || 0) + (wallet.losses || 0) >= 5 && 
+                                 wallet.winRate !== null && 
+                                 wallet.winRate !== undefined && 
+                                 wallet.winRate > 0;
+            
+            if (hasValidStats) {
+              walletStats = {
+                profitSol: wallet.profitSol ? parseFloat(wallet.profitSol) : 0,
+                wins: wallet.wins || 0,
+                losses: wallet.losses || 0,
+                winRate: wallet.winRate || 0,
+              };
+              console.log(`[Alpha Alerts] Using cached stats for ${caller.name}: ${wallet.winRate}% WR (${wallet.wins}W/${wallet.losses}L), PNL: ${walletStats.profitSol.toFixed(2)} SOL`);
+            } else {
+              console.log(`[Alpha Alerts] Database stats invalid for ${caller.name} (${wallet.wins || 0}W/${wallet.losses || 0}L, ${wallet.winRate || 0}% WR), will fetch fresh data`);
+              // Force a Helius refresh
+              if (heliusStatsService.isAvailable()) {
+                console.log(`[Alpha Alerts] Forcing Helius refresh for ${caller.name}...`);
+                const heliusStats = await heliusStatsService.getWalletStats(caller.wallet, 200);
+                
+                if (heliusStats && heliusStats.totalTrades >= 10) {
+                  walletStats = {
+                    profitSol: heliusStats.profitSol,
+                    wins: heliusStats.wins,
+                    losses: heliusStats.losses,
+                    winRate: heliusStats.winRate,
+                  };
+                  
+                  console.log(`[Alpha Alerts] ✅ ${heliusStats.source?.toUpperCase() || 'API'} fresh stats for ${caller.name}: ${walletStats.winRate.toFixed(1)}% WR (${walletStats.wins}W/${walletStats.losses}L), PNL: ${walletStats.profitSol.toFixed(2)} SOL`);
+                  
+                  // Update database with fresh stats
+                  await db.update(smartWallets)
+                    .set({
+                      profitSol: heliusStats.profitSol.toFixed(9),
+                      wins: heliusStats.wins,
+                      losses: heliusStats.losses,
+                      winRate: heliusStats.winRate,
+                      lastActiveAt: heliusStats.lastActiveAt,
+                      updatedAt: new Date(),
+                    })
+                    .where(eq(smartWallets.walletAddress, caller.wallet));
+                }
+              }
+            }
+          }
+          
+          if (!walletStats) {
           } else if (!walletStats) {
             // No stats available - use influence-based estimates
             console.log(`[Alpha Alerts] No stats available for ${caller.name}, using influence-based estimate`);
