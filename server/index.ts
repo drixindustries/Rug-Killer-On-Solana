@@ -77,6 +77,12 @@ const bootstrap = async () => {
   console.log('🚀 Bootstrapping server...');
   
   try {
+    // Run database migrations first
+    console.log('📦 Running database migrations...');
+    const { runMigrations } = await import('../migrate.js');
+    await runMigrations();
+    console.log('✅ Database migrations complete');
+    
     const mod = await import('./app.ts');
     const server = await mod.startServer();
     console.log('✅ Server started successfully');
