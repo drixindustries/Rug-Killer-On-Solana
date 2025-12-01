@@ -294,17 +294,27 @@ export class HolderAnalysisService {
       const nonSystemEntries = Array.from(byOwner.entries()).reduce<Array<{ address: string; amountRaw: bigint }>>((acc, [address, amountRaw]) => {
         // Filter pump.fun bonding curve addresses (both main and associated)
         if ((bondingCurveAddress && address === bondingCurveAddress) || (associatedBondingCurveAddress && address === associatedBondingCurveAddress)) {
-          console.log(`[HolderAnalysis] Filtered bonding curve holder: ${address.slice(0, 8)}... (${Number(amountRaw) / 1e9} tokens)`);
+          console.log(`[HolderAnalysis] ✅ Filtered bonding curve holder: ${address.slice(0, 8)}... (${Number(amountRaw) / 1e9} tokens)`);
           pumpFunFilteredCount += 1;
           pumpFunFilteredRaw += amountRaw;
           return acc;
         }
+        // Check Pump.fun AMM (includes pattern matching for 5Nkn...)
         if (isPumpFunAmm(address)) {
+          console.log(`[HolderAnalysis] ✅ Filtered Pump.fun AMM: ${address.slice(0, 8)}...${address.slice(-8)} (${Number(amountRaw) / 1e9} tokens)`);
+          pumpFunFilteredCount += 1;
+          pumpFunFilteredRaw += amountRaw;
+          return acc;
+        }
+        // Check system wallets (Raydium, exchanges, etc.)
+        if (isSystemWallet(address)) {
+          console.log(`[HolderAnalysis] ✅ Filtered system wallet: ${address.slice(0, 8)}... (${getSystemWalletType(address)})`);
           pumpFunFilteredCount += 1;
           pumpFunFilteredRaw += amountRaw;
           return acc;
         }
         if (isMeteoraAmm(address)) {
+          console.log(`[HolderAnalysis] ✅ Filtered Meteora AMM: ${address.slice(0, 8)}...`);
           meteoraFilteredCount += 1;
           meteoraFilteredRaw += amountRaw;
           return acc;
@@ -584,19 +594,30 @@ export class HolderAnalysisService {
 
         // Filter pump.fun bonding curve addresses (both main and associated)
         if ((bondingCurveAddress && ownerAddress === bondingCurveAddress) || (associatedBondingCurveAddress && ownerAddress === associatedBondingCurveAddress)) {
-          console.log(`[HolderAnalysis] Filtered bonding curve holder: ${ownerAddress.slice(0, 8)}... (${amountRaw / 1e9} tokens)`);
+          console.log(`[HolderAnalysis] ✅ Filtered bonding curve holder: ${ownerAddress.slice(0, 8)}... (${amountRaw / 1e9} tokens)`);
           pumpFunFilteredCount += 1;
           pumpFunFilteredRaw += amountRaw;
           continue;
         }
 
+        // Check Pump.fun AMM (includes pattern matching for 5Nkn...)
         if (isPumpFunAmm(ownerAddress)) {
+          console.log(`[HolderAnalysis] ✅ Filtered Pump.fun AMM: ${ownerAddress.slice(0, 8)}...${ownerAddress.slice(-8)} (${amountRaw / 1e9} tokens)`);
+          pumpFunFilteredCount += 1;
+          pumpFunFilteredRaw += amountRaw;
+          continue;
+        }
+
+        // Check system wallets
+        if (isSystemWallet(ownerAddress)) {
+          console.log(`[HolderAnalysis] ✅ Filtered system wallet: ${ownerAddress.slice(0, 8)}... (${getSystemWalletType(ownerAddress)})`);
           pumpFunFilteredCount += 1;
           pumpFunFilteredRaw += amountRaw;
           continue;
         }
 
         if (isMeteoraAmm(ownerAddress)) {
+          console.log(`[HolderAnalysis] ✅ Filtered Meteora AMM: ${ownerAddress.slice(0, 8)}...`);
           meteoraFilteredCount += 1;
           meteoraFilteredRaw += amountRaw;
           continue;
@@ -752,20 +773,21 @@ export class HolderAnalysisService {
     isLP: boolean;
     isCreator: boolean;
   } {
-    // Check exchanges first (pre-listed + auto-detected)
-    if (isKnownOrAutoExchange(address)) {
-      const exchangeLabel = getExchangeLabel(address) || 'Exchange';
+    // CRITICAL: Check system wallets FIRST before any heuristics
+    // This prevents Pump.fun AMM wallets from being mislabeled as "Creator/Dev"
+    if (isSystemWallet(address)) {
+      const walletType = getSystemWalletType(address);
       return {
-        label: exchangeLabel,
-        isExchange: true,
-        isLP: false,
+        label: walletType,
+        isExchange: false,
+        isLP: true,
         isCreator: false,
       };
     }
 
     if (isPumpFunAmm(address)) {
       return {
-        label: 'Pump.fun AMM',
+        label: 'Pump.fun AMM (WSOL)',
         isExchange: false,
         isLP: true,
         isCreator: false,
@@ -777,6 +799,17 @@ export class HolderAnalysisService {
         label: 'Meteora DLMM Pool',
         isExchange: false,
         isLP: true,
+        isCreator: false,
+      };
+    }
+
+    // Check exchanges (pre-listed + auto-detected)
+    if (isKnownOrAutoExchange(address)) {
+      const exchangeLabel = getExchangeLabel(address) || 'Exchange';
+      return {
+        label: exchangeLabel,
+        isExchange: true,
+        isLP: false,
         isCreator: false,
       };
     }
@@ -794,6 +827,7 @@ export class HolderAnalysisService {
     }
 
     // Heuristic: Very high percentage might be LP or creator
+    // NOTE: These heuristics run AFTER all whitelist checks above
     if (percentage > 90) {
       return {
         label: 'Likely LP Pool',
