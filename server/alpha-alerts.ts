@@ -401,6 +401,23 @@ export class AlphaAlertService {
       console.log('[ALPHA ALERT] Failed to fetch token info from DexScreener:', error);
     }
     
+    // Fallback: RugCheck metadata (name, symbol, logo)
+    if (!tokenImageUrl || !enrichedTokenName || !enrichedTokenSymbol || enrichedTokenSymbol === 'Unknown') {
+      try {
+        const rcResp = await fetch(`https://api.rugcheck.xyz/v1/tokens/${alert.mint}/report`);
+        if (rcResp.ok) {
+          const rc = await rcResp.json();
+          if (rc) {
+            if (!tokenImageUrl && rc.logo_uri) tokenImageUrl = rc.logo_uri;
+            if ((!enrichedTokenSymbol || enrichedTokenSymbol === 'Unknown') && rc.symbol) enrichedTokenSymbol = rc.symbol;
+            if (!enrichedTokenName && rc.name) enrichedTokenName = rc.name;
+          }
+        }
+      } catch (error) {
+        console.log('[ALPHA ALERT] RugCheck metadata fallback failed:', error);
+      }
+    }
+    
     // Create embed data for rich formatting
     const embedData = alert.type === 'caller_signal' ? {
       title: `🚨 Alpha Alert`,
