@@ -787,7 +787,7 @@ export class HolderAnalysisService {
 
     if (isPumpFunAmm(address)) {
       return {
-        label: 'Pump.fun AMM (WSOL)',
+        label: '🚀 PUMP FUN AMM WALLET',
         isExchange: false,
         isLP: true,
         isCreator: false,
