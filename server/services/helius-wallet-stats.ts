@@ -84,10 +84,8 @@ export class HeliusWalletStatsService {
       const response = await fetch(url, { signal: controller.signal });
       clearTimeout(timeout);
 
-  /**
-   * Analyze Helius transactions to calculate win rate and profit
-   */
-  private analyzeHeliusTransactions(transactions: any[], walletAddress: string): WalletStats {
+      if (!response.ok) {
+        if (response.status === 429) {
           console.warn('[WalletStats] Insufficient Helius credits');
         }
         return null;
@@ -103,6 +101,38 @@ export class HeliusWalletStatsService {
       }
       return null;
     }
+  }
+
+  /**
+   * Analyze Helius transactions to calculate win rate and profit
+   */
+  private analyzeHeliusTransactions(transactions: any[], walletAddress: string): WalletStats {
+    // Simple analysis - count wins/losses based on SOL balance changes
+    let totalTrades = 0;
+    let wins = 0;
+    let totalProfit = 0;
+
+    for (const tx of transactions) {
+      if (tx.type === 'SWAP' || tx.type === 'TRANSFER') {
+        totalTrades++;
+        const nativeChange = tx.nativeTransfers?.find((t: any) => t.toUserAccount === walletAddress)?.amount || 0;
+        if (nativeChange > 0) {
+          wins++;
+          totalProfit += nativeChange / 1e9; // Convert lamports to SOL
+        } else if (nativeChange < 0) {
+          totalProfit += nativeChange / 1e9;
+        }
+      }
+    }
+
+    const winRate = totalTrades > 0 ? (wins / totalTrades) * 100 : 0;
+
+    return {
+      winRate,
+      totalTrades,
+      profitLoss: totalProfit,
+      source: 'helius'
+    };
   }
 
   /**

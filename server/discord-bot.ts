@@ -16,7 +16,7 @@ import { getCreatorWallet } from './creator-wallet';
 import { smartMoneyRelay } from './services/smart-money-relay.ts';
 import { getAccessControlService } from './services/access-control.js';
 import { getWhopService } from './services/whop-service.js';
-import { connection } from './solana-connection.js';
+import { connection } from './solana-connection.ts';
 
 // Instantiate shared service singletons needed in command handlers
 const dexScreener = new DexScreenerService();
