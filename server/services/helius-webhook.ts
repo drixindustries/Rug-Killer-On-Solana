@@ -321,11 +321,25 @@ export class HeliusWebhookService extends EventEmitter {
       for (const transfer of tx.tokenTransfers || []) {
         // Check for large transfers (potential whale activity)
         if (transfer.tokenAmount > 1000000) { // Adjust threshold as needed
+          // Find corresponding SOL transfer (native transfer)
+          let solAmount: number | undefined;
+          if (tx.nativeTransfers && tx.nativeTransfers.length > 0) {
+            // Find native transfer that matches the token transfer participants
+            const nativeTransfer = tx.nativeTransfers.find(nt => 
+              (nt.fromUserAccount === transfer.fromUserAccount || nt.toUserAccount === transfer.toUserAccount) ||
+              (nt.fromUserAccount === transfer.toUserAccount || nt.toUserAccount === transfer.fromUserAccount)
+            );
+            if (nativeTransfer) {
+              solAmount = nativeTransfer.amount / 1e9; // Convert lamports to SOL
+            }
+          }
+
           this.emit('large_transfer', {
             mint: transfer.mint,
             from: transfer.fromUserAccount,
             to: transfer.toUserAccount,
             amount: transfer.tokenAmount,
+            amountSol: solAmount,
             signature: tx.signature,
             timestamp: tx.timestamp,
           });
@@ -380,11 +394,13 @@ export class HeliusWebhookService extends EventEmitter {
       const tokenMints = new Map<string, typeof smartMoneyWallets>();
       for (const transfer of tx.tokenTransfers || []) {
         const smartWallet = smartMoneyWallets.find(w =>
-          w.walletAddress === transfer.fromUserAccount ||
-          w.walletAddress === transfer.toUserAccount
+          w && w.walletAddress && (
+            w.walletAddress === transfer.fromUserAccount ||
+            w.walletAddress === transfer.toUserAccount
+          )
         );
 
-        if (smartWallet && transfer.mint) {
+        if (smartWallet && smartWallet.walletAddress && transfer.mint) {
           if (!tokenMints.has(transfer.mint)) {
             tokenMints.set(transfer.mint, []);
           }
@@ -394,12 +410,18 @@ export class HeliusWebhookService extends EventEmitter {
 
       // Publish smart money event for each token
       for (const [mint, wallets] of tokenMints.entries()) {
-        const eliteWallets = wallets.map(w => ({
-          address: w.walletAddress,
-          winrate: w.winrate || 0,
-          profit: w.profitLoss || 0,
-          directive: getDirective(w.winrate || 0, w.profitLoss || 0),
-        }));
+        // Filter out wallets with missing walletAddress and map to eliteWallets
+        const eliteWallets = wallets
+          .filter(w => w && w.walletAddress)
+          .map(w => ({
+            address: w.walletAddress!,
+            winrate: w.winrate || 0,
+            profit: w.profitLoss || 0,
+            directive: getDirective(w.winrate || 0, w.profitLoss || 0),
+          }));
+
+        // Skip if no valid wallets after filtering
+        if (eliteWallets.length === 0) continue;
 
         smartMoneyRelay.publish({
           tokenMint: mint,

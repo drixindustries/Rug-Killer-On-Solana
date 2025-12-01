@@ -111,7 +111,7 @@ function createTelegramBot(botToken: string): Telegraf {
     }
     
     try {
-      const accessControl = getAccessControlService(connection);
+      const accessControl = getAccessControlService();
       const isGroupContext = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
       const checkId = isGroupContext ? String(ctx.chat?.id) : String(ctx.from?.id);
       
@@ -195,7 +195,7 @@ function createTelegramBot(botToken: string): Telegraf {
         return ctx.reply('❌ Invalid Solana wallet address. Please check and try again.');
       }
       
-      const accessControl = getAccessControlService(connection);
+      const accessControl = getAccessControlService();
       const success = await accessControl.linkWallet(String(ctx.from?.id), 'telegram', walletAddress);
       
       if (success) {
@@ -225,7 +225,7 @@ function createTelegramBot(botToken: string): Telegraf {
   // /trial command
   bot.command('trial', async (ctx) => {
     try {
-      const accessControl = getAccessControlService(connection);
+      const accessControl = getAccessControlService();
       const isGroupContext = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
       const checkId = isGroupContext ? String(ctx.chat?.id) : String(ctx.from?.id);
       const accessCheck = await accessControl.checkAccess(checkId, 'telegram', isGroupContext);
@@ -260,7 +260,7 @@ function createTelegramBot(botToken: string): Telegraf {
   // /access command
   bot.command('access', async (ctx) => {
     try {
-      const accessControl = getAccessControlService(connection);
+      const accessControl = getAccessControlService();
       const whopService = getWhopService();
       const isGroupContext = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
       const checkId = isGroupContext ? String(ctx.chat?.id) : String(ctx.from?.id);
@@ -302,7 +302,7 @@ function createTelegramBot(botToken: string): Telegraf {
     const code = args.slice(1).join(' '); // In case code has spaces
     
     try {
-      const accessControl = getAccessControlService(connection);
+      const accessControl = getAccessControlService();
       const isGroupContext = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
       const checkId = isGroupContext ? String(ctx.chat?.id) : String(ctx.from?.id);
       

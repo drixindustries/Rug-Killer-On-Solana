@@ -281,6 +281,7 @@ export class AlphaAlertService {
       const tokenSymbol = alert.data?.tokenSymbol || alert.data?.tokenName;
       const tokenName = alert.data?.tokenName && alert.data?.tokenName !== tokenSymbol ? alert.data?.tokenName : undefined;
       const amountToken = Number(alert.data?.amountToken);
+      const amountSol = Number(alert.data?.amountSol);
       const amountUsd = Number(alert.data?.amountUsd);
       const txHash = typeof alert.data?.txHash === 'string' ? alert.data.txHash : undefined;
       const sourceUrl = typeof alert.data?.sourceUrl === 'string' ? alert.data.sourceUrl : undefined;
@@ -339,8 +340,9 @@ export class AlphaAlertService {
       
       // Token info and purchase amount on same line
       const formattedSize = formatValue(amountToken, amountToken > 1 ? 2 : 4);
+      const formattedSol = formatValue(amountSol, 4);
       const formattedUsd = formatValue(amountUsd, amountUsd > 1000 ? 0 : 2);
-      const buyInfo = formattedSize || formattedUsd ? `🛒 Bought: ${formattedSize ? `${formattedSize} tokens` : ''}${formattedSize && formattedUsd ? ' • ' : ''}${formattedUsd ? `$${formattedUsd}` : ''}` : null;
+      const buyInfo = formattedSize || formattedSol || formattedUsd ? `🛒 Bought: ${formattedSize ? `${formattedSize} tokens` : ''}${formattedSize && formattedSol ? ' • ' : ''}${formattedSol ? `${formattedSol} SOL` : ''}${(formattedSize || formattedSol) && formattedUsd ? ' • ' : ''}${formattedUsd ? `$${formattedUsd}` : ''}` : null;
       
       if (tokenSymbol) {
         summaryLines.push(`🏷️ ${tokenSymbol}${tokenName ? ` (${tokenName})` : ''}${buyInfo ? ` • ${buyInfo}` : ''}`);
@@ -422,9 +424,9 @@ export class AlphaAlertService {
           value: `\`${alert.mint}\``,
           inline: false
         },
-        ...(alert.data?.amountToken || alert.data?.amountUsd ? [{
+        ...(alert.data?.amountToken || alert.data?.amountSol || alert.data?.amountUsd ? [{
           name: '💰 Purchase',
-          value: `${alert.data.amountToken ? `${Number(alert.data.amountToken).toLocaleString(undefined, {maximumFractionDigits: 4})} tokens` : ''}${alert.data.amountToken && alert.data.amountUsd ? ' • ' : ''}${alert.data.amountUsd ? `$${Number(alert.data.amountUsd).toLocaleString(undefined, {maximumFractionDigits: 2})}` : ''}`,
+          value: `${alert.data.amountToken ? `${Number(alert.data.amountToken).toLocaleString(undefined, {maximumFractionDigits: 2})} tokens` : ''}${alert.data.amountToken && alert.data.amountSol ? ' • ' : ''}${alert.data.amountSol ? `${Number(alert.data.amountSol).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})} SOL` : ''}${(alert.data.amountToken || alert.data.amountSol) && alert.data.amountUsd ? ' • ' : ''}${alert.data.amountUsd ? `$${Number(alert.data.amountUsd).toLocaleString(undefined, {maximumFractionDigits: 2})}` : ''}`,
           inline: true
         }] : []),
         {
@@ -929,6 +931,7 @@ export class AlphaAlertService {
           console.log('[Alpha Alerts] Monitored wallet activity:', event);
           await this.checkTokenForAlphaWallets(event.mint, 'Large Transfer', matchedCaller, {
             amountToken: event.amount,
+            amountSol: event.amountSol,
             txHash: event.signature,
           });
         }
@@ -973,7 +976,7 @@ export class AlphaAlertService {
   /**
    * Check if a newly detected token involves any alpha wallets
    */
-  private async checkTokenForAlphaWallets(mint: string, source: string, caller?: AlphaCallerConfig, txData?: { amountToken?: number; amountUsd?: number; txHash?: string }): Promise<void> {
+  private async checkTokenForAlphaWallets(mint: string, source: string, caller?: AlphaCallerConfig, txData?: { amountToken?: number; amountSol?: number; amountUsd?: number; txHash?: string }): Promise<void> {
     try {
       const walletInfo = caller ? `${caller.name} (${caller.wallet.slice(0, 8)}...)` : 'Unknown';
       console.log(`[Alpha Alerts] Checking token ${mint} from ${source} - Wallet: ${walletInfo}`);
@@ -1111,6 +1114,7 @@ export class AlphaAlertService {
             influenceScore: caller?.influenceScore,
             walletStats,
             amountToken: txData?.amountToken,
+            amountSol: txData?.amountSol,
             amountUsd: txData?.amountUsd,
             txHash: txData?.txHash,
           }

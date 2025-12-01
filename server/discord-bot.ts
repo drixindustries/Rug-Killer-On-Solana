@@ -522,7 +522,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     
     try {
       // Access control check
-      const accessControl = getAccessControlService(connection);
+      const accessControl = getAccessControlService();
       const isGroupContext = !!interaction.guildId;
       const checkId = isGroupContext ? interaction.guildId! : interaction.user.id;
       
@@ -1999,7 +1999,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             return;
           }
           
-          const accessControl = getAccessControlService(connection);
+          const accessControl = getAccessControlService();
           const success = await accessControl.linkWallet(interaction.user.id, 'discord', walletAddress);
           
           if (success) {
@@ -2034,7 +2034,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         await interaction.deferReply({ ephemeral: true });
         
         try {
-          const accessControl = getAccessControlService(connection);
+          const accessControl = getAccessControlService();
           const isGroupContext = !!interaction.guildId;
           const checkId = isGroupContext ? interaction.guildId! : interaction.user.id;
           const accessCheck = await accessControl.checkAccess(checkId, 'discord', isGroupContext);
@@ -2088,7 +2088,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         await interaction.deferReply({ ephemeral: true });
         
         try {
-          const accessControl = getAccessControlService(connection);
+          const accessControl = getAccessControlService();
           const whopService = getWhopService();
           const isGroupContext = !!interaction.guildId;
           const checkId = isGroupContext ? interaction.guildId! : interaction.user.id;
@@ -2154,7 +2154,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         await interaction.deferReply({ ephemeral: true });
         
         try {
-          const accessControl = getAccessControlService(connection);
+          const accessControl = getAccessControlService();
           const isGroupContext = !!interaction.guildId;
           const checkId = isGroupContext ? interaction.guildId! : interaction.user.id;
           
