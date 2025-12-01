@@ -521,8 +521,19 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     if (!interaction.isChatInputCommand()) return;
     
     try {
-      // Access control check
-      const accessControl = getAccessControlService();
+      // Access control check - with error handling
+      let accessControl;
+      try {
+        accessControl = getAccessControlService();
+      } catch (err: any) {
+        console.error('[Discord] AccessControlService initialization failed:', err?.message || err);
+        await interaction.reply({ 
+          content: '❌ Service temporarily unavailable. Please try again in a moment.', 
+          ephemeral: true 
+        });
+        return;
+      }
+      
       const isGroupContext = !!interaction.guildId;
       const checkId = isGroupContext ? interaction.guildId! : interaction.user.id;
       
@@ -3156,6 +3167,16 @@ export async function startDiscordBot() {
   }
   
   try {
+    // Initialize AccessControlService before starting bot to ensure it's ready
+    console.log('🔐 Initializing AccessControlService...');
+    try {
+      getAccessControlService();
+      console.log('✅ AccessControlService initialized');
+    } catch (err: any) {
+      console.warn('⚠️ AccessControlService initialization failed:', err?.message || err);
+      console.log('⚠️ Bot will continue but access control features may be limited');
+    }
+    
     clientInstance = createDiscordClient(BOT_TOKEN, CLIENT_ID);
     await clientInstance.login(BOT_TOKEN);
     console.log('✅ Discord bot started successfully');

@@ -311,7 +311,15 @@ export function getAccessControlService(connection?: Connection): AccessControlS
         conn = new (require('@solana/web3.js').Connection)(url, { commitment: 'confirmed' });
         console.log('[AccessControl] Initialized Connection via RPC balancer');
       } catch (e) {
-        console.warn('[AccessControl] Failed to initialize Connection lazily:', e?.message || e);
+        console.warn('[AccessControl] Failed to initialize Connection via RPC balancer:', e?.message || e);
+        // Fallback to public RPC as last resort
+        try {
+          const publicRpc = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+          conn = new (require('@solana/web3.js').Connection)(publicRpc, { commitment: 'confirmed' });
+          console.log('[AccessControl] Initialized Connection with fallback RPC:', publicRpc);
+        } catch (fallbackErr) {
+          console.error('[AccessControl] Failed to initialize Connection with fallback:', fallbackErr?.message || fallbackErr);
+        }
       }
     }
     if (!conn) {
