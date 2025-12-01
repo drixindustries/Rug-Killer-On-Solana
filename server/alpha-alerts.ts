@@ -414,7 +414,7 @@ export class AlphaAlertService {
         },
         ...(alert.data?.walletStats ? [{
           name: '📊 Performance',
-          value: `**Win Rate: ${(alert.data.walletStats.winRate || 0)}%**\n**PNL:** ${alert.data.walletStats.profitSol >= 0 ? '+' : ''}${(alert.data.walletStats.profitSol || 0).toFixed(2)} SOL\n**Trades:** ${(alert.data.walletStats.wins || 0) + (alert.data.walletStats.losses || 0)}`,
+          value: `**Win Rate:** ${(alert.data.walletStats.winRate || 0).toFixed(1)}%\n**PNL:** ${alert.data.walletStats.profitSol >= 0 ? '+' : ''}${(alert.data.walletStats.profitSol || 0).toFixed(2)} SOL\n**Trades:** ${(alert.data.walletStats.wins || 0) + (alert.data.walletStats.losses || 0)}`,
           inline: true
         }] : []),
         {
@@ -1004,10 +1004,10 @@ export class AlphaAlertService {
                 profitSol: heliusStats.profitSol,
                 wins: heliusStats.wins,
                 losses: heliusStats.losses,
-                winRate: Math.round(heliusStats.winRate),
+                winRate: heliusStats.winRate, // Keep decimal precision, don't round
               };
               
-              console.log(`[Alpha Alerts] ✅ ${heliusStats.source?.toUpperCase() || 'API'} stats for ${caller.name}: ${walletStats.winRate}% WR (${walletStats.wins}W/${walletStats.losses}L), PNL: ${walletStats.profitSol.toFixed(2)} SOL`);
+              console.log(`[Alpha Alerts] ✅ ${heliusStats.source?.toUpperCase() || 'API'} stats for ${caller.name}: ${walletStats.winRate.toFixed(1)}% WR (${walletStats.wins}W/${walletStats.losses}L), PNL: ${walletStats.profitSol.toFixed(2)} SOL`);
               
               // Update database with fresh stats
               if (wallet) {
@@ -1016,7 +1016,7 @@ export class AlphaAlertService {
                     profitSol: heliusStats.profitSol.toFixed(9),
                     wins: heliusStats.wins,
                     losses: heliusStats.losses,
-                    winRate: Math.round(heliusStats.winRate),
+                    winRate: heliusStats.winRate, // Store with decimal precision
                     lastActiveAt: heliusStats.lastActiveAt,
                     updatedAt: new Date(),
                   })
@@ -1028,7 +1028,7 @@ export class AlphaAlertService {
                   profitSol: heliusStats.profitSol.toFixed(9),
                   wins: heliusStats.wins,
                   losses: heliusStats.losses,
-                  winRate: Math.round(heliusStats.winRate),
+                  winRate: heliusStats.winRate, // Store with decimal precision
                   influenceScore: caller.influenceScore || 50,
                   source: 'helius-enriched',
                   isActive: true,

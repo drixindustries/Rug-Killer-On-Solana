@@ -651,7 +651,9 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           await interaction.editReply({ embeds: [embed] });
           console.log(`[Discord /execute] Reply sent for ${tokenAddress}`);
         } catch (error: any) {
-          console.error(`[Discord /execute] Error for ${tokenAddress}:`, error.message);
+          console.error(`[Discord /execute] ERROR for ${tokenAddress}:`, error);
+          console.error(`[Discord /execute] Error message:`, error.message);
+          console.error(`[Discord /execute] Error stack:`, error.stack);
           
           // Provide more specific error messages based on the error type
           let errorTitle = '❌ Analysis Failed';
