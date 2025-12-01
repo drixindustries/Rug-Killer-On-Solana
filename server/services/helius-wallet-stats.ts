@@ -111,6 +111,7 @@ export class HeliusWalletStatsService {
     let totalTrades = 0;
     let wins = 0;
     let totalProfit = 0;
+    let lastActiveAt = new Date(0); // Epoch start
 
     for (const tx of transactions) {
       if (tx.type === 'SWAP' || tx.type === 'TRANSFER') {
@@ -122,15 +123,27 @@ export class HeliusWalletStatsService {
         } else if (nativeChange < 0) {
           totalProfit += nativeChange / 1e9;
         }
+        
+        // Track most recent transaction timestamp
+        if (tx.timestamp) {
+          const txDate = new Date(tx.timestamp * 1000);
+          if (txDate > lastActiveAt) {
+            lastActiveAt = txDate;
+          }
+        }
       }
     }
 
+    const losses = totalTrades - wins;
     const winRate = totalTrades > 0 ? (wins / totalTrades) * 100 : 0;
 
     return {
+      wins,
+      losses,
       winRate,
+      profitSol: totalProfit,
       totalTrades,
-      profitLoss: totalProfit,
+      lastActiveAt,
       source: 'helius'
     };
   }
