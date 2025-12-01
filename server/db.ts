@@ -2,7 +2,10 @@
 // Moved to synchronous import to avoid top-level await issues in esbuild
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
+import { sql } from 'drizzle-orm';
 import * as schema from "../shared/schema.ts";
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Drizzle regression guard: some index() definitions are receiving base PgColumn instances
 // lacking the internal defaultConfig expected by the index builder (which JSON.parse's it).
@@ -45,6 +48,9 @@ if (!DATABASE_URL || FORCE_IN_MEMORY) {
       ssl: { rejectUnauthorized: false }
     });
     db = drizzle(pool, { schema });
+    
+    // Run migrations on startup
+    await runMigrations(db);
   } catch (err) {
     console.error('❌ Failed to initialize PostgreSQL pool:', err);
     console.warn('⚠️ Falling back to in-memory stub DB.');
@@ -80,6 +86,43 @@ function createInMemoryDbStub() {
   return new Proxy({}, {
     get: () => chainable
   });
+}
+
+async function runMigrations(database: any) {
+  try {
+    console.log('📦 Running database migrations...');
+    
+    const migrationsDir = path.join(process.cwd(), 'migrations');
+    
+    if (!fs.existsSync(migrationsDir)) {
+      console.log('ℹ️  No migrations directory found, skipping migrations');
+      return;
+    }
+    
+    const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
+    
+    if (files.length === 0) {
+      console.log('ℹ️  No migration files found');
+      return;
+    }
+    
+    for (const file of files) {
+      const filePath = path.join(migrationsDir, file);
+      const sqlContent = fs.readFileSync(filePath, 'utf-8');
+      
+      console.log(`  ⚙️  Applying migration: ${file}`);
+      await database.execute(sql.raw(sqlContent));
+    }
+    
+    console.log('✅ Database migrations complete');
+  } catch (error: any) {
+    // Migration might fail if tables already exist - that's okay
+    if (error.message?.includes('already exists')) {
+      console.log('ℹ️  Migration tables already exist, skipping');
+    } else {
+      console.error('⚠️  Migration error (non-fatal):', error.message);
+    }
+  }
 }
 
 export { db, pool };
