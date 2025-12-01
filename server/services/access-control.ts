@@ -18,14 +18,48 @@ export interface AccessCheck {
 }
 
 export class AccessControlService {
-  private readonly connection: Connection;
+  private connection: Connection | null = null;
   private readonly TOKEN_MINT: string;
   private readonly MIN_TOKEN_BALANCE = 10_000_000; // 10M tokens
   private readonly TRIAL_DAYS = 7;
 
-  constructor(connection: Connection) {
-    this.connection = connection;
+  constructor(connection?: Connection) {
+    this.connection = connection || null;
     this.TOKEN_MINT = process.env.RUG_KILLER_TOKEN_MINT || '';
+  }
+
+  /**
+   * Lazy-load connection when needed
+   */
+  private getConnection(): Connection | null {
+    if (this.connection) return this.connection;
+    
+    try {
+      // Try to get connection from RPC balancer
+      const { rpcBalancer } = require('../services/rpc-balancer.js');
+      if (rpcBalancer.providers && rpcBalancer.providers.length > 0) {
+        const provider = rpcBalancer.select();
+        const url = provider?.getUrl();
+        if (url) {
+          this.connection = new Connection(url, { commitment: 'confirmed' });
+          console.log('[AccessControl] Lazy-loaded connection from RPC balancer:', provider.name);
+          return this.connection;
+        }
+      }
+    } catch (e) {
+      console.warn('[AccessControl] Failed to lazy-load connection from RPC balancer:', e?.message || e);
+    }
+    
+    // Fallback to public RPC
+    try {
+      const publicRpc = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+      this.connection = new Connection(publicRpc, { commitment: 'confirmed' });
+      console.log('[AccessControl] Lazy-loaded connection with fallback RPC:', publicRpc);
+      return this.connection;
+    } catch (e) {
+      console.error('[AccessControl] Failed to lazy-load connection:', e?.message || e);
+      return null;
+    }
   }
 
   /**
@@ -209,12 +243,18 @@ export class AccessControlService {
   private async checkTokenBalance(walletAddress: string): Promise<boolean> {
     if (!this.TOKEN_MINT) return false;
 
+    const connection = this.getConnection();
+    if (!connection) {
+      console.warn('[AccessControl] No connection available for token balance check');
+      return false;
+    }
+
     try {
       const walletPubkey = new PublicKey(walletAddress);
       const mintPubkey = new PublicKey(this.TOKEN_MINT);
 
       // Get token accounts for this wallet
-      const tokenAccounts = await this.connection.getParsedTokenAccountsByOwner(
+      const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
         walletPubkey,
         { mint: mintPubkey }
       );
@@ -301,31 +341,10 @@ let accessControlService: AccessControlService | null = null;
 
 export function getAccessControlService(connection?: Connection): AccessControlService {
   if (!accessControlService) {
-    let conn = connection;
-    if (!conn) {
-      try {
-        // Lazy-init a Connection via RPC balancer to avoid hard failures
-        const { rpcBalancer } = require('../services/rpc-balancer.js');
-        const provider = rpcBalancer.select();
-        const url = provider.getUrl();
-        conn = new (require('@solana/web3.js').Connection)(url, { commitment: 'confirmed' });
-        console.log('[AccessControl] Initialized Connection via RPC balancer');
-      } catch (e) {
-        console.warn('[AccessControl] Failed to initialize Connection via RPC balancer:', e?.message || e);
-        // Fallback to public RPC as last resort
-        try {
-          const publicRpc = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
-          conn = new (require('@solana/web3.js').Connection)(publicRpc, { commitment: 'confirmed' });
-          console.log('[AccessControl] Initialized Connection with fallback RPC:', publicRpc);
-        } catch (fallbackErr) {
-          console.error('[AccessControl] Failed to initialize Connection with fallback:', fallbackErr?.message || fallbackErr);
-        }
-      }
-    }
-    if (!conn) {
-      throw new Error('Connection required to initialize AccessControlService');
-    }
-    accessControlService = new AccessControlService(conn);
+    // Create service without requiring connection upfront
+    // Connection will be lazy-loaded when needed for token balance checks
+    accessControlService = new AccessControlService(connection);
+    console.log('[AccessControl] Service initialized (connection will be lazy-loaded when needed)');
   }
   return accessControlService;
 }
