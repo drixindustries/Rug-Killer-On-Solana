@@ -16,7 +16,6 @@ import { DexScreenerService } from './dexscreener-service';
 import { getCreatorWallet } from './creator-wallet';
 import { getAccessControlService } from './services/access-control.js';
 import { getWhopService } from './services/whop-service.js';
-import { connection } from './solana-connection.js';
 
 const dexScreener = new DexScreenerService();
 const creatorWalletService = getCreatorWallet();
