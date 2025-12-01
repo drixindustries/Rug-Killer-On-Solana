@@ -301,10 +301,23 @@ let accessControlService: AccessControlService | null = null;
 
 export function getAccessControlService(connection?: Connection): AccessControlService {
   if (!accessControlService) {
-    if (!connection) {
+    let conn = connection;
+    if (!conn) {
+      try {
+        // Lazy-init a Connection via RPC balancer to avoid hard failures
+        const { rpcBalancer } = require('../services/rpc-balancer.js');
+        const provider = rpcBalancer.select();
+        const url = provider.getUrl();
+        conn = new (require('@solana/web3.js').Connection)(url, { commitment: 'confirmed' });
+        console.log('[AccessControl] Initialized Connection via RPC balancer');
+      } catch (e) {
+        console.warn('[AccessControl] Failed to initialize Connection lazily:', e?.message || e);
+      }
+    }
+    if (!conn) {
       throw new Error('Connection required to initialize AccessControlService');
     }
-    accessControlService = new AccessControlService(connection);
+    accessControlService = new AccessControlService(conn);
   }
   return accessControlService;
 }
