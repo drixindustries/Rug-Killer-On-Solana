@@ -251,6 +251,9 @@ async function startServices() {
   }
 
   // Discord bot (optional)
+  console.log('========================================');
+  console.log('🤖 DISCORD BOT INITIALIZATION');
+  console.log('========================================');
   const rawToken = process.env.DISCORD_BOT_TOKEN;
   const trimmedToken = rawToken?.trim();
   console.log('🔍 Discord check - DISCORD_ENABLED:', process.env.DISCORD_ENABLED);
@@ -263,23 +266,35 @@ async function startServices() {
   
   // Clean the token - remove quotes and trim spaces
   const cleanToken = trimmedToken?.replace(/^["']|["']$/g, '');
+  console.log('🔍 Discord check - CLEAN BOT_TOKEN length:', cleanToken?.length || 0);
   
-  if (
-    (process.env.DISCORD_ENABLED || '').toLowerCase() === 'true' &&
-    cleanToken && cleanToken.length > 10 &&
-    process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_ID !== 'PLACEHOLDER_ID'
-  ) {
+  const isEnabled = (process.env.DISCORD_ENABLED || '').toLowerCase() === 'true';
+  const hasValidToken = cleanToken && cleanToken.length > 10;
+  const hasValidClientId = process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_ID !== 'PLACEHOLDER_ID';
+  
+  console.log('🔍 Discord check - isEnabled:', isEnabled);
+  console.log('🔍 Discord check - hasValidToken:', hasValidToken);
+  console.log('🔍 Discord check - hasValidClientId:', hasValidClientId);
+  
+  if (isEnabled && hasValidToken && hasValidClientId) {
+    console.log('✅ Discord bot checks passed - attempting to start...');
     try {
       const { startDiscordBot } = await import('./discord-bot.ts');
-      startDiscordBot().catch((err: any) => {
-        console.warn('⚠️ Discord bot unavailable (silenced):', err?.message || String(err));
-      });
+      console.log('✅ Discord bot module imported');
+      await startDiscordBot();
+      console.log('✅ Discord bot startup complete');
     } catch (err: any) {
+      console.error('❌ DISCORD BOT ERROR:', err);
+      console.error('❌ Error stack:', err?.stack);
       console.warn('⚠️ Discord bot not loaded (silenced):', err?.message || String(err));
     }
   } else {
-    console.log('ℹ️ Discord bot disabled (set DISCORD_ENABLED=true to enable)');
+    console.log('❌ Discord bot disabled - checks failed:');
+    console.log('   - DISCORD_ENABLED:', isEnabled);
+    console.log('   - Valid Token:', hasValidToken);
+    console.log('   - Valid Client ID:', hasValidClientId);
   }
+  console.log('========================================');
 
   // Alpha alerts
   if (process.env.ALPHA_ALERTS_ENABLED === 'true') {
