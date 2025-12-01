@@ -630,6 +630,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       } else if (interaction.commandName === 'execute') {
         const tokenAddress = interaction.options.getString('address', true);
         console.log(`[Discord /execute] User ${interaction.user.tag} scanning: ${tokenAddress}`);
+        console.log(`[Discord /execute] Starting analysis for token: ${tokenAddress}`);
         
         await interaction.deferReply();
         
