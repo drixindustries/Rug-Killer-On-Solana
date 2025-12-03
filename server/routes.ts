@@ -355,9 +355,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Alpha Alerts Health
-  app.get('/api/alpha/health', (req, res) => {
+  app.get('/api/alpha/health', async (req, res) => {
     try {
-      const { getAlphaAlertService } = require('./alpha-alerts.ts');
+      const { getAlphaAlertService } = await import('./alpha-alerts.ts');
       const svc = getAlphaAlertService();
       res.json(svc.getHealth());
     } catch (err: any) {
