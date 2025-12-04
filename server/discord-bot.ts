@@ -441,8 +441,8 @@ const commands = [
     .addStringOption(option => option.setName('address').setDescription('Token address').setRequired(true)),
   new SlashCommandBuilder()
     .setName('graderepo')
-    .setDescription('Grade any GitHub repository with AI-powered analysis (0-100%)')
-    .addStringOption(option => option.setName('url').setDescription('GitHub repository URL (e.g., https://github.com/solana-labs/solana)').setRequired(true)),
+    .setDescription('Grade GitHub repository or user profile with AI-powered analysis (0-100%)')
+    .addStringOption(option => option.setName('url').setDescription('GitHub repository URL or user profile (e.g., https://github.com/solana-labs/solana or https://github.com/username)').setRequired(true)),
   new SlashCommandBuilder()
     .setName('smartwallet')
     .setDescription('Manage Smart Money wallet DB (admin)')
@@ -2201,6 +2201,80 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         try {
           // Import the analyzer
           const { githubAnalyzer } = await import('./services/github-repo-analyzer.js');
+          
+          // Check if it's a user profile URL
+          if (githubAnalyzer.isUserProfileUrl(githubUrl)) {
+            console.log(`[Discord /graderepo] Detected user profile, grading all repos...`);
+            const profileResult = await githubAnalyzer.gradeUserProfile(githubUrl);
+            
+            if (profileResult.error) {
+              const errorEmbed = new EmbedBuilder()
+                .setColor(0xff0000)
+                .setTitle('❌ Profile Analysis Failed')
+                .setDescription(profileResult.error)
+                .setTimestamp();
+              
+              await interaction.editReply({ embeds: [errorEmbed] });
+              return;
+            }
+
+            // Create summary embed for profile
+            const avgColor = profileResult.averageScore >= 85 ? 0x00ff00 
+              : profileResult.averageScore >= 70 ? 0xffff00 
+              : profileResult.averageScore >= 55 ? 0xff8800 
+              : 0xff0000;
+
+            const profileEmbed = new EmbedBuilder()
+              .setColor(avgColor)
+              .setTitle(`📊 GitHub Profile Analysis: @${profileResult.username}`)
+              .setURL(profileResult.profileUrl)
+              .setDescription(`Analyzed **${profileResult.analyzedRepos}** of **${profileResult.totalRepos}** repositories`)
+              .addFields(
+                {
+                  name: '📈 Average Score',
+                  value: `**${profileResult.averageScore}/100**`,
+                  inline: true
+                },
+                {
+                  name: '📊 Grade Distribution',
+                  value: 
+                    `A+: ${profileResult.reposByGrade['A+']}\n` +
+                    `A: ${profileResult.reposByGrade['A']}\n` +
+                    `B: ${profileResult.reposByGrade['B']}\n` +
+                    `C: ${profileResult.reposByGrade['C']}\n` +
+                    `D: ${profileResult.reposByGrade['D']}\n` +
+                    `F: ${profileResult.reposByGrade['F']}`,
+                  inline: true
+                },
+                {
+                  name: '⚠️ Failed',
+                  value: `${profileResult.failedRepos} repos couldn't be analyzed`,
+                  inline: true
+                }
+              )
+              .setTimestamp();
+
+            // Add top repositories
+            if (profileResult.topRepos.length > 0) {
+              const topReposText = profileResult.topRepos
+                .slice(0, 10)
+                .map((repo, idx) => 
+                  `${idx + 1}. [${repo.name}](${repo.url}) - **${repo.score}/100** (${repo.grade})`
+                )
+                .join('\n');
+
+              profileEmbed.addFields({
+                name: '🏆 Top Repositories',
+                value: topReposText.slice(0, 1024),
+                inline: false
+              });
+            }
+
+            await interaction.editReply({ embeds: [profileEmbed] });
+            return;
+          }
+          
+          // Single repository analysis
           const result = await githubAnalyzer.gradeRepository(githubUrl);
           
           console.log(`[Discord /graderepo] Analysis complete for ${githubUrl}`);

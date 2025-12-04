@@ -86,6 +86,31 @@ export interface RepoGradeResult {
   error?: string;
 }
 
+export interface UserProfileGradeResult {
+  username: string;
+  profileUrl: string;
+  totalRepos: number;
+  analyzedRepos: number;
+  failedRepos: number;
+  averageScore: number;
+  topRepos: Array<{
+    name: string;
+    url: string;
+    score: number;
+    grade: string;
+  }>;
+  reposByGrade: {
+    'A+': number;
+    'A': number;
+    'B': number;
+    'C': number;
+    'D': number;
+    'F': number;
+  };
+  analyzedAt: Date;
+  error?: string;
+}
+
 export class GitHubRepoAnalyzer {
   private githubToken?: string;
   private apiBase = 'https://api.github.com';
@@ -192,6 +217,224 @@ export class GitHubRepoAnalyzer {
     }
   }
   
+  /**
+   * Detect if URL is a GitHub user profile (not a single repo)
+   */
+  isUserProfileUrl(url: string): boolean {
+    // Match patterns like:
+    // - https://github.com/username
+    // - https://github.com/username?tab=repositories
+    // - github.com/username
+    // - username (just the username)
+    
+    // Check if it's just a username (no slashes, no github.com)
+    if (url.match(/^[^\/\s]+$/) && !url.includes('.')) {
+      return true;
+    }
+    
+    // Check if it's github.com/username (with optional query params, but no second path segment)
+    const profileMatch = url.match(/(?:https?:\/\/)?(?:www\.)?github\.com\/([^\/\s?]+)(?:\?.*)?$/);
+    if (profileMatch) {
+      const pathAfterUsername = url.match(/github\.com\/[^\/\s?]+\/([^\/\s?]+)/);
+      // If there's a second path segment, it's a repo, not a profile
+      return !pathAfterUsername;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Extract username from profile URL
+   */
+  private parseProfileUrl(url: string): string | null {
+    // Match: github.com/username or just username
+    const match = url.match(/(?:https?:\/\/)?(?:www\.)?github\.com\/([^\/\s?]+)/);
+    if (match) {
+      return match[1];
+    }
+    // If it's just a username without github.com
+    if (url.match(/^[^\/\s]+$/)) {
+      return url;
+    }
+    return null;
+  }
+
+  /**
+   * Fetch all repositories for a GitHub user
+   */
+  private async fetchUserRepositories(username: string): Promise<Array<{ owner: string; repo: string; url: string }>> {
+    const headers: Record<string, string> = {
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'Rug-Killer-Solana-Bot'
+    };
+    
+    if (this.githubToken) {
+      headers['Authorization'] = `token ${this.githubToken}`;
+    }
+
+    const repos: Array<{ owner: string; repo: string; url: string }> = [];
+    let page = 1;
+    const perPage = 100; // Max allowed by GitHub API
+
+    try {
+      while (true) {
+        const response = await axios.get(
+          `${this.apiBase}/users/${username}/repos?per_page=${perPage}&page=${page}&sort=updated&direction=desc`,
+          { headers }
+        );
+
+        if (response.data.length === 0) {
+          break;
+        }
+
+        for (const repo of response.data) {
+          // Skip forks unless they want to include them
+          // For now, we'll include all repos
+          repos.push({
+            owner: repo.owner.login,
+            repo: repo.name,
+            url: repo.html_url
+          });
+        }
+
+        // If we got less than perPage, we're done
+        if (response.data.length < perPage) {
+          break;
+        }
+
+        page++;
+        
+        // Safety limit: don't fetch more than 100 repos
+        if (repos.length >= 100) {
+          break;
+        }
+      }
+
+      return repos;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        throw new Error(`User '${username}' not found on GitHub`);
+      } else if (error.response?.status === 403) {
+        throw new Error('GitHub API rate limit exceeded or access forbidden');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Grade all repositories for a GitHub user
+   */
+  async gradeUserProfile(profileUrl: string): Promise<UserProfileGradeResult> {
+    const username = this.parseProfileUrl(profileUrl);
+    if (!username) {
+      throw new Error('Invalid GitHub profile URL');
+    }
+
+    try {
+      // Fetch all repositories
+      const repos = await this.fetchUserRepositories(username);
+      
+      if (repos.length === 0) {
+        return {
+          username,
+          profileUrl: `https://github.com/${username}`,
+          totalRepos: 0,
+          analyzedRepos: 0,
+          failedRepos: 0,
+          averageScore: 0,
+          topRepos: [],
+          reposByGrade: { 'A+': 0, 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'F': 0 },
+          analyzedAt: new Date(),
+          error: 'No repositories found for this user'
+        };
+      }
+
+      // Grade all repositories in parallel (with concurrency limit)
+      const CONCURRENCY_LIMIT = 5; // Don't overwhelm GitHub API
+      const results: RepoGradeResult[] = [];
+      const errors: Array<{ repo: string; error: string }> = [];
+
+      for (let i = 0; i < repos.length; i += CONCURRENCY_LIMIT) {
+        const batch = repos.slice(i, i + CONCURRENCY_LIMIT);
+        const batchResults = await Promise.allSettled(
+          batch.map(repo => this.gradeRepository(repo.url))
+        );
+
+        for (let j = 0; j < batchResults.length; j++) {
+          const result = batchResults[j];
+          if (result.status === 'fulfilled' && result.value.found) {
+            results.push(result.value);
+          } else {
+            const repo = batch[j];
+            errors.push({
+              repo: repo.repo,
+              error: result.status === 'rejected' 
+                ? result.reason?.message || 'Unknown error'
+                : result.value.error || 'Repository not found'
+            });
+          }
+        }
+
+        // Small delay between batches to respect rate limits
+        if (i + CONCURRENCY_LIMIT < repos.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
+      // Calculate summary statistics
+      const scores = results.map(r => r.confidenceScore).filter(s => s > 0);
+      const averageScore = scores.length > 0 
+        ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+        : 0;
+
+      // Sort by score and get top 10
+      const topRepos = results
+        .sort((a, b) => b.confidenceScore - a.confidenceScore)
+        .slice(0, 10)
+        .map(r => ({
+          name: r.metrics ? `${r.metrics.owner}/${r.metrics.repo}` : r.githubUrl,
+          url: r.metrics?.url || r.githubUrl,
+          score: r.confidenceScore,
+          grade: r.grade
+        }));
+
+      // Count by grade
+      const reposByGrade = {
+        'A+': results.filter(r => r.grade === 'A+').length,
+        'A': results.filter(r => r.grade === 'A').length,
+        'B': results.filter(r => r.grade === 'B').length,
+        'C': results.filter(r => r.grade === 'C').length,
+        'D': results.filter(r => r.grade === 'D').length,
+        'F': results.filter(r => r.grade === 'F').length,
+      };
+
+      return {
+        username,
+        profileUrl: `https://github.com/${username}`,
+        totalRepos: repos.length,
+        analyzedRepos: results.length,
+        failedRepos: errors.length,
+        averageScore,
+        topRepos,
+        reposByGrade,
+        analyzedAt: new Date()
+      };
+    } catch (error: any) {
+      return {
+        username,
+        profileUrl: `https://github.com/${username}`,
+        totalRepos: 0,
+        analyzedRepos: 0,
+        failedRepos: 0,
+        averageScore: 0,
+        topRepos: [],
+        reposByGrade: { 'A+': 0, 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'F': 0 },
+        analyzedAt: new Date(),
+        error: error.message || 'Failed to analyze user profile'
+      };
+    }
+  }
+
   /**
    * Parse GitHub URL to extract owner and repo
    */
