@@ -300,6 +300,35 @@ export class SolanaRpcBalancer {
     }
   }
 
+  /**
+   * Get a Helius-specific connection for index RPC methods
+   * Index methods require premium RPC providers
+   */
+  getHeliusConnection(): Connection | null {
+    const heliusUrl = getHeliusUrl();
+    if (!heliusUrl) {
+      console.warn('[RPC Balancer] Helius not available for index RPC methods');
+      return null;
+    }
+    
+    const cacheKey = `Helius-${heliusUrl}`;
+    if (this.connectionPool.has(cacheKey)) {
+      return this.connectionPool.get(cacheKey)!;
+    }
+    
+    const { Connection } = require('@solana/web3.js');
+    const connection = new Connection(heliusUrl, {
+      commitment: 'confirmed',
+      disableRetryOnRateLimit: false,
+    });
+    
+    if (this.connectionPool.size < this.poolSize) {
+      this.connectionPool.set(cacheKey, connection);
+    }
+    
+    return connection;
+  }
+
   getConnection(): Connection {
     let attempts = 0;
     const maxAttempts = 3;

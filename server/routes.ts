@@ -2123,10 +2123,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { priceService } = await import('./services/price-service.ts');
         const { DexScreenerService } = await import('./dexscreener-service.ts');
       
-        const connection = rpcBalancer.getConnection();
+        // Use Helius for index RPC methods (getParsedTokenAccountsByOwner requires premium plan)
+        const connection = rpcBalancer.getHeliusConnection();
+        if (!connection) {
+          return res.status(503).json({ 
+            message: "Helius RPC not configured. Index RPC methods require a premium RPC provider." 
+          });
+        }
+        
         const publicKey = new PublicKey(walletAddress);
       
-        // Get all token accounts for this wallet
+        // Get all token accounts for this wallet (index RPC method - requires Helius)
         const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
           programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
         });
