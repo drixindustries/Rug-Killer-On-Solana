@@ -160,7 +160,7 @@ export class JitoBundleMonitor extends EventEmitter {
       let slotLanded: number | undefined;
 
       // Check for Jito tip transfer
-      if (transaction.meta?.postBalances && transaction.transaction) {
+      if (transaction.meta?.postBalances && transaction.transaction?.message?.accountKeys) {
         const accountKeys = transaction.transaction.message.accountKeys.map((k: any) => 
           typeof k === 'string' ? k : k.toBase58()
         );
