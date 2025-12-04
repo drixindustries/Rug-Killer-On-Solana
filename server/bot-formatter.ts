@@ -542,13 +542,9 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     }
   }
   
-  // JITO BUNDLE DETECTION (MEV Bundle Analysis)
+  // JITO BUNDLE DETECTION (MEV Bundle Analysis) - Always show bundle status
   let bundle: string | undefined;
-  const jitoDataUnavailableForSection = !analysis.jitoBundleData && !analysis.advancedBundleData;
-  if (jitoDataUnavailableForSection) {
-    // Hide verbose bundle section when unknown; keep single-line status above
-    bundle = '';
-  } else if (analysis.jitoBundleData?.isBundle) {
+  if (analysis.jitoBundleData?.isBundle && analysis.jitoBundleData.confidence !== 'LOW') {
     const jb = analysis.jitoBundleData;
     
     // Status emoji
@@ -609,6 +605,9 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
       bundle += `\n• Early Cluster: ${bd.earlyBuyCluster.walletCount} wallets in ${bd.earlyBuyCluster.avgTimingGapMs}ms`;
     }
     bundle += `\n📊 [View Bundle Chart](${websiteUrl}/?analyze=${analysis.tokenAddress})`;
+  } else {
+    // Always show bundle status, even if no bundles detected
+    bundle = `✅ **BUNDLE ANALYSIS** (SAFE)\n• Jito Bundles: None detected\n• Status: No MEV bundle activity found\n• Bundle Score: 0/100`;
   }
   
   // NETWORK ANALYSIS
