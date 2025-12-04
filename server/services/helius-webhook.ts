@@ -432,6 +432,39 @@ export class HeliusWebhookService extends EventEmitter {
         // Skip if no valid wallets after filtering
         if (eliteWallets.length === 0) continue;
 
+        // Enrich with token analysis (including bundle detection)
+        let analysisData: any = undefined;
+        try {
+          const { tokenAnalyzer } = await import('../solana-analyzer.js');
+          console.log(`[Helius Webhook] Running token analysis for smart money alert: ${mint.slice(0, 8)}...`);
+          
+          const tokenAnalysis = await tokenAnalyzer.analyzeToken(mint);
+          
+          // Extract bundle information
+          const isBundled = tokenAnalysis.jitoBundleData?.isBundle || 
+                           (tokenAnalysis.advancedBundleData?.bundleScore >= 50) ||
+                           false;
+          const bundleScore = tokenAnalysis.jitoBundleData?.confidence === 'HIGH' ? 100 :
+                             tokenAnalysis.jitoBundleData?.confidence === 'MEDIUM' ? 70 :
+                             tokenAnalysis.advancedBundleData?.bundleScore || 0;
+          
+          analysisData = {
+            riskScore: tokenAnalysis.riskScore,
+            holderCount: tokenAnalysis.holderCount,
+            topConcentration: tokenAnalysis.topHolderConcentration,
+            agedWalletRisk: tokenAnalysis.agedWalletData?.totalFakeVolumePercent || 0,
+            suspiciousFundingPct: tokenAnalysis.suspiciousFundingPct || 0,
+            bundled: isBundled,
+            bundleScore: bundleScore,
+            bundleDetails: tokenAnalysis.jitoBundleData || tokenAnalysis.advancedBundleData,
+          };
+          
+          console.log(`[Helius Webhook] ✅ Analysis complete - Risk: ${analysisData.riskScore}, Bundled: ${isBundled}, Bundle Score: ${bundleScore}`);
+        } catch (analysisError: any) {
+          console.warn(`[Helius Webhook] Failed to analyze token ${mint.slice(0, 8)}... for smart money alert:`, analysisError.message);
+          // Continue without analysis - don't block smart money alerts
+        }
+
         smartMoneyRelay.publish({
           tokenMint: mint,
           symbol: undefined, // Will be enriched by bot
@@ -439,10 +472,11 @@ export class HeliusWebhookService extends EventEmitter {
           walletCount: eliteWallets.length,
           eliteWallets,
           allSample: eliteWallets.map(w => w.address.slice(0, 8) + '...'),
+          analysis: analysisData,
           timestamp: tx.timestamp || Date.now(),
         });
 
-        console.log(`[Helius Webhook] 📢 Published smart money alert for token ${mint.slice(0, 8)}... (${eliteWallets.length} wallets)`);
+        console.log(`[Helius Webhook] 📢 Published smart money alert for token ${mint.slice(0, 8)}... (${eliteWallets.length} wallets, bundled: ${analysisData?.bundled || false})`);
       }
     } catch (error: any) {
       // Don't spam logs with full stack traces - just log the message

@@ -3225,7 +3225,29 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             const short = `${w.address.slice(0,6)}…${w.address.slice(-4)}`;
             return `• ${short} • ${w.winrate.toFixed(1)}% win • $${Math.round(w.profit).toLocaleString()} • ${w.directive}`;
           });
-          const analysis = evt.analysis ? `\nRisk: ${evt.analysis.riskScore} | Holders: ${evt.analysis.holderCount} | Top10: ${evt.analysis.topConcentration?.toFixed?.(2) ?? evt.analysis.topConcentration}% | AgedRisk: ${evt.analysis.agedWalletRisk} | Funding: ${evt.analysis.suspiciousFundingPct?.toFixed?.(1) ?? evt.analysis.suspiciousFundingPct}% | Bundled: ${evt.analysis.bundled ? 'Yes' : 'No'}` : '';
+          // Build analysis line with bundle details
+          let analysis = '';
+          if (evt.analysis) {
+            const parts: string[] = [];
+            parts.push(`Risk: ${evt.analysis.riskScore}`);
+            parts.push(`Holders: ${evt.analysis.holderCount}`);
+            parts.push(`Top10: ${evt.analysis.topConcentration?.toFixed?.(2) ?? evt.analysis.topConcentration}%`);
+            if (evt.analysis.agedWalletRisk > 0) {
+              parts.push(`AgedRisk: ${evt.analysis.agedWalletRisk.toFixed(1)}%`);
+            }
+            if (evt.analysis.suspiciousFundingPct > 0) {
+              parts.push(`Funding: ${evt.analysis.suspiciousFundingPct.toFixed(1)}%`);
+            }
+            // Bundle information with score
+            if (evt.analysis.bundled) {
+              const bundleEmoji = evt.analysis.bundleScore >= 70 ? '🔴' : '⚠️';
+              parts.push(`${bundleEmoji} Bundled: Yes (Score: ${evt.analysis.bundleScore})`);
+            } else {
+              parts.push(`✅ Bundled: No`);
+            }
+            analysis = `\n${parts.join(' | ')}`;
+          }
+          
           const legend = 'Directives: PRIORITY WATCH > HIGH WATCH > ACCUMULATION SIGNAL > EARLY WATCH > INFO';
           const links = `Pump.fun: https://pump.fun/${evt.tokenMint}\nDexscreener: https://dexscreener.com/solana/${evt.tokenMint}\nSolscan: https://solscan.io/token/${evt.tokenMint}`;
           const message = [header, ageLine, '', 'Elite Wallets:', ...walletLines, analysis, '', legend, '', links].join('\n');
