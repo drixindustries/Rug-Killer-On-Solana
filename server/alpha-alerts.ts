@@ -1458,15 +1458,24 @@ export class AlphaAlertService {
           
           // Check if we should refresh stats from Helius
           const heliusStatsService = getHeliusWalletStatsService();
+          
+          // Only use Helius if:
+          // 1. No wallet in DB, OR
+          // 2. Wallet has stale/invalid stats (0% win rate with 50+ trades = likely bad data)
+          // 3. Stats are older than 24 hours (only refresh once per day max)
           const hasStaleStats = wallet && (!wallet.winRate || wallet.winRate === 0) && (wallet.wins || 0) + (wallet.losses || 0) > 50;
-          const shouldUseHelius = heliusStatsService.isAvailable() && (!wallet || hasStaleStats);
+          const statsAge = wallet?.updatedAt ? Date.now() - new Date(wallet.updatedAt).getTime() : Infinity;
+          const statsTooOld = statsAge > 24 * 60 * 60 * 1000; // 24 hours
+          const shouldUseHelius = heliusStatsService.isAvailable() && (!wallet || hasStaleStats || statsTooOld);
           
           if (shouldUseHelius) {
-            console.log(`[Alpha Alerts] Will fetch from Helius for ${caller.name} (hasStaleStats=${hasStaleStats}, noWallet=${!wallet})`);
+            console.log(`[Alpha Alerts] Will fetch from Helius for ${caller.name} (hasStaleStats=${hasStaleStats}, noWallet=${!wallet}, statsTooOld=${statsTooOld})`);
+          } else {
+            console.log(`[Alpha Alerts] Using cached DB stats for ${caller.name} (stats age: ${Math.floor(statsAge / 3600000)}h)`);
           }
           
           if (shouldUseHelius) {
-            // Try to get fresh stats from Helius
+            // Try to get fresh stats from Helius (with 4-hour cache + circuit breaker)
             console.log(`[Alpha Alerts] Fetching fresh stats from Helius for ${caller.name}...`);
             const heliusStats = await heliusStatsService.getWalletStats(caller.wallet, 200);
             
@@ -1513,6 +1522,7 @@ export class AlphaAlertService {
           }
           
           // Fall back to database stats if Helius didn't work or wasn't needed
+          // CRITICAL: Prefer DB stats over making more Helius calls
           if (!walletStats && wallet) {
             // Validate we have meaningful stats from database
             const hasValidStats = (wallet.wins || 0) + (wallet.losses || 0) >= 5 && 
@@ -1527,37 +1537,13 @@ export class AlphaAlertService {
                 losses: wallet.losses || 0,
                 winRate: wallet.winRate || 0,
               };
-              console.log(`[Alpha Alerts] Using cached stats for ${caller.name}: ${wallet.winRate}% WR (${wallet.wins}W/${wallet.losses}L), PNL: ${walletStats.profitSol.toFixed(2)} SOL`);
+              console.log(`[Alpha Alerts] Using cached DB stats for ${caller.name}: ${wallet.winRate}% WR (${wallet.wins}W/${wallet.losses}L), PNL: ${walletStats.profitSol.toFixed(2)} SOL`);
             } else {
-              console.log(`[Alpha Alerts] Database stats invalid for ${caller.name} (${wallet.wins || 0}W/${wallet.losses || 0}L, ${wallet.winRate || 0}% WR), will fetch fresh data`);
-              // Force a Helius refresh
-              if (heliusStatsService.isAvailable()) {
-                console.log(`[Alpha Alerts] Forcing Helius refresh for ${caller.name}...`);
-                const heliusStats = await heliusStatsService.getWalletStats(caller.wallet, 200);
-                
-                if (heliusStats && heliusStats.totalTrades >= 10) {
-                  walletStats = {
-                    profitSol: heliusStats.profitSol,
-                    wins: heliusStats.wins,
-                    losses: heliusStats.losses,
-                    winRate: heliusStats.winRate,
-                  };
-                  
-                  console.log(`[Alpha Alerts] ✅ ${heliusStats.source?.toUpperCase() || 'API'} fresh stats for ${caller.name}: ${walletStats.winRate.toFixed(1)}% WR (${walletStats.wins}W/${walletStats.losses}L), PNL: ${walletStats.profitSol.toFixed(2)} SOL`);
-                  
-                  // Update database with fresh stats
-                  await db.update(smartWallets)
-                    .set({
-                      profitSol: heliusStats.profitSol.toFixed(9),
-                      wins: heliusStats.wins,
-                      losses: heliusStats.losses,
-                      winRate: heliusStats.winRate,
-                      lastActiveAt: heliusStats.lastActiveAt,
-                      updatedAt: new Date(),
-                    })
-                    .where(eq(smartWallets.walletAddress, caller.wallet));
-                }
-              }
+              // Only force refresh if stats are truly invalid AND we haven't tried recently
+              // Don't force refresh if we just tried and it failed (circuit breaker protection)
+              console.log(`[Alpha Alerts] Database stats invalid for ${caller.name} (${wallet.wins || 0}W/${wallet.losses || 0}L, ${wallet.winRate || 0}% WR), but skipping forced refresh to conserve Helius credits`);
+              // REMOVED: Force Helius refresh - this was causing excessive API calls
+              // Stats will be refreshed on next natural cycle (24h) or if wallet buys again
             }
           }
           

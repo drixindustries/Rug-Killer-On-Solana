@@ -38,15 +38,22 @@ export class HeliusWalletStatsService {
   private readonly TIMEOUT_MS = 15000;
   private readonly SOL_PRICE = 200; // Approximate SOL price for USD conversion
   
-  // Caching
-  private readonly CACHE_TTL = Number(process.env.HELIUS_WALLET_STATS_CACHE_TTL) || 1800; // 30 minutes default
+  // Caching - Increased to reduce API calls significantly
+  private readonly CACHE_TTL = Number(process.env.HELIUS_WALLET_STATS_CACHE_TTL) || 14400; // 4 hours default (was 30 min)
   
   // Request deduplication - track in-flight requests
   private inFlightRequests = new Map<string, Promise<WalletStats | null>>();
   
-  // Rate limiting - sliding window
-  private readonly MAX_REQUESTS_PER_MINUTE = Number(process.env.HELIUS_MAX_REQUESTS_PER_MINUTE) || 100;
+  // Rate limiting - sliding window (reduced to conserve credits)
+  private readonly MAX_REQUESTS_PER_MINUTE = Number(process.env.HELIUS_MAX_REQUESTS_PER_MINUTE) || 30; // Reduced from 100 to 30
   private readonly RATE_LIMIT_QUEUE_SIZE = Number(process.env.HELIUS_RATE_LIMIT_QUEUE_SIZE) || 50;
+  
+  // Circuit breaker - stop calling Helius if we're hitting limits
+  private circuitBreakerOpen = false;
+  private circuitBreakerOpenUntil = 0;
+  private consecutiveFailures = 0;
+  private readonly CIRCUIT_BREAKER_THRESHOLD = 5; // Open after 5 consecutive failures
+  private readonly CIRCUIT_BREAKER_RESET_MS = 5 * 60 * 1000; // 5 minutes
   private requestTimestamps: number[] = [];
   private requestQueue: Array<{ resolve: (value: WalletStats | null) => void; reject: (error: any) => void; fn: () => Promise<WalletStats | null> }> = [];
   private isProcessingQueue = false;
@@ -71,17 +78,34 @@ export class HeliusWalletStatsService {
    * Tries Helius first, falls back to Moralis
    * 
    * Features:
-   * - Redis caching with 30-min TTL
+   * - Redis caching with 4-hour TTL (reduced API calls by 8x)
    * - Request deduplication
-   * - Rate limiting
+   * - Rate limiting (30/min max)
+   * - Circuit breaker (stops calling if hitting limits)
    */
   async getWalletStats(walletAddress: string, limit: number = 200): Promise<WalletStats | null> {
     const cacheKey = `helius:wallet-stats:v1:${walletAddress}`;
     
-    // Check cache first
+    // Check cache first (4-hour TTL significantly reduces API calls)
     const cached = await redisCache.get<WalletStats>(cacheKey);
     if (cached) {
+      console.log(`[WalletStats] Using cached stats for ${walletAddress.slice(0, 8)}... (cache hit)`);
       return cached;
+    }
+    
+    // Check circuit breaker
+    const now = Date.now();
+    if (this.circuitBreakerOpen && now < this.circuitBreakerOpenUntil) {
+      const remainingMs = this.circuitBreakerOpenUntil - now;
+      console.warn(`[WalletStats] Circuit breaker OPEN - skipping Helius call (resets in ${Math.ceil(remainingMs / 1000)}s)`);
+      return null; // Don't call API if circuit breaker is open
+    }
+    
+    // Reset circuit breaker if time has passed
+    if (this.circuitBreakerOpen && now >= this.circuitBreakerOpenUntil) {
+      console.log('[WalletStats] Circuit breaker RESET - attempting Helius calls again');
+      this.circuitBreakerOpen = false;
+      this.consecutiveFailures = 0;
     }
     
     // Check if request is already in flight (deduplication)
@@ -208,10 +232,19 @@ export class HeliusWalletStatsService {
 
       if (!response.ok) {
         if (response.status === 429) {
-          console.warn('[WalletStats] Insufficient Helius credits');
+          console.warn('[WalletStats] Helius rate limited (429) - opening circuit breaker');
+          this.consecutiveFailures++;
+          if (this.consecutiveFailures >= this.CIRCUIT_BREAKER_THRESHOLD) {
+            this.circuitBreakerOpen = true;
+            this.circuitBreakerOpenUntil = Date.now() + this.CIRCUIT_BREAKER_RESET_MS;
+            console.error(`[WalletStats] Circuit breaker OPENED - too many failures. Will reset in ${this.CIRCUIT_BREAKER_RESET_MS / 1000}s`);
+          }
         }
         return null;
       }
+      
+      // Reset failure counter on success
+      this.consecutiveFailures = 0;
 
       const transactions = await response.json();
       return this.analyzeHeliusTransactions(transactions, walletAddress);
