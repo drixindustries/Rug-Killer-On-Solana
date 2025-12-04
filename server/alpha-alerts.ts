@@ -423,12 +423,72 @@ export class AlphaAlertService {
       }
     }
     
+    // Run token analysis to get metrics for the embed
+    let tokenAnalysis: any = null;
+    let analysisMetrics: any = null;
+    try {
+      const { tokenAnalyzer } = await import('./solana-analyzer.js');
+      const { buildCompactMessage, getRiskEmoji } = await import('./bot-formatter.js');
+      
+      console.log(`[ALPHA ALERT] Running token analysis for ${alert.mint}...`);
+      tokenAnalysis = await tokenAnalyzer.analyzeToken(alert.mint);
+      const messageData = buildCompactMessage(tokenAnalysis);
+      
+      // Extract key metrics
+      analysisMetrics = {
+        riskScore: tokenAnalysis.riskScore,
+        riskLevel: tokenAnalysis.riskLevel,
+        riskEmoji: getRiskEmoji(tokenAnalysis.riskLevel),
+        holderCount: tokenAnalysis.holderCount,
+        topHolderConcentration: tokenAnalysis.topHolderConcentration,
+        mintRevoked: !tokenAnalysis.mintAuthority?.hasAuthority,
+        freezeRevoked: !tokenAnalysis.freezeAuthority?.hasAuthority,
+        liquidityStatus: tokenAnalysis.liquidityPool?.status || 'Unknown',
+        lpBurnPercent: tokenAnalysis.liquidityPool?.burnPercentage,
+        marketCap: tokenAnalysis.marketData?.marketCap,
+        volume24h: tokenAnalysis.marketData?.volume24h,
+        priceUsd: tokenAnalysis.marketData?.priceUsd,
+        aiVerdict: messageData.aiVerdict,
+        security: messageData.security,
+        holders: messageData.holders,
+        market: messageData.market,
+        pumpFun: messageData.pumpFun,
+        rugScore: tokenAnalysis.rugScoreBreakdown,
+      };
+      
+      console.log(`[ALPHA ALERT] Token analysis complete - Risk: ${analysisMetrics.riskLevel} (${analysisMetrics.riskScore}/100)`);
+    } catch (error) {
+      console.error('[ALPHA ALERT] Token analysis failed (non-fatal):', error);
+      // Continue without metrics - don't block the alert
+    }
+    
     // Create embed data for rich formatting
     const walletName = alert.data?.walletName || alert.source;
+    
+    // Determine embed color based on token risk or wallet influence
+    let embedColor = alert.data?.influenceScore >= 80 ? 0xFFD700 : 0xFF6600; // Default: Gold for high influence, orange otherwise
+    if (analysisMetrics) {
+      // Override with risk-based color if analysis available
+      switch (analysisMetrics.riskLevel) {
+        case 'LOW':
+          embedColor = 0x00FF00; // Green
+          break;
+        case 'MODERATE':
+          embedColor = 0xFFFF00; // Yellow
+          break;
+        case 'HIGH':
+          embedColor = 0xFF8800; // Orange
+          break;
+        case 'EXTREME':
+          embedColor = 0xFF0000; // Red
+          break;
+      }
+    }
+    
     const embedData = alert.type === 'caller_signal' ? {
       title: `🔔 Alpha Alert\n\n💎 ${enrichedTokenName || enrichedTokenSymbol} (${enrichedTokenSymbol})\n📍 Wallet\n${walletName}`,
       description: `A monitored alpha wallet has bought **${enrichedTokenSymbol}**\n\nWallet: ${alert.source}`,
-      color: alert.data?.influenceScore >= 80 ? 0xFFD700 : 0xFF6600, // Gold for high influence, orange otherwise
+      color: embedColor,
       thumbnail: tokenImageUrl ? { url: tokenImageUrl } : { url: `https://dd.dexscreener.com/ds-data/tokens/solana/${alert.mint}.png?size=md&t=${Date.now()}` },
       fields: [
         {
@@ -460,6 +520,77 @@ export class AlphaAlertService {
           })(),
           inline: true
         }] : []),
+        // Token Analysis Metrics
+        ...(analysisMetrics ? [
+          {
+            name: `🔍 Token Analysis ${analysisMetrics.riskEmoji}`,
+            value: `**Risk:** ${analysisMetrics.riskLevel} (${analysisMetrics.riskScore}/100)`,
+            inline: false
+          },
+          {
+            name: '🔐 Security',
+            value: (() => {
+              const parts: string[] = [];
+              if (analysisMetrics.mintRevoked) parts.push('✅ Mint Revoked');
+              else parts.push('⚠️ Mint Active');
+              if (analysisMetrics.freezeRevoked) parts.push('✅ Freeze Revoked');
+              else parts.push('⚠️ Freeze Active');
+              if (analysisMetrics.lpBurnPercent !== undefined && analysisMetrics.lpBurnPercent !== null) {
+                const burnEmoji = analysisMetrics.lpBurnPercent >= 95 ? '🔥' : analysisMetrics.lpBurnPercent >= 50 ? '⚠️' : '❌';
+                parts.push(`${burnEmoji} LP Burn: ${analysisMetrics.lpBurnPercent.toFixed(1)}%`);
+              }
+              return parts.join('\n') || 'No data';
+            })(),
+            inline: true
+          },
+          {
+            name: '👥 Holders',
+            value: (() => {
+              const parts: string[] = [];
+              if (analysisMetrics.holderCount !== undefined) {
+                parts.push(`**Count:** ${analysisMetrics.holderCount.toLocaleString()}`);
+              }
+              if (analysisMetrics.topHolderConcentration !== undefined) {
+                parts.push(`**Top 10:** ${analysisMetrics.topHolderConcentration.toFixed(1)}%`);
+              }
+              return parts.join('\n') || 'No data';
+            })(),
+            inline: true
+          },
+          ...(analysisMetrics.marketCap || analysisMetrics.volume24h || analysisMetrics.priceUsd ? [{
+            name: '💰 Market',
+            value: (() => {
+              const parts: string[] = [];
+              if (analysisMetrics.priceUsd) {
+                parts.push(`**Price:** $${Number(analysisMetrics.priceUsd).toFixed(6)}`);
+              }
+              if (analysisMetrics.marketCap) {
+                parts.push(`**MCap:** $${Number(analysisMetrics.marketCap).toLocaleString()}`);
+              }
+              if (analysisMetrics.volume24h) {
+                parts.push(`**24h Vol:** $${Number(analysisMetrics.volume24h).toLocaleString()}`);
+              }
+              return parts.join('\n') || 'No data';
+            })(),
+            inline: true
+          }] : []),
+          ...(analysisMetrics.aiVerdict ? [{
+            name: '🤖 AI Verdict',
+            value: analysisMetrics.aiVerdict.length > 1024 
+              ? analysisMetrics.aiVerdict.substring(0, 1021) + '...'
+              : analysisMetrics.aiVerdict,
+            inline: false
+          }] : []),
+          ...(analysisMetrics.rugScore ? [{
+            name: `🚨 Rug Score: ${analysisMetrics.rugScore.totalScore}`,
+            value: `**${analysisMetrics.rugScore.classification}**\n` +
+              `Auth: ${analysisMetrics.rugScore.components.authorities.score} | ` +
+              `Holders: ${analysisMetrics.rugScore.components.holderDistribution.score} | ` +
+              `Liquidity: ${analysisMetrics.rugScore.components.liquidity.score} | ` +
+              `Activity: ${analysisMetrics.rugScore.components.marketActivity.score}`,
+            inline: false
+          }] : [])
+        ] : []),
         {
           name: '🔗 Quick Links',
           value: `[Pump.fun](https://pump.fun/${alert.mint}) • [DexScreener](https://dexscreener.com/solana/${alert.mint}) • [Solscan](https://solscan.io/token/${alert.mint})${alert.data?.txHash ? ` • [Tx](https://solscan.io/tx/${alert.data.txHash})` : ''}`,
