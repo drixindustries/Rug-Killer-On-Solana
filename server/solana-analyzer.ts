@@ -27,6 +27,10 @@ import { fundingAnalyzer } from "./services/funding-source-analyzer.js";
 import { redisCache } from "./services/redis-cache.js";
 import { getBundleMonitor } from "./services/jito-bundle-monitor.js";
 
+// Debug logging - only enable in development or when DEBUG_ANALYZER=true
+const DEBUG = process.env.DEBUG_ANALYZER === 'true' || (process.env.NODE_ENV !== 'production' && process.env.DEBUG_ANALYZER !== 'false');
+const debugLog = DEBUG ? (...args: any[]) => console.log(...args) : () => {};
+
 export class SolanaTokenAnalyzer {
   private dexScreener: DexScreenerService;
   private tgnDetector: TemporalGNNDetector | null = null;
@@ -131,8 +135,8 @@ export class SolanaTokenAnalyzer {
       }
 
       console.log(`✅ [Analyzer] Data fetched in ${Date.now() - startTime}ms`);
-      console.log(`[Analyzer DEBUG] DexScreener data:`, { hasDex: !!dex, pairs: dex?.pairs?.length ?? 0 });
-      console.log(`[Analyzer DEBUG] Pump.fun data:`, { isPumpFun: pumpFun?.isPumpFun, bondingCurve: pumpFun?.bondingCurve });
+      debugLog(`[Analyzer DEBUG] DexScreener data:`, { hasDex: !!dex, pairs: dex?.pairs?.length ?? 0 });
+      debugLog(`[Analyzer DEBUG] Pump.fun data:`, { isPumpFun: pumpFun?.isPumpFun, bondingCurve: pumpFun?.bondingCurve });
 
       // Build analysis response
       const response: TokenAnalysisResponse = {
@@ -1246,26 +1250,26 @@ export class SolanaTokenAnalyzer {
     pumpFun: any,
     tokenAddress: string
   ): Promise<LiquidityPoolStatus> {
-    console.log(`\n[LP Analyzer DEBUG] Starting LP calculation for ${tokenAddress}`);
+    debugLog(`\n[LP Analyzer DEBUG] Starting LP calculation for ${tokenAddress}`);
     
     const liquidityUsd = dex?.pairs?.[0]?.liquidity?.usd || 0;
     const pairAddress = dex?.pairs?.[0]?.pairAddress;
     
-    console.log(`[LP Analyzer DEBUG] Liquidity USD: $${liquidityUsd}`);
-    console.log(`[LP Analyzer DEBUG] Pair Address: ${pairAddress || 'none'}`);
-    console.log(`[LP Analyzer DEBUG] Is Pump.fun: ${pumpFun?.isPumpFun}`);
-    console.log(`[LP Analyzer DEBUG] Bonding Curve: ${pumpFun?.bondingCurve}%`);
+    debugLog(`[LP Analyzer DEBUG] Liquidity USD: $${liquidityUsd}`);
+    debugLog(`[LP Analyzer DEBUG] Pair Address: ${pairAddress || 'none'}`);
+    debugLog(`[LP Analyzer DEBUG] Is Pump.fun: ${pumpFun?.isPumpFun}`);
+    debugLog(`[LP Analyzer DEBUG] Bonding Curve: ${pumpFun?.bondingCurve}%`);
     
     // For Pump.fun tokens, check bonding status
     if (pumpFun?.isPumpFun) {
       const bondingCurve = pumpFun.bondingCurve ?? 0;
       const isGraduated = bondingCurve >= 100 || pumpFun.mayhemMode;
       
-      console.log(`[LP Analyzer DEBUG] Pump.fun token - Graduated: ${isGraduated}, Bonding: ${bondingCurve}%`);
+      debugLog(`[LP Analyzer DEBUG] Pump.fun token - Graduated: ${isGraduated}, Bonding: ${bondingCurve}%`);
       
       if (!isGraduated) {
         // Token hasn't bonded yet - no LP to burn
-        console.log(`[LP Analyzer DEBUG] Not bonded yet (${bondingCurve}% bonding curve) - returning no burn data`);
+        debugLog(`[LP Analyzer DEBUG] Not bonded yet (${bondingCurve}% bonding curve) - returning no burn data`);
         return {
           exists: false,
           status: 'UNKNOWN' as const,
@@ -1278,9 +1282,9 @@ export class SolanaTokenAnalyzer {
       // Token has graduated - Pump.fun AUTOMATICALLY burns LP on graduation
       // This is PROTOCOL-ENFORCED: 100% of LP tokens are burned when bonding curve completes
       // No need to check on-chain - it's guaranteed by Pump.fun's graduation mechanism
-      console.log(`[LP Analyzer DEBUG] Token graduated - LP is AUTOMATICALLY BURNED by Pump.fun protocol`);
+      debugLog(`[LP Analyzer DEBUG] Token graduated - LP is AUTOMATICALLY BURNED by Pump.fun protocol`);
       if (pairAddress) {
-        console.log(`[LP Analyzer DEBUG] Raydium pair found: ${pairAddress} - LP tokens 100% burned (protocol guarantee)`);
+        debugLog(`[LP Analyzer DEBUG] Raydium pair found: ${pairAddress} - LP tokens 100% burned (protocol guarantee)`);
         return {
           exists: true,
           status: 'SAFE',
@@ -1290,7 +1294,7 @@ export class SolanaTokenAnalyzer {
       }
       
       // Graduated but no pair address found yet (DexScreener lag)
-      console.log(`[LP Analyzer DEBUG] Token graduated but pair not indexed yet - LP still 100% burned`);
+      debugLog(`[LP Analyzer DEBUG] Token graduated but pair not indexed yet - LP still 100% burned`);
       return {
         exists: true, // LP exists, just not indexed yet
         status: 'SAFE', // Still safe - LP is burned
@@ -1300,9 +1304,9 @@ export class SolanaTokenAnalyzer {
     
     // For regular tokens with liquidity pools
     if (pairAddress && liquidityUsd > 0) {
-      console.log(`[LP Analyzer DEBUG] Regular token with LP - calculating burn`);
+      debugLog(`[LP Analyzer DEBUG] Regular token with LP - calculating burn`);
       const burnPct = await this.calculateLPBurnPercentage(pairAddress);
-      console.log(`[LP Analyzer DEBUG] Calculated burn percentage: ${burnPct}%`);
+      debugLog(`[LP Analyzer DEBUG] Calculated burn percentage: ${burnPct}%`);
       
       return {
         exists: true,
@@ -1313,7 +1317,7 @@ export class SolanaTokenAnalyzer {
     }
     
     // No liquidity pool found
-    console.log(`[LP Analyzer DEBUG] No LP found - returning no data`);
+    debugLog(`[LP Analyzer DEBUG] No LP found - returning no data`);
     return {
       exists: !!liquidityUsd,
       status: liquidityUsd > 1000 ? 'SAFE' : 'RISKY',
@@ -1326,7 +1330,7 @@ export class SolanaTokenAnalyzer {
    * Returns percentage of LP tokens burned (sent to dead addresses)
    */
   private async calculateLPBurnPercentage(lpMintAddress: string): Promise<number> {
-    console.log(`[LP Burn DEBUG] Calculating burn for LP: ${lpMintAddress}`);
+    debugLog(`[LP Burn DEBUG] Calculating burn for LP: ${lpMintAddress}`);
     
     try {
       const connection = rpcBalancer.getConnection();
@@ -1337,19 +1341,19 @@ export class SolanaTokenAnalyzer {
         .catch(() => getMint(connection, lpMintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID));
       
       const totalSupply = Number(mintInfo.supply);
-      console.log(`[LP Burn DEBUG] Total LP supply: ${totalSupply}`);
+      debugLog(`[LP Burn DEBUG] Total LP supply: ${totalSupply}`);
       
       if (totalSupply === 0) {
-        console.log(`[LP Burn DEBUG] Total supply is 0 - 100% burned`);
+        debugLog(`[LP Burn DEBUG] Total supply is 0 - 100% burned`);
         return 100;
       }
       
       // Get largest LP token holders
       const largestAccounts = await connection.getTokenLargestAccounts(lpMintPubkey, 'confirmed');
-      console.log(`[LP Burn DEBUG] Found ${largestAccounts.value.length} LP token accounts`);
+      debugLog(`[LP Burn DEBUG] Found ${largestAccounts.value.length} LP token accounts`);
       
       if (largestAccounts.value.length === 0) {
-        console.log(`[LP Burn DEBUG] No token accounts found - 100% burned`);
+        debugLog(`[LP Burn DEBUG] No token accounts found - 100% burned`);
         return 100;
       }
       
@@ -1373,14 +1377,14 @@ export class SolanaTokenAnalyzer {
         const amount = Number(largestAccounts.value[i].amount);
         
         if (!accountInfo?.data || amount === 0) {
-          console.log(`[LP Burn DEBUG] Account ${i}: No data or zero balance - Amount: ${amount}`);
+          debugLog(`[LP Burn DEBUG] Account ${i}: No data or zero balance - Amount: ${amount}`);
           continue;
         }
         
         // Parse token account to get owner (owner is at bytes 32-64)
         const data = accountInfo.data as Buffer;
         if (data.length < 64) {
-          console.log(`[LP Burn DEBUG] Account ${i}: Insufficient data length`);
+          debugLog(`[LP Burn DEBUG] Account ${i}: Insufficient data length`);
           continue;
         }
         
@@ -1392,14 +1396,14 @@ export class SolanaTokenAnalyzer {
         
         if (isBurned) {
           burnedAmount += amount;
-          console.log(`[LP Burn DEBUG] Burned account found: ${owner.slice(0, 8)}... Amount: ${amount}`);
+          debugLog(`[LP Burn DEBUG] Burned account found: ${owner.slice(0, 8)}... Amount: ${amount}`);
         } else {
-          console.log(`[LP Burn DEBUG] Active account: ${owner.slice(0, 8)}... Amount: ${amount}`);
+          debugLog(`[LP Burn DEBUG] Active account: ${owner.slice(0, 8)}... Amount: ${amount}`);
         }
       }
       
       const burnPercentage = (burnedAmount / totalSupply) * 100;
-      console.log(`[LP Burn DEBUG] Burned: ${burnedAmount} / ${totalSupply} = ${burnPercentage.toFixed(2)}%`);
+      debugLog(`[LP Burn DEBUG] Burned: ${burnedAmount} / ${totalSupply} = ${burnPercentage.toFixed(2)}%`);
       
       return burnPercentage;
       

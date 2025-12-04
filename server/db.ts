@@ -92,7 +92,12 @@ async function runMigrations(database: any) {
   try {
     console.log('📦 Running database migrations...');
     
-    const migrationsDir = path.join(process.cwd(), 'migrations');
+    // In Docker, migrations are at /app/migrations, but CWD might be /app/server
+    // Try both locations to handle both local dev and Docker
+    let migrationsDir = path.join(process.cwd(), 'migrations');
+    if (!fs.existsSync(migrationsDir)) {
+      migrationsDir = path.join(process.cwd(), '..', 'migrations');
+    }
     
     if (!fs.existsSync(migrationsDir)) {
       console.log('ℹ️  No migrations directory found, skipping migrations');

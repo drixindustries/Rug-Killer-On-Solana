@@ -29,6 +29,10 @@ import { isPumpFunAmmWallet } from './pumpfun-amm-detector.js';
 import { batchDetectExchanges, isKnownOrAutoExchange, getExchangeLabel } from './exchange-auto-detector.js';
 import bs58 from 'bs58';
 
+// Debug logging - only enable in development or when DEBUG_HOLDER_ANALYSIS=true
+const DEBUG = process.env.DEBUG_HOLDER_ANALYSIS === 'true' || (process.env.NODE_ENV !== 'production' && process.env.DEBUG_HOLDER_ANALYSIS !== 'false');
+const debugLog = DEBUG ? (...args: any[]) => console.log(...args) : () => {};
+
 export interface HolderDetail {
   address: string;
   balance: number;
@@ -70,18 +74,18 @@ export class HolderAnalysisService {
    */
   async analyzeHolders(tokenAddress: string): Promise<HolderAnalysisResult> {
     const cacheKey = `holder-analysis:v3:${tokenAddress}`;
-    console.log(`\n🔍 [HolderAnalysis DEBUG] Starting analysis for ${tokenAddress}`);
-    console.log(`[HolderAnalysis DEBUG] Cache key: ${cacheKey}`);
+    debugLog(`\n🔍 [HolderAnalysis DEBUG] Starting analysis for ${tokenAddress}`);
+    debugLog(`[HolderAnalysis DEBUG] Cache key: ${cacheKey}`);
 
     return await redisCache.cacheFetch(
       cacheKey,
       async () => {
-        console.log(`[HolderAnalysis DEBUG] Cache MISS - fetching fresh data...`);
+        debugLog(`[HolderAnalysis DEBUG] Cache MISS - fetching fresh data...`);
         
         // Try direct on-chain scan via getProgramAccounts FIRST (most accurate)
-        console.log(`[HolderAnalysis DEBUG] Step 1: Attempting on-chain RPC scan via getProgramAccounts...`);
+        debugLog(`[HolderAnalysis DEBUG] Step 1: Attempting on-chain RPC scan via getProgramAccounts...`);
         const programScan = await this.fetchFromProgramAccounts(tokenAddress);
-        console.log(`[HolderAnalysis DEBUG] getProgramAccounts result:`, {
+        debugLog(`[HolderAnalysis DEBUG] getProgramAccounts result:`, {
           success: !!programScan,
           holderCount: programScan?.holderCount ?? 'null',
           top20Length: programScan?.top20Holders?.length ?? 0,
@@ -92,12 +96,12 @@ export class HolderAnalysisService {
           console.log(`[HolderAnalysis] ✅ SUCCESS: Used on-chain RPC scan for ${tokenAddress} - ${programScan.holderCount} holders`);
           return programScan;
         }
-        console.log(`[HolderAnalysis DEBUG] ⚠️ getProgramAccounts failed or returned no data, trying fallbacks...`);
+        debugLog(`[HolderAnalysis DEBUG] ⚠️ getProgramAccounts failed or returned no data, trying fallbacks...`);
 
         // Try Helius as backup (requires API key but has accurate counts)
-        console.log(`[HolderAnalysis DEBUG] Step 2: Attempting Helius RPC...`);
+        debugLog(`[HolderAnalysis DEBUG] Step 2: Attempting Helius RPC...`);
         const heliusResult = await this.fetchFromHelius(tokenAddress);
-        console.log(`[HolderAnalysis DEBUG] Helius result:`, {
+        debugLog(`[HolderAnalysis DEBUG] Helius result:`, {
           success: !!heliusResult,
           holderCount: heliusResult?.holderCount ?? 'null',
           hasApiKey: !!process.env.HELIUS_API_KEY?.trim()
@@ -107,23 +111,23 @@ export class HolderAnalysisService {
           console.log(`[HolderAnalysis] ✅ SUCCESS: Used Helius for ${tokenAddress} - ${heliusResult.holderCount} holders`);
           return heliusResult;
         }
-        console.log(`[HolderAnalysis DEBUG] ⚠️ Helius failed or returned no data, using RPC fallback...`);
+        debugLog(`[HolderAnalysis DEBUG] ⚠️ Helius failed or returned no data, using RPC fallback...`);
 
         // Fallback to basic RPC (top 20 only, limited data but still accurate)
-        console.log(`[HolderAnalysis DEBUG] Step 3: Using basic RPC fallback (getTokenLargestAccounts)...`);
+        debugLog(`[HolderAnalysis DEBUG] Step 3: Using basic RPC fallback (getTokenLargestAccounts)...`);
         const rpcResult = await this.fetchFromRPC(tokenAddress);
-        console.log(`[HolderAnalysis DEBUG] RPC fallback result:`, {
+        debugLog(`[HolderAnalysis DEBUG] RPC fallback result:`, {
           holderCount: rpcResult.holderCount,
           top20Length: rpcResult.top20Holders.length,
           source: rpcResult.source
         });
         console.log(`[HolderAnalysis] ⚠️ FALLBACK: Used RPC fallback for ${tokenAddress} (limited to top 20 holders, holderCount=${rpcResult.holderCount})`);
-        console.log(`[HolderAnalysis DEBUG] === Analysis complete ===\n`);
+        debugLog(`[HolderAnalysis DEBUG] === Analysis complete ===\n`);
         return rpcResult;
       },
       this.CACHE_TTL
     ).then(result => {
-      console.log(`[HolderAnalysis DEBUG] FINAL RESULT for ${tokenAddress}:`, {
+      debugLog(`[HolderAnalysis DEBUG] FINAL RESULT for ${tokenAddress}:`, {
         holderCount: result.holderCount,
         top20Length: result.top20Holders.length,
         source: result.source,

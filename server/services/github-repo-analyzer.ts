@@ -471,40 +471,40 @@ export class GitHubRepoAnalyzer {
     const risks: string[] = [];
     
     if (metrics.isArchived) {
-      risks.push('⚠️ Repository is archived (no longer maintained)');
+      risks.push('[!] Repository is archived (no longer maintained)');
     }
     
     if (!metrics.hasLicense) {
-      risks.push('⚠️ No license found (legal risks)');
+      risks.push('[!] No license found (legal risks)');
     }
     
     if (metrics.contributors <= 1) {
-      risks.push('⚠️ Single contributor (bus factor risk)');
+      risks.push('[!] Single contributor (bus factor risk)');
     }
     
     if (metrics.lastCommitDate) {
       const daysSince = Math.floor((Date.now() - metrics.lastCommitDate.getTime()) / (1000 * 60 * 60 * 24));
       if (daysSince > 365) {
-        risks.push(`⚠️ No commits in ${Math.floor(daysSince / 365)} year(s) (abandoned?)');
+        risks.push(`[!] No commits in ${Math.floor(daysSince / 365)} year(s) (abandoned?)`);
       } else if (daysSince > 180) {
-        risks.push('⚠️ No recent activity (6+ months)');
+        risks.push('[!] No recent activity (6+ months)');
       }
     }
     
     if (metrics.stars < 10 && !metrics.isFork) {
-      risks.push('⚠️ Low community adoption (< 10 stars)');
+      risks.push('[!] Low community adoption (< 10 stars)');
     }
     
     if (metrics.openIssues > 100) {
-      risks.push('⚠️ High open issue count (maintenance backlog)');
+      risks.push('[!] High open issue count (maintenance backlog)');
     }
     
     if (!metrics.hasSecurityPolicy) {
-      risks.push('⚠️ No security policy defined');
+      risks.push('[!] No security policy defined');
     }
     
     if (metrics.isSolanaProject && !metrics.hasAnchor && !metrics.hasCargoToml) {
-      risks.push('⚠️ Solana project missing standard setup files');
+      risks.push('[!] Solana project missing standard setup files');
     }
     
     return risks;
@@ -517,40 +517,40 @@ export class GitHubRepoAnalyzer {
     const strengths: string[] = [];
     
     if (metrics.stars > 1000) {
-      strengths.push(`✅ High community trust (${metrics.stars.toLocaleString()} stars)`);
+      strengths.push(`[+] High community trust (${metrics.stars.toLocaleString()} stars)`);
     }
     
     if (metrics.contributors > 20) {
-      strengths.push(`✅ Strong contributor base (${metrics.contributors} contributors)`);
+      strengths.push(`[+] Strong contributor base (${metrics.contributors} contributors)`);
     }
     
     if (metrics.commits > 500) {
-      strengths.push(`✅ Mature codebase (${metrics.commits.toLocaleString()} commits)`);
+      strengths.push(`[+] Mature codebase (${metrics.commits.toLocaleString()} commits)`);
     }
     
     if (metrics.lastCommitDate) {
       const daysSince = Math.floor((Date.now() - metrics.lastCommitDate.getTime()) / (1000 * 60 * 60 * 24));
       if (daysSince <= 30) {
-        strengths.push('✅ Recently updated (active development)');
+        strengths.push('[+] Recently updated (active development)');
       }
     }
     
     if (metrics.hasLicense) {
-      strengths.push('✅ Licensed (legal clarity)');
+      strengths.push('[+] Licensed (legal clarity)');
     }
     
     if (metrics.hasSecurityPolicy) {
-      strengths.push('✅ Security policy defined');
+      strengths.push('[+] Security policy defined');
     }
     
     if (metrics.isSolanaProject && metrics.hasAnchor) {
-      strengths.push('✅ Uses Anchor framework (best practice)');
+      strengths.push('[+] Uses Anchor framework (best practice)');
     }
     
     if (!metrics.isArchived && metrics.lastCommitDate) {
       const daysSince = Math.floor((Date.now() - metrics.lastCommitDate.getTime()) / (1000 * 60 * 60 * 24));
       if (daysSince <= 90) {
-        strengths.push('✅ Actively maintained');
+        strengths.push('[+] Actively maintained');
       }
     }
     
@@ -562,22 +562,22 @@ export class GitHubRepoAnalyzer {
    */
   private generateRecommendation(result: RepoGradeResult): string {
     if (!result.found) {
-      return '❌ Repository not found or inaccessible';
+      return '[X] Repository not found or inaccessible';
     }
     
     if (result.confidenceScore >= 85) {
-      return '🟢 HIGHLY TRUSTED - This repository shows strong indicators of quality, security, and active maintenance. Safe to use.';
+      return '[+++] HIGHLY TRUSTED - This repository shows strong indicators of quality, security, and active maintenance. Safe to use.';
     }
     
     if (result.confidenceScore >= 70) {
-      return '🟡 GENERALLY SAFE - This repository has good metrics but some areas could be improved. Review identified risks before use.';
+      return '[++] GENERALLY SAFE - This repository has good metrics but some areas could be improved. Review identified risks before use.';
     }
     
     if (result.confidenceScore >= 55) {
-      return '🟠 PROCEED WITH CAUTION - This repository has moderate concerns. Thoroughly review the code and risks before use.';
+      return '[+] PROCEED WITH CAUTION - This repository has moderate concerns. Thoroughly review the code and risks before use.';
     }
     
-    return '🔴 HIGH RISK - This repository shows significant warning signs. Not recommended for production use without extensive auditing.';
+    return '[!] HIGH RISK - This repository shows significant warning signs. Not recommended for production use without extensive auditing.'
   }
   
   /**
@@ -585,26 +585,26 @@ export class GitHubRepoAnalyzer {
    */
   formatForDisplay(result: RepoGradeResult): string {
     if (!result.found) {
-      return `❌ **Repository not found**\n${result.githubUrl}\n\n${result.error || 'Invalid URL or inaccessible repository'}`;
+      return `[X] **Repository not found**\n${result.githubUrl}\n\n${result.error || 'Invalid URL or inaccessible repository'}`;
     }
     
     const m = result.metrics!;
     
-    let output = `📊 **GitHub Repository Grade: ${result.grade}**\n`;
-    output += `🎯 **Confidence Score: ${result.confidenceScore}/100**\n\n`;
+    let output = `**GitHub Repository Grade: ${result.grade}**\n`;
+    output += `**Confidence Score: ${result.confidenceScore}/100**\n\n`;
     
     output += `**Repository:** ${m.owner}/${m.repo}\n`;
-    output += `⭐ ${m.stars.toLocaleString()} stars | 🍴 ${m.forks.toLocaleString()} forks | 👥 ${m.contributors} contributors\n`;
-    output += `💻 Language: ${m.language || 'Mixed'} ${m.isSolanaProject ? '(Solana Project)' : ''}\n`;
-    output += `📝 ${m.commits.toLocaleString()} commits | Last updated: ${m.lastCommitDate?.toLocaleDateString() || 'Unknown'}\n\n`;
+    output += `* ${m.stars.toLocaleString()} stars | ${m.forks.toLocaleString()} forks | ${m.contributors} contributors\n`;
+    output += `Language: ${m.language || 'Mixed'} ${m.isSolanaProject ? '(Solana Project)' : ''}\n`;
+    output += `${m.commits.toLocaleString()} commits | Last updated: ${m.lastCommitDate?.toLocaleDateString() || 'Unknown'}\n\n`;
     
     output += `**Score Breakdown:**\n`;
-    output += `🔒 Security: ${result.securityScore}/30\n`;
-    output += `⚡ Activity: ${result.activityScore}/25\n`;
-    output += `🌟 Popularity: ${result.popularityScore}/20\n`;
-    output += `💚 Health: ${result.healthScore}/15\n`;
+    output += `Security: ${result.securityScore}/30\n`;
+    output += `Activity: ${result.activityScore}/25\n`;
+    output += `Popularity: ${result.popularityScore}/20\n`;
+    output += `Health: ${result.healthScore}/15\n`;
     if (result.solanaScore > 0) {
-      output += `🚀 Solana Bonus: ${result.solanaScore}/10\n`;
+      output += `Solana Bonus: ${result.solanaScore}/10\n`;
     }
     output += `\n`;
     
