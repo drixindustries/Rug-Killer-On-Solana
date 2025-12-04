@@ -3135,6 +3135,8 @@ function createDiscordClient(botToken: string, clientId: string): Client {
   client.once('ready', async () => {
     console.log(`✅ Discord bot logged in as ${client.user?.tag}`);
     console.log(`✅ Discord bot is online and ready!`);
+    console.log(`✅ Bot is in ${client.guilds.cache.size} guilds`);
+    console.log(`✅ Bot user ID: ${client.user?.id}`);
     registerCommands();
     
     // Register alpha alert callback to send alerts to configured Discord channels (gated)
@@ -3300,8 +3302,28 @@ export async function startDiscordBot() {
       console.log('[Discord Bot] Reconnecting to Discord...');
     });
     
-    await clientInstance.login(BOT_TOKEN);
-    console.log('✅ Discord bot login initiated - waiting for ready event...');
+    // Add debug logging for connection status
+    clientInstance.on('shardReady', (shardId) => {
+      console.log(`[Discord Bot] Shard ${shardId} is ready`);
+    });
+    
+    clientInstance.on('shardError', (error, shardId) => {
+      console.error(`[Discord Bot] Shard ${shardId} error:`, error);
+    });
+    
+    try {
+      console.log('[Discord Bot] Attempting to login...');
+      await clientInstance.login(BOT_TOKEN);
+      console.log('✅ Discord bot login successful - waiting for ready event...');
+    } catch (loginError: any) {
+      console.error('❌ Discord bot login failed:', loginError?.message || loginError);
+      console.error('❌ Login error details:', {
+        message: loginError?.message,
+        code: loginError?.code,
+        stack: loginError?.stack
+      });
+      throw loginError; // Re-throw to be caught by outer catch
+    }
   } catch (error: any) {
     console.error('❌ Error starting Discord bot:', error?.message || error);
     console.error('❌ Error stack:', error?.stack);
