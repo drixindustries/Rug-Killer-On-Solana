@@ -118,44 +118,76 @@ export class GitHubRepoAnalyzer {
       // Parse GitHub URL
       const { owner, repo } = this.parseGitHubUrl(githubUrl);
       if (!owner || !repo) {
-        result.error = 'Invalid GitHub URL format';
+        result.error = 'Invalid GitHub URL format. Expected: github.com/owner/repo';
         return result;
       }
       
+      // Check if GitHub token is configured
+      if (!this.githubToken) {
+        console.warn('[GitHub Analyzer] No GITHUB_TOKEN configured - API rate limits will be very restrictive');
+      }
+      
       // Fetch repository metrics
-      const metrics = await this.fetchRepoMetrics(owner, repo);
-      result.metrics = metrics;
-      result.found = true;
-      
-      // Calculate component scores
-      result.securityScore = this.calculateSecurityScore(metrics);
-      result.activityScore = this.calculateActivityScore(metrics);
-      result.popularityScore = this.calculatePopularityScore(metrics);
-      result.healthScore = this.calculateHealthScore(metrics);
-      result.solanaScore = this.calculateSolanaScore(metrics);
-      
-      // Total confidence score
-      result.confidenceScore = Math.min(100, Math.round(
-        result.securityScore +
-        result.activityScore +
-        result.popularityScore +
-        result.healthScore +
-        result.solanaScore
-      ));
-      
-      // Assign letter grade
-      result.grade = this.assignGrade(result.confidenceScore);
-      
-      // Generate risks and strengths
-      result.risks = this.identifyRisks(metrics, result);
-      result.strengths = this.identifyStrengths(metrics, result);
-      result.recommendation = this.generateRecommendation(result);
-      
-      return result;
+      try {
+        const metrics = await this.fetchRepoMetrics(owner, repo);
+        result.metrics = metrics;
+        result.found = true;
+        
+        // Calculate component scores
+        result.securityScore = this.calculateSecurityScore(metrics);
+        result.activityScore = this.calculateActivityScore(metrics);
+        result.popularityScore = this.calculatePopularityScore(metrics);
+        result.healthScore = this.calculateHealthScore(metrics);
+        result.solanaScore = this.calculateSolanaScore(metrics);
+        
+        // Total confidence score
+        result.confidenceScore = Math.min(100, Math.round(
+          result.securityScore +
+          result.activityScore +
+          result.popularityScore +
+          result.healthScore +
+          result.solanaScore
+        ));
+        
+        // Assign letter grade
+        result.grade = this.assignGrade(result.confidenceScore);
+        
+        // Generate risks and strengths
+        result.risks = this.identifyRisks(metrics, result);
+        result.strengths = this.identifyStrengths(metrics, result);
+        result.recommendation = this.generateRecommendation(result);
+        
+        return result;
+      } catch (fetchError: any) {
+        // Handle specific GitHub API errors
+        if (fetchError.response?.status === 404) {
+          result.error = `Repository not found: ${owner}/${repo}. Please check the URL and try again.`;
+        } else if (fetchError.response?.status === 403) {
+          if (fetchError.response?.data?.message?.includes('rate limit')) {
+            result.error = 'GitHub API rate limit exceeded. Please try again later or configure a GITHUB_TOKEN.';
+          } else {
+            result.error = 'Access forbidden. The repository may be private or require authentication.';
+          }
+        } else if (fetchError.response?.status === 401) {
+          result.error = 'GitHub authentication failed. Please check GITHUB_TOKEN configuration.';
+        } else if (fetchError.code === 'ENOTFOUND' || fetchError.code === 'ECONNREFUSED') {
+          result.error = 'Could not connect to GitHub API. Please check your internet connection.';
+        } else {
+          result.error = fetchError.message || 'Failed to fetch repository data';
+        }
+        
+        console.error(`[GitHub Analyzer] Error fetching ${owner}/${repo}:`, {
+          status: fetchError.response?.status,
+          message: fetchError.message,
+          code: fetchError.code,
+        });
+        
+        return result;
+      }
       
     } catch (error: any) {
       result.error = error.message || 'Analysis failed';
-      console.error('GitHub repo analysis error:', error);
+      console.error('[GitHub Analyzer] Unexpected error:', error);
       return result;
     }
   }
@@ -193,14 +225,17 @@ export class GitHubRepoAnalyzer {
     
     if (this.githubToken) {
       headers['Authorization'] = `token ${this.githubToken}`;
+    } else {
+      console.warn(`[GitHub Analyzer] Fetching ${owner}/${repo} without authentication - rate limits apply`);
     }
     
-    // Fetch main repo data
-    const repoResponse = await axios.get(
-      `${this.apiBase}/repos/${owner}/${repo}`,
-      { headers }
-    );
-    const repoData = repoResponse.data;
+    try {
+      // Fetch main repo data
+      const repoResponse = await axios.get(
+        `${this.apiBase}/repos/${owner}/${repo}`,
+        { headers }
+      );
+      const repoData = repoResponse.data;
     
     // Fetch languages
     let languages: Record<string, number> = {};
@@ -300,30 +335,40 @@ export class GitHubRepoAnalyzer {
       console.warn('Could not fetch last commit:', e);
     }
     
-    return {
-      owner,
-      repo,
-      url: repoData.html_url,
-      stars: repoData.stargazers_count,
-      forks: repoData.forks_count,
-      watchers: repoData.watchers_count,
-      openIssues: repoData.open_issues_count,
-      language: repoData.language,
-      languages,
-      commits: commitsCount,
-      contributors: contributorsCount,
-      lastCommitDate,
-      createdAt: new Date(repoData.created_at),
-      updatedAt: new Date(repoData.updated_at),
-      hasLicense: !!repoData.license,
-      hasReadme: !!repoData.has_wiki || repoData.size > 0,
-      hasSecurityPolicy,
-      isArchived: repoData.archived,
-      isFork: repoData.fork,
-      isSolanaProject,
-      hasAnchor,
-      hasCargoToml,
-    };
+      return {
+        owner,
+        repo,
+        url: repoData.html_url,
+        stars: repoData.stargazers_count,
+        forks: repoData.forks_count,
+        watchers: repoData.watchers_count,
+        openIssues: repoData.open_issues_count,
+        language: repoData.language,
+        languages,
+        commits: commitsCount,
+        contributors: contributorsCount,
+        lastCommitDate,
+        createdAt: new Date(repoData.created_at),
+        updatedAt: new Date(repoData.updated_at),
+        hasLicense: !!repoData.license,
+        hasReadme: !!repoData.has_wiki || repoData.size > 0,
+        hasSecurityPolicy,
+        isArchived: repoData.archived,
+        isFork: repoData.fork,
+        isSolanaProject,
+        hasAnchor,
+        hasCargoToml,
+      };
+    } catch (error: any) {
+      // Re-throw with better error context for axios errors
+      if (error.response) {
+        const err: any = new Error(error.response.data?.message || error.message);
+        err.response = error.response;
+        err.code = error.code;
+        throw err;
+      }
+      throw error;
+    }
   }
   
   /**

@@ -192,7 +192,7 @@ export default function Rugs() {
                         <TrendingDown className="h-4 w-4 text-muted-foreground" />
                         <div>
                           <p className="text-xs text-muted-foreground">Market Cap</p>
-                          <p className="font-semibold">${rug.marketCap.toLocaleString()}</p>
+                          <p className="font-semibold">${(rug.marketCap ?? 0).toLocaleString()}</p>
                         </div>
                       </div>
                     )}
@@ -201,7 +201,7 @@ export default function Rugs() {
                         <Users className="h-4 w-4 text-muted-foreground" />
                         <div>
                           <p className="text-xs text-muted-foreground">Holders</p>
-                          <p className="font-semibold">{rug.holders.toLocaleString()}</p>
+                          <p className="font-semibold">{(rug.holders ?? 0).toLocaleString()}</p>
                         </div>
                       </div>
                     )}
@@ -210,7 +210,7 @@ export default function Rugs() {
                         <Droplet className="h-4 w-4 text-muted-foreground" />
                         <div>
                           <p className="text-xs text-muted-foreground">Liquidity</p>
-                          <p className="font-semibold">${rug.liquidity.toLocaleString()}</p>
+                          <p className="font-semibold">${(rug.liquidity ?? 0).toLocaleString()}</p>
                         </div>
                       </div>
                     )}

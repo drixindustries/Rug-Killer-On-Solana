@@ -229,7 +229,7 @@ export default function Analytics() {
                 ) : (
                   <>
                     <div className="text-2xl font-bold" data-testid="text-total-analyzed">
-                      {marketOverview?.totalAnalyzed.toLocaleString() || 0}
+                      {(marketOverview?.totalAnalyzed ?? 0).toLocaleString()}
                     </div>
                     <p className="text-xs text-muted-foreground">Last hour</p>
                   </>
@@ -248,7 +248,7 @@ export default function Analytics() {
                 ) : (
                   <>
                     <div className="text-2xl font-bold text-destructive" data-testid="text-rugs-detected">
-                      {marketOverview?.rugsDetected.toLocaleString() || 0}
+                      {(marketOverview?.rugsDetected ?? 0).toLocaleString()}
                     </div>
                     <p className="text-xs text-muted-foreground">All time • Click to view</p>
                   </>

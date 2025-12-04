@@ -56,7 +56,7 @@ export function MetricsGrid({
     {
       icon: Users,
       label: "Holder Count",
-      value: holderCount.toLocaleString(),
+      value: (holderCount ?? 0).toLocaleString(),
       secondary: "unique addresses",
       testId: "metric-holder-count",
     },
@@ -101,7 +101,7 @@ export function MetricsGrid({
     {
       icon: Users,
       label: "Holder Count",
-      value: holderCount.toLocaleString(),
+      value: (holderCount ?? 0).toLocaleString(),
       secondary: "unique addresses",
       testId: "metric-holder-count",
     },
@@ -115,10 +115,10 @@ export function MetricsGrid({
     {
       icon: AlertTriangle,
       label: "Bundled Wallets",
-      value: bundledCount.toLocaleString(),
+      value: (bundledCount ?? 0).toLocaleString(),
       secondary: getBundleSecondaryText(),
       testId: "metric-bundled-wallets",
-      warning: bundledCount > 0,
+      warning: (bundledCount ?? 0) > 0,
     },
     {
       icon: Droplet,

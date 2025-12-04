@@ -99,11 +99,11 @@ export function TGNAnalysisCard({ tgnResult, isPreMigration, migrationDetected, 
             <div className="space-y-1">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Wallets:</span>
-                <span className="font-mono font-semibold">{tgnResult.graphMetrics.nodeCount.toLocaleString()}</span>
+                <span className="font-mono font-semibold">{(tgnResult?.graphMetrics?.nodeCount ?? 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Transactions:</span>
-                <span className="font-mono font-semibold">{tgnResult.graphMetrics.edgeCount.toLocaleString()}</span>
+                <span className="font-mono font-semibold">{(tgnResult?.graphMetrics?.edgeCount ?? 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Avg Degree:</span>

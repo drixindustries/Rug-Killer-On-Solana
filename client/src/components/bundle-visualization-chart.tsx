@@ -126,7 +126,7 @@ export function BundleVisualizationChart({ filtering, totalHolders }: BundleVisu
             <span className="font-semibold">{data.name}</span>
           </div>
           <p className="text-sm text-muted-foreground mb-1">{data.description}</p>
-          <p className="text-lg font-bold">{data.value.toLocaleString()} holders</p>
+          <p className="text-lg font-bold">{(data.value ?? 0).toLocaleString()} holders</p>
           <p className="text-xs text-muted-foreground">
             {percentage}% of total
           </p>
@@ -147,8 +147,8 @@ export function BundleVisualizationChart({ filtering, totalHolders }: BundleVisu
             <span className="font-semibold">{data.name}</span>
           </div>
           <p className="text-sm text-muted-foreground mb-1">{data.description}</p>
-          <p className="text-lg font-bold">{data.value.toLocaleString()} wallets</p>
-          {data.supplyPercent > 0 && (
+          <p className="text-lg font-bold">{(data.value ?? 0).toLocaleString()} wallets</p>
+          {(data.supplyPercent ?? 0) > 0 && (
             <p className="text-xs text-muted-foreground">
               {(typeof data.supplyPercent === 'number' ? data.supplyPercent.toFixed(2) : '0.00')}% of token supply
             </p>
@@ -399,26 +399,26 @@ export function BundleVisualizationChart({ filtering, totalHolders }: BundleVisu
           <div>
             <p className="text-sm text-muted-foreground">Total Holders</p>
             <p className="text-2xl font-bold" data-testid="text-total-holders">
-              {totalHolders.toLocaleString()}
+              {(totalHolders ?? 0).toLocaleString()}
             </p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Filtered Addresses</p>
             <p className="text-2xl font-bold" data-testid="text-filtered-count">
-              {filtering.totals.total.toLocaleString()}
+              {(filtering?.totals?.total ?? 0).toLocaleString()}
             </p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Legitimate Holders</p>
             <p className="text-2xl font-bold text-green-600" data-testid="text-legit-holders">
-              {legitHolders.toLocaleString()}
+              {(legitHolders ?? 0).toLocaleString()}
             </p>
           </div>
-          {filtering.totals.bundled > 0 && (
+          {(filtering?.totals?.bundled ?? 0) > 0 && (
             <div>
               <p className="text-sm text-muted-foreground">Suspicious Bundles</p>
               <p className="text-2xl font-bold text-destructive" data-testid="text-bundle-count">
-                {filtering.totals.bundled.toLocaleString()}
+                {(filtering?.totals?.bundled ?? 0).toLocaleString()}
               </p>
             </div>
           )}
