@@ -3131,9 +3131,10 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     }
   }); // End of messageCreate handler
   
-  // Ready event (using clientReady for Discord.js v14+)
-  client.once('clientReady' as any, async () => {
+  // Ready event - Discord.js v14 uses 'ready' event
+  client.once('ready', async () => {
     console.log(`✅ Discord bot logged in as ${client.user?.tag}`);
+    console.log(`✅ Discord bot is online and ready!`);
     registerCommands();
     
     // Register alpha alert callback to send alerts to configured Discord channels (gated)
@@ -3281,10 +3282,29 @@ export async function startDiscordBot() {
     }
     
     clientInstance = createDiscordClient(BOT_TOKEN, CLIENT_ID);
+    
+    // Add error handlers before login
+    clientInstance.on('error', (error) => {
+      console.error('[Discord Bot] Client error:', error);
+    });
+    
+    clientInstance.on('warn', (warning) => {
+      console.warn('[Discord Bot] Client warning:', warning);
+    });
+    
+    clientInstance.on('disconnect', () => {
+      console.warn('[Discord Bot] Disconnected from Discord');
+    });
+    
+    clientInstance.on('reconnecting', () => {
+      console.log('[Discord Bot] Reconnecting to Discord...');
+    });
+    
     await clientInstance.login(BOT_TOKEN);
-    console.log('✅ Discord bot started successfully');
+    console.log('✅ Discord bot login initiated - waiting for ready event...');
   } catch (error: any) {
     console.error('❌ Error starting Discord bot:', error?.message || error);
+    console.error('❌ Error stack:', error?.stack);
     console.log('⚠️ Discord bot unavailable (silenced):', error?.message || 'Unknown error');
     clientInstance = null;
     // Don't throw - allow server to continue
