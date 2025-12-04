@@ -520,6 +520,21 @@ function createDiscordClient(botToken: string, clientId: string): Client {
   client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
     
+    // Commands that need immediate deferral to avoid timeout
+    const commandsNeedingDefer = ['execute', 'rugcheck', 'holders', 'first20', 'devaudit', 'whaletrack', 'compare', 'trending'];
+    const needsDefer = commandsNeedingDefer.includes(interaction.commandName);
+    
+    // Defer immediately for commands that might take time
+    let deferred = false;
+    if (needsDefer) {
+      try {
+        await interaction.deferReply();
+        deferred = true;
+      } catch (error) {
+        console.error('[Discord] Failed to defer reply:', error);
+      }
+    }
+    
     try {
       // Access control check - with error handling
       let accessControl;
@@ -527,10 +542,16 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         accessControl = getAccessControlService();
       } catch (err: any) {
         console.error('[Discord] AccessControlService initialization failed:', err?.message || err);
-        await interaction.reply({ 
-          content: '❌ Service temporarily unavailable. Please try again in a moment.', 
-          ephemeral: true 
-        });
+        if (deferred) {
+          await interaction.editReply({ 
+            content: '❌ Service temporarily unavailable. Please try again in a moment.'
+          });
+        } else {
+          await interaction.reply({ 
+            content: '❌ Service temporarily unavailable. Please try again in a moment.', 
+            ephemeral: true 
+          });
+        }
         return;
       }
       
@@ -565,7 +586,11 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           });
         }
         
-        await interaction.reply({ embeds: [deniedEmbed], ephemeral: true });
+        if (deferred) {
+          await interaction.editReply({ embeds: [deniedEmbed] });
+        } else {
+          await interaction.reply({ embeds: [deniedEmbed], ephemeral: true });
+        }
         return;
       }
       
@@ -643,7 +668,11 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         console.log(`[Discord /execute] User ${interaction.user.tag} scanning: ${tokenAddress}`);
         console.log(`[Discord /execute] Starting analysis for token: ${tokenAddress}`);
         
-        await interaction.deferReply();
+        // Ensure we've deferred (should already be done above, but double-check)
+        if (!deferred) {
+          await interaction.deferReply();
+          deferred = true;
+        }
         
         try {
           // Add timeout to prevent hanging (60s for new tokens that need indexing)
