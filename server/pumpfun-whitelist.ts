@@ -69,6 +69,8 @@ const PUMPFUN_ADDRESS_PATTERNS = [
   /^5Nkn/,   // WSOL AMM vault (CRITICAL - reported 20+ times)
   /^DezX/,   // Bonk-style vault clone
   /^4wTV/,   // Legacy vault
+  /^CebN5WGQ/, // Pump.fun Global variants
+  /^6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P/, // Full program ID pattern
 ];
 
 /**

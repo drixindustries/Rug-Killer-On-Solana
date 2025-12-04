@@ -304,6 +304,7 @@ export class HolderAnalysisService {
           return acc;
         }
         // Check Pump.fun AMM (includes pattern matching for 5Nkn...)
+        // CRITICAL: Check this BEFORE system wallets to catch all Pump.fun AMM variants
         if (isPumpFunAmm(address)) {
           console.log(`[HolderAnalysis] ✅ Filtered Pump.fun AMM: ${address.slice(0, 8)}...${address.slice(-8)} (${Number(amountRaw) / 1e9} tokens)`);
           pumpFunFilteredCount += 1;
@@ -338,7 +339,46 @@ export class HolderAnalysisService {
         ? (Number(meteoraFilteredRaw) / totalSupplyNumber) * 100
         : 0;
 
-      const list = nonSystemEntries
+      // Additional async check for high-percentage holders that might be Pump.fun AMM wallets
+      // This catches edge cases where pattern matching didn't work
+      const suspiciousHighPercentageHolders = nonSystemEntries
+        .filter(({ address, amountRaw }) => {
+          const percentage = Number(amountRaw) / effectiveSupply * 100;
+          // Check holders with >10% that weren't caught by pattern matching
+          return percentage > 10 && !isPumpFunAmm(address) && !isSystemWallet(address);
+        })
+        .slice(0, 5); // Only check top 5 suspicious holders to avoid performance issues
+
+      // Async check for Pump.fun AMM wallets (non-blocking, runs in parallel)
+      const ammChecks = suspiciousHighPercentageHolders.map(async ({ address, amountRaw }) => {
+        try {
+          const detection = await isPumpFunAmmWallet(connection, address, tokenAddress);
+          if (detection.isPumpFunAmm && detection.confidence === 'high') {
+            console.log(`[HolderAnalysis] ✅ Async-detected Pump.fun AMM: ${address.slice(0, 8)}... (${detection.reason})`);
+            return { address, isAmm: true };
+          }
+        } catch (error) {
+          // Silently fail - don't block on async detection
+        }
+        return { address, isAmm: false };
+      });
+
+      const ammResults = await Promise.all(ammChecks).catch(() => []);
+      const detectedAmmAddresses = new Set(
+        ammResults.filter(r => r.isAmm).map(r => r.address)
+      );
+
+      // Filter out async-detected AMM wallets
+      const finalNonSystemEntries = nonSystemEntries.filter(({ address }) => {
+        if (detectedAmmAddresses.has(address)) {
+          pumpFunFilteredCount += 1;
+          // Note: amountRaw already counted in pumpFunFilteredRaw from initial filtering
+          return false;
+        }
+        return true;
+      });
+
+      const list = finalNonSystemEntries
         .map(({ address, amountRaw }) => {
           const percentage = Number(amountRaw) / effectiveSupply * 100;
           const balance = Number(amountRaw) / Math.pow(10, decimals);
@@ -357,15 +397,33 @@ export class HolderAnalysisService {
         .sort((a, b) => b.balance - a.balance);
 
       const top20 = list.slice(0, 20);
-      const top10Concentration = top20.slice(0, 10).reduce((sum, h) => sum + h.percentage, 0);
+      
+      // Calculate top 10 concentration as percentage of TOTAL supply (not effective supply)
+      // This shows what percentage of the total token supply is held by the top 10 wallets
+      const top10TotalSupply = top20.slice(0, 10).reduce((sum, h) => {
+        // Find the original amountRaw for this holder
+        const holderEntry = finalNonSystemEntries.find(e => e.address === h.address);
+        if (holderEntry) {
+          return sum + Number(holderEntry.amountRaw);
+        }
+        return sum;
+      }, 0);
+      const top10Concentration = totalSupplyNumber > 0 
+        ? (top10TotalSupply / totalSupplyNumber) * 100 
+        : 0;
+      
       const exchangeHolders = top20.filter(h => h.isExchange);
       const lpHolders = top20.filter(h => h.isLP);
 
+      // holderCount should be TOTAL unique holders (including filtered system wallets)
+      // This represents ALL wallets holding the token
+      const totalHolderCount = byOwner.size;
+
       const result = {
         tokenAddress,
-        holderCount: list.length,
+        holderCount: totalHolderCount, // Total holders including filtered ones
         top20Holders: top20,
-        topHolderConcentration: top10Concentration,
+        topHolderConcentration: top10Concentration, // Percentage of total supply held by top 10
         exchangeHolderCount: exchangeHolders.length,
         exchangeSupplyPercent: exchangeHolders.reduce((sum, h) => sum + h.percentage, 0),
         lpSupplyPercent: lpHolders.reduce((sum, h) => sum + h.percentage, 0),
@@ -511,15 +569,38 @@ export class HolderAnalysisService {
         };
       });
 
-      const top10Concentration = top20.slice(0, 10).reduce((sum, h) => sum + h.percentage, 0);
+      // Calculate top 10 concentration as percentage of TOTAL supply (not effective supply)
+      const top10TotalSupply = top20.slice(0, 10).reduce((sum, h) => {
+        const holderEntry = filteredAccounts.find(e => e.owner === h.address);
+        if (holderEntry) {
+          return sum + holderEntry.amountRaw;
+        }
+        return sum;
+      }, 0);
+      const top10Concentration = totalSupplyRaw > 0 
+        ? (top10TotalSupply / totalSupplyRaw) * 100 
+        : 0;
+      
       const exchangeHolders = top20.filter(h => h.isExchange);
       const lpHolders = top20.filter(h => h.isLP);
 
+      // Count total unique holders (including filtered ones)
+      // For Helius method, we need to count all accounts including filtered
+      const totalUniqueHolders = new Set([
+        ...filteredAccounts.map(a => a.owner),
+        ...Array.from({ length: pumpFunFilteredCount + meteoraFilteredCount + systemWalletsFiltered }, (_, i) => `filtered_${i}`)
+      ]).size;
+      
+      // Try to get actual holder count if available, otherwise use estimate
+      const actualHolderCount = totalUniqueHolders > filteredAccounts.length 
+        ? totalUniqueHolders 
+        : filteredAccounts.length + pumpFunFilteredCount + meteoraFilteredCount + systemWalletsFiltered;
+
       return {
         tokenAddress,
-        holderCount: filteredAccounts.length,
+        holderCount: actualHolderCount, // Total holders including filtered ones
         top20Holders: top20,
-        topHolderConcentration: top10Concentration,
+        topHolderConcentration: top10Concentration, // Percentage of total supply held by top 10
         exchangeHolderCount: exchangeHolders.length,
         exchangeSupplyPercent: exchangeHolders.reduce((sum, h) => sum + h.percentage, 0),
         lpSupplyPercent: lpHolders.reduce((sum, h) => sum + h.percentage, 0),
@@ -605,6 +686,7 @@ export class HolderAnalysisService {
         }
 
         // Check Pump.fun AMM (includes pattern matching for 5Nkn...)
+        // CRITICAL: Check this BEFORE system wallets to catch all Pump.fun AMM variants
         if (isPumpFunAmm(ownerAddress)) {
           console.log(`[HolderAnalysis] ✅ Filtered Pump.fun AMM: ${ownerAddress.slice(0, 8)}...${ownerAddress.slice(-8)} (${amountRaw / 1e9} tokens)`);
           pumpFunFilteredCount += 1;
@@ -612,7 +694,7 @@ export class HolderAnalysisService {
           continue;
         }
 
-        // Check system wallets
+        // Check system wallets (includes Pump.fun system wallets)
         if (isSystemWallet(ownerAddress)) {
           console.log(`[HolderAnalysis] ✅ Filtered system wallet: ${ownerAddress.slice(0, 8)}... (${getSystemWalletType(ownerAddress)})`);
           pumpFunFilteredCount += 1;
@@ -650,11 +732,25 @@ export class HolderAnalysisService {
         };
       });
 
-      const top10Concentration = top20.slice(0, 10).reduce((sum, h) => sum + h.percentage, 0);
+      // Calculate top 10 concentration as percentage of TOTAL supply (not effective supply)
+      // This shows what percentage of the total token supply is held by the top 10 wallets
+      const top10TotalSupply = top20.slice(0, 10).reduce((sum, h) => {
+        // Find the original amountRaw for this holder
+        const holderEntry = filteredAccounts.find(e => e.owner === h.address);
+        if (holderEntry) {
+          return sum + holderEntry.amountRaw;
+        }
+        return sum;
+      }, 0);
+      const top10Concentration = totalSupplyRaw > 0 
+        ? (top10TotalSupply / totalSupplyRaw) * 100 
+        : 0;
+      
       const exchangeHolders = top20.filter(h => h.isExchange);
       const lpHolders = top20.filter(h => h.isLP);
 
       // Try to get actual holder count from Solscan API as last resort
+      // This should be the TOTAL holder count (all wallets, including filtered ones)
       let actualHolderCount = filteredAccounts.length;
       try {
         console.log(`[HolderAnalysis DEBUG - RPC Fallback] Fetching holder count from Solscan API...`);
@@ -680,9 +776,9 @@ export class HolderAnalysisService {
 
       return {
         tokenAddress,
-        holderCount: actualHolderCount,
+        holderCount: actualHolderCount, // Total holders (from Solscan API if available)
         top20Holders: top20,
-        topHolderConcentration: top10Concentration,
+        topHolderConcentration: top10Concentration, // Percentage of total supply held by top 10
         exchangeHolderCount: exchangeHolders.length,
         exchangeSupplyPercent: exchangeHolders.reduce((sum, h) => sum + h.percentage, 0),
         lpSupplyPercent: lpHolders.reduce((sum, h) => sum + h.percentage, 0),
