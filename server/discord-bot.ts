@@ -442,7 +442,7 @@ const commands = [
   new SlashCommandBuilder()
     .setName('graderepo')
     .setDescription('Grade GitHub repository or user profile with AI-powered analysis (0-100%)')
-    .addStringOption(option => option.setName('url').setDescription('GitHub repository URL or user profile (e.g., https://github.com/solana-labs/solana or https://github.com/username)').setRequired(true)),
+    .addStringOption(option => option.setName('url').setDescription('GitHub repo URL or user profile (e.g., github.com/username)').setRequired(true)),
   new SlashCommandBuilder()
     .setName('smartwallet')
     .setDescription('Manage Smart Money wallet DB (admin)')
