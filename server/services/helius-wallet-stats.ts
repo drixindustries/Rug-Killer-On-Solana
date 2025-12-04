@@ -11,7 +11,14 @@
  * 
  * Much more accurate than raw RPC parsing since these APIs pre-process
  * transaction data and provide swap detection.
+ * 
+ * Features:
+ * - Redis caching (30 min TTL)
+ * - Request deduplication (prevents concurrent duplicate requests)
+ * - Rate limiting (sliding window)
  */
+
+import { redisCache } from './redis-cache.js';
 
 export interface WalletStats {
   wins: number;
@@ -30,6 +37,19 @@ export class HeliusWalletStatsService {
   private readonly MORALIS_BASE_URL = 'https://solana-gateway.moralis.io';
   private readonly TIMEOUT_MS = 15000;
   private readonly SOL_PRICE = 200; // Approximate SOL price for USD conversion
+  
+  // Caching
+  private readonly CACHE_TTL = Number(process.env.HELIUS_WALLET_STATS_CACHE_TTL) || 1800; // 30 minutes default
+  
+  // Request deduplication - track in-flight requests
+  private inFlightRequests = new Map<string, Promise<WalletStats | null>>();
+  
+  // Rate limiting - sliding window
+  private readonly MAX_REQUESTS_PER_MINUTE = Number(process.env.HELIUS_MAX_REQUESTS_PER_MINUTE) || 100;
+  private readonly RATE_LIMIT_QUEUE_SIZE = Number(process.env.HELIUS_RATE_LIMIT_QUEUE_SIZE) || 50;
+  private requestTimestamps: number[] = [];
+  private requestQueue: Array<{ resolve: (value: WalletStats | null) => void; reject: (error: any) => void; fn: () => Promise<WalletStats | null> }> = [];
+  private isProcessingQueue = false;
 
   constructor(heliusKey?: string, moralisKey?: string) {
     this.HELIUS_API_KEY = heliusKey || process.env.HELIUS_API_KEY || '';
@@ -42,33 +62,135 @@ export class HeliusWalletStatsService {
       if (this.HELIUS_API_KEY) providers.push('Helius');
       if (this.MORALIS_API_KEY) providers.push('Moralis');
       console.log(`[WalletStats] Initialized with providers: ${providers.join(', ')}`);
+      console.log(`[WalletStats] Cache TTL: ${this.CACHE_TTL}s, Rate limit: ${this.MAX_REQUESTS_PER_MINUTE}/min`);
     }
   }
 
   /**
    * Calculate wallet performance stats using available APIs
    * Tries Helius first, falls back to Moralis
+   * 
+   * Features:
+   * - Redis caching with 30-min TTL
+   * - Request deduplication
+   * - Rate limiting
    */
   async getWalletStats(walletAddress: string, limit: number = 200): Promise<WalletStats | null> {
-    // Try Helius first (more detailed transaction data)
-    if (this.HELIUS_API_KEY) {
-      const heliusStats = await this.getHeliusStats(walletAddress, limit);
-      if (heliusStats) {
-        return { ...heliusStats, source: 'helius' };
+    const cacheKey = `helius:wallet-stats:v1:${walletAddress}`;
+    
+    // Check cache first
+    const cached = await redisCache.get<WalletStats>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+    
+    // Check if request is already in flight (deduplication)
+    const inFlight = this.inFlightRequests.get(walletAddress);
+    if (inFlight) {
+      console.log(`[WalletStats] Deduplicating request for ${walletAddress.slice(0, 8)}...`);
+      return inFlight;
+    }
+    
+    // Create new request with deduplication tracking
+    const requestPromise = this.fetchWithRateLimit(async () => {
+      try {
+        // Try Helius first (more detailed transaction data)
+        if (this.HELIUS_API_KEY) {
+          const heliusStats = await this.getHeliusStats(walletAddress, limit);
+          if (heliusStats) {
+            const result = { ...heliusStats, source: 'helius' };
+            await redisCache.set(cacheKey, result, this.CACHE_TTL);
+            return result;
+          }
+        }
+
+        // Fall back to Moralis
+        if (this.MORALIS_API_KEY) {
+          console.log('[WalletStats] Helius unavailable, trying Moralis...');
+          const moralisStats = await this.getMoralisStats(walletAddress, limit);
+          if (moralisStats) {
+            const result = { ...moralisStats, source: 'moralis' };
+            await redisCache.set(cacheKey, result, this.CACHE_TTL);
+            return result;
+          }
+        }
+
+        console.warn('[WalletStats] All providers failed or unavailable');
+        return null;
+      } finally {
+        // Remove from in-flight tracking
+        this.inFlightRequests.delete(walletAddress);
+      }
+    });
+    
+    // Track in-flight request
+    this.inFlightRequests.set(walletAddress, requestPromise);
+    
+    return requestPromise;
+  }
+  
+  /**
+   * Execute request with rate limiting (sliding window)
+   */
+  private async fetchWithRateLimit<T>(fn: () => Promise<T>): Promise<T> {
+    // Clean up old timestamps (older than 1 minute)
+    const now = Date.now();
+    const oneMinuteAgo = now - 60000;
+    this.requestTimestamps = this.requestTimestamps.filter(ts => ts > oneMinuteAgo);
+    
+    // Check if we're under the rate limit
+    if (this.requestTimestamps.length < this.MAX_REQUESTS_PER_MINUTE) {
+      this.requestTimestamps.push(now);
+      return fn();
+    }
+    
+    // Rate limited - queue the request
+    console.log(`[WalletStats] Rate limited (${this.requestTimestamps.length}/${this.MAX_REQUESTS_PER_MINUTE}), queuing request...`);
+    
+    // Check queue size
+    if (this.requestQueue.length >= this.RATE_LIMIT_QUEUE_SIZE) {
+      throw new Error('[WalletStats] Rate limit queue full - try again later');
+    }
+    
+    return new Promise<T>((resolve, reject) => {
+      this.requestQueue.push({ resolve: resolve as any, reject, fn: fn as any });
+      this.processQueue();
+    });
+  }
+  
+  /**
+   * Process queued requests as rate limit allows
+   */
+  private async processQueue(): Promise<void> {
+    if (this.isProcessingQueue || this.requestQueue.length === 0) {
+      return;
+    }
+    
+    this.isProcessingQueue = true;
+    
+    while (this.requestQueue.length > 0) {
+      const now = Date.now();
+      const oneMinuteAgo = now - 60000;
+      this.requestTimestamps = this.requestTimestamps.filter(ts => ts > oneMinuteAgo);
+      
+      if (this.requestTimestamps.length < this.MAX_REQUESTS_PER_MINUTE) {
+        const request = this.requestQueue.shift();
+        if (request) {
+          this.requestTimestamps.push(now);
+          try {
+            const result = await request.fn();
+            request.resolve(result);
+          } catch (error) {
+            request.reject(error);
+          }
+        }
+      } else {
+        // Wait a bit before checking again
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
-
-    // Fall back to Moralis
-    if (this.MORALIS_API_KEY) {
-      console.log('[WalletStats] Helius unavailable, trying Moralis...');
-      const moralisStats = await this.getMoralisStats(walletAddress, limit);
-      if (moralisStats) {
-        return { ...moralisStats, source: 'moralis' };
-      }
-    }
-
-    console.warn('[WalletStats] All providers failed or unavailable');
-    return null;
+    
+    this.isProcessingQueue = false;
   }
 
   /**

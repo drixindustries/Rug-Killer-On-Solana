@@ -517,7 +517,8 @@ export class GitHubRepoAnalyzer {
     const strengths: string[] = [];
     
     if (metrics.stars > 1000) {
-      strengths.push(`[+] High community trust (${metrics.stars.toLocaleString()} stars)`);
+      const starsFormatted = metrics.stars.toLocaleString();
+      strengths.push(`[+] High community trust (${starsFormatted} stars)`);
     }
     
     if (metrics.contributors > 20) {
@@ -525,7 +526,8 @@ export class GitHubRepoAnalyzer {
     }
     
     if (metrics.commits > 500) {
-      strengths.push(`[+] Mature codebase (${metrics.commits.toLocaleString()} commits)`);
+      const commitsFormatted = metrics.commits.toLocaleString();
+      strengths.push(`[+] Mature codebase (${commitsFormatted} commits)`);
     }
     
     if (metrics.lastCommitDate) {
@@ -594,9 +596,13 @@ export class GitHubRepoAnalyzer {
     output += `**Confidence Score: ${result.confidenceScore}/100**\n\n`;
     
     output += `**Repository:** ${m.owner}/${m.repo}\n`;
-    output += `* ${m.stars.toLocaleString()} stars | ${m.forks.toLocaleString()} forks | ${m.contributors} contributors\n`;
+    const starsFormatted = m.stars.toLocaleString();
+    const forksFormatted = m.forks.toLocaleString();
+    const commitsFormatted = m.commits.toLocaleString();
+    const lastUpdated = m.lastCommitDate?.toLocaleDateString() || 'Unknown';
+    output += `* ${starsFormatted} stars | ${forksFormatted} forks | ${m.contributors} contributors\n`;
     output += `Language: ${m.language || 'Mixed'} ${m.isSolanaProject ? '(Solana Project)' : ''}\n`;
-    output += `${m.commits.toLocaleString()} commits | Last updated: ${m.lastCommitDate?.toLocaleDateString() || 'Unknown'}\n\n`;
+    output += `${commitsFormatted} commits | Last updated: ${lastUpdated}\n\n`;
     
     output += `**Score Breakdown:**\n`;
     output += `Security: ${result.securityScore}/30\n`;

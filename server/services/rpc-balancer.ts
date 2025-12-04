@@ -97,11 +97,12 @@ function getAnkrUrl(): string | undefined {
 }
 
 const RPC_PROVIDERS = [
-  // Helius Premium RPC - FREE TIER (PRIMARY)
-  // Main RPC provider with generous free tier
+  // Helius Premium RPC - DEPRIORITIZED to conserve credits
+  // Use Helius only for critical operations (webhooks, wallet stats)
+  // For general token analysis, holder queries, etc., use Shyft/public RPCs
   { 
     getUrl: () => `${getHeliusUrl() || ""}`,
-    weight: 100, // MAXIMUM PRIORITY: Primary RPC
+    weight: Number(process.env.HELIUS_PRIORITY === 'high' ? '100' : '25'), // REDUCED: Save credits (was 100)
     name: "Helius",
     tier: "premium" as const,
     requiresKey: true,
@@ -109,12 +110,13 @@ const RPC_PROVIDERS = [
     rateLimit: 30, // Free tier limit per second
     rateLimitWindow: 1000
   },
-  // Shyft Free RPC (Good speed/reliability balance)
+  // Shyft Free RPC - PROMOTED TO PRIMARY
+  // Good speed/reliability for general usage
   { 
     getUrl: () => `${getShyftUrl() || ""}`,
-    weight: 35, // INCREASED: Often fastest
+    weight: 100, // PROMOTED: Primary RPC (was 35)
     name: "Shyft",
-    tier: "premium" as const, // Promoted for speed
+    tier: "premium" as const,
     requiresKey: true,
     hasKey: () => !!getShyftUrl(),
     rateLimit: 100, // Conservative for free tier

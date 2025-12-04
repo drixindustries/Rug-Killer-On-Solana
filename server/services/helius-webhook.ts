@@ -78,10 +78,11 @@ export class HeliusWebhookService extends EventEmitter {
   private isMonitoring = false;
   private processedSignatures = new Set<string>();
   private readonly MAX_CACHE_SIZE = 10000;
-  private readonly TOKEN_WINDOW_MS = Number(process.env.HELIUS_TOKEN_WINDOW_MS ?? '60000');
-  private readonly TOKEN_WINDOW_CAP = Number(process.env.HELIUS_TOKEN_WINDOW_CAP ?? '120');
-  private readonly ANALYSIS_WINDOW_MS = Number(process.env.HELIUS_ANALYSIS_WINDOW_MS ?? '60000');
-  private readonly ANALYSIS_WINDOW_CAP = Number(process.env.HELIUS_ANALYSIS_WINDOW_CAP ?? '12');
+  // Optimized throttling windows - reduce Helius API usage by 50%+
+  private readonly TOKEN_WINDOW_MS = Number(process.env.HELIUS_TOKEN_WINDOW_MS ?? '120000'); // 2 min (was 1 min)
+  private readonly TOKEN_WINDOW_CAP = Number(process.env.HELIUS_TOKEN_WINDOW_CAP ?? '60'); // 60/window (was 120)
+  private readonly ANALYSIS_WINDOW_MS = Number(process.env.HELIUS_ANALYSIS_WINDOW_MS ?? '60000'); // 1 min
+  private readonly ANALYSIS_WINDOW_CAP = Number(process.env.HELIUS_ANALYSIS_WINDOW_CAP ?? '6'); // 6/min (was 12)
   private tokenDetectionTimestamps: number[] = [];
   private analysisTimestamps: number[] = [];
   private tokenThrottleNoticeAt = 0;
