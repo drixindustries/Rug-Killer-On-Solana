@@ -32,6 +32,16 @@ interface AlphaCallerConfig {
 // No default wallets are monitored to avoid legal issues with naming specific individuals/programs
 const DEFAULT_ALPHA_CALLERS: AlphaCallerConfig[] = [];
 
+interface TokenPurchase {
+  wallet: string;
+  walletName: string;
+  timestamp: number;
+  amountToken?: number;
+  amountSol?: number;
+  amountUsd?: number;
+  txHash?: string;
+}
+
 export class AlphaAlertService {
   private connection: Connection;
   private listeners: Map<string, number> = new Map();
@@ -50,6 +60,10 @@ export class AlphaAlertService {
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private tgnDetector: TemporalGNNDetector | null = null;
   private migrationDetector: MigrationDetector | null = null;
+  // Multi-wallet purchase tracking: token mint -> array of recent purchases
+  private recentPurchases: Map<string, TokenPurchase[]> = new Map();
+  private readonly MULTI_WALLET_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+  private readonly MULTI_WALLET_THRESHOLD = 2; // Trigger when 2+ wallets buy
 
   constructor(rpcUrl?: string, customCallers?: AlphaCallerConfig[]) {
     // Use RPC balancer for intelligent load distribution - NO WebSocket subscriptions
@@ -697,6 +711,267 @@ export class AlphaAlertService {
     }
   }
 
+  /**
+   * Send special alert when multiple wallets buy the same coin
+   * This triggers @everyone and shows all the same metrics as a normal alpha alert
+   */
+  private async sendMultiWalletAlert(
+    mint: string,
+    purchases: TokenPurchase[],
+    walletStats?: any
+  ): Promise<void> {
+    console.log(`[ALPHA ALERTS] 🚨 Sending multi-wallet alert for ${mint} - ${purchases.length} wallets`);
+    
+    // Get token info
+    let tokenSymbol = 'Unknown';
+    let tokenName: string | undefined;
+    let tokenImageUrl: string | null = null;
+    
+    try {
+      const dexResponse = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`);
+      if (dexResponse.ok) {
+        const dexData = await dexResponse.json();
+        if (dexData.pairs && dexData.pairs.length > 0) {
+          const pair = dexData.pairs[0];
+          if (pair.baseToken?.symbol) tokenSymbol = pair.baseToken.symbol;
+          if (pair.baseToken?.name) tokenName = pair.baseToken.name;
+          if (pair.info?.imageUrl) tokenImageUrl = pair.info.imageUrl;
+        }
+      }
+    } catch (error) {
+      console.log('[MULTI-WALLET ALERT] Failed to fetch token info from DexScreener:', error);
+    }
+    
+    // Run token analysis to get metrics
+    let tokenAnalysis: any = null;
+    let analysisMetrics: any = null;
+    try {
+      const { tokenAnalyzer } = await import('./solana-analyzer.js');
+      const { buildCompactMessage, getRiskEmoji } = await import('./bot-formatter.js');
+      
+      console.log(`[MULTI-WALLET ALERT] Running token analysis for ${mint}...`);
+      tokenAnalysis = await tokenAnalyzer.analyzeToken(mint);
+      
+      // CRITICAL: Block multi-wallet alerts for tokens with risk score < 50
+      if (tokenAnalysis.riskScore < 50) {
+        console.log(`[MULTI-WALLET ALERT] ${mint} - ❌ BLOCKED (Risk Score: ${tokenAnalysis.riskScore}/100 < 50 - High rug risk)`);
+        return; // Don't send the alert
+      }
+      
+      const messageData = buildCompactMessage(tokenAnalysis);
+      
+      analysisMetrics = {
+        riskScore: tokenAnalysis.riskScore,
+        riskLevel: tokenAnalysis.riskLevel,
+        riskEmoji: getRiskEmoji(tokenAnalysis.riskLevel),
+        holderCount: tokenAnalysis.holderCount,
+        topHolderConcentration: tokenAnalysis.topHolderConcentration,
+        mintRevoked: !tokenAnalysis.mintAuthority?.hasAuthority,
+        freezeRevoked: !tokenAnalysis.freezeAuthority?.hasAuthority,
+        liquidityStatus: tokenAnalysis.liquidityPool?.status || 'Unknown',
+        lpBurnPercent: tokenAnalysis.liquidityPool?.burnPercentage,
+        marketCap: tokenAnalysis.marketData?.marketCap,
+        volume24h: tokenAnalysis.marketData?.volume24h,
+        priceUsd: tokenAnalysis.marketData?.priceUsd,
+        aiVerdict: messageData.aiVerdict,
+        security: messageData.security,
+        holders: messageData.holders,
+        market: messageData.market,
+        pumpFun: messageData.pumpFun,
+        rugScore: tokenAnalysis.rugScoreBreakdown,
+      };
+      
+      console.log(`[MULTI-WALLET ALERT] Token analysis complete - Risk: ${analysisMetrics.riskLevel} (${analysisMetrics.riskScore}/100)`);
+    } catch (error) {
+      console.error('[MULTI-WALLET ALERT] Token analysis failed (non-fatal):', error);
+      // If analysis fails, don't send alert to be safe
+      return;
+    }
+    
+    // Build wallet list
+    const walletList = purchases.map(p => {
+      const shortWallet = p.wallet.length > 8 ? `${p.wallet.slice(0, 6)}...${p.wallet.slice(-4)}` : p.wallet;
+      return `• **${p.walletName}** (\`${shortWallet}\`)`;
+    }).join('\n');
+    
+    // Determine embed color based on risk
+    let embedColor = 0xFF6600; // Default orange
+    if (analysisMetrics) {
+      switch (analysisMetrics.riskLevel) {
+        case 'LOW': embedColor = 0x00FF00; break;
+        case 'MODERATE': embedColor = 0xFFFF00; break;
+        case 'HIGH': embedColor = 0xFF8800; break;
+        case 'EXTREME': embedColor = 0xFF0000; break;
+      }
+    }
+    
+    // Build embed data (same structure as normal alpha alert)
+    const embedData = {
+      title: `🚨 Multiple Wallets Have Bought ${tokenSymbol}!`,
+      description: `**${purchases.length} wallets** have purchased **${tokenSymbol}**${tokenName ? ` (${tokenName})` : ''} within the last 5 minutes!\n\n📍 **Contract:** \`${mint}\``,
+      color: embedColor,
+      thumbnail: tokenImageUrl ? { url: tokenImageUrl } : { url: `https://dd.dexscreener.com/ds-data/tokens/solana/${mint}.png?size=md&t=${Date.now()}` },
+      fields: [
+        {
+          name: `👥 Wallets (${purchases.length})`,
+          value: walletList,
+          inline: false
+        },
+        {
+          name: '📍 Contract',
+          value: `\`${mint}\``,
+          inline: false
+        },
+        // Token Analysis Metrics (same as normal alert)
+        ...(analysisMetrics ? [
+          {
+            name: `🔍 Token Analysis ${analysisMetrics.riskEmoji}`,
+            value: `**Risk:** ${analysisMetrics.riskLevel} (${analysisMetrics.riskScore}/100)`,
+            inline: false
+          },
+          {
+            name: '🔐 Security',
+            value: (() => {
+              const parts: string[] = [];
+              if (analysisMetrics.mintRevoked) parts.push('✅ Mint Revoked');
+              else parts.push('⚠️ Mint Active');
+              if (analysisMetrics.freezeRevoked) parts.push('✅ Freeze Revoked');
+              else parts.push('⚠️ Freeze Active');
+              if (analysisMetrics.lpBurnPercent !== undefined && analysisMetrics.lpBurnPercent !== null) {
+                const burnEmoji = analysisMetrics.lpBurnPercent >= 95 ? '🔥' : analysisMetrics.lpBurnPercent >= 50 ? '⚠️' : '❌';
+                parts.push(`${burnEmoji} LP Burn: ${analysisMetrics.lpBurnPercent.toFixed(1)}%`);
+              }
+              return parts.join('\n') || 'No data';
+            })(),
+            inline: true
+          },
+          {
+            name: '👥 Holders',
+            value: (() => {
+              const parts: string[] = [];
+              if (analysisMetrics.holderCount !== undefined) {
+                parts.push(`**Count:** ${analysisMetrics.holderCount.toLocaleString()}`);
+              }
+              if (analysisMetrics.topHolderConcentration !== undefined) {
+                parts.push(`**Top 10:** ${analysisMetrics.topHolderConcentration.toFixed(1)}%`);
+              }
+              return parts.join('\n') || 'No data';
+            })(),
+            inline: true
+          },
+          ...(analysisMetrics.marketCap || analysisMetrics.volume24h || analysisMetrics.priceUsd ? [{
+            name: '💰 Market',
+            value: (() => {
+              const parts: string[] = [];
+              if (analysisMetrics.priceUsd) {
+                parts.push(`**Price:** $${Number(analysisMetrics.priceUsd).toFixed(6)}`);
+              }
+              if (analysisMetrics.marketCap) {
+                parts.push(`**MCap:** $${Number(analysisMetrics.marketCap).toLocaleString()}`);
+              }
+              if (analysisMetrics.volume24h) {
+                parts.push(`**24h Vol:** $${Number(analysisMetrics.volume24h).toLocaleString()}`);
+              }
+              return parts.join('\n') || 'No data';
+            })(),
+            inline: true
+          }] : []),
+          ...(analysisMetrics.aiVerdict ? [{
+            name: '🤖 AI Verdict',
+            value: analysisMetrics.aiVerdict.length > 1024 
+              ? analysisMetrics.aiVerdict.substring(0, 1021) + '...'
+              : analysisMetrics.aiVerdict,
+            inline: false
+          }] : []),
+          ...(analysisMetrics.rugScore ? [{
+            name: `🚨 Rug Score: ${analysisMetrics.rugScore.totalScore}`,
+            value: `**${analysisMetrics.rugScore.classification}**\n` +
+              `Auth: ${analysisMetrics.rugScore.components.authorities.score} | ` +
+              `Holders: ${analysisMetrics.rugScore.components.holderDistribution.score} | ` +
+              `Liquidity: ${analysisMetrics.rugScore.components.liquidity.score} | ` +
+              `Activity: ${analysisMetrics.rugScore.components.marketActivity.score}`,
+            inline: false
+          }] : [])
+        ] : []),
+        {
+          name: '🔗 Quick Links',
+          value: `[Pump.fun](https://pump.fun/${mint}) • [DexScreener](https://dexscreener.com/solana/${mint}) • [Solscan](https://solscan.io/token/${mint})`,
+          inline: false
+        }
+      ],
+      timestamp: new Date().toISOString()
+    };
+    
+    // Build message with @everyone
+    const message = `@everyone\n\n🚨 **Multiple Wallets Have Bought ${tokenSymbol}!**\n\n**${purchases.length} wallets** have purchased this token within the last 5 minutes!\n\n📍 **Contract:** \`${mint}\`\n\n${walletList}\n\n🔗 [Pump.fun](https://pump.fun/${mint}) • [DexScreener](https://dexscreener.com/solana/${mint}) • [Solscan](https://solscan.io/token/${mint})`;
+    
+    // Send to Discord webhook
+    const DIRECT = process.env.ALPHA_ALERTS_DIRECT_SEND === 'true';
+    const DISCORD_WEBHOOK = process.env.ALPHA_DISCORD_WEBHOOK;
+    if (DIRECT && DISCORD_WEBHOOK && DISCORD_WEBHOOK !== 'SET_ME') {
+      try {
+        const payload: any = {
+          username: 'RugKiller Alpha Alerts',
+          avatar_url: 'https://i.imgur.com/AfFp7pu.png',
+          content: '@everyone', // @everyone mention
+          embeds: [embedData]
+        };
+        
+        await fetch(DISCORD_WEBHOOK, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        console.log('[MULTI-WALLET ALERT] ✅ Discord webhook notification sent with @everyone');
+      } catch (error) {
+        console.error('[MULTI-WALLET ALERT] Discord webhook notification failed:', error);
+      }
+    }
+    
+    // Send to Telegram
+    const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.ALPHA_TELEGRAM_BOT_TOKEN;
+    const TELEGRAM_CHAT = process.env.ALPHA_TELEGRAM_CHAT_ID;
+    if (DIRECT && TELEGRAM_TOKEN && TELEGRAM_CHAT) {
+      try {
+        const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
+        await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: TELEGRAM_CHAT,
+            text: message,
+            parse_mode: 'Markdown',
+          }),
+        });
+        console.log('[MULTI-WALLET ALERT] ✅ Telegram notification sent');
+      } catch (error) {
+        console.error('[MULTI-WALLET ALERT] Telegram notification failed:', error);
+      }
+    }
+    
+    // Trigger callbacks with a synthetic alert
+    const syntheticAlert: AlphaAlert = {
+      type: 'caller_signal',
+      mint,
+      source: `Multiple Wallets (${purchases.length})`,
+      timestamp: Date.now(),
+      data: {
+        provider: 'Multi-Wallet Detection',
+        multiWallet: true,
+        walletCount: purchases.length,
+        wallets: purchases.map(p => ({ wallet: p.wallet, walletName: p.walletName }))
+      }
+    };
+    
+    for (const callback of this.alertCallbacks) {
+      try {
+        await callback(syntheticAlert, message, embedData);
+      } catch (error) {
+        console.error('[MULTI-WALLET ALERT] Callback error:', error);
+      }
+    }
+  }
+
   // Public: trigger a synthetic alert for testing delivery
   async triggerTestAlert(mint?: string, source?: string): Promise<void> {
     const testMint = (mint && mint.length >= 32) ? mint : 'So11111111111111111111111111111111111111112';
@@ -942,6 +1217,28 @@ export class AlphaAlertService {
           console.error('[ALPHA ALERT] [TGN] Analysis failed:', tgnError);
           tgnResult = null;
         }
+      }
+
+      // ============================================================================
+      // RISK SCORE CHECK: Filter out tokens with riskScore < 50 (high rug risk)
+      // ============================================================================
+      // Run full token analysis to get risk score (0-100, higher = safer)
+      let tokenRiskScore: number | null = null;
+      try {
+        const { tokenAnalyzer } = await import('./solana-analyzer.js');
+        const analysis = await tokenAnalyzer.analyzeToken(mint);
+        tokenRiskScore = analysis.riskScore;
+        
+        // CRITICAL: Block tokens with risk score < 50 (high rug risk)
+        if (tokenRiskScore < 50) {
+          console.log(`[ALPHA ALERT] ${mint} - ❌ REJECT (Risk Score: ${tokenRiskScore}/100 < 50 - High rug risk, blocking alert)`);
+          return false;
+        }
+        
+        console.log(`[ALPHA ALERT] ${mint} - Risk Score: ${tokenRiskScore}/100 (passed minimum threshold of 50)`);
+      } catch (riskCheckError) {
+        console.warn(`[ALPHA ALERT] ${mint} - Failed to get risk score, continuing with other checks:`, riskCheckError);
+        // Continue with other checks if risk score unavailable
       }
 
       // ============================================================================
@@ -1314,24 +1611,57 @@ export class AlphaAlertService {
       if (isQuality) {
         console.log(`[Alpha Alerts] ✅ Token ${mint} passed quality check - sending alert`);
         
-        // Send the alert with wallet information, PNL stats, and transaction data
-        await this.sendAlert({
-          type: 'caller_signal',
-          mint,
-          source: caller ? caller.name : source,
+        // Track this purchase for multi-wallet detection
+        const purchase: TokenPurchase = {
+          wallet: caller?.wallet || source,
+          walletName: caller?.name || source,
           timestamp: Date.now(),
-          data: { 
-            provider: source,
-            wallet: caller?.wallet,
-            walletName: caller?.name,
-            influenceScore: caller?.influenceScore,
-            walletStats,
-            amountToken: txData?.amountToken,
-            amountSol: txData?.amountSol,
-            amountUsd: txData?.amountUsd,
-            txHash: txData?.txHash,
-          }
-        });
+          amountToken: txData?.amountToken,
+          amountSol: txData?.amountSol,
+          amountUsd: txData?.amountUsd,
+          txHash: txData?.txHash,
+        };
+        
+        // Add to recent purchases tracking
+        const now = Date.now();
+        const existingPurchases = this.recentPurchases.get(mint) || [];
+        
+        // Clean up old purchases (outside time window)
+        const recentPurchases = existingPurchases.filter(
+          p => now - p.timestamp < this.MULTI_WALLET_WINDOW_MS
+        );
+        
+        // Add current purchase
+        recentPurchases.push(purchase);
+        this.recentPurchases.set(mint, recentPurchases);
+        
+        // Check if multiple wallets have bought this token
+        const uniqueWallets = new Set(recentPurchases.map(p => p.wallet));
+        if (uniqueWallets.size >= this.MULTI_WALLET_THRESHOLD) {
+          console.log(`[Alpha Alerts] 🚨 MULTI-WALLET DETECTED: ${uniqueWallets.size} wallets bought ${mint}`);
+          
+          // Trigger special multi-wallet alert with @everyone
+          await this.sendMultiWalletAlert(mint, recentPurchases, walletStats);
+        } else {
+          // Send normal single-wallet alert
+          await this.sendAlert({
+            type: 'caller_signal',
+            mint,
+            source: caller ? caller.name : source,
+            timestamp: Date.now(),
+            data: { 
+              provider: source,
+              wallet: caller?.wallet,
+              walletName: caller?.name,
+              influenceScore: caller?.influenceScore,
+              walletStats,
+              amountToken: txData?.amountToken,
+              amountSol: txData?.amountSol,
+              amountUsd: txData?.amountUsd,
+              txHash: txData?.txHash,
+            }
+          });
+        }
       } else {
         console.log(`[Alpha Alerts] ⚠️ Token ${mint} failed quality check - skipping alert`);
       }
