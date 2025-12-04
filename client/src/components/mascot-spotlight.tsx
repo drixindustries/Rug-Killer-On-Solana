@@ -97,10 +97,6 @@ export function MascotSpotlight({ onScrollToAnalyzer }: MascotSpotlightProps) {
               <ShieldCheck className="h-4 w-4 text-primary" />
               Wallet reputation + exit risk overlays
             </li>
-            <li className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-primary" />
-              Backed by the 80+ RPC balancer we ship in prod
-            </li>
           </ul>
 
           <div className="flex flex-wrap gap-3">

@@ -424,12 +424,12 @@ export class AlphaAlertService {
     }
     
     // Create embed data for rich formatting
+    const walletName = alert.data?.walletName || alert.source;
     const embedData = alert.type === 'caller_signal' ? {
-      title: `🚨 Alpha Alert`,
-      description: `**${enrichedTokenSymbol}**${enrichedTokenName && enrichedTokenName !== enrichedTokenSymbol ? ` (${enrichedTokenName})` : ''}`,
+      title: `🔔 Alpha Alert\n\n💎 ${enrichedTokenName || enrichedTokenSymbol} (${enrichedTokenSymbol})\n📍 Wallet\n${walletName}`,
+      description: `A monitored alpha wallet has bought **${enrichedTokenSymbol}**\n\nWallet: ${alert.source}`,
       color: alert.data?.influenceScore >= 80 ? 0xFFD700 : 0xFF6600, // Gold for high influence, orange otherwise
-      thumbnail: tokenImageUrl ? { url: tokenImageUrl } : undefined,
-      image: tokenImageUrl ? { url: `https://dd.dexscreener.com/ds-data/tokens/solana/${alert.mint}.png?size=lg&t=${Date.now()}` } : undefined,
+      thumbnail: tokenImageUrl ? { url: tokenImageUrl } : { url: `https://dd.dexscreener.com/ds-data/tokens/solana/${alert.mint}.png?size=md&t=${Date.now()}` },
       fields: [
         {
           name: '👤 Wallet',
