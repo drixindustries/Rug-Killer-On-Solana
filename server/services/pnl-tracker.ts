@@ -11,7 +11,7 @@
  */
 
 import { db } from '../db.js';
-import { trades, smartWallets } from '../../shared/schema.js';
+import { trades, smartWallets } from '../../shared/schema.ts';
 import { eq, and, gte, lte, desc } from 'drizzle-orm';
 
 // Price fetching
@@ -117,13 +117,13 @@ interface TradeRecord {
   id: number;
   walletAddress: string;
   tokenMint: string;
-  tokenSymbol?: string;
-  action: 'buy' | 'sell';
-  amount: number;
-  solAmount: number;
-  priceUsd?: number;
-  txSignature: string;
-  timestamp: Date;
+  tokenSymbol?: string | null;
+  side: 'buy' | 'sell';
+  amount: string; // Decimal comes as string from db
+  totalSol: string | null;
+  priceUsd?: string | null;
+  txSignature: string | null;
+  tradedAt: Date;
 }
 
 /**
@@ -138,9 +138,9 @@ export async function calculatePnL(
     .select()
     .from(trades)
     .where(eq(trades.walletAddress, walletAddress))
-    .orderBy(trades.timestamp);
+    .orderBy(trades.tradedAt);
   
-  if (tradeRecords.length === 0) {
+  if (!tradeRecords || tradeRecords.length === 0) {
     return {
       wallet: walletAddress,
       walletShort: `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`,
@@ -170,29 +170,32 @@ export async function calculatePnL(
   // Process all trades
   for (const trade of tradeRecords) {
     const mint = trade.tokenMint;
+    const amount = parseFloat(trade.amount || '0');
+    const solAmount = parseFloat(trade.totalSol || '0');
+    
     if (!stacks[mint]) stacks[mint] = [];
     if (!realizedPerToken[mint]) realizedPerToken[mint] = 0;
     
-    if (trade.action === 'buy') {
-      const costPerToken = trade.amount > 0 ? trade.solAmount / trade.amount : 0;
+    if (trade.side === 'buy') {
+      const costPerToken = amount > 0 ? solAmount / amount : 0;
       stacks[mint].push({
-        amount: trade.amount,
+        amount: amount,
         costPerTokenSol: costPerToken,
-        costBasisUsd: trade.solAmount * solPrice,
-        dateAcquired: new Date(trade.timestamp).toISOString().split('T')[0],
-        txSignature: trade.txSignature
+        costBasisUsd: solAmount * solPrice,
+        dateAcquired: new Date(trade.tradedAt).toISOString().split('T')[0],
+        txSignature: trade.txSignature || ''
       });
-      totalInvested += trade.solAmount;
-    } else if (trade.action === 'sell') {
-      let remaining = trade.amount;
-      const soldSol = trade.solAmount;
+      totalInvested += solAmount;
+    } else if (trade.side === 'sell') {
+      let remaining = amount;
+      const soldSol = solAmount;
       
       while (remaining > 0 && stacks[mint].length > 0) {
         // FIFO: pop from front, LIFO: pop from back
         const lot = method === 'LIFO' ? stacks[mint].pop()! : stacks[mint].shift()!;
         const sellFromLot = Math.min(lot.amount, remaining);
         const costOfSold = sellFromLot * lot.costPerTokenSol;
-        const revenue = soldSol * (sellFromLot / trade.amount);
+        const revenue = soldSol * (sellFromLot / amount);
         
         realizedPnlSol += revenue - costOfSold;
         realizedPerToken[mint] += revenue - costOfSold;
@@ -290,12 +293,14 @@ export async function generateTaxReport(
     .select()
     .from(trades)
     .where(eq(trades.walletAddress, walletAddress))
-    .orderBy(trades.timestamp);
+    .orderBy(trades.tradedAt);
+  
+  if (!tradeRecords) tradeRecords = [];
   
   // Filter by year if specified
   if (year) {
     tradeRecords = tradeRecords.filter(t => {
-      const tradeYear = new Date(t.timestamp).getFullYear();
+      const tradeYear = new Date(t.tradedAt).getFullYear();
       return tradeYear === year;
     });
   }
@@ -309,37 +314,39 @@ export async function generateTaxReport(
   // Process trades for tax events
   for (const trade of tradeRecords) {
     const mint = trade.tokenMint;
-    const timestamp = new Date(trade.timestamp);
+    const amount = parseFloat(trade.amount || '0');
+    const solAmount = parseFloat(trade.totalSol || '0');
+    const timestamp = new Date(trade.tradedAt);
     const dateStr = timestamp.toISOString().split('T')[0];
     
     if (!stacks[mint]) stacks[mint] = [];
     if (!washAdjustedBasis[mint]) washAdjustedBasis[mint] = 0;
     
-    if (trade.action === 'buy') {
-      let costPerToken = trade.amount > 0 ? trade.solAmount / trade.amount : 0;
+    if (trade.side === 'buy') {
+      let costPerToken = amount > 0 ? solAmount / amount : 0;
       // Add wash sale adjustment to cost basis
-      if (washAdjustedBasis[mint] > 0 && trade.amount > 0) {
-        costPerToken += washAdjustedBasis[mint] / trade.amount;
+      if (washAdjustedBasis[mint] > 0 && amount > 0) {
+        costPerToken += washAdjustedBasis[mint] / amount;
         washAdjustedBasis[mint] = 0; // Reset after applying
       }
       
       stacks[mint].push({
-        amount: trade.amount,
+        amount: amount,
         costPerTokenSol: costPerToken,
-        costBasisUsd: trade.solAmount * solPrice,
+        costBasisUsd: solAmount * solPrice,
         dateAcquired: dateStr,
-        txSignature: trade.txSignature
+        txSignature: trade.txSignature || ''
       });
-    } else if (trade.action === 'sell') {
-      let remaining = trade.amount;
-      const soldSol = trade.solAmount;
+    } else if (trade.side === 'sell') {
+      let remaining = amount;
+      const soldSol = solAmount;
       const proceedsUsd = soldSol * solPrice;
       
       while (remaining > 0 && stacks[mint].length > 0) {
         const lot = method === 'LIFO' ? stacks[mint].pop()! : stacks[mint].shift()!;
         const sellFromLot = Math.min(lot.amount, remaining);
         const costBasisUsd = sellFromLot * lot.costPerTokenSol * solPrice;
-        const revenueUsd = proceedsUsd * (sellFromLot / trade.amount);
+        const revenueUsd = proceedsUsd * (sellFromLot / amount);
         let gainLossUsd = revenueUsd - costBasisUsd;
         
         // Calculate holding period
@@ -356,10 +363,10 @@ export async function generateTaxReport(
           // Check for buys within 30-day window
           const buysInWindow = tradeRecords.filter(t =>
             t.tokenMint === mint &&
-            t.action === 'buy' &&
-            new Date(t.timestamp) >= windowStart &&
-            new Date(t.timestamp) <= windowEnd &&
-            new Date(t.timestamp).getTime() !== timestamp.getTime()
+            t.side === 'buy' &&
+            new Date(t.tradedAt) >= windowStart &&
+            new Date(t.tradedAt) <= windowEnd &&
+            new Date(t.tradedAt).getTime() !== timestamp.getTime()
           );
           
           if (buysInWindow.length > 0) {
@@ -374,14 +381,14 @@ export async function generateTaxReport(
         taxEvents.push({
           dateSold: dateStr,
           token: mint,
-          tokenSymbol: trade.tokenSymbol,
+          tokenSymbol: trade.tokenSymbol || undefined,
           amountSold: Math.round(sellFromLot * 1000000) / 1000000,
           proceedsUsd: Math.round(revenueUsd * 100) / 100,
           costBasisUsd: Math.round(costBasisUsd * 100) / 100,
           gainLossUsd: Math.round(gainLossUsd * 100) / 100,
           holdingPeriod,
           washSaleDisallowed: Math.round(washSaleDisallowed * 100) / 100,
-          txSell: trade.txSignature,
+          txSell: trade.txSignature || '',
           txBuy: lot.txSignature
         });
         

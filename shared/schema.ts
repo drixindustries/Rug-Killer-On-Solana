@@ -1689,3 +1689,71 @@ export const userAccessControl = pgTable("user_access_control", {
 
 export type UserAccessControl = typeof userAccessControl.$inferSelect;
 export type InsertUserAccessControl = typeof userAccessControl.$inferInsert;
+
+// ============================================================================
+// TRADES TABLE (PnL Tracking & Tax Reporting)
+// ============================================================================
+
+// Trades - records all buy/sell transactions for PnL calculation
+export const trades = pgTable("trades", {
+  id: serial("id").primaryKey(),
+  walletAddress: varchar("wallet_address", { length: 44 }).notNull(),
+  tokenMint: varchar("token_mint", { length: 44 }).notNull(),
+  tokenSymbol: varchar("token_symbol", { length: 20 }),
+  side: varchar("side", { length: 4 }).notNull(), // 'buy' or 'sell'
+  amount: decimal("amount", { precision: 38, scale: 12 }).notNull(), // Token amount
+  priceUsd: decimal("price_usd", { precision: 24, scale: 12 }), // Price at time of trade
+  priceSol: decimal("price_sol", { precision: 24, scale: 12 }), // SOL price at trade
+  totalUsd: decimal("total_usd", { precision: 24, scale: 8 }), // Total value in USD
+  totalSol: decimal("total_sol", { precision: 20, scale: 9 }), // Total value in SOL
+  txSignature: varchar("tx_signature", { length: 120 }).unique(),
+  fee: decimal("fee", { precision: 20, scale: 9 }), // Transaction fee in SOL
+  source: varchar("source", { length: 50 }).default("helius"), // helius, manual, import
+  tradedAt: timestamp("traded_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_trades_wallet").on(table.walletAddress),
+  index("idx_trades_token").on(table.tokenMint),
+  index("idx_trades_traded_at").on(table.tradedAt),
+  index("idx_trades_wallet_token").on(table.walletAddress, table.tokenMint),
+]);
+
+export type Trade = typeof trades.$inferSelect;
+export type InsertTrade = typeof trades.$inferInsert;
+
+// ============================================================================
+// SMART WALLET CALLS TABLE (Call Tracking for 20%+ Gains)
+// ============================================================================
+
+// Smart wallet calls - tracks when smart wallets "call" a token
+export const smartWalletCalls = pgTable("smart_wallet_calls", {
+  id: serial("id").primaryKey(),
+  walletAddress: varchar("wallet_address", { length: 44 }).notNull(),
+  walletName: varchar("wallet_name", { length: 255 }),
+  tokenMint: varchar("token_mint", { length: 44 }).notNull(),
+  tokenSymbol: varchar("token_symbol", { length: 20 }),
+  tokenName: varchar("token_name", { length: 255 }),
+  entryPriceUsd: decimal("entry_price_usd", { precision: 24, scale: 12 }),
+  currentPriceUsd: decimal("current_price_usd", { precision: 24, scale: 12 }),
+  peakPriceUsd: decimal("peak_price_usd", { precision: 24, scale: 12 }),
+  gainPercent: decimal("gain_percent", { precision: 10, scale: 4 }),
+  peakGainPercent: decimal("peak_gain_percent", { precision: 10, scale: 4 }),
+  hitTarget: boolean("hit_target").default(false), // Hit 20%+ gain
+  hitTargetAt: timestamp("hit_target_at"),
+  status: varchar("status", { length: 20 }).default("active"), // active, hit, expired, failed
+  platform: varchar("platform", { length: 20 }), // discord, telegram
+  channelId: varchar("channel_id", { length: 100 }),
+  notified: boolean("notified").default(false),
+  calledAt: timestamp("called_at").notNull(),
+  expiresAt: timestamp("expires_at"), // 24h expiry for tracking
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_smart_calls_wallet").on(table.walletAddress),
+  index("idx_smart_calls_token").on(table.tokenMint),
+  index("idx_smart_calls_status").on(table.status),
+  index("idx_smart_calls_called_at").on(table.calledAt),
+]);
+
+export type SmartWalletCall = typeof smartWalletCalls.$inferSelect;
+export type InsertSmartWalletCall = typeof smartWalletCalls.$inferInsert;
