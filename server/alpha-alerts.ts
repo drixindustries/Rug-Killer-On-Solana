@@ -812,11 +812,11 @@ export class AlphaAlertService {
           // Rug Score Breakdown
           ...(analysisMetrics.rugScore ? [{
             name: (() => {
-              const score = analysisMetrics.rugScore.totalScore;
+              const score = Math.round(analysisMetrics.rugScore.totalScore);
               const emoji = score < 10 ? '✅' : score < 50 ? '⚠️' : '🚨';
               return `${emoji} Rug Score: ${score}`;
             })(),
-            value: `**${analysisMetrics.rugScore.classification}**\nAuth: ${analysisMetrics.rugScore.components.authorities.score} | Holders: ${analysisMetrics.rugScore.components.holderDistribution.score} | Liquidity: ${analysisMetrics.rugScore.components.liquidity.score} | Activity: ${analysisMetrics.rugScore.components.marketActivity.score}`,
+            value: `**${analysisMetrics.rugScore.classification}**\nAuth: ${Math.round(analysisMetrics.rugScore.components.authorities.score)} | Holders: ${Math.round(analysisMetrics.rugScore.components.holderDistribution.score)} | Liquidity: ${Math.round(analysisMetrics.rugScore.components.liquidity.score)} | Activity: ${Math.round(analysisMetrics.rugScore.components.marketActivity.score)}`,
             inline: false
           }] : []),
           // Social Sentiment (FinBERT-Solana fusion from X/Telegram/Discord)
@@ -1338,11 +1338,11 @@ export class AlphaAlertService {
           // Rug Score Breakdown
           ...(analysisMetrics.rugScore ? [{
             name: (() => {
-              const score = analysisMetrics.rugScore.totalScore;
+              const score = Math.round(analysisMetrics.rugScore.totalScore);
               const emoji = score < 10 ? '✅' : score < 50 ? '⚠️' : '🚨';
               return `${emoji} Rug Score: ${score}`;
             })(),
-            value: `**${analysisMetrics.rugScore.classification}**\nAuth: ${analysisMetrics.rugScore.components.authorities.score} | Holders: ${analysisMetrics.rugScore.components.holderDistribution.score} | Liquidity: ${analysisMetrics.rugScore.components.liquidity.score} | Activity: ${analysisMetrics.rugScore.components.marketActivity.score}`,
+            value: `**${analysisMetrics.rugScore.classification}**\nAuth: ${Math.round(analysisMetrics.rugScore.components.authorities.score)} | Holders: ${Math.round(analysisMetrics.rugScore.components.holderDistribution.score)} | Liquidity: ${Math.round(analysisMetrics.rugScore.components.liquidity.score)} | Activity: ${Math.round(analysisMetrics.rugScore.components.marketActivity.score)}`,
             inline: false
           }] : []),
           // Social Sentiment (FinBERT-Solana fusion from X/Telegram/Discord)

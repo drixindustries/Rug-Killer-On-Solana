@@ -116,11 +116,11 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     const rs = analysis.rugScoreBreakdown;
     const emoji = rs.classification === 'SAFE' ? '✅' : rs.classification === 'WARNING' ? '⚠️' : '🚨';
     const color = rs.classification === 'SAFE' ? 'green' : rs.classification === 'WARNING' ? 'yellow' : 'red';
-    rugScoreText = `${emoji} **Rug Score:** ${rs.totalScore} (${rs.classification})\n_<10 = Safe | 10-50 = Warning | >50 = Danger_\n\n**Breakdown:**\n` +
-      `• Authorities: ${rs.components.authorities.score} pts\n` +
-      `• Holder Dist: ${rs.components.holderDistribution.score} pts\n` +
-      `• Liquidity: ${rs.components.liquidity.score} pts\n` +
-      `• Market Activity: ${rs.components.marketActivity.score} pts`;
+    rugScoreText = `${emoji} **Rug Score:** ${Math.round(rs.totalScore)} (${rs.classification})\n_<10 = Safe | 10-50 = Warning | >50 = Danger_\n\n**Breakdown:**\n` +
+      `• Authorities: ${Math.round(rs.components.authorities.score)} pts\n` +
+      `• Holder Dist: ${Math.round(rs.components.holderDistribution.score)} pts\n` +
+      `• Liquidity: ${Math.round(rs.components.liquidity.score)} pts\n` +
+      `• Market Activity: ${Math.round(rs.components.marketActivity.score)} pts`;
   }
   
   // AI VERDICT
