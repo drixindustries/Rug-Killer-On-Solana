@@ -16,6 +16,8 @@ import { getCreatorWallet } from './creator-wallet';
 import { smartMoneyRelay } from './services/smart-money-relay.ts';
 import { getAccessControlService } from './services/access-control.js';
 import { getWhopService } from './services/whop-service.js';
+import { pnlTracker, type AccountingMethod } from './services/pnl-tracker.js';
+import { callHitTracker } from './services/call-hit-tracker.js';
 
 // Instantiate shared service singletons needed in command handlers
 const dexScreener = new DexScreenerService();
@@ -519,6 +521,35 @@ const commands = [
     .setName('redeem')
     .setDescription('Redeem an access code for lifetime access')
     .addStringOption(option => option.setName('code').setDescription('Your access code').setRequired(true)),
+  // === NEW PnL & LEADERBOARD COMMANDS ===
+  new SlashCommandBuilder()
+    .setName('pnl')
+    .setDescription('Show wallet PnL with FIFO/LIFO accounting')
+    .addStringOption(option => option.setName('wallet').setDescription('Wallet address').setRequired(true))
+    .addStringOption(option => option.setName('method').setDescription('Accounting method').addChoices(
+      { name: 'FIFO (First In, First Out)', value: 'FIFO' },
+      { name: 'LIFO (Last In, First Out)', value: 'LIFO' }
+    )),
+  new SlashCommandBuilder()
+    .setName('leaderboard')
+    .setDescription('Show top callers by win rate and PnL'),
+  new SlashCommandBuilder()
+    .setName('trackcall')
+    .setDescription('Track a token call for 20%+ gains')
+    .addStringOption(option => option.setName('contract').setDescription('Token contract address').setRequired(true))
+    .addStringOption(option => option.setName('symbol').setDescription('Token symbol (optional)')),
+  new SlashCommandBuilder()
+    .setName('taxreport')
+    .setDescription('Generate IRS-compliant tax report with wash sale detection')
+    .addStringOption(option => option.setName('wallet').setDescription('Wallet address').setRequired(true))
+    .addIntegerOption(option => option.setName('year').setDescription('Tax year (e.g., 2024, 2025)'))
+    .addStringOption(option => option.setName('method').setDescription('Accounting method').addChoices(
+      { name: 'FIFO (First In, First Out)', value: 'FIFO' },
+      { name: 'LIFO (Last In, First Out)', value: 'LIFO' }
+    )),
+  new SlashCommandBuilder()
+    .setName('callstats')
+    .setDescription('Show your personal call tracking stats'),
 ].map(command => command.toJSON());
 
 // ============================================================================
@@ -558,7 +589,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     if (!interaction.isChatInputCommand()) return;
     
     // Commands that need immediate deferral to avoid timeout
-    const commandsNeedingDefer = ['execute', 'rugcheck', 'holders', 'first20', 'devaudit', 'whaletrack', 'compare', 'trending'];
+    const commandsNeedingDefer = ['execute', 'rugcheck', 'holders', 'first20', 'devaudit', 'whaletrack', 'compare', 'trending', 'pnl', 'leaderboard', 'trackcall', 'taxreport'];
     const needsDefer = commandsNeedingDefer.includes(interaction.commandName);
     
     // Defer immediately for commands that might take time
@@ -2581,6 +2612,172 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         }
       }
       
+      // ===================================================================
+      // NEW PnL & LEADERBOARD COMMANDS
+      // ===================================================================
+      
+      else if (interaction.commandName === 'pnl') {
+        const walletAddress = interaction.options.getString('wallet', true);
+        const method = (interaction.options.getString('method') || 'FIFO') as AccountingMethod;
+        
+        await interaction.deferReply();
+        
+        try {
+          const pnl = await pnlTracker.calculatePnL(walletAddress, method);
+          const embedData = pnlTracker.formatPnLForDiscord(pnl);
+          
+          const embed = new EmbedBuilder()
+            .setColor(embedData.color)
+            .setTitle(embedData.title)
+            .setDescription(embedData.description)
+            .setTimestamp();
+          
+          for (const field of embedData.fields) {
+            embed.addFields({ name: field.name, value: field.value, inline: field.inline });
+          }
+          
+          if (embedData.footer) {
+            embed.setFooter({ text: embedData.footer.text });
+          }
+          
+          await interaction.editReply({ embeds: [embed] });
+        } catch (error: any) {
+          const errorEmbed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('❌ PnL Calculation Failed')
+            .setDescription(`Could not calculate PnL: ${error?.message || 'Unknown error'}\n\nMake sure the wallet has trading history.`);
+          await interaction.editReply({ embeds: [errorEmbed] });
+        }
+      }
+      
+      else if (interaction.commandName === 'leaderboard') {
+        await interaction.deferReply();
+        
+        try {
+          const leaderboard = callHitTracker.getLeaderboard(10);
+          const embedData = callHitTracker.formatLeaderboardEmbed(leaderboard);
+          
+          const embed = new EmbedBuilder()
+            .setColor(embedData.color)
+            .setTitle(embedData.title)
+            .setDescription(embedData.description)
+            .setTimestamp();
+          
+          if (embedData.footer) {
+            embed.setFooter({ text: embedData.footer.text });
+          }
+          
+          await interaction.editReply({ embeds: [embed] });
+        } catch (error: any) {
+          await interaction.editReply({ content: `❌ Failed to fetch leaderboard: ${error?.message || 'Unknown error'}` });
+        }
+      }
+      
+      else if (interaction.commandName === 'trackcall') {
+        const contract = interaction.options.getString('contract', true);
+        const symbol = interaction.options.getString('symbol') || undefined;
+        
+        await interaction.deferReply();
+        
+        try {
+          const call = await callHitTracker.registerCall(
+            contract,
+            interaction.user.id,
+            interaction.user.username,
+            interaction.channelId,
+            'discord',
+            `Called by ${interaction.user.username}`,
+            symbol
+          );
+          
+          if (call) {
+            const embed = new EmbedBuilder()
+              .setColor(0x00ff88)
+              .setTitle('📞 Call Registered!')
+              .setDescription(`Now tracking **${symbol || contract.slice(0, 12)}** for 20%+ gains`)
+              .addFields(
+                { name: '💰 Entry Price', value: `$${call.initialPrice.toFixed(8)}`, inline: true },
+                { name: '🎯 Target', value: '+20% gain', inline: true },
+                { name: '⏱️ Expires', value: '24 hours', inline: true }
+              )
+              .setFooter({ text: `Contract: ${contract}` })
+              .setTimestamp();
+            
+            await interaction.editReply({ embeds: [embed] });
+          } else {
+            await interaction.editReply({ content: '❌ Could not register call - token has no price data' });
+          }
+        } catch (error: any) {
+          await interaction.editReply({ content: `❌ Failed to register call: ${error?.message || 'Unknown error'}` });
+        }
+      }
+      
+      else if (interaction.commandName === 'taxreport') {
+        const walletAddress = interaction.options.getString('wallet', true);
+        const year = interaction.options.getInteger('year') || undefined;
+        const method = (interaction.options.getString('method') || 'FIFO') as AccountingMethod;
+        
+        await interaction.deferReply();
+        
+        try {
+          const report = await pnlTracker.generateTaxReport(walletAddress, year, method);
+          
+          const embed = new EmbedBuilder()
+            .setColor(report.totalPnlUsd >= 0 ? 0x00ff88 : 0xff3366)
+            .setTitle(`📋 Tax Report (${report.year}) - ${method}`)
+            .setDescription(`Wallet: \`${report.walletShort}\`\n**IRS Wash Sale Rule: ENFORCED**`)
+            .addFields(
+              { name: '💰 Total PnL', value: `$${report.totalPnlUsd.toLocaleString()}`, inline: true },
+              { name: '📈 Short-Term Gains', value: `$${report.shortTermGainsUsd.toLocaleString()}`, inline: true },
+              { name: '📊 Long-Term Gains', value: `$${report.longTermGainsUsd.toLocaleString()}`, inline: true },
+              { name: '📉 Capital Losses', value: `$${report.totalCapitalLossesUsd.toLocaleString()}`, inline: true },
+              { name: '⚠️ Wash Sales', value: `${report.washSaleEvents} events\n$${report.totalDisallowedLossesUsd.toLocaleString()} disallowed`, inline: true },
+              { name: '📊 Total Trades', value: `${report.totalTrades}`, inline: true }
+            )
+            .setFooter({ text: 'Export full CSV for Form 8949 via API' })
+            .setTimestamp();
+          
+          await interaction.editReply({ embeds: [embed] });
+        } catch (error: any) {
+          const errorEmbed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('❌ Tax Report Failed')
+            .setDescription(`Could not generate tax report: ${error?.message || 'Unknown error'}`);
+          await interaction.editReply({ embeds: [errorEmbed] });
+        }
+      }
+      
+      else if (interaction.commandName === 'callstats') {
+        await interaction.deferReply({ ephemeral: true });
+        
+        try {
+          const stats = callHitTracker.getCallerStats(interaction.user.id);
+          
+          if (!stats || stats.totalCalls === 0) {
+            await interaction.editReply({ content: '📊 You haven\'t made any tracked calls yet! Use `/trackcall` to start.' });
+            return;
+          }
+          
+          const embed = new EmbedBuilder()
+            .setColor(stats.hitRate >= 50 ? 0x00ff88 : stats.hitRate >= 25 ? 0xffaa00 : 0xff3366)
+            .setTitle('📊 Your Call Stats')
+            .setDescription(`**${stats.username}**`)
+            .addFields(
+              { name: '🎯 Hit Rate', value: `${stats.hitRate.toFixed(1)}%`, inline: true },
+              { name: '✅ Hits', value: `${stats.hits}`, inline: true },
+              { name: '❌ Misses', value: `${stats.misses}`, inline: true },
+              { name: '📞 Total Calls', value: `${stats.totalCalls}`, inline: true },
+              { name: '📈 Avg Gain', value: `+${stats.avgGain.toFixed(1)}%`, inline: true },
+              { name: '🚀 Best Gain', value: `+${stats.bestGain.toFixed(1)}%`, inline: true }
+            )
+            .setTimestamp();
+          
+          await interaction.editReply({ embeds: [embed] });
+        } catch (error: any) {
+          await interaction.editReply({ content: `❌ Failed to fetch stats: ${error?.message || 'Unknown error'}` });
+        }
+      }
+      
     } catch (error) {
       console.error('Discord command error:', error);
       
@@ -3279,6 +3476,33 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     console.log(`✅ Bot is in ${client.guilds.cache.size} guilds`);
     console.log(`✅ Bot user ID: ${client.user?.id}`);
     registerCommands();
+    
+    // Start call tracker service
+    callHitTracker.startCallTracker();
+    
+    // Register call hit notifications to send to Discord
+    callHitTracker.onCallHit(async (call, gainPct) => {
+      if (call.platform === 'discord') {
+        try {
+          const channel = await client.channels.fetch(call.chatId);
+          if (channel && channel.isTextBased() && 'send' in channel) {
+            const embedData = callHitTracker.formatCallHitEmbed(call);
+            const embed = new EmbedBuilder()
+              .setColor(embedData.color)
+              .setTitle(embedData.title)
+              .setDescription(embedData.description)
+              .setTimestamp();
+            for (const field of embedData.fields) {
+              embed.addFields({ name: field.name, value: field.value, inline: field.inline });
+            }
+            if (embedData.footer) embed.setFooter({ text: embedData.footer.text });
+            await channel.send({ embeds: [embed] });
+          }
+        } catch (error) {
+          console.error('[Discord] Failed to send call hit notification:', error);
+        }
+      }
+    });
     
     // Register alpha alert callback to send alerts to configured Discord channels (gated)
     const alphaService = getAlphaAlertService();
