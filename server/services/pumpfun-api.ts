@@ -26,18 +26,27 @@ async function tryDexScreener(tokenAddress: string): Promise<PumpFunInfo | null>
     if (response.data?.pairs && response.data.pairs.length > 0) {
       const pair = response.data.pairs[0];
       
-      // Check if it's a pump.fun token by looking at the DEX
-      const isPumpFun = pair.dexId === 'raydium' && pair.chainId === 'solana';
+      // Check if it's a pump.fun token - look for pump.fun dex OR raydium (graduated)
+      // Also check URL patterns that indicate pump.fun origin
+      const isPumpFunDex = pair.dexId === 'pumpfun' || pair.dexId === 'pump.fun';
+      const isGraduatedPumpFun = pair.dexId === 'raydium' && pair.chainId === 'solana' && 
+        (pair.url?.includes('pump.fun') || pair.info?.socials?.some((s: any) => s.url?.includes('pump.fun')));
+      const hasPumpFunUrl = pair.url?.includes('pump.fun') || pair.baseToken?.address?.endsWith('pump');
       
-      if (isPumpFun && pair.pairCreatedAt) {
-        console.log(`[Pump.fun] Detected via DexScreener: ${pair.baseToken?.name}`);
-        
+      const isPumpFun = isPumpFunDex || isGraduatedPumpFun || hasPumpFunUrl;
+      
+      if (isPumpFun || pair.chainId === 'solana') {
         // Estimate bonding curve progress from market cap
         const marketCap = pair.fdv || pair.marketCap || 0;
-        const bondingCurve = Math.min((marketCap / 85000) * 100, 100); // ~85k target
+        // pump.fun graduates at ~$69k market cap (85 SOL * ~$800/SOL at current prices)
+        const bondingCurve = isPumpFunDex ? Math.min((marketCap / 69000) * 100, 99) : 100;
+        
+        if (isPumpFun) {
+          console.log(`[Pump.fun] Detected via DexScreener: ${pair.baseToken?.name} (dexId: ${pair.dexId}, bondingCurve: ${bondingCurve.toFixed(1)}%)`);
+        }
         
         return {
-          isPumpFun: true,
+          isPumpFun,
           devBought: 0, // Unknown via DexScreener
           bondingCurve,
           mayhemMode: bondingCurve >= 99

@@ -26,6 +26,16 @@ import { mlScorer } from "./services/ml-scorer.js";
 import { fundingAnalyzer } from "./services/funding-source-analyzer.js";
 import { redisCache } from "./services/redis-cache.js";
 import { getBundleMonitor } from "./services/jito-bundle-monitor.js";
+import { AgedWalletDetector } from "./services/aged-wallet-detector.js";
+
+// Singleton aged wallet detector
+let agedWalletDetector: AgedWalletDetector | null = null;
+function getAgedWalletDetector(): AgedWalletDetector {
+  if (!agedWalletDetector) {
+    agedWalletDetector = new AgedWalletDetector();
+  }
+  return agedWalletDetector;
+}
 
 // Debug logging - only enable in development or when DEBUG_ANALYZER=true
 const DEBUG = process.env.DEBUG_ANALYZER === 'true' || (process.env.NODE_ENV !== 'production' && process.env.DEBUG_ANALYZER !== 'false');
@@ -375,6 +385,117 @@ export class SolanaTokenAnalyzer {
           }
           response.jitoBundleData = undefined;
         }
+      }
+      
+      // AGED WALLET DETECTION - Detect fake volume from aged wallets
+      if (holders && holders.top20Holders && holders.top20Holders.length > 0 && !options.skipExternal) {
+        const agedWalletTimeout = isFastMode ? 3000 : 8000;
+        try {
+          console.log(`[Analyzer] Running aged wallet detection for ${tokenMintAddress}...`);
+          
+          const detector = getAgedWalletDetector();
+          const agedWalletPromise = detector.detectAgedWallets(
+            tokenMintAddress,
+            holders.top20Holders.map(h => ({
+              address: h.address,
+              balance: h.balance,
+              percentage: h.percentage
+            })),
+            [] // Recent transactions - can add later
+          );
+          
+          const agedWalletResult = await Promise.race([
+            agedWalletPromise,
+            new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Aged wallet timeout')), agedWalletTimeout))
+          ]).catch(() => null);
+          
+          if (agedWalletResult) {
+            response.agedWalletData = {
+              agedWalletCount: agedWalletResult.agedWalletCount,
+              totalFakeVolumePercent: agedWalletResult.totalFakeVolumePercent,
+              riskScore: agedWalletResult.riskScore,
+              patterns: agedWalletResult.patterns,
+              suspiciousWallets: agedWalletResult.suspiciousAgedWallets?.slice(0, 10) || [],
+              ageTiers: agedWalletResult.ageTiers,
+              risks: agedWalletResult.risks,
+            };
+            
+            console.log(`[Analyzer] Aged wallet detection complete: ${agedWalletResult.agedWalletCount} aged wallets, ${agedWalletResult.totalFakeVolumePercent.toFixed(1)}% fake volume, risk: ${agedWalletResult.riskScore}/100`);
+            
+            // Add red flag if high risk
+            if (agedWalletResult.riskScore >= 60) {
+              response.redFlags.push({
+                type: 'aged_wallet_manipulation',
+                severity: 'high',
+                title: '🚨 Aged Wallet Manipulation',
+                description: `${agedWalletResult.agedWalletCount} aged wallets detected creating fake volume (${agedWalletResult.totalFakeVolumePercent.toFixed(1)}%). Risk score: ${agedWalletResult.riskScore}/100`,
+              });
+            } else if (agedWalletResult.riskScore >= 30) {
+              response.redFlags.push({
+                type: 'aged_wallet_warning',
+                severity: 'medium',
+                title: '⚠️ Aged Wallet Activity',
+                description: `${agedWalletResult.agedWalletCount} aged wallets detected. Possible fake volume: ${agedWalletResult.totalFakeVolumePercent.toFixed(1)}%`,
+              });
+            }
+          } else {
+            // Default to safe if detection fails
+            response.agedWalletData = {
+              agedWalletCount: 0,
+              totalFakeVolumePercent: 0,
+              riskScore: 0,
+              patterns: {
+                sameFundingSource: false,
+                similarAges: false,
+                coordinatedBuys: false,
+                noSells: false,
+                similarBuyAmounts: false
+              },
+              suspiciousWallets: [],
+              ageTiers: { extreme: 0, high: 0, medium: 0, low: 0 },
+              risks: [],
+            };
+          }
+        } catch (agedWalletError: any) {
+          if (agedWalletError.message === 'Aged wallet timeout') {
+            console.warn(`[Analyzer] Aged wallet detection timed out after ${agedWalletTimeout}ms`);
+          } else {
+            console.error('[Analyzer] Aged wallet detection failed:', agedWalletError.message);
+          }
+          // Set default values on error
+          response.agedWalletData = {
+            agedWalletCount: 0,
+            totalFakeVolumePercent: 0,
+            riskScore: 0,
+            patterns: {
+              sameFundingSource: false,
+              similarAges: false,
+              coordinatedBuys: false,
+              noSells: false,
+              similarBuyAmounts: false
+            },
+            suspiciousWallets: [],
+            ageTiers: { extreme: 0, high: 0, medium: 0, low: 0 },
+            risks: [],
+          };
+        }
+      } else {
+        // No holders to analyze
+        response.agedWalletData = {
+          agedWalletCount: 0,
+          totalFakeVolumePercent: 0,
+          riskScore: 0,
+          patterns: {
+            sameFundingSource: false,
+            similarAges: false,
+            coordinatedBuys: false,
+            noSells: false,
+            similarBuyAmounts: false
+          },
+          suspiciousWallets: [],
+          ageTiers: { extreme: 0, high: 0, medium: 0, low: 0 },
+          risks: [],
+        };
       }
       
       // FUNDING SOURCE ANALYSIS - TEMPORARILY DISABLED

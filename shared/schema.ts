@@ -514,12 +514,21 @@ export interface AgedWalletData {
     similarAges: boolean;
     coordinatedBuys: boolean;
     noSells: boolean;
+    similarBuyAmounts?: boolean;
   };
   suspiciousWallets: Array<{
     wallet: string;
     walletAge: number; // Days
     hasOnlyBuys: boolean;
+    buyAmount?: number;
+    fundingSource?: string;
   }>;
+  ageTiers?: {
+    extreme: number; // 2+ years
+    high: number; // 400+ days
+    medium: number; // 180+ days
+    low: number; // 90+ days
+  };
   risks: string[];
 }
 
