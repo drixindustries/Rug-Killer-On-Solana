@@ -448,7 +448,7 @@ export class AlphaAlertService {
       tokenAnalysis = await tokenAnalyzer.analyzeToken(alert.mint);
       const messageData = buildCompactMessage(tokenAnalysis);
       
-      // Extract key metrics
+      // Extract ALL key metrics including Aged Wallets, Jito Bundle, TGN, ML, etc.
       analysisMetrics = {
         riskScore: tokenAnalysis.riskScore,
         riskLevel: tokenAnalysis.riskLevel,
@@ -460,18 +460,83 @@ export class AlphaAlertService {
         liquidityStatus: tokenAnalysis.liquidityPool?.status || 'Unknown',
         lpBurnPercent: tokenAnalysis.liquidityPool?.burnPercentage,
         notBondedYet: tokenAnalysis.liquidityPool?.notBondedYet || false, // Pump.fun pre-bond state
-        marketCap: tokenAnalysis.marketData?.marketCap,
-        volume24h: tokenAnalysis.marketData?.volume24h,
-        priceUsd: tokenAnalysis.marketData?.priceUsd,
+        marketCap: tokenAnalysis.marketData?.marketCap || tokenAnalysis.dexscreenerData?.pairs?.[0]?.marketCap,
+        volume24h: tokenAnalysis.marketData?.volume24h || tokenAnalysis.dexscreenerData?.pairs?.[0]?.volume?.h24,
+        priceUsd: tokenAnalysis.marketData?.priceUsd || tokenAnalysis.dexscreenerData?.pairs?.[0]?.priceUsd,
+        priceChange24h: tokenAnalysis.dexscreenerData?.pairs?.[0]?.priceChange?.h24,
         aiVerdict: messageData.aiVerdict,
         security: messageData.security,
         holders: messageData.holders,
         market: messageData.market,
         pumpFun: messageData.pumpFun,
         rugScore: tokenAnalysis.rugScoreBreakdown,
+        
+        // Aged Wallet Detection - CRITICAL for rug detection
+        agedWalletData: tokenAnalysis.agedWalletData,
+        agedWalletCount: tokenAnalysis.agedWalletData?.agedWalletCount ?? 0,
+        agedWalletRiskScore: tokenAnalysis.agedWalletData?.riskScore ?? 0,
+        agedWalletFakeVolume: tokenAnalysis.agedWalletData?.totalFakeVolumePercent ?? 0,
+        
+        // Jito Bundle Detection - MEV bundle analysis
+        jitoBundleData: tokenAnalysis.jitoBundleData,
+        hasJitoBundle: tokenAnalysis.jitoBundleData?.isBundle && tokenAnalysis.jitoBundleData?.confidence !== 'LOW',
+        jitoBundleCount: tokenAnalysis.jitoBundleData?.bundleActivity?.bundleCount ?? 0,
+        jitoBundleStatus: tokenAnalysis.jitoBundleData?.status,
+        jitoBundleConfidence: tokenAnalysis.jitoBundleData?.confidence,
+        jitoBundleTip: tokenAnalysis.jitoBundleData?.tipAmountSol,
+        
+        // Advanced Bundle Detection (timing-based)
+        advancedBundleData: tokenAnalysis.advancedBundleData,
+        bundleScore: tokenAnalysis.advancedBundleData?.bundleScore ?? 0,
+        bundledSupplyPercent: tokenAnalysis.advancedBundleData?.bundledSupplyPercent ?? 0,
+        suspiciousWallets: tokenAnalysis.advancedBundleData?.suspiciousWallets?.length ?? 0,
+        
+        // TGN (Temporal Graph Neural Network) Analysis
+        tgnResult: tokenAnalysis.tgnResult,
+        tgnRugProbability: tokenAnalysis.tgnResult?.rugProbability,
+        tgnConfidence: tokenAnalysis.tgnResult?.confidence,
+        tgnPatterns: tokenAnalysis.tgnResult?.patterns,
+        
+        // ML Decision Tree Analysis
+        mlScore: (tokenAnalysis as any).mlScore,
+        
+        // Pump.fun specific data
+        pumpFunData: tokenAnalysis.pumpFunData,
+        isPumpFun: tokenAnalysis.pumpFunData?.isPumpFun,
+        bondingCurve: tokenAnalysis.pumpFunData?.bondingCurve,
+        devBought: tokenAnalysis.pumpFunData?.devBought,
+        
+        // Honeypot Detection
+        honeypotDetection: tokenAnalysis.honeypotDetection,
+        isHoneypot: tokenAnalysis.honeypotDetection?.isHoneypot,
+        honeypotGrade: tokenAnalysis.honeypotDetection?.grade,
+        buyTax: tokenAnalysis.honeypotDetection?.taxes?.buyTax ?? 0,
+        sellTax: tokenAnalysis.honeypotDetection?.taxes?.sellTax ?? 0,
+        
+        // Funding Analysis
+        fundingAnalysis: tokenAnalysis.fundingAnalysis,
+        suspiciousFunding: tokenAnalysis.fundingAnalysis?.suspiciousFunding,
+        
+        // Whale Detection
+        whaleDetection: tokenAnalysis.whaleDetection,
+        whaleCount: tokenAnalysis.whaleDetection?.whaleCount ?? 0,
+        totalWhaleSupply: tokenAnalysis.whaleDetection?.totalWhaleSupplyPercent ?? 0,
+        
+        // Social Sentiment (FinBERT-Solana fusion from X/Telegram/Discord)
+        socialSentiment: tokenAnalysis.socialSentiment,
+        hypeScore: tokenAnalysis.socialSentiment?.hypeScore ?? 0,
+        sentimentScore: tokenAnalysis.socialSentiment?.sentimentScore ?? 0,
+        sentimentLabel: tokenAnalysis.socialSentiment?.sentimentLabel,
+        sentimentConfidence: tokenAnalysis.socialSentiment?.confidence ?? 0,
+        mentionVolume: tokenAnalysis.socialSentiment?.mentionVolume?.total ?? 0,
+        mentionChange24h: tokenAnalysis.socialSentiment?.mentionVolume?.change24h ?? 0,
+        fusedRugProbability: tokenAnalysis.socialSentiment?.fusedRugProbability,
+        
+        // Pre-formatted message sections
+        messageData: messageData,
       };
       
-      console.log(`[ALPHA ALERT] Token analysis complete - Risk: ${analysisMetrics.riskLevel} (${analysisMetrics.riskScore}/100)`);
+      console.log(`[ALPHA ALERT] Token analysis complete - Risk: ${analysisMetrics.riskLevel} (${analysisMetrics.riskScore}/100), Aged Wallets: ${analysisMetrics.agedWalletCount}, Jito Bundle: ${analysisMetrics.hasJitoBundle ? 'Yes' : 'No'}, Hype: ${analysisMetrics.hypeScore}/100`);
     } catch (error) {
       console.error('[ALPHA ALERT] Token analysis failed (non-fatal):', error);
       // Continue without metrics - don't block the alert
@@ -501,14 +566,14 @@ export class AlphaAlertService {
     }
     
     const embedData = alert.type === 'caller_signal' ? {
-      title: `🔔 Alpha Alert\n\n💎 ${enrichedTokenName || enrichedTokenSymbol} (${enrichedTokenSymbol})\n📍 Wallet\n${walletName}`,
-      description: `A monitored alpha wallet has bought **${enrichedTokenSymbol}**\n\nWallet: ${alert.source}`,
+      title: `🔔 Alpha Alert`,
+      description: `💎 **${enrichedTokenName || enrichedTokenSymbol}** (${enrichedTokenSymbol})\n\n👤 **${walletName}** bought this token`,
       color: embedColor,
       thumbnail: tokenImageUrl ? { url: tokenImageUrl } : { url: `https://dd.dexscreener.com/ds-data/tokens/solana/${alert.mint}.png?size=md&t=${Date.now()}` },
       fields: [
         {
-          name: '👤 Wallet',
-          value: `${alert.data?.walletName || alert.source} **(${alert.data?.influenceScore || 50}/100)**\n\`${alert.data?.wallet ? `${alert.data.wallet.slice(0,6)}...${alert.data.wallet.slice(-4)}` : 'Unknown'}\``,
+          name: '📍 Wallet',
+          value: `**${alert.data?.walletName || alert.source}** (${alert.data?.influenceScore || 50}/100)\n\`${alert.data?.wallet ? `${alert.data.wallet.slice(0,6)}...${alert.data.wallet.slice(-4)}` : 'Unknown'}\``,
           inline: true
         },
         ...(alert.data?.walletStats ? [{
@@ -547,15 +612,23 @@ export class AlphaAlertService {
             value: (() => {
               const parts: string[] = [];
               if (analysisMetrics.mintRevoked) parts.push('✅ Mint Revoked');
-              else parts.push('⚠️ Mint Active');
+              else parts.push('❌ Mint Active');
               if (analysisMetrics.freezeRevoked) parts.push('✅ Freeze Revoked');
-              else parts.push('⚠️ Freeze Active');
+              else parts.push('❌ Freeze Active');
               // Handle LP Burn display - show "Not Bonded" for pre-bonded pump.fun tokens
-              if (analysisMetrics.notBondedYet) {
+              if (analysisMetrics.notBondedYet || (analysisMetrics.isPumpFun && analysisMetrics.bondingCurve < 100)) {
                 parts.push('⏳ LP Burn: Not Bonded');
               } else if (analysisMetrics.lpBurnPercent !== undefined && analysisMetrics.lpBurnPercent !== null) {
-                const burnEmoji = analysisMetrics.lpBurnPercent >= 95 ? '🔥' : analysisMetrics.lpBurnPercent >= 50 ? '⚠️' : '❌';
+                const burnEmoji = analysisMetrics.lpBurnPercent >= 95 ? '✅' : analysisMetrics.lpBurnPercent >= 50 ? '⚠️' : '❌';
                 parts.push(`${burnEmoji} LP Burn: ${analysisMetrics.lpBurnPercent.toFixed(1)}%`);
+              } else {
+                parts.push('❓ LP Burn: Unknown');
+              }
+              // Honeypot/Tax info
+              if (analysisMetrics.isHoneypot) {
+                parts.push('🍯 Honeypot: DETECTED');
+              } else if (analysisMetrics.buyTax > 0 || analysisMetrics.sellTax > 0) {
+                parts.push(`💸 Tax: ${analysisMetrics.buyTax}%/${analysisMetrics.sellTax}%`);
               }
               return parts.join('\n') || 'No data';
             })(),
@@ -565,22 +638,30 @@ export class AlphaAlertService {
             name: '👥 Holders',
             value: (() => {
               const parts: string[] = [];
-              if (analysisMetrics.holderCount !== undefined) {
+              if (analysisMetrics.holderCount !== undefined && analysisMetrics.holderCount !== null) {
                 parts.push(`**Count:** ${analysisMetrics.holderCount.toLocaleString()}`);
+              } else {
+                parts.push('**Count:** Pending...');
               }
-              if (analysisMetrics.topHolderConcentration !== undefined) {
+              if (analysisMetrics.topHolderConcentration !== undefined && analysisMetrics.topHolderConcentration !== null) {
                 parts.push(`**Top 10:** ${analysisMetrics.topHolderConcentration.toFixed(1)}%`);
+              }
+              // Dev bought percentage for Pump.fun
+              if (analysisMetrics.devBought && analysisMetrics.devBought > 0) {
+                parts.push(`**Dev:** ${analysisMetrics.devBought.toFixed(1)}%`);
               }
               return parts.join('\n') || 'No data';
             })(),
             inline: true
           },
+          // Market Data
           ...(analysisMetrics.marketCap || analysisMetrics.volume24h || analysisMetrics.priceUsd ? [{
             name: '💰 Market',
             value: (() => {
               const parts: string[] = [];
               if (analysisMetrics.priceUsd) {
-                parts.push(`**Price:** $${Number(analysisMetrics.priceUsd).toFixed(6)}`);
+                const price = Number(analysisMetrics.priceUsd);
+                parts.push(`**Price:** $${price < 0.000001 ? price.toExponential(2) : price.toFixed(8)}`);
               }
               if (analysisMetrics.marketCap) {
                 parts.push(`**MCap:** $${Number(analysisMetrics.marketCap).toLocaleString()}`);
@@ -588,10 +669,139 @@ export class AlphaAlertService {
               if (analysisMetrics.volume24h) {
                 parts.push(`**24h Vol:** $${Number(analysisMetrics.volume24h).toLocaleString()}`);
               }
+              if (analysisMetrics.priceChange24h !== undefined) {
+                const change = Number(analysisMetrics.priceChange24h);
+                const changeEmoji = change >= 0 ? '📈' : '📉';
+                parts.push(`${changeEmoji} **24h:** ${change >= 0 ? '+' : ''}${change.toFixed(1)}%`);
+              }
               return parts.join('\n') || 'No data';
             })(),
             inline: true
           }] : []),
+          // AGED WALLET DETECTION - Critical for rug detection
+          ...(analysisMetrics.agedWalletData ? [{
+            name: (() => {
+              const risk = analysisMetrics.agedWalletRiskScore;
+              const emoji = risk >= 60 ? '🚨' : risk >= 40 ? '⚠️' : risk >= 20 ? '🟡' : '✅';
+              return `${emoji} Aged Wallets`;
+            })(),
+            value: (() => {
+              const parts: string[] = [];
+              parts.push(`**Old Wallets:** ${analysisMetrics.agedWalletCount}`);
+              parts.push(`**Fake Volume:** ${analysisMetrics.agedWalletFakeVolume.toFixed(1)}%`);
+              parts.push(`**Risk Score:** ${analysisMetrics.agedWalletRiskScore}/100`);
+              // Show patterns if detected
+              if (analysisMetrics.agedWalletData.patterns) {
+                const patterns = analysisMetrics.agedWalletData.patterns;
+                if (patterns.coordinatedBuys) parts.push('⚠️ Coordinated buys');
+                if (patterns.sameFundingSource) parts.push('⚠️ Same funding source');
+                if (patterns.similarBuyAmounts) parts.push('⚠️ Similar buy amounts');
+              }
+              return parts.join('\n') || 'No aged wallet data';
+            })(),
+            inline: true
+          }] : [{
+            name: '✅ Aged Wallets',
+            value: '**Old Wallets:** 0\n**Fake Volume:** 0%\n**Risk Score:** 0/100',
+            inline: true
+          }]),
+          // JITO BUNDLE DETECTION - MEV bundle analysis
+          ...(analysisMetrics.hasJitoBundle ? [{
+            name: `📦 Jito Bundle ${analysisMetrics.jitoBundleConfidence === 'HIGH' ? '🔴' : '🟡'}`,
+            value: (() => {
+              const parts: string[] = [];
+              parts.push(`**Status:** ${analysisMetrics.jitoBundleStatus || 'Detected'}`);
+              parts.push(`**Confidence:** ${analysisMetrics.jitoBundleConfidence}`);
+              if (analysisMetrics.jitoBundleCount > 0) {
+                parts.push(`**Bundles Found:** ${analysisMetrics.jitoBundleCount}`);
+              }
+              if (analysisMetrics.jitoBundleTip && analysisMetrics.jitoBundleTip > 0) {
+                parts.push(`**Tip Paid:** ${analysisMetrics.jitoBundleTip.toFixed(6)} SOL`);
+              }
+              return parts.join('\n');
+            })(),
+            inline: true
+          }] : (analysisMetrics.bundleScore >= 20 ? [{
+            name: `📦 Bundle Analysis ${analysisMetrics.bundleScore >= 60 ? '🔴' : analysisMetrics.bundleScore >= 40 ? '🟠' : '🟡'}`,
+            value: (() => {
+              const parts: string[] = [];
+              parts.push(`**Bundle Score:** ${analysisMetrics.bundleScore}/100`);
+              parts.push(`**Bundled Supply:** ${analysisMetrics.bundledSupplyPercent.toFixed(1)}%`);
+              parts.push(`**Suspicious Wallets:** ${analysisMetrics.suspiciousWallets}`);
+              return parts.join('\n');
+            })(),
+            inline: true
+          }] : [{
+            name: '✅ Jito Bundles',
+            value: '**Status:** None detected\n**Bundle Score:** 0/100',
+            inline: true
+          }])),
+          // TGN (Temporal Graph Neural Network) Analysis
+          ...(analysisMetrics.tgnResult ? [{
+            name: (() => {
+              const prob = analysisMetrics.tgnRugProbability || 0;
+              const emoji = prob > 0.70 ? '🚨' : prob > 0.40 ? '⚠️' : '✅';
+              return `${emoji} TGN Analysis`;
+            })(),
+            value: (() => {
+              const parts: string[] = [];
+              const prob = (analysisMetrics.tgnRugProbability * 100).toFixed(1);
+              parts.push(`**Rug Risk:** ${prob}%`);
+              if (analysisMetrics.tgnConfidence) {
+                parts.push(`**Confidence:** ${(analysisMetrics.tgnConfidence * 100).toFixed(0)}%`);
+              }
+              if (analysisMetrics.tgnResult.graphMetrics) {
+                parts.push(`**Graph:** ${analysisMetrics.tgnResult.graphMetrics.nodeCount} wallets`);
+              }
+              if (analysisMetrics.tgnPatterns && analysisMetrics.tgnPatterns.length > 0) {
+                const pattern = analysisMetrics.tgnPatterns[0];
+                parts.push(`**Pattern:** ${pattern.type?.replace(/_/g, ' ') || 'Unknown'}`);
+              }
+              return parts.join('\n');
+            })(),
+            inline: true
+          }] : []),
+          // ML Decision Tree Analysis
+          ...(analysisMetrics.mlScore ? [{
+            name: (() => {
+              const prob = analysisMetrics.mlScore.probability || 0;
+              const emoji = prob > 0.70 ? '🚨' : prob > 0.40 ? '⚠️' : '✅';
+              return `${emoji} ML Analysis`;
+            })(),
+            value: (() => {
+              const parts: string[] = [];
+              const prob = (analysisMetrics.mlScore.probability * 100).toFixed(1);
+              parts.push(`**Rug Risk:** ${prob}%`);
+              parts.push(`**Confidence:** ${(analysisMetrics.mlScore.confidence * 100).toFixed(0)}%`);
+              parts.push(`**Model:** ${analysisMetrics.mlScore.model || 'Decision Tree'}`);
+              return parts.join('\n');
+            })(),
+            inline: true
+          }] : []),
+          // Pump.fun specific
+          ...(analysisMetrics.isPumpFun ? [{
+            name: '🎯 Pump.fun',
+            value: (() => {
+              const parts: string[] = [];
+              const bondingCurve = analysisMetrics.bondingCurve || 0;
+              const curveEmoji = bondingCurve >= 99 ? '🔥' : bondingCurve >= 75 ? '🚀' : bondingCurve >= 50 ? '📈' : '📊';
+              parts.push(`${curveEmoji} **Bonding:** ${bondingCurve.toFixed(1)}%`);
+              if (bondingCurve >= 99) parts.push('✅ Graduated');
+              if (analysisMetrics.devBought && analysisMetrics.devBought > 0) {
+                const devEmoji = analysisMetrics.devBought > 10 ? '🚨' : analysisMetrics.devBought > 5 ? '⚠️' : '';
+                parts.push(`${devEmoji} **Dev:** ${analysisMetrics.devBought.toFixed(1)}%`);
+              }
+              return parts.join('\n');
+            })(),
+            inline: true
+          }] : []),
+          // Whale Detection
+          ...(analysisMetrics.whaleCount > 0 ? [{
+            name: `🐋 Whales ${analysisMetrics.whaleCount >= 5 ? '🚨' : analysisMetrics.whaleCount >= 3 ? '⚠️' : ''}`,
+            value: `**Count:** ${analysisMetrics.whaleCount}\n**Supply:** ${analysisMetrics.totalWhaleSupply.toFixed(1)}%`,
+            inline: true
+          }] : []),
+          // AI Verdict
           ...(analysisMetrics.aiVerdict ? [{
             name: '🤖 AI Verdict',
             value: analysisMetrics.aiVerdict.length > 1024 
@@ -599,14 +809,48 @@ export class AlphaAlertService {
               : analysisMetrics.aiVerdict,
             inline: false
           }] : []),
+          // Rug Score Breakdown
           ...(analysisMetrics.rugScore ? [{
-            name: `🚨 Rug Score: ${analysisMetrics.rugScore.totalScore}`,
-            value: `**${analysisMetrics.rugScore.classification}**\n` +
-              `Auth: ${analysisMetrics.rugScore.components.authorities.score} | ` +
-              `Holders: ${analysisMetrics.rugScore.components.holderDistribution.score} | ` +
-              `Liquidity: ${analysisMetrics.rugScore.components.liquidity.score} | ` +
-              `Activity: ${analysisMetrics.rugScore.components.marketActivity.score}`,
+            name: (() => {
+              const score = analysisMetrics.rugScore.totalScore;
+              const emoji = score < 10 ? '✅' : score < 50 ? '⚠️' : '🚨';
+              return `${emoji} Rug Score: ${score}`;
+            })(),
+            value: `**${analysisMetrics.rugScore.classification}**\nAuth: ${analysisMetrics.rugScore.components.authorities.score} | Holders: ${analysisMetrics.rugScore.components.holderDistribution.score} | Liquidity: ${analysisMetrics.rugScore.components.liquidity.score} | Activity: ${analysisMetrics.rugScore.components.marketActivity.score}`,
             inline: false
+          }] : []),
+          // Social Sentiment (FinBERT-Solana fusion from X/Telegram/Discord)
+          ...(analysisMetrics.socialSentiment ? [{
+            name: (() => {
+              const hype = analysisMetrics.hypeScore || 0;
+              const label = analysisMetrics.sentimentLabel || 'NEUTRAL';
+              const emoji = hype >= 70 ? '🔥' : hype <= 30 ? '📉' : label === 'BULLISH' ? '📈' : label === 'BEARISH' ? '📉' : '📊';
+              return `${emoji} Social Sentiment`;
+            })(),
+            value: (() => {
+              const parts: string[] = [];
+              const label = analysisMetrics.sentimentLabel || 'NEUTRAL';
+              const labelEmoji = label === 'BULLISH' ? '🟢' : label === 'BEARISH' ? '🔴' : label === 'MIXED' ? '🟡' : '⚪';
+              parts.push(`${labelEmoji} **${label}** • Hype: ${analysisMetrics.hypeScore}/100`);
+              parts.push(`**Sentiment:** ${(analysisMetrics.sentimentScore * 100).toFixed(0)}%`);
+              if (analysisMetrics.mentionVolume > 0) {
+                const changeEmoji = analysisMetrics.mentionChange24h >= 50 ? '🚀' : analysisMetrics.mentionChange24h <= -30 ? '📉' : '';
+                parts.push(`**Mentions:** ${analysisMetrics.mentionVolume} ${changeEmoji}${analysisMetrics.mentionChange24h > 0 ? '+' : ''}${analysisMetrics.mentionChange24h.toFixed(0)}%`);
+              }
+              // Risk signals
+              const signals: string[] = [];
+              if (analysisMetrics.socialSentiment.signals?.coordinatedHype) signals.push('🚨Hype');
+              if (analysisMetrics.socialSentiment.signals?.sentimentDrop) signals.push('📉Drop');
+              if (analysisMetrics.socialSentiment.signals?.rugKeywords) signals.push('⚠️Rug');
+              if (signals.length > 0) parts.push(`**Signals:** ${signals.join(' ')}`);
+              // Fused probability
+              if (analysisMetrics.fusedRugProbability !== undefined) {
+                const fusedEmoji = analysisMetrics.fusedRugProbability > 0.7 ? '🚨' : analysisMetrics.fusedRugProbability > 0.4 ? '⚠️' : '✅';
+                parts.push(`${fusedEmoji} **Fused Rug:** ${(analysisMetrics.fusedRugProbability * 100).toFixed(1)}%`);
+              }
+              return parts.join('\n');
+            })(),
+            inline: true
           }] : [])
         ] : []),
         {
@@ -764,6 +1008,7 @@ export class AlphaAlertService {
       
       const messageData = buildCompactMessage(tokenAnalysis);
       
+      // Extract ALL key metrics including Aged Wallets, Jito Bundle, TGN, ML, etc.
       analysisMetrics = {
         riskScore: tokenAnalysis.riskScore,
         riskLevel: tokenAnalysis.riskLevel,
@@ -774,19 +1019,79 @@ export class AlphaAlertService {
         freezeRevoked: !tokenAnalysis.freezeAuthority?.hasAuthority,
         liquidityStatus: tokenAnalysis.liquidityPool?.status || 'Unknown',
         lpBurnPercent: tokenAnalysis.liquidityPool?.burnPercentage,
-        notBondedYet: tokenAnalysis.liquidityPool?.notBondedYet || false, // Pump.fun pre-bond state
-        marketCap: tokenAnalysis.marketData?.marketCap,
-        volume24h: tokenAnalysis.marketData?.volume24h,
-        priceUsd: tokenAnalysis.marketData?.priceUsd,
+        notBondedYet: tokenAnalysis.liquidityPool?.notBondedYet || false,
+        marketCap: tokenAnalysis.marketData?.marketCap || tokenAnalysis.dexscreenerData?.pairs?.[0]?.marketCap,
+        volume24h: tokenAnalysis.marketData?.volume24h || tokenAnalysis.dexscreenerData?.pairs?.[0]?.volume?.h24,
+        priceUsd: tokenAnalysis.marketData?.priceUsd || tokenAnalysis.dexscreenerData?.pairs?.[0]?.priceUsd,
+        priceChange24h: tokenAnalysis.dexscreenerData?.pairs?.[0]?.priceChange?.h24,
         aiVerdict: messageData.aiVerdict,
         security: messageData.security,
         holders: messageData.holders,
         market: messageData.market,
         pumpFun: messageData.pumpFun,
         rugScore: tokenAnalysis.rugScoreBreakdown,
+        
+        // Aged Wallet Detection - CRITICAL for rug detection
+        agedWalletData: tokenAnalysis.agedWalletData,
+        agedWalletCount: tokenAnalysis.agedWalletData?.agedWalletCount ?? 0,
+        agedWalletRiskScore: tokenAnalysis.agedWalletData?.riskScore ?? 0,
+        agedWalletFakeVolume: tokenAnalysis.agedWalletData?.totalFakeVolumePercent ?? 0,
+        
+        // Jito Bundle Detection - MEV bundle analysis
+        jitoBundleData: tokenAnalysis.jitoBundleData,
+        hasJitoBundle: tokenAnalysis.jitoBundleData?.isBundle && tokenAnalysis.jitoBundleData?.confidence !== 'LOW',
+        jitoBundleCount: tokenAnalysis.jitoBundleData?.bundleActivity?.bundleCount ?? 0,
+        jitoBundleStatus: tokenAnalysis.jitoBundleData?.status,
+        jitoBundleConfidence: tokenAnalysis.jitoBundleData?.confidence,
+        jitoBundleTip: tokenAnalysis.jitoBundleData?.tipAmountSol,
+        
+        // Advanced Bundle Detection (timing-based)
+        advancedBundleData: tokenAnalysis.advancedBundleData,
+        bundleScore: tokenAnalysis.advancedBundleData?.bundleScore ?? 0,
+        bundledSupplyPercent: tokenAnalysis.advancedBundleData?.bundledSupplyPercent ?? 0,
+        suspiciousWallets: tokenAnalysis.advancedBundleData?.suspiciousWallets?.length ?? 0,
+        
+        // TGN (Temporal Graph Neural Network) Analysis
+        tgnResult: tokenAnalysis.tgnResult,
+        tgnRugProbability: tokenAnalysis.tgnResult?.rugProbability,
+        tgnConfidence: tokenAnalysis.tgnResult?.confidence,
+        tgnPatterns: tokenAnalysis.tgnResult?.patterns,
+        
+        // ML Decision Tree Analysis
+        mlScore: (tokenAnalysis as any).mlScore,
+        
+        // Pump.fun specific data
+        pumpFunData: tokenAnalysis.pumpFunData,
+        isPumpFun: tokenAnalysis.pumpFunData?.isPumpFun,
+        bondingCurve: tokenAnalysis.pumpFunData?.bondingCurve,
+        devBought: tokenAnalysis.pumpFunData?.devBought,
+        
+        // Honeypot Detection
+        honeypotDetection: tokenAnalysis.honeypotDetection,
+        isHoneypot: tokenAnalysis.honeypotDetection?.isHoneypot,
+        honeypotGrade: tokenAnalysis.honeypotDetection?.grade,
+        buyTax: tokenAnalysis.honeypotDetection?.taxes?.buyTax ?? 0,
+        sellTax: tokenAnalysis.honeypotDetection?.taxes?.sellTax ?? 0,
+        
+        // Whale Detection
+        whaleDetection: tokenAnalysis.whaleDetection,
+        whaleCount: tokenAnalysis.whaleDetection?.whaleCount ?? 0,
+        totalWhaleSupply: tokenAnalysis.whaleDetection?.totalWhaleSupplyPercent ?? 0,
+        
+        // Social Sentiment (FinBERT-Solana fusion from X/Telegram/Discord)
+        socialSentiment: tokenAnalysis.socialSentiment,
+        hypeScore: tokenAnalysis.socialSentiment?.hypeScore ?? 0,
+        sentimentScore: tokenAnalysis.socialSentiment?.sentimentScore ?? 0,
+        sentimentLabel: tokenAnalysis.socialSentiment?.sentimentLabel,
+        sentimentConfidence: tokenAnalysis.socialSentiment?.confidence ?? 0,
+        mentionVolume: tokenAnalysis.socialSentiment?.mentionVolume?.total ?? 0,
+        mentionChange24h: tokenAnalysis.socialSentiment?.mentionVolume?.change24h ?? 0,
+        fusedRugProbability: tokenAnalysis.socialSentiment?.fusedRugProbability,
+        
+        messageData: messageData,
       };
       
-      console.log(`[MULTI-WALLET ALERT] Token analysis complete - Risk: ${analysisMetrics.riskLevel} (${analysisMetrics.riskScore}/100)`);
+      console.log(`[MULTI-WALLET ALERT] Token analysis complete - Risk: ${analysisMetrics.riskLevel} (${analysisMetrics.riskScore}/100), Aged Wallets: ${analysisMetrics.agedWalletCount}, Jito Bundle: ${analysisMetrics.hasJitoBundle ? 'Yes' : 'No'}, Hype: ${analysisMetrics.hypeScore}/100`);
     } catch (error) {
       console.error('[MULTI-WALLET ALERT] Token analysis failed (non-fatal):', error);
       // If analysis fails, don't send alert to be safe
@@ -827,7 +1132,7 @@ export class AlphaAlertService {
           value: `\`${mint}\``,
           inline: false
         },
-        // Token Analysis Metrics (same as normal alert)
+        // Token Analysis Metrics (ALL SolRPDS metrics - same as single wallet alert)
         ...(analysisMetrics ? [
           {
             name: `🔍 Token Analysis ${analysisMetrics.riskEmoji}`,
@@ -839,15 +1144,21 @@ export class AlphaAlertService {
             value: (() => {
               const parts: string[] = [];
               if (analysisMetrics.mintRevoked) parts.push('✅ Mint Revoked');
-              else parts.push('⚠️ Mint Active');
+              else parts.push('❌ Mint Active');
               if (analysisMetrics.freezeRevoked) parts.push('✅ Freeze Revoked');
-              else parts.push('⚠️ Freeze Active');
-              // Handle LP Burn display - show "Not Bonded" for pre-bonded pump.fun tokens
-              if (analysisMetrics.notBondedYet) {
+              else parts.push('❌ Freeze Active');
+              if (analysisMetrics.notBondedYet || (analysisMetrics.isPumpFun && analysisMetrics.bondingCurve < 100)) {
                 parts.push('⏳ LP Burn: Not Bonded');
               } else if (analysisMetrics.lpBurnPercent !== undefined && analysisMetrics.lpBurnPercent !== null) {
-                const burnEmoji = analysisMetrics.lpBurnPercent >= 95 ? '🔥' : analysisMetrics.lpBurnPercent >= 50 ? '⚠️' : '❌';
+                const burnEmoji = analysisMetrics.lpBurnPercent >= 95 ? '✅' : analysisMetrics.lpBurnPercent >= 50 ? '⚠️' : '❌';
                 parts.push(`${burnEmoji} LP Burn: ${analysisMetrics.lpBurnPercent.toFixed(1)}%`);
+              } else {
+                parts.push('❓ LP Burn: Unknown');
+              }
+              if (analysisMetrics.isHoneypot) {
+                parts.push('🍯 Honeypot: DETECTED');
+              } else if (analysisMetrics.buyTax > 0 || analysisMetrics.sellTax > 0) {
+                parts.push(`💸 Tax: ${analysisMetrics.buyTax}%/${analysisMetrics.sellTax}%`);
               }
               return parts.join('\n') || 'No data';
             })(),
@@ -857,11 +1168,16 @@ export class AlphaAlertService {
             name: '👥 Holders',
             value: (() => {
               const parts: string[] = [];
-              if (analysisMetrics.holderCount !== undefined) {
+              if (analysisMetrics.holderCount !== undefined && analysisMetrics.holderCount !== null) {
                 parts.push(`**Count:** ${analysisMetrics.holderCount.toLocaleString()}`);
+              } else {
+                parts.push('**Count:** Pending...');
               }
-              if (analysisMetrics.topHolderConcentration !== undefined) {
+              if (analysisMetrics.topHolderConcentration !== undefined && analysisMetrics.topHolderConcentration !== null) {
                 parts.push(`**Top 10:** ${analysisMetrics.topHolderConcentration.toFixed(1)}%`);
+              }
+              if (analysisMetrics.devBought && analysisMetrics.devBought > 0) {
+                parts.push(`**Dev:** ${analysisMetrics.devBought.toFixed(1)}%`);
               }
               return parts.join('\n') || 'No data';
             })(),
@@ -872,7 +1188,8 @@ export class AlphaAlertService {
             value: (() => {
               const parts: string[] = [];
               if (analysisMetrics.priceUsd) {
-                parts.push(`**Price:** $${Number(analysisMetrics.priceUsd).toFixed(6)}`);
+                const price = Number(analysisMetrics.priceUsd);
+                parts.push(`**Price:** $${price < 0.000001 ? price.toExponential(2) : price.toFixed(8)}`);
               }
               if (analysisMetrics.marketCap) {
                 parts.push(`**MCap:** $${Number(analysisMetrics.marketCap).toLocaleString()}`);
@@ -880,10 +1197,137 @@ export class AlphaAlertService {
               if (analysisMetrics.volume24h) {
                 parts.push(`**24h Vol:** $${Number(analysisMetrics.volume24h).toLocaleString()}`);
               }
+              if (analysisMetrics.priceChange24h !== undefined) {
+                const change = Number(analysisMetrics.priceChange24h);
+                const changeEmoji = change >= 0 ? '📈' : '📉';
+                parts.push(`${changeEmoji} **24h:** ${change >= 0 ? '+' : ''}${change.toFixed(1)}%`);
+              }
               return parts.join('\n') || 'No data';
             })(),
             inline: true
           }] : []),
+          // AGED WALLET DETECTION - Critical SolRPDS metric
+          ...(analysisMetrics.agedWalletData ? [{
+            name: (() => {
+              const risk = analysisMetrics.agedWalletRiskScore;
+              const emoji = risk >= 60 ? '🚨' : risk >= 40 ? '⚠️' : risk >= 20 ? '🟡' : '✅';
+              return `${emoji} Aged Wallets`;
+            })(),
+            value: (() => {
+              const parts: string[] = [];
+              parts.push(`**Old Wallets:** ${analysisMetrics.agedWalletCount}`);
+              parts.push(`**Fake Volume:** ${analysisMetrics.agedWalletFakeVolume.toFixed(1)}%`);
+              parts.push(`**Risk Score:** ${analysisMetrics.agedWalletRiskScore}/100`);
+              if (analysisMetrics.agedWalletData.patterns) {
+                const patterns = analysisMetrics.agedWalletData.patterns;
+                if (patterns.coordinatedBuys) parts.push('⚠️ Coordinated buys');
+                if (patterns.sameFundingSource) parts.push('⚠️ Same funding source');
+              }
+              return parts.join('\n') || 'No aged wallet data';
+            })(),
+            inline: true
+          }] : [{
+            name: '✅ Aged Wallets',
+            value: '**Old Wallets:** 0\n**Fake Volume:** 0%\n**Risk Score:** 0/100',
+            inline: true
+          }]),
+          // JITO BUNDLE DETECTION - MEV bundle analysis
+          ...(analysisMetrics.hasJitoBundle ? [{
+            name: `📦 Jito Bundle ${analysisMetrics.jitoBundleConfidence === 'HIGH' ? '🔴' : '🟡'}`,
+            value: (() => {
+              const parts: string[] = [];
+              parts.push(`**Status:** ${analysisMetrics.jitoBundleStatus || 'Detected'}`);
+              parts.push(`**Confidence:** ${analysisMetrics.jitoBundleConfidence}`);
+              if (analysisMetrics.jitoBundleCount > 0) {
+                parts.push(`**Bundles Found:** ${analysisMetrics.jitoBundleCount}`);
+              }
+              if (analysisMetrics.jitoBundleTip && analysisMetrics.jitoBundleTip > 0) {
+                parts.push(`**Tip Paid:** ${analysisMetrics.jitoBundleTip.toFixed(6)} SOL`);
+              }
+              return parts.join('\n');
+            })(),
+            inline: true
+          }] : (analysisMetrics.bundleScore >= 20 ? [{
+            name: `📦 Bundle Analysis ${analysisMetrics.bundleScore >= 60 ? '🔴' : analysisMetrics.bundleScore >= 40 ? '🟠' : '🟡'}`,
+            value: (() => {
+              const parts: string[] = [];
+              parts.push(`**Bundle Score:** ${analysisMetrics.bundleScore}/100`);
+              parts.push(`**Bundled Supply:** ${analysisMetrics.bundledSupplyPercent.toFixed(1)}%`);
+              parts.push(`**Suspicious Wallets:** ${analysisMetrics.suspiciousWallets}`);
+              return parts.join('\n');
+            })(),
+            inline: true
+          }] : [{
+            name: '✅ Jito Bundles',
+            value: '**Status:** None detected\n**Bundle Score:** 0/100',
+            inline: true
+          }])),
+          // TGN (Temporal Graph Neural Network) Analysis
+          ...(analysisMetrics.tgnResult ? [{
+            name: (() => {
+              const prob = analysisMetrics.tgnRugProbability || 0;
+              const emoji = prob > 0.70 ? '🚨' : prob > 0.40 ? '⚠️' : '✅';
+              return `${emoji} TGN Analysis`;
+            })(),
+            value: (() => {
+              const parts: string[] = [];
+              const prob = (analysisMetrics.tgnRugProbability * 100).toFixed(1);
+              parts.push(`**Rug Risk:** ${prob}%`);
+              if (analysisMetrics.tgnConfidence) {
+                parts.push(`**Confidence:** ${(analysisMetrics.tgnConfidence * 100).toFixed(0)}%`);
+              }
+              if (analysisMetrics.tgnResult.graphMetrics) {
+                parts.push(`**Graph:** ${analysisMetrics.tgnResult.graphMetrics.nodeCount} wallets`);
+              }
+              if (analysisMetrics.tgnPatterns && analysisMetrics.tgnPatterns.length > 0) {
+                const pattern = analysisMetrics.tgnPatterns[0];
+                parts.push(`**Pattern:** ${pattern.type?.replace(/_/g, ' ') || 'Unknown'}`);
+              }
+              return parts.join('\n');
+            })(),
+            inline: true
+          }] : []),
+          // ML Decision Tree Analysis
+          ...(analysisMetrics.mlScore ? [{
+            name: (() => {
+              const prob = analysisMetrics.mlScore.probability || 0;
+              const emoji = prob > 0.70 ? '🚨' : prob > 0.40 ? '⚠️' : '✅';
+              return `${emoji} ML Analysis`;
+            })(),
+            value: (() => {
+              const parts: string[] = [];
+              const prob = (analysisMetrics.mlScore.probability * 100).toFixed(1);
+              parts.push(`**Rug Risk:** ${prob}%`);
+              parts.push(`**Confidence:** ${(analysisMetrics.mlScore.confidence * 100).toFixed(0)}%`);
+              parts.push(`**Model:** ${analysisMetrics.mlScore.model || 'Decision Tree'}`);
+              return parts.join('\n');
+            })(),
+            inline: true
+          }] : []),
+          // Pump.fun specific
+          ...(analysisMetrics.isPumpFun ? [{
+            name: '🎯 Pump.fun',
+            value: (() => {
+              const parts: string[] = [];
+              const bondingCurve = analysisMetrics.bondingCurve || 0;
+              const curveEmoji = bondingCurve >= 99 ? '🔥' : bondingCurve >= 75 ? '🚀' : bondingCurve >= 50 ? '📈' : '📊';
+              parts.push(`${curveEmoji} **Bonding:** ${bondingCurve.toFixed(1)}%`);
+              if (bondingCurve >= 99) parts.push('✅ Graduated');
+              if (analysisMetrics.devBought && analysisMetrics.devBought > 0) {
+                const devEmoji = analysisMetrics.devBought > 10 ? '🚨' : analysisMetrics.devBought > 5 ? '⚠️' : '';
+                parts.push(`${devEmoji} **Dev:** ${analysisMetrics.devBought.toFixed(1)}%`);
+              }
+              return parts.join('\n');
+            })(),
+            inline: true
+          }] : []),
+          // Whale Detection
+          ...(analysisMetrics.whaleCount > 0 ? [{
+            name: `🐋 Whales ${analysisMetrics.whaleCount >= 5 ? '🚨' : analysisMetrics.whaleCount >= 3 ? '⚠️' : ''}`,
+            value: `**Count:** ${analysisMetrics.whaleCount}\n**Supply:** ${analysisMetrics.totalWhaleSupply.toFixed(1)}%`,
+            inline: true
+          }] : []),
+          // AI Verdict
           ...(analysisMetrics.aiVerdict ? [{
             name: '🤖 AI Verdict',
             value: analysisMetrics.aiVerdict.length > 1024 
@@ -891,14 +1335,48 @@ export class AlphaAlertService {
               : analysisMetrics.aiVerdict,
             inline: false
           }] : []),
+          // Rug Score Breakdown
           ...(analysisMetrics.rugScore ? [{
-            name: `🚨 Rug Score: ${analysisMetrics.rugScore.totalScore}`,
-            value: `**${analysisMetrics.rugScore.classification}**\n` +
-              `Auth: ${analysisMetrics.rugScore.components.authorities.score} | ` +
-              `Holders: ${analysisMetrics.rugScore.components.holderDistribution.score} | ` +
-              `Liquidity: ${analysisMetrics.rugScore.components.liquidity.score} | ` +
-              `Activity: ${analysisMetrics.rugScore.components.marketActivity.score}`,
+            name: (() => {
+              const score = analysisMetrics.rugScore.totalScore;
+              const emoji = score < 10 ? '✅' : score < 50 ? '⚠️' : '🚨';
+              return `${emoji} Rug Score: ${score}`;
+            })(),
+            value: `**${analysisMetrics.rugScore.classification}**\nAuth: ${analysisMetrics.rugScore.components.authorities.score} | Holders: ${analysisMetrics.rugScore.components.holderDistribution.score} | Liquidity: ${analysisMetrics.rugScore.components.liquidity.score} | Activity: ${analysisMetrics.rugScore.components.marketActivity.score}`,
             inline: false
+          }] : []),
+          // Social Sentiment (FinBERT-Solana fusion from X/Telegram/Discord)
+          ...(analysisMetrics.socialSentiment ? [{
+            name: (() => {
+              const hype = analysisMetrics.hypeScore || 0;
+              const label = analysisMetrics.sentimentLabel || 'NEUTRAL';
+              const emoji = hype >= 70 ? '🔥' : hype <= 30 ? '📉' : label === 'BULLISH' ? '📈' : label === 'BEARISH' ? '📉' : '📊';
+              return `${emoji} Social Sentiment`;
+            })(),
+            value: (() => {
+              const parts: string[] = [];
+              const label = analysisMetrics.sentimentLabel || 'NEUTRAL';
+              const labelEmoji = label === 'BULLISH' ? '🟢' : label === 'BEARISH' ? '🔴' : label === 'MIXED' ? '🟡' : '⚪';
+              parts.push(`${labelEmoji} **${label}** • Hype: ${analysisMetrics.hypeScore}/100`);
+              parts.push(`**Sentiment:** ${(analysisMetrics.sentimentScore * 100).toFixed(0)}%`);
+              if (analysisMetrics.mentionVolume > 0) {
+                const changeEmoji = analysisMetrics.mentionChange24h >= 50 ? '🚀' : analysisMetrics.mentionChange24h <= -30 ? '📉' : '';
+                parts.push(`**Mentions:** ${analysisMetrics.mentionVolume} ${changeEmoji}${analysisMetrics.mentionChange24h > 0 ? '+' : ''}${analysisMetrics.mentionChange24h.toFixed(0)}%`);
+              }
+              // Risk signals
+              const signals: string[] = [];
+              if (analysisMetrics.socialSentiment.signals?.coordinatedHype) signals.push('🚨Hype');
+              if (analysisMetrics.socialSentiment.signals?.sentimentDrop) signals.push('📉Drop');
+              if (analysisMetrics.socialSentiment.signals?.rugKeywords) signals.push('⚠️Rug');
+              if (signals.length > 0) parts.push(`**Signals:** ${signals.join(' ')}`);
+              // Fused probability
+              if (analysisMetrics.fusedRugProbability !== undefined) {
+                const fusedEmoji = analysisMetrics.fusedRugProbability > 0.7 ? '🚨' : analysisMetrics.fusedRugProbability > 0.4 ? '⚠️' : '✅';
+                parts.push(`${fusedEmoji} **Fused Rug:** ${(analysisMetrics.fusedRugProbability * 100).toFixed(1)}%`);
+              }
+              return parts.join('\n');
+            })(),
+            inline: true
           }] : [])
         ] : []),
         {

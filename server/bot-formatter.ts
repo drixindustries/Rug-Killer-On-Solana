@@ -70,6 +70,7 @@ export interface CompactMessageData {
   agedWallets?: string;
   walletAges?: string;
   gmgn?: string;
+  socialSentiment?: string; // NEW: Social sentiment from X/Telegram/Discord
   alerts: string[];
   links: string;
 }
@@ -664,15 +665,41 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     holderActivity = `📉 **COORDINATED SELLOFF**\n• Sellers: ${cs.sellersCount}\n• Combined Supply: ${cs.combinedSupplyPercent.toFixed(1)}%\n• ${cs.description}`;
   }
   
-  // AGED WALLETS (CRITICAL FOR NEW TOKENS) - Show warnings only if significant risk
+  // AGED WALLETS (CRITICAL FOR NEW TOKENS) - Always show status for transparency
   let agedWallets: string | undefined;
-  if (analysis.agedWalletData && analysis.agedWalletData.riskScore >= 35) {
+  if (analysis.agedWalletData) {
     const aw = analysis.agedWalletData;
-    const ageWarning = isNewToken ? '🚨 CRITICAL - ' : '';
-    const emoji = aw.riskScore >= 60 ? '🚨⏰' : '⚠️⏰';
-    agedWallets = `${emoji} **AGED WALLET SCHEME ${ageWarning}**\n• Risk Score: ${aw.riskScore}/100\n• Fake Volume: ${aw.totalFakeVolumePercent.toFixed(1)}%\n• Suspicious Wallets: ${aw.agedWalletCount}`;
-    if (isNewToken) {
-      agedWallets += `\n⚠️ NEW TOKEN with aged wallets = HIGH RUG RISK`;
+    const riskScore = aw.riskScore ?? 0;
+    const walletCount = aw.agedWalletCount ?? 0;
+    const fakeVolume = aw.totalFakeVolumePercent ?? 0;
+    
+    if (riskScore >= 35 || walletCount > 0) {
+      // Show warning when risk is significant
+      const ageWarning = isNewToken && walletCount > 0 ? '🚨 CRITICAL - ' : '';
+      const emoji = riskScore >= 60 ? '🚨⏰' : riskScore >= 35 ? '⚠️⏰' : '🟡⏰';
+      agedWallets = `${emoji} **AGED WALLET DETECTION ${ageWarning}**\n`;
+      agedWallets += `• Risk Score: ${riskScore}/100\n`;
+      agedWallets += `• Fake Volume: ${fakeVolume.toFixed(1)}%\n`;
+      agedWallets += `• Old Wallets: ${walletCount}`;
+      
+      // Show patterns if detected
+      if (aw.patterns) {
+        const patternFlags: string[] = [];
+        if (aw.patterns.coordinatedBuys) patternFlags.push('Coordinated');
+        if (aw.patterns.sameFundingSource) patternFlags.push('Same Source');
+        if (aw.patterns.similarBuyAmounts) patternFlags.push('Similar Amounts');
+        if (aw.patterns.noSells) patternFlags.push('No Sells');
+        if (patternFlags.length > 0) {
+          agedWallets += `\n• Patterns: ${patternFlags.join(', ')}`;
+        }
+      }
+      
+      if (isNewToken && walletCount > 0) {
+        agedWallets += `\n⚠️ NEW TOKEN with aged wallets = HIGH RUG RISK`;
+      }
+    } else {
+      // Show safe status when no aged wallet risk
+      agedWallets = `✅⏰ **AGED WALLETS** (SAFE)\n• Risk Score: ${riskScore}/100\n• Old Wallets: ${walletCount}\n• Fake Volume: ${fakeVolume.toFixed(1)}%`;
     }
   }
   
@@ -725,6 +752,68 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     gmgn = `📊 **GMGN Intelligence**\n• Bundled: ${g.bundleSupplyPercent.toFixed(1)}% in ${g.bundleWalletCount} wallets\n• Insiders: ${g.insiderCount} | Snipers: ${g.sniperCount}\n• Confidence: ${g.confidence}%`;
   }
   
+  // SOCIAL SENTIMENT - FinBERT-Solana fusion (from Grok's research)
+  let socialSentiment: string | undefined;
+  if (analysis.socialSentiment) {
+    const ss = analysis.socialSentiment;
+    const hypeScore = ss.hypeScore ?? 0;
+    const sentimentScore = ss.sentimentScore ?? 0;
+    const label = ss.sentimentLabel ?? 'NEUTRAL';
+    
+    // Hype score emoji
+    let hypeEmoji = '📊';
+    if (hypeScore >= 70) hypeEmoji = '🔥';
+    else if (hypeScore >= 50) hypeEmoji = '📈';
+    else if (hypeScore <= 30) hypeEmoji = '📉';
+    
+    // Sentiment label emoji
+    const labelEmoji = label === 'BULLISH' ? '🟢' : 
+                       label === 'BEARISH' ? '🔴' : 
+                       label === 'MIXED' ? '🟡' : '⚪';
+    
+    socialSentiment = `${hypeEmoji} **Social Sentiment** (${ss.model || 'FinBERT-Solana'})\n`;
+    socialSentiment += `${labelEmoji} **${label}** • Hype Score: ${hypeScore}/100\n`;
+    socialSentiment += `• Sentiment: ${(sentimentScore * 100).toFixed(0)}% • Confidence: ${((ss.confidence ?? 0) * 100).toFixed(0)}%\n`;
+    
+    // Volume metrics
+    if (ss.mentionVolume) {
+      const vol = ss.mentionVolume;
+      const changeEmoji = vol.change24h >= 100 ? '🚀' : vol.change24h >= 50 ? '📈' : vol.change24h <= -30 ? '📉' : '';
+      socialSentiment += `• Mentions: ${vol.total} (${vol.hourly}/hr) ${changeEmoji}${vol.change24h > 0 ? '+' : ''}${vol.change24h.toFixed(0)}% 24h\n`;
+    }
+    
+    // Platform breakdown
+    const platforms: string[] = [];
+    if (ss.platforms?.twitter?.mentions) platforms.push(`X: ${ss.platforms.twitter.mentions}`);
+    if (ss.platforms?.telegram?.mentions) platforms.push(`TG: ${ss.platforms.telegram.mentions}`);
+    if (ss.platforms?.discord?.mentions) platforms.push(`DC: ${ss.platforms.discord.mentions}`);
+    if (platforms.length > 0) {
+      socialSentiment += `• Platforms: ${platforms.join(' | ')}\n`;
+    }
+    
+    // Risk signals
+    const signals: string[] = [];
+    if (ss.signals?.coordinatedHype) signals.push('🚨 Coordinated Hype');
+    if (ss.signals?.sentimentDrop) signals.push('📉 Sentiment Drop');
+    if (ss.signals?.rugKeywords) signals.push('⚠️ Rug Keywords');
+    if (ss.signals?.fakeEngagement) signals.push('🤖 Fake Engagement');
+    if (ss.signals?.influencerPump) signals.push('📢 Influencer Pump');
+    if (signals.length > 0) {
+      socialSentiment += `• Signals: ${signals.join(', ')}\n`;
+    }
+    
+    // Fused probability (TGN + FinBERT)
+    if (ss.fusedRugProbability !== undefined) {
+      const fusedEmoji = ss.fusedRugProbability > 0.7 ? '🚨' : ss.fusedRugProbability > 0.4 ? '⚠️' : '✅';
+      socialSentiment += `${fusedEmoji} **Fused Rug Prob:** ${(ss.fusedRugProbability * 100).toFixed(1)}%`;
+      if (ss.fusionFormula) socialSentiment += ` (${ss.fusionFormula})`;
+    }
+    
+    // Data freshness
+    const freshnessEmoji = ss.dataFreshness === 'LIVE' ? '🟢' : ss.dataFreshness === 'CACHED' ? '🟡' : '🔴';
+    socialSentiment += `\n${freshnessEmoji} Data: ${ss.dataFreshness}`;
+  }
+  
   // CRITICAL ALERTS
   const alerts: string[] = [];
   
@@ -766,6 +855,7 @@ Quick Links → [Solscan](https://solscan.io/token/${analysis.tokenAddress}) •
     walletAges,
     gmgn,
     mlAnalysis,
+    socialSentiment,
     alerts,
     links
   };
@@ -850,6 +940,10 @@ export function toPlainText(data: CompactMessageData): string {
   
   if (data.gmgn) {
     message += `${data.gmgn}\n\n`;
+  }
+  
+  if (data.socialSentiment) {
+    message += `${data.socialSentiment}\n\n`;
   }
   
   if (data.alerts.length > 0) {

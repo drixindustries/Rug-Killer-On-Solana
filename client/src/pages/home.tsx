@@ -28,6 +28,10 @@ import AgedWalletDetectionCard from "@/components/aged-wallet-detection-card";
 import FundingAnalysisCard from "@/components/funding-analysis-card";
 import TGNAnalysisCard from "@/components/tgn-analysis-card";
 import MLAnalysisCard from "@/components/ml-analysis-card";
+// SolRPDS Enhanced Detection Components
+import RugScoreBreakdownCard from "@/components/rug-score-breakdown-card";
+import JitoBundleCard from "@/components/jito-bundle-card";
+import { SocialSentimentCard } from "@/components/social-sentiment-card";
 
 export default function Home() {
   const { toast } = useToast();
@@ -107,11 +111,21 @@ export default function Home() {
         {analysis && (
           <div className="space-y-6">
             {/* Risk Score Card */}
-            <RiskScoreCard analysis={analysis} />
+            <RiskScoreCard 
+              score={analysis.riskScore} 
+              riskLevel={analysis.riskLevel} 
+              redFlagsCount={analysis.redFlags?.length || 0}
+              analyzedAt={analysis.analyzedAt}
+            />
 
             {/* Critical Alerts */}
-            {analysis.alerts && analysis.alerts.length > 0 && (
-              <CriticalAlerts alerts={analysis.alerts} />
+            {analysis.redFlags && analysis.redFlags.length > 0 && (
+              <CriticalAlerts alerts={analysis.redFlags} />
+            )}
+
+            {/* SolRPDS Rug Score Breakdown - Primary Risk Metric */}
+            {analysis.rugScoreBreakdown && (
+              <RugScoreBreakdownCard data={analysis.rugScoreBreakdown} />
             )}
 
             {/* Metrics Grid */}
@@ -119,27 +133,37 @@ export default function Home() {
 
             {/* AI/ML Analysis Cards */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {analysis.tgnAnalysis && (
-                <TGNAnalysisCard data={analysis.tgnAnalysis} />
+              {analysis.tgnResult && (
+                <TGNAnalysisCard data={analysis.tgnResult} />
               )}
-              {analysis.mlPrediction && (
-                <MLAnalysisCard data={analysis.mlPrediction} />
+              {(analysis as any).mlScore && (
+                <MLAnalysisCard data={(analysis as any).mlScore} />
               )}
             </div>
 
-            {/* Advanced Detection Cards */}
+            {/* Advanced Detection Cards - SolRPDS Metrics */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {analysis.bundleDetection && (
-                <BundleDetectionCard data={analysis.bundleDetection} />
+              {/* Social Sentiment (FinBERT-Solana from X/Telegram/Discord) */}
+              <SocialSentimentCard sentiment={analysis.socialSentiment} />
+              {/* Jito MEV Bundle Detection */}
+              {analysis.jitoBundleData && (
+                <JitoBundleCard data={analysis.jitoBundleData} />
               )}
+              {/* Advanced Bundle Detection (timing-based) */}
+              {analysis.advancedBundleData && (
+                <BundleDetectionCard data={analysis.advancedBundleData} />
+              )}
+              {/* Network/Wallet Cluster Analysis */}
               {analysis.networkAnalysis && (
                 <NetworkAnalysisCard data={analysis.networkAnalysis} />
               )}
+              {/* Whale Activity Detection */}
               {analysis.whaleDetection && (
                 <WhaleDetectionCard data={analysis.whaleDetection} />
               )}
-              {analysis.agedWalletDetection && (
-                <AgedWalletDetectionCard data={analysis.agedWalletDetection} />
+              {/* Aged Wallet Detection (SolRPDS critical metric) */}
+              {analysis.agedWalletData && (
+                <AgedWalletDetectionCard data={analysis.agedWalletData} />
               )}
             </div>
 
@@ -150,25 +174,25 @@ export default function Home() {
 
             {/* Token Metadata & Market Data */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {analysis.tokenInfo && (
+              {analysis.metadata && (
                 <TokenMetadataCard 
-                  metadata={analysis.tokenInfo} 
-                  tokenAddress={analysis.tokenInfo?.address || analysis.tokenAddress || ""} 
+                  metadata={analysis.metadata} 
+                  tokenAddress={analysis.tokenAddress || ""} 
                   creationDate={analysis.creationDate}
                 />
               )}
-              {analysis.dexscreener && (
+              {analysis.dexscreenerData && (
                 <MarketDataCard 
-                  data={analysis.dexscreener} 
-                  tokenAddress={analysis.tokenInfo?.address || analysis.tokenAddress || ""}
+                  data={analysis.dexscreenerData} 
+                  tokenAddress={analysis.tokenAddress || ""}
                 />
               )}
             </div>
 
             {/* Security Checks */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {analysis.honeypotData && (
-                <HoneypotCard data={analysis.honeypotData} />
+              {analysis.honeypotDetection && (
+                <HoneypotCard data={analysis.honeypotDetection} />
               )}
               {analysis.liquidityPool && (
                 <LiquidityBurnCard data={analysis.liquidityPool} />
@@ -178,10 +202,10 @@ export default function Home() {
             {/* External Security Data */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {analysis.rugcheckData && (
-                <RugcheckCard data={analysis.rugcheckData} tokenAddress={analysis.tokenInfo?.address || ""} />
+                <RugcheckCard data={analysis.rugcheckData} tokenAddress={analysis.tokenAddress || ""} />
               )}
-              {analysis.goPlusData && (
-                <GoPlusCard data={analysis.goPlusData} />
+              {analysis.goplusData && (
+                <GoPlusCard data={analysis.goplusData} />
               )}
             </div>
 

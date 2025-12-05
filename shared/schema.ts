@@ -398,6 +398,68 @@ export interface JitoBundleData {
   detectedAt: number;
 }
 
+// Social Sentiment Data (Twitter/X, Telegram, Discord Analysis - FinBERT-Solana Fusion)
+export interface SocialSentimentData {
+  // Overall metrics (0-100 hype score from Grok's research)
+  hypeScore: number; // 0-100 composite (>70 = bullish, <30 = bearish/rug risk)
+  sentimentScore: number; // -1 to +1 polarity score (FinBERT output)
+  sentimentLabel: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | 'MIXED';
+  confidence: number; // 0-1 model confidence
+  
+  // Volume & Velocity (key rug indicators)
+  mentionVolume: {
+    total: number; // Total mentions across platforms
+    hourly: number; // Mentions per hour
+    daily: number; // Mentions per day
+    change24h: number; // % change in volume (spike = pump potential)
+  };
+  engagementVelocity: number; // Likes/reposts/replies per hour
+  
+  // Sentiment breakdown
+  positiveRatio: number; // % of positive mentions (0-100)
+  negativeRatio: number; // % of negative mentions (0-100)
+  neutralRatio: number; // % of neutral mentions (0-100)
+  
+  // Platform-specific metrics
+  platforms: {
+    twitter?: {
+      mentions: number;
+      sentiment: number;
+      topInfluencers: number;
+      trending: boolean;
+    };
+    telegram?: {
+      mentions: number;
+      sentiment: number;
+      channelCount: number;
+      alphaCallCount: number;
+    };
+    discord?: {
+      mentions: number;
+      sentiment: number;
+      serverCount: number;
+    };
+  };
+  
+  // Risk signals from sentiment analysis
+  signals: {
+    coordinatedHype: boolean; // Sudden spike = potential pump
+    sentimentDrop: boolean; // Negative surge = impending dump
+    fakeEngagement: boolean; // Bot-like patterns detected
+    influencerPump: boolean; // Multiple influencer mentions
+    rugKeywords: boolean; // "rug", "scam", "dev sold" detected
+  };
+  
+  // Fusion with TGN (from Grok's research)
+  fusedRugProbability?: number; // TGN + FinBERT fusion (0-1)
+  fusionFormula?: string; // e.g., "0.65*TGN + 0.35*sentiment"
+  
+  // Model info
+  model: string; // e.g., "FinBERT-Solana-v1" or "VADER"
+  analyzedAt: number;
+  dataFreshness: 'LIVE' | 'CACHED' | 'STALE';
+}
+
 // Network Analysis Data (Bubblemaps)
 export interface NetworkAnalysisData {
   networkRiskScore: number; // 0-100
@@ -709,6 +771,7 @@ export interface TokenAnalysisResponse {
   holderTracking?: HolderTrackingData; // Top holder sell-off detection
   fundingAnalysis?: FundingAnalysisData; // Wallet funding source analysis
   jitoBundleData?: JitoBundleData; // NEW: Jito MEV bundle detection
+  socialSentiment?: SocialSentimentData; // NEW: Social sentiment from X/Telegram/Discord (FinBERT-Solana)
   
   // Temporal GNN Detection (2025)
   tgnResult?: TGNResult; // Temporal graph analysis with 0.958-0.966 F1-score

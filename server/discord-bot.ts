@@ -112,101 +112,138 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
     .setTimestamp()
     .setImage(`https://dd.dexscreener.com/ds-data/tokens/solana/${analysis.tokenAddress}.png?size=lg&t=${Date.now()}`);
   
+  // RUG SCORE - Critical metric from SolRPDS research
+  if (messageData.rugScore) {
+    const rugScoreLines = messageData.rugScore.split('\n');
+    const headerLine = rugScoreLines[0] || '';
+    const bodyLines = rugScoreLines.slice(1).join('\n');
+    // Extract score and classification from header
+    const scoreMatch = headerLine.match(/Rug Score:\s*(\d+)/);
+    const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
+    const scoreEmoji = score < 10 ? '✅' : score < 50 ? '⚠️' : '🚨';
+    embed.addFields({
+      name: `${scoreEmoji} ${stripBold(headerLine) || 'Rug Score'}`,
+      value: bodyLines.slice(0, 1024) || 'No breakdown available',
+      inline: false
+    });
+  }
+  
   // AI VERDICT
   const sanitizedAiVerdict = stripBold(messageData.aiVerdict);
   if (sanitizedAiVerdict) {
     embed.addFields({
       name: '🤖 AI Analysis',
-      value: sanitizedAiVerdict,
+      value: sanitizedAiVerdict.slice(0, 1024),
       inline: false
     });
   }
   
   // CORE METRICS (Security, Holders, Market in columns)
-  embed.addFields({
-    name: '🔐 Security',
-    value: messageData.security.split('\n').slice(1).join('\n'), // Remove header
-    inline: true
-  });
-  
-  embed.addFields({
-    name: '👥 Holders',
-    value: messageData.holders.split('\n').slice(1).join('\n'), // Remove header
-    inline: true
-  });
-  
-  if (messageData.market) {
+  const securityContent = messageData.security.split('\n').slice(1).join('\n');
+  if (securityContent) {
     embed.addFields({
-      name: '💰 Market',
-      value: messageData.market.split('\n').slice(1).join('\n'), // Remove header
+      name: '🔐 Security',
+      value: securityContent.slice(0, 1024),
       inline: true
     });
+  }
+  
+  const holdersContent = messageData.holders.split('\n').slice(1).join('\n');
+  if (holdersContent) {
+    embed.addFields({
+      name: '👥 Holders',
+      value: holdersContent.slice(0, 1024),
+      inline: true
+    });
+  }
+  
+  if (messageData.market) {
+    const marketContent = messageData.market.split('\n').slice(1).join('\n');
+    if (marketContent) {
+      embed.addFields({
+        name: '💰 Market',
+        value: marketContent.slice(0, 1024),
+        inline: true
+      });
+    }
   }
   
   // PUMP.FUN
   if (messageData.pumpFun) {
-    embed.addFields({
-      name: '🎯 Pump.fun',
-      value: messageData.pumpFun.split('\n').slice(1).join('\n'), // Remove header
-      inline: true
-    });
+    const pumpFunContent = messageData.pumpFun.split('\n').slice(1).join('\n');
+    if (pumpFunContent) {
+      embed.addFields({
+        name: '🎯 Pump.fun',
+        value: pumpFunContent.slice(0, 1024),
+        inline: true
+      });
+    }
   }
   
-  addSectionField(embed, messageData.floorInfo, '📊 Support Analysis');
-  addSectionField(embed, messageData.honeypot, '🍯 Honeypot Detection');
-  addSectionField(embed, messageData.funding, '💸 Suspicious Funding');
-  addSectionField(embed, messageData.bundle, '📦 Bundle Activity');
-  addSectionField(embed, messageData.network, '🌐 Wallet Network', true);
-  addSectionField(embed, messageData.whales, '🐋 Whale Activity', true);
-  addSectionField(embed, messageData.pumpDump, '🚨 Pump & Dump');
-  addSectionField(embed, messageData.liquidity, '💧 Liquidity Alerts');
-  addSectionField(embed, messageData.holderActivity, '📉 Holder Activity');
+  // JITO BUNDLE DETECTION - Critical MEV metric
+  addSectionField(embed, messageData.bundle, '📦 Jito Bundle Analysis');
+  
+  // AGED WALLET DETECTION - Critical for rug detection (SolRPDS)
   addSectionField(embed, messageData.agedWallets, '⏰ Aged Wallet Risk');
-  addSectionField(embed, messageData.gmgn, '📊 GMGN Intelligence');
   
-  // TGN & ML ANALYSIS - AI Models
-  if (messageData.tgnAnalysis) {
-    embed.addFields({
-      name: '🧠 Temporal GNN (Neural Network)',
-      value: messageData.tgnAnalysis.split('\n').slice(1).join('\n'), // Remove header
-      inline: true
-    });
-  }
-  
-  if (messageData.mlAnalysis) {
-    embed.addFields({
-      name: '🤖 ML Decision Tree (TypeScript)',
-      value: messageData.mlAnalysis.split('\n').slice(1).join('\n'), // Remove header
-      inline: true
-    });
-  }
-  
-  // WALLET AGES - Prominent section for wallet age analysis
+  // WALLET AGES - Detailed age breakdown
   const sanitizedWalletAges = stripBold(messageData.walletAges);
   if (sanitizedWalletAges) {
     embed.addFields({
-      name: '⏰ Wallet Ages',
-      value: sanitizedWalletAges,
-      inline: false
+      name: '👴 Wallet Ages',
+      value: sanitizedWalletAges.slice(0, 1024),
+      inline: true
     });
   }
   
-  // ADVANCED DETECTION (Consolidate into sections)
-  const advancedWarnings: string[] = [...messageData.alerts];
+  // TGN & ML ANALYSIS - Neural network models
+  if (messageData.tgnAnalysis) {
+    const tgnContent = messageData.tgnAnalysis.split('\n').slice(1).join('\n');
+    if (tgnContent) {
+      embed.addFields({
+        name: '🧠 Temporal GNN',
+        value: tgnContent.slice(0, 1024),
+        inline: true
+      });
+    }
+  }
   
-  // Add warnings field if any exist (max 1024 chars per field)
+  if (messageData.mlAnalysis) {
+    const mlContent = messageData.mlAnalysis.split('\n').slice(1).join('\n');
+    if (mlContent) {
+      embed.addFields({
+        name: '🤖 ML Decision Tree',
+        value: mlContent.slice(0, 1024),
+        inline: true
+      });
+    }
+  }
+  
+  // ADDITIONAL RISK METRICS
+  addSectionField(embed, messageData.honeypot, '🍯 Honeypot Detection');
+  addSectionField(embed, messageData.funding, '💸 Funding Sources');
+  addSectionField(embed, messageData.whales, '🐋 Whale Activity', true);
+  addSectionField(embed, messageData.network, '🌐 Wallet Network', true);
+  addSectionField(embed, messageData.pumpDump, '🚨 Pump & Dump');
+  addSectionField(embed, messageData.liquidity, '💧 Liquidity Monitor');
+  addSectionField(embed, messageData.holderActivity, '📉 Holder Activity');
+  addSectionField(embed, messageData.floorInfo, '📊 Floor & Support');
+  addSectionField(embed, messageData.gmgn, '📊 GMGN Intel');
+  
+  // ADVANCED DETECTION WARNINGS
+  const advancedWarnings: string[] = [...messageData.alerts];
   if (advancedWarnings.length > 0) {
     embed.addFields({
-      name: '⚠️ Advanced Detection',
-      value: advancedWarnings.join('\n\n').slice(0, 1024),
+      name: '⚠️ Critical Alerts',
+      value: advancedWarnings.join('\n').slice(0, 1024),
       inline: false
     });
   }
   
-  // QUICK LINKS
+  // QUICK LINKS - Trading tools and explorers
   embed.addFields({
     name: '🔗 Quick Links',
-    value: messageData.links.split('\n').join('\n')
+    value: messageData.links.split('\n').slice(0, 4).join('\n').slice(0, 1024)
   });
   
   embed.setURL(`https://solscan.io/token/${analysis.tokenAddress}`);
