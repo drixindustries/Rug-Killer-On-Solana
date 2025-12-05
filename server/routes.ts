@@ -549,6 +549,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const analysis = await Promise.race([analysisPromise, timeoutPromise]) as any;
         try { nameCache.remember(tokenAddress, (analysis as any)?.metadata?.symbol, (analysis as any)?.metadata?.name); } catch {}
         
+        // Save snapshot for analytics dashboard (non-blocking)
+        try {
+          const { priceCache } = await import('./services/price-cache.ts');
+          
+          // Update price cache with analysis results
+          if (analysis.marketData) {
+            priceCache.set(tokenAddress, {
+              tokenAddress,
+              priceUsd: analysis.marketData.priceUsd || 0,
+              priceNative: analysis.marketData.priceNative || 0,
+              marketCap: analysis.marketData.marketCap || null,
+              liquidity: analysis.marketData.liquidityUsd || null,
+              volume24h: analysis.marketData.volume24h || null,
+              priceChange24h: analysis.marketData.priceChange24h || null,
+            });
+          }
+          
+          // Save snapshot to database for historical tracking
+          const txCount24h = analysis.marketData?.txns24h
+            ? analysis.marketData.txns24h.buys + analysis.marketData.txns24h.sells
+            : undefined;
+            
+          storage.saveTokenSnapshot({
+            tokenAddress,
+            priceUsd: analysis.marketData?.priceUsd?.toString() || null,
+            riskScore: analysis.riskScore,
+            holderCount: analysis.holderCount,
+            volume24h: analysis.marketData?.volume24h?.toString() || null,
+            liquidityUsd: analysis.marketData?.liquidityUsd?.toString() || null,
+            riskFlags: analysis.redFlags?.map((f: { type: string }) => f.type) || [],
+            txCount24h,
+            analyzerVersion: "1.0",
+          }).catch(err => console.error('[Analytics] Failed to save snapshot:', err.message));
+        } catch (err) {
+          // Non-blocking - don't fail the response
+          console.error('[Analytics] Failed to update analytics:', err);
+        }
+        
         res.json({
           success: true,
           ...analysis
@@ -2313,6 +2351,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
       try { nameCache.remember(tokenAddress, (analysis as any)?.metadata?.symbol, (analysis as any)?.metadata?.name); } catch {}
       
+      // Save analytics snapshot (non-blocking)
+      try {
+        const { priceCache } = await import('./services/price-cache.ts');
+        
+        // Update price cache
+        if (analysis.marketData) {
+          priceCache.set(tokenAddress, {
+            tokenAddress,
+            priceUsd: analysis.marketData.priceUsd || 0,
+            priceNative: analysis.marketData.priceNative || 0,
+            marketCap: analysis.marketData.marketCap || null,
+            liquidity: analysis.marketData.liquidityUsd || null,
+            volume24h: analysis.marketData.volume24h || null,
+            priceChange24h: analysis.marketData.priceChange24h || null,
+          });
+        }
+        
+        // Save snapshot
+        const txCount24h = analysis.marketData?.txns24h
+          ? analysis.marketData.txns24h.buys + analysis.marketData.txns24h.sells
+          : undefined;
+          
+        storage.saveTokenSnapshot({
+          tokenAddress,
+          priceUsd: analysis.marketData?.priceUsd?.toString() || null,
+          riskScore: analysis.riskScore,
+          holderCount: analysis.holderCount,
+          volume24h: analysis.marketData?.volume24h?.toString() || null,
+          liquidityUsd: analysis.marketData?.liquidityUsd?.toString() || null,
+          riskFlags: analysis.redFlags?.map((f: { type: string }) => f.type) || [],
+          txCount24h,
+          analyzerVersion: "1.0",
+        }).catch(err => console.error('[Analytics] Failed to save snapshot:', err.message));
+      } catch (err) {
+        console.error('[Analytics] Failed to update analytics:', err);
+      }
+      
       // Get userId if authenticated
       const userId = (req as any).user?.claims?.sub;
       
@@ -2382,6 +2457,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
           try { nameCache.remember(tokenAddress, (analysis as any)?.metadata?.symbol, (analysis as any)?.metadata?.name); } catch {}
+          
+          // Save analytics snapshot (non-blocking)
+          try {
+            const { priceCache } = await import('./services/price-cache.ts');
+            if (analysis.marketData) {
+              priceCache.set(tokenAddress, {
+                tokenAddress,
+                priceUsd: analysis.marketData.priceUsd || 0,
+                priceNative: analysis.marketData.priceNative || 0,
+                marketCap: analysis.marketData.marketCap || null,
+                liquidity: analysis.marketData.liquidityUsd || null,
+                volume24h: analysis.marketData.volume24h || null,
+                priceChange24h: analysis.marketData.priceChange24h || null,
+              });
+            }
+            const txCount24h = analysis.marketData?.txns24h
+              ? analysis.marketData.txns24h.buys + analysis.marketData.txns24h.sells
+              : undefined;
+            storage.saveTokenSnapshot({
+              tokenAddress,
+              priceUsd: analysis.marketData?.priceUsd?.toString() || null,
+              riskScore: analysis.riskScore,
+              holderCount: analysis.holderCount,
+              volume24h: analysis.marketData?.volume24h?.toString() || null,
+              liquidityUsd: analysis.marketData?.liquidityUsd?.toString() || null,
+              riskFlags: analysis.redFlags?.map((f: { type: string }) => f.type) || [],
+              txCount24h,
+              analyzerVersion: "1.0",
+            }).catch(err => console.error('[Analytics] Failed to save snapshot:', err.message));
+          } catch {}
           
           // Get userId if authenticated (optional)
           const userId = (req as any).user?.claims?.sub;

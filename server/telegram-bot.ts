@@ -326,7 +326,7 @@ function createTelegramBot(botToken: string): Telegraf {
     }
   });
   
-  // /execute command - Full analysis
+  // /execute command - Full analysis (FAST MODE for 2-3 second response)
   bot.command('execute', async (ctx) => {
     const args = (ctx.message?.text || '').split(' ');
     if (args.length < 2) {
@@ -336,9 +336,10 @@ function createTelegramBot(botToken: string): Telegraf {
     const tokenAddress = args[1];
     
     try {
-      await ctx.reply('🔍 Analyzing token... This may take a few seconds.');
+      await ctx.reply('⚡ Quick scan in progress...');
       
-      const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
+      // FAST MODE: 2-3 second target response time
+      const analysis = await tokenAnalyzer.analyzeToken(tokenAddress, { fastMode: true });
       try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
       const message = formatAnalysis(analysis);
       
@@ -1503,9 +1504,10 @@ function createTelegramBot(botToken: string): Telegraf {
       switch (command.toLowerCase()) {
         case 'scan':
         case 'execute':
-          const loadingMsg = await ctx.reply('🔍 Scanning token...');
+          const loadingMsg = await ctx.reply('⚡ Quick scan...');
           try {
-            const analysis = await tokenAnalyzer.analyzeToken(address);
+            // FAST MODE: 2-3 second target response time
+            const analysis = await tokenAnalyzer.analyzeToken(address, { fastMode: true });
             try { nameCache.remember(address, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
             const messageData = buildCompactMessage(analysis);
             await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, undefined, messageData.header, { parse_mode: 'Markdown' });

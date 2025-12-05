@@ -666,30 +666,107 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       } else if (interaction.commandName === 'execute') {
         const tokenAddress = interaction.options.getString('address', true);
         console.log(`[Discord /execute] User ${interaction.user.tag} scanning: ${tokenAddress}`);
-        console.log(`[Discord /execute] Starting analysis for token: ${tokenAddress}`);
         
-        // Ensure we've deferred (should already be done above, but double-check)
+        // Ensure we've deferred
         if (!deferred) {
           await interaction.deferReply();
           deferred = true;
         }
         
         try {
-          // Add timeout to prevent hanging (60s for new tokens that need indexing)
-          const analysisPromise = tokenAnalyzer.analyzeToken(tokenAddress);
+          // PROGRESSIVE LOADING: Update embed as data arrives
+          const shortAddr = `${tokenAddress.slice(0, 6)}...${tokenAddress.slice(-4)}`;
+          let currentPhase = 0;
+          const phases = ['🔍 Fetching market data...', '⛓️ Reading blockchain...', '👥 Analyzing holders...', '🎯 Detecting bundles...', '✅ Complete!'];
+          
+          // Create initial loading embed
+          const createProgressEmbed = (phase: number, data: any = {}) => {
+            const embed = new EmbedBuilder()
+              .setColor(data.riskLevel ? getRiskColor(data.riskLevel) : 0x3498db)
+              .setTitle(`${data.name || 'Token'} (${data.symbol || '???'})`)
+              .setDescription(phase < 4 ? `**${phases[phase]}**\n\n_Progressive scan in progress..._` : 
+                `**Risk Level: ${data.riskLevel || 'Analyzing...'}** (Score: ${data.riskScore ?? '...'}/100)`)
+              .setFooter({ text: `Contract: ${shortAddr}` })
+              .setTimestamp();
+            
+            if (data.tokenAddress) {
+              embed.setImage(`https://dd.dexscreener.com/ds-data/tokens/solana/${data.tokenAddress}.png?size=lg&t=${Date.now()}`);
+            }
+            
+            // Add data as it becomes available
+            const fields: { name: string; value: string; inline: boolean }[] = [];
+            
+            if (data.priceUsd) {
+              fields.push({ name: '💰 Price', value: `$${Number(data.priceUsd).toFixed(8)}`, inline: true });
+            }
+            if (data.marketCap) {
+              fields.push({ name: '📊 MCap', value: `$${Number(data.marketCap).toLocaleString()}`, inline: true });
+            }
+            if (data.volume24h) {
+              fields.push({ name: '📈 24h Vol', value: `$${Number(data.volume24h).toLocaleString()}`, inline: true });
+            }
+            if (data.mintRevoked !== undefined) {
+              fields.push({ 
+                name: '🔐 Security', 
+                value: `${data.mintRevoked ? '✅' : '❌'} Mint ${data.mintRevoked ? 'Revoked' : 'Active'}\n${data.freezeRevoked ? '✅' : '❌'} Freeze ${data.freezeRevoked ? 'Revoked' : 'Active'}`,
+                inline: true 
+              });
+            }
+            if (data.holderCount !== undefined) {
+              fields.push({ 
+                name: '👥 Holders', 
+                value: `Count: ${data.holderCount?.toLocaleString() || '...'}\nTop 10: ${data.topHolderConcentration?.toFixed(1) || '...'}%`,
+                inline: true 
+              });
+            }
+            if (data.jitoBundles !== undefined) {
+              fields.push({ 
+                name: '📦 Bundles', 
+                value: data.jitoBundles ? `⚠️ ${data.jitoBundles} detected` : '✅ None detected',
+                inline: true 
+              });
+            }
+            
+            // Progress bar
+            const progress = '█'.repeat(phase + 1) + '░'.repeat(4 - phase);
+            fields.push({ name: '⏳ Progress', value: `\`[${progress}]\` ${phases[phase]}`, inline: false });
+            
+            embed.addFields(fields);
+            return embed;
+          };
+          
+          // Send initial loading embed
+          await interaction.editReply({ embeds: [createProgressEmbed(0, { tokenAddress })] });
+          
+          // Start analysis with progressive updates
+          const analysisPromise = tokenAnalyzer.analyzeToken(tokenAddress, { fastMode: true });
+          
+          // Update progress while waiting (non-blocking visual updates)
+          const progressInterval = setInterval(async () => {
+            if (currentPhase < 3) {
+              currentPhase++;
+              try {
+                await interaction.editReply({ embeds: [createProgressEmbed(currentPhase, { tokenAddress })] });
+              } catch {} // Ignore edit errors if analysis completes
+            }
+          }, 600); // Update every 600ms
+          
           const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Analysis timeout after 60 seconds')), 60000)
+            setTimeout(() => reject(new Error('Analysis timeout after 8 seconds')), 8000)
           );
           
           const analysis = await Promise.race([analysisPromise, timeoutPromise]) as any;
+          clearInterval(progressInterval);
+          
           console.log(`[Discord /execute] Analysis complete for ${tokenAddress}`);
           
           // Remember symbol/name mapping for quick $symbol lookups later
           try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
-          const embed = createAnalysisEmbed(analysis);
           
+          // Final complete embed
+          const embed = createAnalysisEmbed(analysis);
           await interaction.editReply({ embeds: [embed] });
-          console.log(`[Discord /execute] Reply sent for ${tokenAddress}`);
+          console.log(`[Discord /execute] Final reply sent for ${tokenAddress}`);
         } catch (error: any) {
           console.error(`[Discord /execute] ERROR for ${tokenAddress}:`, error);
           console.error(`[Discord /execute] Error message:`, error.message);
@@ -2515,25 +2592,52 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     // These work WITHOUT requiring bot mention
     // ===================================================================
     
-    // !scan or !execute - Full rug detection scan
+    // !scan or !execute - Full rug detection scan with PROGRESSIVE LOADING
     // More flexible regex: allows multiple spaces and works with/without trailing content
     const scanMatch = text.match(/^!(?:scan|execute)\s+([1-9A-HJ-NP-Za-km-z]{32,44})/i);
     if (scanMatch) {
       const tokenAddress = scanMatch[1];
       console.log(`[Discord !scan] User ${message.author.tag} scanning: ${tokenAddress}`);
       
-      const intro = rally.getAnalysisIntro('this token', true);
-      const loadingMsg = await message.reply(intro.message);
+      const shortAddr = `${tokenAddress.slice(0, 6)}...${tokenAddress.slice(-4)}`;
+      const phases = ['🔍 Market data...', '⛓️ Blockchain...', '👥 Holders...', '🎯 Bundles...', '✅ Done!'];
+      let currentPhase = 0;
+      
+      // Create progress embed
+      const createProgressEmbed = (phase: number) => {
+        const progress = '█'.repeat(phase + 1) + '░'.repeat(4 - phase);
+        return new EmbedBuilder()
+          .setColor(0x3498db)
+          .setTitle(`🔍 Scanning ${shortAddr}`)
+          .setDescription(`**${phases[phase]}**\n\n\`[${progress}]\``)
+          .setTimestamp();
+      };
+      
+      const loadingMsg = await message.reply({ embeds: [createProgressEmbed(0)] });
       
       try {
         await message.channel.sendTyping();
         
-        const analysisPromise = tokenAnalyzer.analyzeToken(tokenAddress);
+        // Start analysis
+        const analysisPromise = tokenAnalyzer.analyzeToken(tokenAddress, { fastMode: true });
+        
+        // Update progress while waiting
+        const progressInterval = setInterval(async () => {
+          if (currentPhase < 3) {
+            currentPhase++;
+            try {
+              await loadingMsg.edit({ embeds: [createProgressEmbed(currentPhase)] });
+            } catch {}
+          }
+        }, 500);
+        
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Analysis timeout after 30 seconds')), 30000)
+          setTimeout(() => reject(new Error('Analysis timeout after 8 seconds')), 8000)
         );
         
         const analysis = await Promise.race([analysisPromise, timeoutPromise]) as any;
+        clearInterval(progressInterval);
+        
         console.log(`[Discord !scan] Analysis complete for ${tokenAddress}`);
         
         try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
@@ -2542,7 +2646,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         const riskComment = rally.getRiskCommentary(analysis.riskScore, analysis.riskLevel);
         
         await loadingMsg.edit({ content: riskComment.message, embeds: [embed] });
-        console.log(`[Discord !scan] Reply sent for ${tokenAddress}`);
+        console.log(`[Discord !scan] Final reply sent for ${tokenAddress}`);
         return;
       } catch (error: any) {
         console.error(`[Discord !scan] Error for ${tokenAddress}:`, error.message);

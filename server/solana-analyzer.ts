@@ -51,10 +51,11 @@ export class SolanaTokenAnalyzer {
 
   async analyzeToken(
     tokenMintAddress: string,
-    options: { skipExternal?: boolean; skipOnChain?: boolean } = {}
+    options: { skipExternal?: boolean; skipOnChain?: boolean; fastMode?: boolean } = {}
   ): Promise<TokenAnalysisResponse> {
     const startTime = Date.now();
-    console.log(`🔍 [Analyzer] Starting analysis for ${tokenMintAddress}`);
+    const isFastMode = options.fastMode ?? false;
+    console.log(`🔍 [Analyzer] Starting analysis for ${tokenMintAddress}${isFastMode ? ' (FAST MODE)' : ''}`);
 
     try {
       // Check Redis cache first for instant results
@@ -72,8 +73,23 @@ export class SolanaTokenAnalyzer {
         throw new Error("Invalid token address format");
       }
 
-      // Fetch data in parallel with aggressive timeouts for speed
-      // DexScreener: 8s, On-chain: 10s, Holders: 15s, PumpFun: 5s
+      // FAST MODE: Aggressive timeouts for 2-3 second response
+      // NORMAL MODE: Standard timeouts for thorough analysis
+      const TIMEOUTS = isFastMode ? {
+        dexScreener: 2000,   // 2s (fast)
+        onChain: 2000,       // 2s (fast)
+        holders: 2500,       // 2.5s (fast)
+        creationDate: 1500,  // 1.5s (fast)
+        pumpFun: 1500,       // 1.5s (fast)
+      } : {
+        dexScreener: 8000,   // 8s (normal)
+        onChain: 10000,      // 10s (normal)
+        holders: 15000,      // 15s (normal)
+        creationDate: 5000,  // 5s (normal)
+        pumpFun: 5000,       // 5s (normal)
+      };
+
+      // Fetch data in parallel with timeouts
       const withTimeout = <T>(promise: Promise<T>, ms: number, name: string): Promise<T | null> => {
         return Promise.race([
           promise,
@@ -88,15 +104,16 @@ export class SolanaTokenAnalyzer {
 
       const [dexData, onChainData, holderData, creationDateData, pumpFunData] = await Promise.all([
         options.skipExternal ? Promise.resolve({ status: 'fulfilled' as const, value: null }) : 
-          withTimeout(this.dexScreener.getTokenData(tokenMintAddress), 8000, 'DexScreener').then(v => ({ status: 'fulfilled' as const, value: v })),
+          withTimeout(this.dexScreener.getTokenData(tokenMintAddress), TIMEOUTS.dexScreener, 'DexScreener').then(v => ({ status: 'fulfilled' as const, value: v })),
         options.skipOnChain ? Promise.resolve({ status: 'fulfilled' as const, value: null }) : 
-          withTimeout(this.getOnChainData(tokenAddress), 10000, 'OnChain').then(v => ({ status: 'fulfilled' as const, value: v })),
+          withTimeout(this.getOnChainData(tokenAddress), TIMEOUTS.onChain, 'OnChain').then(v => ({ status: 'fulfilled' as const, value: v })),
         options.skipExternal ? Promise.resolve({ status: 'fulfilled' as const, value: null }) : 
-          withTimeout(holderAnalysis.analyzeHolders(tokenMintAddress), 15000, 'Holders').then(v => ({ status: 'fulfilled' as const, value: v })),
-        options.skipOnChain ? Promise.resolve({ status: 'fulfilled' as const, value: null }) : 
-          withTimeout(this.getTokenCreationDate(tokenAddress), 5000, 'CreationDate').then(v => ({ status: 'fulfilled' as const, value: v })),
+          withTimeout(holderAnalysis.analyzeHolders(tokenMintAddress), TIMEOUTS.holders, 'Holders').then(v => ({ status: 'fulfilled' as const, value: v })),
+        // Skip creation date in fast mode (not critical)
+        (options.skipOnChain || isFastMode) ? Promise.resolve({ status: 'fulfilled' as const, value: null }) : 
+          withTimeout(this.getTokenCreationDate(tokenAddress), TIMEOUTS.creationDate, 'CreationDate').then(v => ({ status: 'fulfilled' as const, value: v })),
         options.skipExternal ? Promise.resolve({ status: 'fulfilled' as const, value: null }) : 
-          withTimeout(checkPumpFun(tokenMintAddress), 5000, 'PumpFun').then(v => ({ status: 'fulfilled' as const, value: v })),
+          withTimeout(checkPumpFun(tokenMintAddress), TIMEOUTS.pumpFun, 'PumpFun').then(v => ({ status: 'fulfilled' as const, value: v })),
       ]);
 
       // Log any failures for debugging
@@ -157,12 +174,14 @@ export class SolanaTokenAnalyzer {
         
         // Token metadata
         metadata: {
-          name: dex?.pairs?.[0]?.baseToken?.name || "Unknown",
-          symbol: dex?.pairs?.[0]?.baseToken?.symbol || "???",
+          name: dex?.pairs?.[0]?.baseToken?.name || onChain?.metadata?.name || "Unknown",
+          symbol: dex?.pairs?.[0]?.baseToken?.symbol || onChain?.metadata?.symbol || "???",
           decimals: onChain?.decimals || 9,
           supply: onChain?.supply || 0,
-          hasMetadata: true,
-          isMutable: false,
+          hasMetadata: !!onChain?.metadata || !!dex?.pairs?.[0]?.baseToken,
+          // Read actual is_mutable flag from Metaplex metadata account
+          // Most tokens (85%+) are intentionally mutable - only OG collections freeze metadata
+          isMutable: onChain?.metadata?.isMutable ?? true, // Default to true if metadata not found (safer assumption)
         },
         
         // Holder analysis - now using comprehensive holder service
@@ -203,10 +222,10 @@ export class SolanaTokenAnalyzer {
         suspiciousActivityDetected: false,
         
         // Risk assessment
-        riskScore: this.calculateRiskScore(dex, onChain, holders),
-        riskLevel: this.determineRiskLevel(dex, onChain, holders),
+        riskScore: this.calculateRiskScore(dex, onChain, holders, pumpFun),
+        riskLevel: this.determineRiskLevel(dex, onChain, holders, pumpFun),
         redFlags: this.generateRiskFlags(dex, onChain, holders, pumpFun, null),
-        rugScoreBreakdown: this.calculateRugScore(dex, onChain, holders, creationDate || undefined),
+        rugScoreBreakdown: this.calculateRugScore(dex, onChain, holders, creationDate || undefined, pumpFun),
         
         // Creation info
         creationDate: creationDate ?? undefined,
@@ -228,15 +247,27 @@ export class SolanaTokenAnalyzer {
       };
 
       // TEMPORAL GNN ANALYSIS - Add TGN detection results
+      // In fast mode, use shorter timeout but still run TGN
       if (this.tgnDetector && !options.skipExternal) {
         try {
           const lpPoolAddress = dex?.pairs?.[0]?.pairAddress || undefined;
           const isPreMigration = holders?.isPreMigration || false;
           
           console.log(`[Analyzer] Running TGN analysis for ${tokenMintAddress}...`);
-          const tgnResult = await this.tgnDetector.analyzeToken(tokenMintAddress, lpPoolAddress, isPreMigration);
           
-          response.tgnResult = tgnResult;
+          // Use timeout wrapper for TGN in fast mode
+          const tgnTimeout = isFastMode ? 2000 : 10000; // 2s fast, 10s normal
+          const tgnPromise = this.tgnDetector.analyzeToken(tokenMintAddress, lpPoolAddress, isPreMigration);
+          const tgnResult = await Promise.race([
+            tgnPromise,
+            new Promise<null>((_, reject) => setTimeout(() => reject(new Error('TGN timeout')), tgnTimeout))
+          ]).catch(() => null);
+          
+          if (tgnResult) {
+            response.tgnResult = tgnResult;
+            console.log(`[Analyzer] TGN P(rug): ${(tgnResult.rugProbability * 100).toFixed(1)}% | Pre-migration: ${isPreMigration} | Patterns: ${tgnResult.patterns.length}`);
+          }
+          
           response.isPreMigration = isPreMigration;
           response.systemWalletsFiltered = holders?.systemWalletsFiltered || 0;
           response.lpPoolAddress = lpPoolAddress;
@@ -244,8 +275,6 @@ export class SolanaTokenAnalyzer {
           // Check if migration was recently detected
           const migrationDetector = getMigrationDetector(rpcBalancer.getConnection());
           response.migrationDetected = migrationDetector.hasMigrated(tokenMintAddress);
-          
-          console.log(`[Analyzer] TGN P(rug): ${(tgnResult.rugProbability * 100).toFixed(1)}% | Pre-migration: ${isPreMigration} | Patterns: ${tgnResult.patterns.length}`);
         } catch (tgnError) {
           console.error('[Analyzer] TGN analysis failed:', tgnError);
           response.tgnResult = undefined;
@@ -253,17 +282,22 @@ export class SolanaTokenAnalyzer {
       }
 
       // JITO BUNDLE DETECTION - Analyze recent transactions for MEV bundles
+      // In fast mode, use shorter timeout but still run detection
       if (!options.skipExternal) {
-        try {
+        const jitoTimeout = isFastMode ? 2000 : 10000; // 2s fast, 10s normal
+        const jitoDetection = async () => {
           console.log(`[Analyzer] Running Jito bundle detection for ${tokenMintAddress}...`);
           
           const connection = rpcBalancer.getConnection();
           const bundleMonitor = getBundleMonitor(connection);
           
+          // In fast mode, check fewer transactions for speed
+          const txLimit = isFastMode ? 20 : 50;
+          
           // Fetch recent transactions to analyze for bundle activity
           const signatures = await connection.getSignaturesForAddress(
             new PublicKey(tokenMintAddress),
-            { limit: 50 }, // Check last 50 transactions
+            { limit: txLimit },
             'confirmed'
           );
           
@@ -326,8 +360,19 @@ export class SolanaTokenAnalyzer {
               };
             }
           }
+        };
+        
+        try {
+          await Promise.race([
+            jitoDetection(),
+            new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Jito timeout')), jitoTimeout))
+          ]);
         } catch (bundleError: any) {
-          console.error('[Analyzer] Jito bundle detection failed:', bundleError.message);
+          if (bundleError.message === 'Jito timeout') {
+            console.warn(`[Analyzer] Jito bundle detection timed out after ${jitoTimeout}ms`);
+          } else {
+            console.error('[Analyzer] Jito bundle detection failed:', bundleError.message);
+          }
           response.jitoBundleData = undefined;
         }
       }
@@ -704,6 +749,9 @@ export class SolanaTokenAnalyzer {
       const burnedSupply = burnedAmount / Math.pow(10, decimals);
       const circulatingSupply = Math.max(0, totalSupply - burnedSupply);
 
+      // Fetch Metaplex metadata to get isMutable flag
+      const metaplexMetadata = await this.fetchMetaplexMetadata(connection, tokenAddress);
+
       // Holder data is now fetched via HolderAnalysisService in parallel
       // This method only handles mint metadata and authorities
       return {
@@ -717,10 +765,129 @@ export class SolanaTokenAnalyzer {
           mintDisabled: !mintInfo.mintAuthority,
           freezeDisabled: !mintInfo.freezeAuthority,
         },
-        metadata: null,
+        metadata: metaplexMetadata,
       };
     } catch (error: any) {
       console.warn(`⚠️ [Analyzer] On-chain data fetch failed:`, error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch and parse Metaplex Token Metadata account to get isMutable flag
+   * The metadata account is a PDA derived from the mint address
+   * 
+   * Metaplex Metadata struct layout:
+   * - key (1 byte)
+   * - update_authority (32 bytes)
+   * - mint (32 bytes)
+   * - name (4 + up to 32 bytes - string with length prefix)
+   * - symbol (4 + up to 10 bytes - string with length prefix)
+   * - uri (4 + up to 200 bytes - string with length prefix)
+   * - seller_fee_basis_points (2 bytes)
+   * - creators (option: 1 byte + if present: 4 bytes count + 34 bytes per creator)
+   * - primary_sale_happened (1 byte)
+   * - is_mutable (1 byte) <-- THIS IS WHAT WE NEED
+   */
+  private async fetchMetaplexMetadata(connection: Connection, mintAddress: PublicKey): Promise<{
+    isMutable: boolean;
+    updateAuthority: string | null;
+    name?: string;
+    symbol?: string;
+    uri?: string;
+  } | null> {
+    try {
+      // Metaplex Token Metadata Program ID
+      const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+      
+      // Derive the metadata PDA
+      const [metadataPDA] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from('metadata'),
+          METADATA_PROGRAM_ID.toBuffer(),
+          mintAddress.toBuffer(),
+        ],
+        METADATA_PROGRAM_ID
+      );
+      
+      // Fetch the metadata account
+      const metadataAccount = await connection.getAccountInfo(metadataPDA, 'confirmed');
+      
+      if (!metadataAccount || !metadataAccount.data || metadataAccount.data.length < 100) {
+        debugLog(`[Metadata] No Metaplex metadata found for ${mintAddress.toBase58()}`);
+        return null;
+      }
+      
+      const data = metadataAccount.data;
+      let offset = 0;
+      
+      // Skip key (1 byte)
+      offset += 1;
+      
+      // Update authority (32 bytes)
+      const updateAuthority = new PublicKey(data.subarray(offset, offset + 32)).toBase58();
+      offset += 32;
+      
+      // Skip mint (32 bytes) - we already know it
+      offset += 32;
+      
+      // Parse name (length-prefixed string: 4 bytes length + string data)
+      const nameLength = data.readUInt32LE(offset);
+      offset += 4;
+      const name = data.subarray(offset, offset + Math.min(nameLength, 32)).toString('utf8').replace(/\0/g, '').trim();
+      offset += 32; // Always 32 bytes allocated for name
+      
+      // Parse symbol (length-prefixed string: 4 bytes length + string data)
+      const symbolLength = data.readUInt32LE(offset);
+      offset += 4;
+      const symbol = data.subarray(offset, offset + Math.min(symbolLength, 10)).toString('utf8').replace(/\0/g, '').trim();
+      offset += 10; // Always 10 bytes allocated for symbol
+      
+      // Parse URI (length-prefixed string: 4 bytes length + string data)
+      const uriLength = data.readUInt32LE(offset);
+      offset += 4;
+      const uri = data.subarray(offset, offset + Math.min(uriLength, 200)).toString('utf8').replace(/\0/g, '').trim();
+      offset += 200; // Always 200 bytes allocated for URI
+      
+      // Seller fee basis points (2 bytes)
+      offset += 2;
+      
+      // Creators (Option<Vec<Creator>>)
+      // First byte: 0 = None, 1 = Some
+      const hasCreators = data[offset] === 1;
+      offset += 1;
+      
+      if (hasCreators) {
+        // Read number of creators (4 bytes)
+        const creatorsCount = data.readUInt32LE(offset);
+        offset += 4;
+        
+        // Skip each creator (32 bytes pubkey + 1 byte verified + 1 byte share = 34 bytes each)
+        offset += creatorsCount * 34;
+      }
+      
+      // Primary sale happened (1 byte boolean)
+      offset += 1;
+      
+      // *** is_mutable (1 byte boolean) - THE KEY FLAG ***
+      const isMutable = data[offset] === 1;
+      
+      debugLog(`[Metadata] Parsed metadata for ${mintAddress.toBase58().slice(0,8)}...:`);
+      debugLog(`[Metadata]   - Name: ${name}`);
+      debugLog(`[Metadata]   - Symbol: ${symbol}`);
+      debugLog(`[Metadata]   - Update Authority: ${updateAuthority.slice(0,8)}...`);
+      debugLog(`[Metadata]   - is_mutable: ${isMutable}`);
+      
+      return {
+        isMutable,
+        updateAuthority,
+        name: name || undefined,
+        symbol: symbol || undefined,
+        uri: uri || undefined,
+      };
+      
+    } catch (error: any) {
+      debugLog(`[Metadata] Failed to fetch Metaplex metadata: ${error.message}`);
       return null;
     }
   }
@@ -733,22 +900,29 @@ export class SolanaTokenAnalyzer {
     return price * supply;
   }
 
-  private calculateRiskScore(dex: any, onChain: any, holders?: any): number {
+  private calculateRiskScore(dex: any, onChain: any, holders?: any, pumpFun?: any): number {
     let penalties = 0;
+    
+    // Check if this is a pre-bonded pump.fun token (no LP exists yet)
+    const isPreBonded = pumpFun?.isPumpFun && (pumpFun?.bondingCurve < 100) && !pumpFun?.mayhemMode;
 
     // === CRITICAL RED FLAGS (instant rug capability) ===
     if (onChain?.authorities?.mintAuthority) penalties += 20;
     if (onChain?.authorities?.freezeAuthority) penalties += 20;
     
     // === LIQUIDITY RISK (low liquidity = easy manipulation) ===
-    const liquidityUsd = dex?.pairs?.[0]?.liquidity?.usd || 0;
+    // Skip liquidity penalties for pre-bonded pump.fun tokens (no LP exists yet)
+    if (!isPreBonded) {
+      const liquidityUsd = dex?.pairs?.[0]?.liquidity?.usd || 0;
+      
+      // Liquidity too low for market cap
+      if (liquidityUsd < 40000 && liquidityUsd > 0) penalties += 15;
+      if (liquidityUsd < 1000) penalties += 30;
+      if (liquidityUsd < 100) penalties += 40;
+    }
+    
     const marketCap = dex?.pairs?.[0]?.marketCap || 0;
     const volume24h = dex?.pairs?.[0]?.volume?.h24 || 0;
-    
-    // Liquidity too low for market cap
-    if (liquidityUsd < 40000 && liquidityUsd > 0) penalties += 15;
-    if (liquidityUsd < 1000) penalties += 30;
-    if (liquidityUsd < 100) penalties += 40;
     
     // Volume/MC ratio check (wash trading detection)
     if (marketCap > 0 && volume24h > 0) {
@@ -791,8 +965,8 @@ export class SolanaTokenAnalyzer {
     return Math.max(0, 100 - penalties);
   }
 
-  private determineRiskLevel(dex: any, onChain: any, holders?: any): RiskLevel {
-    const score = this.calculateRiskScore(dex, onChain, holders);
+  private determineRiskLevel(dex: any, onChain: any, holders?: any, pumpFun?: any): RiskLevel {
+    const score = this.calculateRiskScore(dex, onChain, holders, pumpFun);
     
     // Inverted: higher score = safer
     if (score >= 80) return "LOW";
@@ -806,18 +980,26 @@ export class SolanaTokenAnalyzer {
    * Lower score = safer | Higher score = more dangerous
    * <10 = SAFE | 10-50 = WARNING | >50 = DANGER
    */
-  private calculateRugScore(dex: any, onChain: any, holders?: any, creationDate?: number): import('../shared/schema').RugScoreBreakdown {
+  private calculateRugScore(dex: any, onChain: any, holders?: any, creationDate?: number, pumpFun?: any): import('../shared/schema').RugScoreBreakdown {
     const breakdown: string[] = [];
     
-    // === AUTHORITIES (30-40% weight, up to 165 points) ===
+    // Check if this is a pre-bonded pump.fun token (no LP exists yet)
+    const isPreBonded = pumpFun?.isPumpFun && (pumpFun?.bondingCurve < 100) && !pumpFun?.mayhemMode;
+    
+    // === AUTHORITIES (30-40% weight, up to 125 points) ===
     const mintAuthorityScore = onChain?.authorities?.mintAuthority ? 80 : 0;
     const freezeAuthorityScore = onChain?.authorities?.freezeAuthority ? 40 : 0;
-    const metadataMutableScore = onChain?.metadata?.isMutable !== false ? 30 : 0;
+    // Metadata mutable is NORMAL for 85%+ of tokens - only give small penalty
+    // Immutable metadata is a BONUS signal for OG collections, not a requirement
+    const metadataMutableScore = onChain?.metadata?.isMutable !== false ? 5 : 0;
     const permanentDelegateScore = 0; // TODO: Check permanent delegate (rare)
     
     if (mintAuthorityScore > 0) breakdown.push(`Mint authority active: +${mintAuthorityScore} pts`);
     if (freezeAuthorityScore > 0) breakdown.push(`Freeze authority active: +${freezeAuthorityScore} pts`);
-    if (metadataMutableScore > 0) breakdown.push(`Metadata mutable: +${metadataMutableScore} pts`);
+    // Only mention metadata mutable if other authorities are also active (compound risk)
+    if (metadataMutableScore > 0 && (mintAuthorityScore > 0 || freezeAuthorityScore > 0)) {
+      breakdown.push(`Metadata mutable: +${metadataMutableScore} pts`);
+    }
     
     const authoritiesScore = mintAuthorityScore + freezeAuthorityScore + metadataMutableScore + permanentDelegateScore;
     
@@ -844,20 +1026,28 @@ export class SolanaTokenAnalyzer {
     const holderDistributionScore = topHolderScore + top10Score + holderCountScore;
     
     // === LIQUIDITY (15-20% weight, up to 85 points) ===
-    const liquidityUsd = dex?.pairs?.[0]?.liquidity?.usd || 0;
-    const burnPercentage = dex?.pairs?.[0]?.liquidity?.burnPercentage || 0;
-    
-    // LP not locked/burned
-    const lpLockedScore = burnPercentage < 50 ? 40 : burnPercentage < 90 ? 20 : 0;
-    if (lpLockedScore > 0) breakdown.push(`LP ${burnPercentage.toFixed(0)}% burned (not fully locked): +${lpLockedScore} pts`);
-    
-    // Low liquidity: more points for lower liquidity
+    // Skip LP penalties for pre-bonded pump.fun tokens (no LP exists yet - it's on bonding curve)
+    let lpLockedScore = 0;
     let lpAmountScore = 0;
-    if (liquidityUsd < 1000) lpAmountScore = 30;
-    else if (liquidityUsd < 5000) lpAmountScore = 25;
-    else if (liquidityUsd < 10000) lpAmountScore = 20;
-    else if (liquidityUsd < 40000) lpAmountScore = 15;
-    if (lpAmountScore > 0) breakdown.push(`Low liquidity ($${(liquidityUsd/1000).toFixed(1)}k): +${lpAmountScore} pts`);
+    
+    if (isPreBonded) {
+      // Pre-bonded pump.fun token - no LP penalties, just note it
+      breakdown.push(`Pre-bonded on Pump.fun (no LP yet)`);
+    } else {
+      const liquidityUsd = dex?.pairs?.[0]?.liquidity?.usd || 0;
+      const burnPercentage = dex?.pairs?.[0]?.liquidity?.burnPercentage || 0;
+      
+      // LP not locked/burned
+      lpLockedScore = burnPercentage < 50 ? 40 : burnPercentage < 90 ? 20 : 0;
+      if (lpLockedScore > 0) breakdown.push(`LP ${burnPercentage.toFixed(0)}% burned (not fully locked): +${lpLockedScore} pts`);
+      
+      // Low liquidity: more points for lower liquidity
+      if (liquidityUsd < 1000) lpAmountScore = 30;
+      else if (liquidityUsd < 5000) lpAmountScore = 25;
+      else if (liquidityUsd < 10000) lpAmountScore = 20;
+      else if (liquidityUsd < 40000) lpAmountScore = 15;
+      if (lpAmountScore > 0) breakdown.push(`Low liquidity ($${(liquidityUsd/1000).toFixed(1)}k): +${lpAmountScore} pts`);
+    }
     
     const lpOwnershipScore = 0; // TODO: Check if dev owns LP tokens
     

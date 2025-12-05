@@ -1,7 +1,9 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AlertCircle, Home, ArrowLeft } from "lucide-react";
 import { Header } from "@/components/header-new";
 import { Footer } from "@/components/footer";
+import { Link } from "wouter";
 
 export default function NotFound() {
   return (
@@ -16,8 +18,21 @@ export default function NotFound() {
             </div>
 
             <p className="mt-4 text-sm text-muted-foreground">
-              Did you forget to add the page to the router?
+              The page you're looking for doesn't exist or has been moved.
             </p>
+            
+            <div className="flex gap-3 mt-6">
+              <Button variant="outline" asChild>
+                <Link href="/">
+                  <Home className="h-4 w-4 mr-2" />
+                  Go Home
+                </Link>
+              </Button>
+              <Button variant="ghost" onClick={() => window.history.back()}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Go Back
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </main>

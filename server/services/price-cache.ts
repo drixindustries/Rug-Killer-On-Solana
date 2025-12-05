@@ -185,8 +185,9 @@ export class PriceCache {
 }
 
 // Global singleton instance
+// Increased TTL to 10 minutes for analytics dashboard data persistence
 export const priceCache = new PriceCache({
-  ttlMs: 20000, // 20 seconds
+  ttlMs: 10 * 60 * 1000, // 10 minutes (was 20 seconds)
   maxSize: 2000, // Support 2000 tokens
 });
 

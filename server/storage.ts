@@ -533,11 +533,22 @@ export class DatabaseStorage implements IStorage {
     return wallet;
   }
 
+  // In-memory challenge cache (fallback when DB is unavailable)
+  private inMemoryChallenges: Map<string, WalletChallenge> = new Map();
+  
   // Wallet challenge operations (anti-replay)
   async createChallenge(userId: string): Promise<WalletChallenge> {
     // Generate random challenge (nonce)
     const challenge = `verify-${userId}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
+    
+    const challengeData: WalletChallenge = {
+      id: Date.now(), // Use timestamp as ID for in-memory
+      userId,
+      challenge,
+      expiresAt,
+      createdAt: new Date(),
+    };
     
     try {
       const [created] = await db
@@ -548,36 +559,79 @@ export class DatabaseStorage implements IStorage {
           expiresAt,
         })
         .returning();
+      
+      // Also store in memory cache for reliability
+      this.inMemoryChallenges.set(challenge, created);
       return created;
     } catch (error) {
-      // In-memory mode fallback - return mock challenge
-      return {
-        id: 0,
-        userId,
-        challenge,
-        expiresAt,
-        createdAt: new Date(),
-      };
+      console.warn('[Storage] DB challenge insert failed, using in-memory fallback:', error);
+      // Store in memory cache
+      this.inMemoryChallenges.set(challenge, challengeData);
+      return challengeData;
     }
   }
 
   async getChallenge(challenge: string): Promise<WalletChallenge | undefined> {
-    const [found] = await db
-      .select()
-      .from(walletChallenges)
-      .where(eq(walletChallenges.challenge, challenge));
-    return found;
+    // First check in-memory cache
+    const cached = this.inMemoryChallenges.get(challenge);
+    if (cached) {
+      return cached;
+    }
+    
+    // Then check database
+    try {
+      const [found] = await db
+        .select()
+        .from(walletChallenges)
+        .where(eq(walletChallenges.challenge, challenge));
+      return found;
+    } catch (error) {
+      console.warn('[Storage] DB challenge lookup failed:', error);
+      return undefined;
+    }
   }
 
-  async markChallengeUsed(challengeId: string): Promise<WalletChallenge> {
-    const [updated] = await db
-      .update(walletChallenges)
-      .set({
+  async markChallengeUsed(challengeId: string | number): Promise<WalletChallenge> {
+    // Find in memory cache and mark as used
+    for (const [key, value] of this.inMemoryChallenges.entries()) {
+      if (value.id === challengeId || value.id === Number(challengeId)) {
+        value.usedAt = new Date();
+        return value;
+      }
+    }
+    
+    // Try database
+    try {
+      const [updated] = await db
+        .update(walletChallenges)
+        .set({
+          usedAt: new Date(),
+        })
+        .where(eq(walletChallenges.id, Number(challengeId)))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.warn('[Storage] DB challenge update failed:', error);
+      // Return a mock response if DB fails
+      return {
+        id: Number(challengeId),
+        userId: '',
+        challenge: '',
+        expiresAt: new Date(),
         usedAt: new Date(),
-      })
-      .where(eq(walletChallenges.id, challengeId))
-      .returning();
-    return updated;
+        createdAt: new Date(),
+      };
+    }
+  }
+  
+  // Clean up expired in-memory challenges (call periodically)
+  cleanExpiredChallenges(): void {
+    const now = new Date();
+    for (const [key, value] of this.inMemoryChallenges.entries()) {
+      if (value.expiresAt < now || value.usedAt) {
+        this.inMemoryChallenges.delete(key);
+      }
+    }
   }
 
   // KOL wallet operations

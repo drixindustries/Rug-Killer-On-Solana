@@ -459,6 +459,7 @@ export class AlphaAlertService {
         freezeRevoked: !tokenAnalysis.freezeAuthority?.hasAuthority,
         liquidityStatus: tokenAnalysis.liquidityPool?.status || 'Unknown',
         lpBurnPercent: tokenAnalysis.liquidityPool?.burnPercentage,
+        notBondedYet: tokenAnalysis.liquidityPool?.notBondedYet || false, // Pump.fun pre-bond state
         marketCap: tokenAnalysis.marketData?.marketCap,
         volume24h: tokenAnalysis.marketData?.volume24h,
         priceUsd: tokenAnalysis.marketData?.priceUsd,
@@ -549,7 +550,10 @@ export class AlphaAlertService {
               else parts.push('⚠️ Mint Active');
               if (analysisMetrics.freezeRevoked) parts.push('✅ Freeze Revoked');
               else parts.push('⚠️ Freeze Active');
-              if (analysisMetrics.lpBurnPercent !== undefined && analysisMetrics.lpBurnPercent !== null) {
+              // Handle LP Burn display - show "Not Bonded" for pre-bonded pump.fun tokens
+              if (analysisMetrics.notBondedYet) {
+                parts.push('⏳ LP Burn: Not Bonded');
+              } else if (analysisMetrics.lpBurnPercent !== undefined && analysisMetrics.lpBurnPercent !== null) {
                 const burnEmoji = analysisMetrics.lpBurnPercent >= 95 ? '🔥' : analysisMetrics.lpBurnPercent >= 50 ? '⚠️' : '❌';
                 parts.push(`${burnEmoji} LP Burn: ${analysisMetrics.lpBurnPercent.toFixed(1)}%`);
               }
@@ -770,6 +774,7 @@ export class AlphaAlertService {
         freezeRevoked: !tokenAnalysis.freezeAuthority?.hasAuthority,
         liquidityStatus: tokenAnalysis.liquidityPool?.status || 'Unknown',
         lpBurnPercent: tokenAnalysis.liquidityPool?.burnPercentage,
+        notBondedYet: tokenAnalysis.liquidityPool?.notBondedYet || false, // Pump.fun pre-bond state
         marketCap: tokenAnalysis.marketData?.marketCap,
         volume24h: tokenAnalysis.marketData?.volume24h,
         priceUsd: tokenAnalysis.marketData?.priceUsd,
@@ -837,7 +842,10 @@ export class AlphaAlertService {
               else parts.push('⚠️ Mint Active');
               if (analysisMetrics.freezeRevoked) parts.push('✅ Freeze Revoked');
               else parts.push('⚠️ Freeze Active');
-              if (analysisMetrics.lpBurnPercent !== undefined && analysisMetrics.lpBurnPercent !== null) {
+              // Handle LP Burn display - show "Not Bonded" for pre-bonded pump.fun tokens
+              if (analysisMetrics.notBondedYet) {
+                parts.push('⏳ LP Burn: Not Bonded');
+              } else if (analysisMetrics.lpBurnPercent !== undefined && analysisMetrics.lpBurnPercent !== null) {
                 const burnEmoji = analysisMetrics.lpBurnPercent >= 95 ? '🔥' : analysisMetrics.lpBurnPercent >= 50 ? '⚠️' : '❌';
                 parts.push(`${burnEmoji} LP Burn: ${analysisMetrics.lpBurnPercent.toFixed(1)}%`);
               }

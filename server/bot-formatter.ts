@@ -209,7 +209,8 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   const devBoughtPct = analysis.pumpFunData?.devBought ?? 0;
   const bundledClusters = analysis.advancedBundleData?.suspiciousWallets?.length ?? 0;
   const systemWalletsFiltered = analysis.systemWalletsFiltered ?? 0;
-  const agedWalletCount = analysis.agedWalletData?.walletIntelligence?.ageDistribution?.aged ?? 0;
+  // FIX: Use correct property path - agedWalletCount is directly on agedWalletData
+  const agedWalletCount = analysis.agedWalletData?.agedWalletCount ?? 0;
   
   // Use the ACTUAL holder count - holderCount already has system wallets filtered out
   const holderCountText = holderCount.toLocaleString();
