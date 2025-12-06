@@ -22,7 +22,7 @@ interface PriceCache {
 }
 
 const priceCache: PriceCache = {};
-const PRICE_CACHE_TTL = 60000; // 1 minute
+const PRICE_CACHE_TTL = 300000; // 5 minutes (increased from 1 minute to reduce API calls)
 
 async function getPrice(mint: string): Promise<number> {
   const cached = priceCache[mint];

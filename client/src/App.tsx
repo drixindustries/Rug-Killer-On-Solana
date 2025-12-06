@@ -20,7 +20,7 @@ import Admin from "@/pages/admin";
 import BotSetup from "@/pages/bot-setup";
 import Watchlist from "@/pages/watchlist";
 import Portfolio from "@/pages/portfolio";
-import Alerts from "@/pages/alerts";
+// Alerts page removed - bots handle notifications
 import Comparison from "@/pages/comparison";
 import Analytics from "@/pages/analytics";
 import Profile from "@/pages/profile";
@@ -43,7 +43,7 @@ function Router() {
       <Route path="/bot-guide" component={BotGuide} />
       <Route path="/watchlist" component={Watchlist} />
       <Route path="/portfolio" component={Portfolio} />
-      <Route path="/alerts" component={Alerts} />
+      {/* Alerts page removed - bots handle notifications */}
       <Route path="/compare" component={Comparison} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/profile/:userId" component={Profile} />

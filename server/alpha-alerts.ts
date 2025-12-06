@@ -12,6 +12,7 @@ import { MigrationDetector, getMigrationDetector, type MigrationEvent } from './
 import { HolderAnalysisService, type HolderAnalysisResult } from './services/holder-analysis.js';
 import { getWalletDiscoveryService } from './services/wallet-discovery.js';
 import { getHeliusWalletStatsService } from './services/helius-wallet-stats.js';
+import { trendingCallsTracker } from './trending-calls-tracker.js';
 
 interface AlphaAlert {
   type: 'new_token' | 'whale_buy' | 'caller_signal';
@@ -944,6 +945,25 @@ export class AlphaAlertService {
       } catch (error) {
         console.error('[ALPHA ALERT] Callback error:', error);
       }
+    }
+    
+    // Track alpha alerts in trending calls tracker
+    try {
+      const tokenSymbol = embedData?.title?.match(/\$(\w+)/)?.[1] || alert.data?.symbol;
+      trendingCallsTracker.trackMention({
+        symbol: tokenSymbol,
+        contractAddress: alert.mint,
+        platform: 'discord', // Alpha alerts typically come through Discord/Telegram
+        channelId: 'alpha-alerts',
+        channelName: `Alpha: ${alert.source}`,
+        userId: alert.source,
+        username: alert.source,
+        timestamp: alert.timestamp,
+        messageContent: `${alert.type}: ${alert.source} bought ${tokenSymbol || alert.mint.slice(0, 8)}`,
+      });
+      console.log(`[ALPHA ALERTS] ✅ Tracked in trending calls: ${alert.mint.slice(0, 8)}...`);
+    } catch (trendingError) {
+      console.warn('[ALPHA ALERTS] Failed to track in trending calls:', trendingError);
     }
   }
 

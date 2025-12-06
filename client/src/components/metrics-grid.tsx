@@ -10,7 +10,7 @@ interface MetricsGridProps {
   decimals: number;
   bundledCount?: number;
   bundleConfidence?: 'low' | 'medium' | 'high';
-  bundleSupplyPct?: number; // % of supply controlled by bundles (DevsNightmare)
+  bundleSupplyPct?: number; // % of supply controlled by bundles (Alpha Scan)
 }
 
 export function MetricsGrid({
@@ -62,7 +62,7 @@ export function MetricsGrid({
     },
     {
       icon: AlertTriangle,
-      label: "Bundle Supply % (DevsNightmare)",
+      label: "Bundle Supply % (Alpha Scan)",
       value: `${(typeof bundleSupplyPct === 'number' ? bundleSupplyPct.toFixed(2) : '0.00')}%`,
       secondary: `${bundledCount} bundled wallet${bundledCount !== 1 ? 's' : ''} control this supply`,
       testId: "metric-bundle-percentage",

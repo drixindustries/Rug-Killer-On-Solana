@@ -67,7 +67,7 @@ export interface HolderAnalysisResult {
 }
 
 export class HolderAnalysisService {
-  private readonly CACHE_TTL = 300; // 5 minutes cache
+  private readonly CACHE_TTL = 900; // 15 minutes cache (increased from 5 min to reduce RPC load)
   
   // DEDUPLICATION: Track in-flight requests to prevent duplicate RPC calls
   private inFlightRequests: Map<string, Promise<HolderAnalysisResult>> = new Map();

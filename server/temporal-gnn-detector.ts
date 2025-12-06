@@ -74,6 +74,11 @@ export class TemporalGNNDetector {
   private readonly memoryDecay = 0.9; // Decay factor for node memory
   private migrationEvents = new Map<string, { timestamp: number; lpAddress: string }>(); // tokenMint -> migration data
   
+  // Aggressive caching to reduce RPC calls
+  private resultCache = new Map<string, { result: TGNResult; timestamp: number }>();
+  private readonly CACHE_TTL = 600_000; // 10 minute cache for TGN results
+  private readonly TX_LIMIT = 25; // Reduced from 50 to minimize RPC calls
+  
   constructor(
     private connection: Connection,
     private config = {
@@ -122,6 +127,13 @@ export class TemporalGNNDetector {
       return this.getDisabledResult();
     }
 
+    // Check cache first to reduce RPC calls
+    const cached = this.resultCache.get(tokenAddress);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      console.log(`[TGN] Cache HIT for ${tokenAddress.slice(0, 8)}...`);
+      return cached.result;
+    }
+
     try {
       // Check if migration event occurred
       const migrationData = this.migrationEvents.get(tokenAddress);
@@ -149,7 +161,7 @@ export class TemporalGNNDetector {
       // Extract risk factors
       const riskFactors = this.extractRiskFactors(patterns, metrics);
 
-      return {
+      const result: TGNResult = {
         rugProbability,
         patterns,
         graphMetrics: metrics,
@@ -157,6 +169,21 @@ export class TemporalGNNDetector {
         migrationDetected,
         riskFactors,
       };
+
+      // Cache result to reduce future RPC calls
+      this.resultCache.set(tokenAddress, { result, timestamp: Date.now() });
+      
+      // Cleanup old cache entries periodically
+      if (this.resultCache.size > 500) {
+        const now = Date.now();
+        for (const [key, entry] of this.resultCache.entries()) {
+          if (now - entry.timestamp > this.CACHE_TTL) {
+            this.resultCache.delete(key);
+          }
+        }
+      }
+
+      return result;
 
     } catch (error) {
       console.error('[TGN] Analysis error:', error);
@@ -179,9 +206,9 @@ export class TemporalGNNDetector {
     try {
       const tokenPubkey = new PublicKey(tokenAddress);
 
-      // Fetch recent signatures (last ~50 transactions)
+      // Fetch recent signatures (reduced to minimize RPC calls)
       const signatures = await this.connection.getSignaturesForAddress(tokenPubkey, {
-        limit: 50,
+        limit: this.TX_LIMIT,
       });
 
       // Process each transaction

@@ -65,7 +65,8 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
+      gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache (formerly cacheTime)
       retry: false,
     },
     mutations: {
@@ -73,3 +74,12 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+// Cache time constants for different data types
+export const CACHE_TIMES = {
+  TRENDING: 2 * 60 * 1000,    // 2 minutes for trending data
+  PORTFOLIO: 60 * 1000,        // 1 minute for portfolio (needs to be more fresh)
+  ANALYTICS: 5 * 60 * 1000,    // 5 minutes for analytics
+  STATIC: 30 * 60 * 1000,      // 30 minutes for static data
+  LIVE_SCANS: 60 * 1000,       // 1 minute for live scans
+};

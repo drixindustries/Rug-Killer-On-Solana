@@ -47,7 +47,8 @@ export default function Portfolio() {
       return res.json();
     },
     enabled: !!walletAddress && viewMode === 'live',
-    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 60 * 1000, // 1 minute fresh
+    refetchInterval: 60 * 1000, // Refresh every 1 minute (reduced from 30s)
   });
 
   // Handle refresh

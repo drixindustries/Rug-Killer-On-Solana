@@ -44,7 +44,7 @@ export function MascotSpotlight({ onScrollToAnalyzer }: MascotSpotlightProps) {
   const { data: stats } = useQuery<MascotHeroStats>({
     queryKey: ["/api/alpha/hero-stats"],
     queryFn: fetchMascotStats,
-    staleTime: 60_000,
+    staleTime: 5 * 60 * 1000, // 5 minutes - hero stats don't need to be instant
   });
 
   const lastAlertAgo = useMemo(() => {

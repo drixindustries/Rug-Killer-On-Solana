@@ -10,7 +10,7 @@ interface CacheEntry {
 }
 
 const CACHE: Map<string, CacheEntry> = new Map();
-const DEFAULT_TTL_MS = 30_000; // 30s to keep fresh for rapid batch scans
+const DEFAULT_TTL_MS = 120_000; // 2 minutes (increased from 30s to reduce API load)
 
 export class DexScreenerService {
   private ttlMs: number;

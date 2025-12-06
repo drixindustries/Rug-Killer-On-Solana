@@ -184,7 +184,7 @@ export default function Features() {
         <div className="text-center mb-8">
           <Badge className="mb-4" data-testid="badge-ai-ml">NEW - AI/ML</Badge>
           <h2 className="text-3xl font-bold mb-2">Advanced AI Detection</h2>
-          <p className="text-muted-foreground">Temporal GNN, Jito MEV, and SyraxML scoring</p>
+          <p className="text-muted-foreground">Temporal GNN, Jito MEV, and Machine Learning scoring</p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6 mb-8">
@@ -245,11 +245,11 @@ export default function Features() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-syraxml">
+          <Card data-testid="card-machine-learning">
             <CardHeader>
               <Eye className="h-8 w-8 mb-2 text-blue-500" />
-              <CardTitle>SyraxML Scoring</CardTitle>
-              <CardDescription>ML legitimacy assessment</CardDescription>
+              <CardTitle>Machine Learning</CardTitle>
+              <CardDescription>AI legitimacy assessment</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">

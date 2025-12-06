@@ -38,14 +38,14 @@ export class HeliusWalletStatsService {
   private readonly TIMEOUT_MS = 15000;
   private readonly SOL_PRICE = 200; // Approximate SOL price for USD conversion
   
-  // Caching - Increased to reduce API calls significantly
-  private readonly CACHE_TTL = Number(process.env.HELIUS_WALLET_STATS_CACHE_TTL) || 14400; // 4 hours default (was 30 min)
+  // Caching - Increased significantly to reduce API calls
+  private readonly CACHE_TTL = Number(process.env.HELIUS_WALLET_STATS_CACHE_TTL) || 28800; // 8 hours default (was 4 hours)
   
   // Request deduplication - track in-flight requests
   private inFlightRequests = new Map<string, Promise<WalletStats | null>>();
   
   // Rate limiting - sliding window (reduced to conserve credits)
-  private readonly MAX_REQUESTS_PER_MINUTE = Number(process.env.HELIUS_MAX_REQUESTS_PER_MINUTE) || 30; // Reduced from 100 to 30
+  private readonly MAX_REQUESTS_PER_MINUTE = Number(process.env.HELIUS_MAX_REQUESTS_PER_MINUTE) || 15; // Reduced from 30 to 15
   private readonly RATE_LIMIT_QUEUE_SIZE = Number(process.env.HELIUS_RATE_LIMIT_QUEUE_SIZE) || 50;
   
   // Circuit breaker - stop calling Helius if we're hitting limits

@@ -30,10 +30,7 @@ export default function Comparison() {
 
   const compareMutation = useMutation({
     mutationFn: async (addresses: string[]) => {
-      const response = await apiRequest("/api/compare-tokens", {
-        method: "POST",
-        body: JSON.stringify({ tokenAddresses: addresses }),
-      });
+      const response = await apiRequest("POST", "/api/compare-tokens", { tokenAddresses: addresses });
       return await response.json() as ComparisonResponse;
     },
     onSuccess: (data) => {

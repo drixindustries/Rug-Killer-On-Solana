@@ -53,13 +53,15 @@ export function LiveScansDashboard() {
   // Fetch initial scan history
   const { data: historyData, refetch } = useQuery<{ scans: LiveScan[] }>({
     queryKey: ["/api/scan-history"],
-    refetchInterval: 30000, // Refetch every 30 seconds as fallback
+    staleTime: 60 * 1000, // 1 minute fresh
+    refetchInterval: 60 * 1000, // Refetch every 1 minute (reduced from 30s)
   });
 
   // Fetch scan stats
   const { data: stats } = useQuery<LiveScanStats>({
     queryKey: ["/api/scan-stats"],
-    refetchInterval: 60000, // Refetch every minute
+    staleTime: 2 * 60 * 1000, // 2 minutes fresh
+    refetchInterval: 2 * 60 * 1000, // Refetch every 2 minutes (reduced from 1 min)
   });
 
   // WebSocket connection

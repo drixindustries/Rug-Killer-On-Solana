@@ -83,7 +83,7 @@ export default function About() {
                     <div>
                       <h3 className="font-semibold text-sm">GROUP Tier (Renamed)</h3>
                       <p className="text-sm text-muted-foreground">
-                        Perfect for Discord/Telegram groups - $120/month with group alerts
+                        Perfect for Discord/Telegram groups - $129/month with group alerts
                       </p>
                     </div>
                   </div>
@@ -266,7 +266,7 @@ export default function About() {
                     </ul>
                   </div>
                   <div>
-                    <h3 className="font-semibold">Group - $120/month</h3>
+                    <h3 className="font-semibold">Group - $129/month</h3>
                     <ul className="text-sm text-muted-foreground space-y-1 mt-2 ml-4">
                       <li>• Everything in Individual</li>
                       <li>• Telegram group/channel alerts</li>

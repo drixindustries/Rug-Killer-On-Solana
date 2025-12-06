@@ -136,6 +136,7 @@ export default function Analytics() {
   // Market Overview Query
   const { data: marketOverview, isLoading: overviewLoading } = useQuery<MarketOverviewData>({
     queryKey: ["analytics", "market-overview"],
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/analytics/market-overview");
       return (await res.json()) as MarketOverviewData;
@@ -170,6 +171,7 @@ export default function Analytics() {
   // Hot Tokens Query (with auto-refresh)
   const { data: hotTokens, isLoading: hotTokensLoading, refetch: refetchHotTokens } = useQuery<HotToken[]>({
     queryKey: ["analytics", "hot-tokens", hotTokensRefresh],
+    staleTime: 2 * 60 * 1000, // 2 minutes cache
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/analytics/hot-tokens?limit=20&_=${hotTokensRefresh}`);
       return (await res.json()) as HotToken[];
@@ -185,11 +187,11 @@ export default function Analytics() {
     },
   });
 
-  // Auto-refresh hot tokens every 30 seconds
+  // Auto-refresh hot tokens every 2 minutes (reduced from 30 seconds)
   useEffect(() => {
     const interval = setInterval(() => {
       setHotTokensRefresh(prev => prev + 1);
-    }, 30000); // 30 seconds
+    }, 2 * 60 * 1000); // 2 minutes
 
     return () => clearInterval(interval);
   }, []);

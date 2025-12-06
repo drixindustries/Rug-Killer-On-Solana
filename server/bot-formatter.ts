@@ -70,7 +70,10 @@ export interface CompactMessageData {
   agedWallets?: string;
   walletAges?: string;
   gmgn?: string;
-  socialSentiment?: string; // NEW: Social sentiment from X/Telegram/Discord
+  socialSentiment?: string; // Social sentiment from X/Telegram/Discord
+  socialRedFlags?: string; // Off-chain red flags (missing socials, casino outflows)
+  alphaScanGrading?: string; // Team/Insider/Sniper detection (formerly DevsNightmare)
+  machineLearning?: string; // ML composite risk score (formerly Syrax)
   alerts: string[];
   links: string;
 }
@@ -815,6 +818,95 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     socialSentiment += `\n${freshnessEmoji} Data: ${ss.dataFreshness}`;
   }
   
+  // SOCIAL RED FLAGS - Off-chain risk detection (Nova methodology)
+  let socialRedFlags: string | undefined;
+  if (analysis.socialRedFlags) {
+    const sr = analysis.socialRedFlags;
+    
+    if (sr.hasMissingSocials || sr.hasCasinoOutflows || sr.suspiciousPatterns?.length > 0) {
+      const riskEmoji = sr.missingSocialsRisk === 'high' ? '🚨' : sr.missingSocialsRisk === 'medium' ? '⚠️' : '🟡';
+      socialRedFlags = `${riskEmoji} **Social Red Flags**\n`;
+      
+      // Social presence
+      const socials = sr.socialPresence;
+      const missing: string[] = [];
+      if (!socials.hasWebsite) missing.push('Website');
+      if (!socials.hasTwitter) missing.push('X/Twitter');
+      if (!socials.hasTelegram) missing.push('Telegram');
+      if (!socials.hasDiscord) missing.push('Discord');
+      
+      if (missing.length > 0) {
+        socialRedFlags += `• Missing: ${missing.join(', ')}\n`;
+      }
+      
+      // Casino outflows
+      if (sr.hasCasinoOutflows && sr.totalCasinoOutflows > 0) {
+        socialRedFlags += `• 🎰 Casino Outflows: ${sr.totalCasinoOutflows.toFixed(2)} SOL\n`;
+      }
+      
+      // Suspicious patterns
+      if (sr.suspiciousPatterns && sr.suspiciousPatterns.length > 0) {
+        socialRedFlags += `• Patterns: ${sr.suspiciousPatterns.slice(0, 3).join(', ')}`;
+      }
+    }
+  }
+  
+  // ALPHA SCAN GRADING - Team/Insider/Sniper detection (Nova methodology)
+  let alphaScanGrading: string | undefined;
+  if (analysis.devsNightmareData) {
+    const dn = analysis.devsNightmareData;
+    
+    const verdictEmoji = {
+      'SAFE': '✅',
+      'WARNING': '⚠️',
+      'BUNDLED_SCAM': '🚨',
+      'AVOID': '❌'
+    }[dn.verdict] || '❓';
+    
+    alphaScanGrading = `${verdictEmoji} **Alpha Scan Grading** (${dn.verdict})\n`;
+    alphaScanGrading += `• Team: ${dn.teamPercent.toFixed(1)}%${dn.teamPercent > 5 ? ' ⚠️' : ''}\n`;
+    alphaScanGrading += `• Insiders: ${dn.insidersPercent.toFixed(1)}%${dn.insidersPercent > 7 ? ' 🚨' : ''}\n`;
+    alphaScanGrading += `• Snipers: ${dn.snipersPercent.toFixed(1)}%${dn.snipersPercent > 10 ? ' ⚠️' : ''}\n`;
+    
+    // CEX breakdown
+    if (dn.cexBreakdown) {
+      const cex = dn.cexBreakdown;
+      const cexEmoji = cex.isLegit ? '✅' : cex.risk === 'high' ? '🚨' : '⚠️';
+      alphaScanGrading += `${cexEmoji} CEX Funding: ${cex.total.toFixed(0)}%`;
+      if (cex.mexc > 20) {
+        alphaScanGrading += ` (MEXC ${cex.mexc.toFixed(0)}% 🚨)`;
+      }
+      alphaScanGrading += `\n`;
+    }
+    
+    // Confidence
+    alphaScanGrading += `• Confidence: ${dn.confidence}%`;
+  }
+  
+  // MACHINE LEARNING - Composite ML risk scoring
+  let machineLearning: string | undefined;
+  if (analysis.syraxMLData) {
+    const ml = analysis.syraxMLData;
+    
+    const riskEmoji = ml.riskLevel === 'EXTREME' ? '🚨' : 
+                      ml.riskLevel === 'HIGH' ? '🔴' : 
+                      ml.riskLevel === 'MODERATE' ? '🟠' : 
+                      ml.riskLevel === 'LOW' ? '🟢' : '⚪';
+    
+    machineLearning = `${riskEmoji} **Machine Learning** (${ml.riskLevel})\n`;
+    machineLearning += `• Composite Score: ${ml.compositeScore}/100\n`;
+    
+    if (ml.featureImportance && ml.featureImportance.length > 0) {
+      const topFeatures = ml.featureImportance.slice(0, 3);
+      const featuresText = topFeatures.map(f => `${f.feature}: ${(f.importance * 100).toFixed(0)}%`).join(', ');
+      machineLearning += `• Top Factors: ${featuresText}\n`;
+    }
+    
+    if (ml.modelVersion) {
+      machineLearning += `• Model: ${ml.modelVersion}`;
+    }
+  }
+  
   // CRITICAL ALERTS
   const alerts: string[] = [];
   
@@ -857,6 +949,9 @@ Quick Links → [Solscan](https://solscan.io/token/${analysis.tokenAddress}) •
     gmgn,
     mlAnalysis,
     socialSentiment,
+    socialRedFlags,
+    alphaScanGrading,
+    machineLearning,
     alerts,
     links
   };
@@ -945,6 +1040,18 @@ export function toPlainText(data: CompactMessageData): string {
   
   if (data.socialSentiment) {
     message += `${data.socialSentiment}\n\n`;
+  }
+  
+  if (data.socialRedFlags) {
+    message += `${data.socialRedFlags}\n\n`;
+  }
+  
+  if (data.alphaScanGrading) {
+    message += `${data.alphaScanGrading}\n\n`;
+  }
+  
+  if (data.machineLearning) {
+    message += `${data.machineLearning}\n\n`;
   }
   
   if (data.alerts.length > 0) {

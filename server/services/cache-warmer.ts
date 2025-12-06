@@ -14,7 +14,7 @@ class CachePreWarmingService {
   private dexScreener: DexScreenerService;
   private warmingInProgress: Set<string> = new Set();
   private warmedTokens: Map<string, number> = new Map(); // mint -> timestamp
-  private readonly REWARM_INTERVAL = 4 * 60 * 1000; // 4 minutes (before 5 min cache expires)
+  private readonly REWARM_INTERVAL = 12 * 60 * 1000; // 12 minutes (before 15 min cache expires)
 
   constructor() {
     this.dexScreener = new DexScreenerService();

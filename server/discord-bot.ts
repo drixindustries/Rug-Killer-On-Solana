@@ -191,6 +191,30 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
     embed.addFields({ name: '🧠 AI Analysis', value: tgnMlParts.join('\n'), inline: false });
   }
   
+  // Alpha Scan Grading (Team/Insider/Sniper detection)
+  if (messageData.alphaScanGrading) {
+    const alphaContent = messageData.alphaScanGrading.split('\n').slice(1).join('\n');
+    if (alphaContent) {
+      embed.addFields({ name: '📊 Alpha Scan Grading', value: alphaContent.slice(0, 250), inline: true });
+    }
+  }
+  
+  // Machine Learning
+  if (messageData.machineLearning) {
+    const mlContent = messageData.machineLearning.split('\n').slice(1).join('\n');
+    if (mlContent) {
+      embed.addFields({ name: '🤖 Machine Learning', value: mlContent.slice(0, 200), inline: true });
+    }
+  }
+  
+  // Social Red Flags
+  if (messageData.socialRedFlags) {
+    const socialContent = messageData.socialRedFlags.split('\n').slice(1).join('\n');
+    if (socialContent) {
+      embed.addFields({ name: '🚩 Social Red Flags', value: socialContent.slice(0, 200), inline: true });
+    }
+  }
+  
   // AI VERDICT (condensed)
   const sanitizedAiVerdict = stripBold(messageData.aiVerdict);
   if (sanitizedAiVerdict) {
@@ -489,12 +513,25 @@ const commands = [
   // === NEW PnL & LEADERBOARD COMMANDS ===
   new SlashCommandBuilder()
     .setName('pnl')
-    .setDescription('Show wallet PnL with FIFO/LIFO accounting')
-    .addStringOption(option => option.setName('wallet').setDescription('Wallet address').setRequired(true))
-    .addStringOption(option => option.setName('method').setDescription('Accounting method').addChoices(
-      { name: 'FIFO (First In, First Out)', value: 'FIFO' },
-      { name: 'LIFO (Last In, First Out)', value: 'LIFO' }
-    )),
+    .setDescription('PnL commands - wallet analysis and alert settings')
+    .addSubcommand(sc => sc
+      .setName('wallet')
+      .setDescription('Show wallet PnL with FIFO/LIFO accounting')
+      .addStringOption(option => option.setName('address').setDescription('Wallet address').setRequired(true))
+      .addStringOption(option => option.setName('method').setDescription('Accounting method').addChoices(
+        { name: 'FIFO (First In, First Out)', value: 'FIFO' },
+        { name: 'LIFO (Last In, First Out)', value: 'LIFO' }
+      ))
+    )
+    .addSubcommand(sc => sc
+      .setName('setchannel')
+      .setDescription('Set channel for PnL pump alerts (20%, 50%, 100%+ gains)')
+      .addChannelOption(option => option.setName('channel').setDescription('Channel for pump alerts').setRequired(true))
+    )
+    .addSubcommand(sc => sc
+      .setName('status')
+      .setDescription('Show current PnL tracking status')
+    ),
   new SlashCommandBuilder()
     .setName('leaderboard')
     .setDescription('Show top callers by win rate and PnL'),
@@ -2609,36 +2646,85 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       // ===================================================================
       
       else if (interaction.commandName === 'pnl') {
-        const walletAddress = interaction.options.getString('wallet', true);
-        const method = (interaction.options.getString('method') || 'FIFO') as AccountingMethod;
+        const subcommand = interaction.options.getSubcommand();
         
-        await interaction.deferReply();
+        if (subcommand === 'wallet') {
+          const walletAddress = interaction.options.getString('address', true);
+          const method = (interaction.options.getString('method') || 'FIFO') as AccountingMethod;
+          
+          await interaction.deferReply();
+          
+          try {
+            const pnl = await pnlTracker.calculatePnL(walletAddress, method);
+            const embedData = pnlTracker.formatPnLForDiscord(pnl);
+            
+            const embed = new EmbedBuilder()
+              .setColor(embedData.color)
+              .setTitle(embedData.title)
+              .setDescription(embedData.description)
+              .setTimestamp();
+            
+            for (const field of embedData.fields) {
+              embed.addFields({ name: field.name, value: field.value, inline: field.inline });
+            }
+            
+            if (embedData.footer) {
+              embed.setFooter({ text: embedData.footer.text });
+            }
+            
+            await interaction.editReply({ embeds: [embed] });
+          } catch (error: any) {
+            const errorEmbed = new EmbedBuilder()
+              .setColor(0xff0000)
+              .setTitle('❌ PnL Calculation Failed')
+              .setDescription(`Could not calculate PnL: ${error?.message || 'Unknown error'}\n\nMake sure the wallet has trading history.`);
+            await interaction.editReply({ embeds: [errorEmbed] });
+          }
+        }
         
-        try {
-          const pnl = await pnlTracker.calculatePnL(walletAddress, method);
-          const embedData = pnlTracker.formatPnLForDiscord(pnl);
+        else if (subcommand === 'setchannel') {
+          const channel = interaction.options.getChannel('channel', true);
+          const guildId = interaction.guildId;
+          
+          if (!guildId) {
+            await interaction.reply({ content: '❌ This command must be used in a server.', ephemeral: true });
+            return;
+          }
+          
+          // Set the PNL channel
+          callHitTracker.setPnlChannel(guildId, channel.id);
           
           const embed = new EmbedBuilder()
-            .setColor(embedData.color)
-            .setTitle(embedData.title)
-            .setDescription(embedData.description)
-            .setTimestamp();
+            .setColor(0x00FF88)
+            .setTitle('✅ PnL Alert Channel Set')
+            .setDescription(`Pump alerts will be sent to <#${channel.id}>\n\n` +
+              `**Alert thresholds:**\n` +
+              `📈 +20% pump\n` +
+              `🔥 +50% pump\n` +
+              `🚀 +100% pump\n` +
+              `💎 +200% pump\n` +
+              `🌙 +500% pump`)
+            .setFooter({ text: 'Use /trackcall to start tracking token calls' });
           
-          for (const field of embedData.fields) {
-            embed.addFields({ name: field.name, value: field.value, inline: field.inline });
-          }
+          await interaction.reply({ embeds: [embed] });
+        }
+        
+        else if (subcommand === 'status') {
+          const guildId = interaction.guildId;
+          const stats = callHitTracker.getCallStats();
+          const pnlChannel = guildId ? callHitTracker.getPnlChannel(guildId) : undefined;
           
-          if (embedData.footer) {
-            embed.setFooter({ text: embedData.footer.text });
-          }
+          const embed = new EmbedBuilder()
+            .setColor(0x3498DB)
+            .setTitle('📊 PnL Tracker Status')
+            .addFields(
+              { name: '🎯 Active Calls', value: `${stats.activeCalls} tokens being tracked`, inline: true },
+              { name: '👥 Total Callers', value: `${stats.totalCallers} unique callers`, inline: true },
+              { name: '📢 Alert Channel', value: pnlChannel ? `<#${pnlChannel}>` : 'Not set', inline: true }
+            )
+            .setFooter({ text: 'Use /pnl setchannel to configure alerts' });
           
-          await interaction.editReply({ embeds: [embed] });
-        } catch (error: any) {
-          const errorEmbed = new EmbedBuilder()
-            .setColor(0xff0000)
-            .setTitle('❌ PnL Calculation Failed')
-            .setDescription(`Could not calculate PnL: ${error?.message || 'Unknown error'}\n\nMake sure the wallet has trading history.`);
-          await interaction.editReply({ embeds: [errorEmbed] });
+          await interaction.reply({ embeds: [embed] });
         }
       }
       
@@ -3655,6 +3741,29 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         } catch (error) {
           console.error('[Discord] Failed to send call hit notification:', error);
         }
+      }
+    });
+    
+    // Register pump alert notifications (20%, 50%, 100%+ gains)
+    callHitTracker.onPumpAlert(async (call, gainPct, threshold, channelId) => {
+      try {
+        const channel = await client.channels.fetch(channelId);
+        if (channel && channel.isTextBased() && 'send' in channel) {
+          const embedData = callHitTracker.formatPumpAlertEmbed(call, gainPct, threshold);
+          const embed = new EmbedBuilder()
+            .setColor(embedData.color)
+            .setTitle(embedData.title)
+            .setDescription(embedData.description)
+            .setTimestamp();
+          for (const field of embedData.fields) {
+            embed.addFields({ name: field.name, value: field.value, inline: field.inline });
+          }
+          if (embedData.footer) embed.setFooter({ text: embedData.footer.text });
+          await channel.send({ embeds: [embed] });
+          console.log(`[Discord] Sent +${threshold}% pump alert to channel ${channelId}`);
+        }
+      } catch (error) {
+        console.error('[Discord] Failed to send pump alert:', error);
       }
     });
     

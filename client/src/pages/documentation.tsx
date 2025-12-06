@@ -130,7 +130,7 @@ const DocumentationPDF = () => (
           <Text style={pdfStyles.text}>1. AUTHORITY ANALYSIS - Mint/freeze authority exploitation detection</Text>
           <Text style={pdfStyles.text}>2. HOLDER DISTRIBUTION - Whale concentration, sybil attack detection</Text>
           <Text style={pdfStyles.text}>3. LIQUIDITY ANALYSIS - LP locks, burns, rug pull pattern recognition</Text>
-          <Text style={pdfStyles.text}>4. TGN + ML DETECTION - Temporal Graph Neural Networks + SyraxML scoring</Text>
+          <Text style={pdfStyles.text}>4. TGN + ML DETECTION - Temporal Graph Neural Networks + Machine Learning scoring</Text>
           <Text style={pdfStyles.text}>5. MEV DETECTION - Jito bundle detection, sandwich attack identification</Text>
           <Text style={pdfStyles.text}>6. SMART MONEY - 39+ alpha wallet tracking, insider trading detection</Text>
         </View>
@@ -238,7 +238,7 @@ const DocumentationPDF = () => (
           <Text style={pdfStyles.text}>• Synchronized activation within 1-minute windows flagged</Text>
           <Text style={pdfStyles.text}>• Similar purchase amounts indicate automated scripts</Text>
         </View>
-        <Text style={pdfStyles.subheading}>DevsNightmare Analysis</Text>
+        <Text style={pdfStyles.subheading}>Alpha Scan Grading</Text>
         <View style={pdfStyles.list}>
           <Text style={pdfStyles.text}>• Team allocation percentage analysis</Text>
           <Text style={pdfStyles.text}>• Insider holdings detection</Text>
@@ -1107,7 +1107,7 @@ export default function Documentation() {
                   </p>
                   <ol className="text-sm text-muted-foreground space-y-1 ml-4 list-decimal">
                     <li>Navigate to <a href="/pricing" className="text-primary hover:underline">/pricing</a> page from header or visit directly</li>
-                    <li>Review tier comparison: PRO ($29/mo) or GROUP ($120/mo)</li>
+                    <li>Review tier comparison: Individual ($29/mo) or GROUP ($129/mo)</li>
                     <li>Click "Subscribe" button on your preferred tier card</li>
                     <li>Redirect to Whop's secure hosted checkout page</li>
                     <li>Enter payment details (credit card, debit card, or crypto)</li>
@@ -1230,8 +1230,8 @@ export default function Documentation() {
                     <li>• WHOP_API_KEY</li>
                     <li>• WHOP_APP_ID</li>
                     <li>• WHOP_COMPANY_ID</li>
-                    <li>• WHOP_PLAN_ID_BASIC ($29/mo tier)</li>
-                    <li>• WHOP_PLAN_ID_PREMIUM ($120/mo tier)</li>
+                    <li>• WHOP_PLAN_ID_BASIC ($29/mo Individual tier)</li>
+                    <li>• WHOP_PLAN_ID_PREMIUM ($129/mo Group tier)</li>
                   </ul>
                 </div>
 

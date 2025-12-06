@@ -32,7 +32,8 @@ export default function TrendingCalls() {
 
   const { data: trendingCalls, isLoading } = useQuery<TrendingCall[]>({
     queryKey: ["/api/trending-calls", timeframe, platform],
-    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 2 * 60 * 1000, // 2 minutes - trending data doesn't need to be instant
+    refetchInterval: 2 * 60 * 1000, // Refresh every 2 minutes (reduced from 30s)
   });
 
   const copyToClipboard = (text: string, label: string) => {

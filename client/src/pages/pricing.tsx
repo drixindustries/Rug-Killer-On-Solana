@@ -40,24 +40,24 @@ const pricingTiers = [
   },
   {
     id: "pro",
-    name: "PRO",
+    name: "INDIVIDUAL",
     icon: Coins,
     price: "$29",
     period: "per month",
-    description: "Advanced analytics for serious investors",
+    description: "DM-only access for personal token scanning",
     features: [
-      "Unlimited token analyses",
-      "Full risk score + AI detection",
-      "BubbleMaps visualization",
-      "Rugcheck + GoPlus integration",
+      "DM bot access only (personal use)",
+      "Unlimited token scans & grading",
+      "Basic risk score analysis",
+      "Holder distribution checks",
+      "Authority & liquidity checks",
       "DexScreener market data",
-      "Telegram & Discord bot access",
       "Blacklist database access",
-      "Priority support"
+      "Standard support"
     ],
-    cta: "Subscribe to PRO",
+    cta: "Subscribe to Individual",
     ctaVariant: "default" as const,
-    badge: "Popular",
+    badge: "Personal",
     testId: "card-tier-pro",
     tier: "individual" as const
   },
@@ -65,22 +65,23 @@ const pricingTiers = [
     id: "group",
     name: "GROUP",
     icon: Crown,
-    price: "$120",
+    price: "$129",
     period: "per month",
-    description: "Premium features for Discord/Telegram groups",
+    description: "Full bot integration for your Discord/Telegram community",
     features: [
-      "Everything in PRO",
-      "Real-time alerts",
-      "Custom watchlists",
-      "API access",
-      "Advanced smart money tracking",
-      "Bundling detection",
+      "Add bot to your Discord/Telegram server",
+      "Everything in Individual tier",
+      "Real-time alpha alerts & notifications",
+      "Smart money wallet tracking",
+      "Advanced bundling detection",
+      "BubbleMaps visualization",
+      "Custom watchlists & API access",
       "Historical data (90 days)",
-      "White-glove support"
+      "Priority white-glove support"
     ],
     cta: "Subscribe to GROUP",
     ctaVariant: "default" as const,
-    badge: "Premium",
+    badge: "Most Popular",
     testId: "card-tier-group",
     tier: "group" as const
   },
@@ -294,6 +295,12 @@ export default function Pricing() {
                   <h3 className="font-semibold mb-1">What's included in the free trial?</h3>
                   <p className="text-sm text-muted-foreground">
                     The 7-day free trial includes 3 token analyses per day with basic risk scoring and holder analysis. No credit card required to start.
+                  </p>
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-1">What's the difference between Individual and Group?</h3>
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Individual</strong> gives you personal DM access to the bot for token scanning and grading. <strong>Group</strong> lets you add the full-featured bot directly to your Discord or Telegram server with real-time alerts, smart money tracking, and advanced detection features for your community.
                   </p>
                 </div>
                 <div>

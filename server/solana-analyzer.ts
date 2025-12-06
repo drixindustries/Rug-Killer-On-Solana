@@ -899,8 +899,8 @@ export class SolanaTokenAnalyzer {
 
       console.log(`✅ [Analyzer] Complete in ${Date.now() - startTime}ms - Risk: ${response.riskLevel}`);
       
-      // Cache result for 5 minutes (300 seconds)
-      await redisCache.set(`token:analysis:${tokenMintAddress}`, response, 300).catch(() => {});
+      // Cache result for 15 minutes (900 seconds) - increased to reduce RPC load
+      await redisCache.set(`token:analysis:${tokenMintAddress}`, response, 900).catch(() => {});
       
       return response;
 
