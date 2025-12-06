@@ -108,25 +108,35 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   const shortAddr = `${analysis.tokenAddress.slice(0,6)}...${analysis.tokenAddress.slice(-4)}`;
   const tokenSymbol = analysis.metadata?.symbol || analysis.dexscreenerData?.pairs?.[0]?.baseToken?.symbol || 'TOKEN';
   
+  // Safety Score: 1-100 (100 = safest, 1 = most dangerous)
+  const safetyScore = Math.max(1, Math.min(100, analysis.riskScore));
+  const safetyEmoji = safetyScore >= 80 ? '🟢' : safetyScore >= 60 ? '🟡' : safetyScore >= 40 ? '🟠' : '🔴';
+  const safetyLabel = safetyScore >= 80 ? 'SAFE' : safetyScore >= 60 ? 'CAUTION' : safetyScore >= 40 ? 'RISKY' : 'DANGER';
+  
   const embed = new EmbedBuilder()
     .setColor(color)
     .setTitle(`${messageData.header} • $${tokenSymbol}`)
-    .setDescription(`\`/execute ${analysis.tokenAddress}\`\n\n**Risk: ${analysis.riskLevel}** (${analysis.riskScore}/100) • ${messageData.age}\n\`${shortAddr}\``)
-    .setFooter({ text: 'Rug Killer Alpha • Higher score = Safer' })
+    .setDescription(`\`/execute ${analysis.tokenAddress}\`\n\n${safetyEmoji} **Safety Score: ${safetyScore}/100** (${safetyLabel})\n${messageData.age}\n\`${shortAddr}\``)
+    .setFooter({ text: 'Rug Killer Alpha • 100 = Safest | 1 = Most Dangerous' })
     .setTimestamp()
     .setThumbnail(`https://dd.dexscreener.com/ds-data/tokens/solana/${analysis.tokenAddress}.png?size=md&t=${Date.now()}`);
   
-  // RUG SCORE (condensed)
-  if (messageData.rugScore) {
-    const rugScoreLines = messageData.rugScore.split('\n');
-    const headerLine = rugScoreLines[0] || '';
-    const bodyLines = rugScoreLines.slice(1).join(' | ').replace(/\*\*/g, '');
-    const scoreMatch = headerLine.match(/Rug Score:\s*(\d+)/);
-    const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
-    const scoreEmoji = score < 10 ? '✅' : score < 50 ? '⚠️' : '🚨';
+  // RUG SCORE - Convert to Danger Level for clarity
+  if (messageData.rugScore && analysis.rugScoreBreakdown) {
+    const rs = analysis.rugScoreBreakdown;
+    const dangerLevel = Math.min(100, Math.round(rs.totalScore));
+    const dangerEmoji = dangerLevel < 10 ? '✅' : dangerLevel < 30 ? '🟢' : dangerLevel < 50 ? '🟡' : dangerLevel < 70 ? '🟠' : '🔴';
+    const dangerLabel = dangerLevel < 10 ? 'VERY LOW' : dangerLevel < 30 ? 'LOW' : dangerLevel < 50 ? 'MODERATE' : dangerLevel < 70 ? 'HIGH' : 'EXTREME';
+    
+    const breakdownParts = [
+      `Auth: ${Math.round(rs.components.authorities.score)}`,
+      `Holders: ${Math.round(rs.components.holderDistribution.score)}`,
+      `Liq: ${Math.round(rs.components.liquidity.score)}`
+    ];
+    
     embed.addFields({
-      name: `${scoreEmoji} ${stripBold(headerLine) || 'Rug Score'}`,
-      value: bodyLines.slice(0, 200) || 'No breakdown',
+      name: `${dangerEmoji} Danger Level: ${dangerLevel} (${dangerLabel})`,
+      value: breakdownParts.join(' • '),
       inline: false
     });
   }
@@ -200,10 +210,10 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
     });
   }
   
-  // QUICK LINKS (single line)
+  // QUICK LINKS (all trading tools)
   embed.addFields({
     name: '🔗 Links',
-    value: `[Pump.fun](https://pump.fun/${analysis.tokenAddress}) • [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress}) • [Solscan](https://solscan.io/token/${analysis.tokenAddress})`,
+    value: `[Pump.fun](https://pump.fun/${analysis.tokenAddress}) • [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress}) • [Axiom](https://axiom.trade/t/${analysis.tokenAddress}/sol) • [GMGN](https://gmgn.ai/sol/token/${analysis.tokenAddress}) • [Padre](https://padre.fun/token/${analysis.tokenAddress}) • [Solscan](https://solscan.io/token/${analysis.tokenAddress})`,
     inline: false
   });
   

@@ -107,16 +107,20 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     header += ` 🆕`;
   }
   
-  // RISK SCORE - Simplified and cleaner
-  const riskScore = `**Risk:** ${analysis.riskLevel} (Score: ${analysis.riskScore}/100)`;
+  // SAFETY SCORE - 1-100 (100 = safest, 1 = most dangerous)
+  const safetyScore = Math.max(1, Math.min(100, analysis.riskScore));
+  const safetyEmoji = safetyScore >= 80 ? '🟢' : safetyScore >= 60 ? '🟡' : safetyScore >= 40 ? '🟠' : '🔴';
+  const safetyLabel = safetyScore >= 80 ? 'SAFE' : safetyScore >= 60 ? 'CAUTION' : safetyScore >= 40 ? 'RISKY' : 'DANGER';
+  const riskScore = `${safetyEmoji} **Safety Score: ${safetyScore}/100** (${safetyLabel})`;
   
-  // RUG SCORE (Rugcheck-style)
+  // DANGER LEVEL (converted from Rug Score for clarity - lower = safer)
   let rugScoreText: string | undefined;
   if (analysis.rugScoreBreakdown) {
     const rs = analysis.rugScoreBreakdown;
-    const emoji = rs.classification === 'SAFE' ? '✅' : rs.classification === 'WARNING' ? '⚠️' : '🚨';
-    const color = rs.classification === 'SAFE' ? 'green' : rs.classification === 'WARNING' ? 'yellow' : 'red';
-    rugScoreText = `${emoji} **Rug Score:** ${Math.round(rs.totalScore)} (${rs.classification})\n_<10 = Safe | 10-50 = Warning | >50 = Danger_\n\n**Breakdown:**\n` +
+    const dangerLevel = Math.min(100, Math.round(rs.totalScore));
+    const dangerEmoji = dangerLevel < 10 ? '✅' : dangerLevel < 30 ? '🟢' : dangerLevel < 50 ? '🟡' : dangerLevel < 70 ? '🟠' : '🔴';
+    const dangerLabel = dangerLevel < 10 ? 'VERY LOW' : dangerLevel < 30 ? 'LOW' : dangerLevel < 50 ? 'MODERATE' : dangerLevel < 70 ? 'HIGH' : 'EXTREME';
+    rugScoreText = `${dangerEmoji} **Danger Level:** ${dangerLevel}/100 (${dangerLabel})\n\n**Breakdown:**\n` +
       `• Authorities: ${Math.round(rs.components.authorities.score)} pts\n` +
       `• Holder Dist: ${Math.round(rs.components.holderDistribution.score)} pts\n` +
       `• Liquidity: ${Math.round(rs.components.liquidity.score)} pts\n` +

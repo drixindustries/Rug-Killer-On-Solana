@@ -375,6 +375,9 @@ export class AlphaAlertService {
       
       summaryLines.push(`🔗 https://pump.fun/${alert.mint}`);
       summaryLines.push(`💎 https://dexscreener.com/solana/${alert.mint}`);
+      summaryLines.push(`📊 https://axiom.trade/t/${alert.mint}/sol`);
+      summaryLines.push(`🟢 https://gmgn.ai/sol/token/${alert.mint}`);
+      summaryLines.push(`🎯 https://padre.fun/token/${alert.mint}`);
       summaryLines.push(`🔍 https://solscan.io/token/${alert.mint}`);
       
       if (txHash) {
@@ -603,8 +606,13 @@ export class AlphaAlertService {
         // Token Analysis Metrics
         ...(analysisMetrics ? [
           {
-            name: `🔍 Token Analysis ${analysisMetrics.riskEmoji}`,
-            value: `**Risk:** ${analysisMetrics.riskLevel} (${analysisMetrics.riskScore}/100)`,
+            name: `🔍 Token Analysis`,
+            value: (() => {
+              const safetyScore = Math.max(1, Math.min(100, analysisMetrics.riskScore));
+              const safetyEmoji = safetyScore >= 80 ? '🟢' : safetyScore >= 60 ? '🟡' : safetyScore >= 40 ? '🟠' : '🔴';
+              const safetyLabel = safetyScore >= 80 ? 'SAFE' : safetyScore >= 60 ? 'CAUTION' : safetyScore >= 40 ? 'RISKY' : 'DANGER';
+              return `${safetyEmoji} **Safety Score: ${safetyScore}/100** (${safetyLabel})`;
+            })(),
             inline: false
           },
           {
@@ -800,7 +808,7 @@ export class AlphaAlertService {
         ] : []),
         {
           name: '🔗 Quick Links',
-          value: `[Pump.fun](https://pump.fun/${alert.mint}) • [DexScreener](https://dexscreener.com/solana/${alert.mint}) • [Solscan](https://solscan.io/token/${alert.mint})${alert.data?.txHash ? ` • [Tx](https://solscan.io/tx/${alert.data.txHash})` : ''}`,
+          value: `[Pump.fun](https://pump.fun/${alert.mint}) • [DexScreener](https://dexscreener.com/solana/${alert.mint}) • [Axiom](https://axiom.trade/t/${alert.mint}/sol) • [GMGN](https://gmgn.ai/sol/token/${alert.mint}) • [Padre](https://padre.fun/token/${alert.mint}) • [Solscan](https://solscan.io/token/${alert.mint})${alert.data?.txHash ? ` • [Tx](https://solscan.io/tx/${alert.data.txHash})` : ''}`,
           inline: false
         }
       ],
@@ -1080,8 +1088,13 @@ export class AlphaAlertService {
         // Token Analysis Metrics (ALL SolRPDS metrics - same as single wallet alert)
         ...(analysisMetrics ? [
           {
-            name: `🔍 Token Analysis ${analysisMetrics.riskEmoji}`,
-            value: `**Risk:** ${analysisMetrics.riskLevel} (${analysisMetrics.riskScore}/100)`,
+            name: `🔍 Token Analysis`,
+            value: (() => {
+              const safetyScore = Math.max(1, Math.min(100, analysisMetrics.riskScore));
+              const safetyEmoji = safetyScore >= 80 ? '🟢' : safetyScore >= 60 ? '🟡' : safetyScore >= 40 ? '🟠' : '🔴';
+              const safetyLabel = safetyScore >= 80 ? 'SAFE' : safetyScore >= 60 ? 'CAUTION' : safetyScore >= 40 ? 'RISKY' : 'DANGER';
+              return `${safetyEmoji} **Safety Score: ${safetyScore}/100** (${safetyLabel})`;
+            })(),
             inline: false
           },
           {
@@ -1302,7 +1315,7 @@ export class AlphaAlertService {
         ] : []),
         {
           name: '🔗 Quick Links',
-          value: `[Pump.fun](https://pump.fun/${mint}) • [DexScreener](https://dexscreener.com/solana/${mint}) • [Solscan](https://solscan.io/token/${mint})`,
+          value: `[Pump.fun](https://pump.fun/${mint}) • [DexScreener](https://dexscreener.com/solana/${mint}) • [Axiom](https://axiom.trade/t/${mint}/sol) • [GMGN](https://gmgn.ai/sol/token/${mint}) • [Padre](https://padre.fun/token/${mint}) • [Solscan](https://solscan.io/token/${mint})`,
           inline: false
         }
       ],
