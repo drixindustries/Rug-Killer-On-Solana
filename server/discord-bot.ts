@@ -106,11 +106,12 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   const messageData = buildCompactMessage(analysis);
   const color = getRiskColor(analysis.riskLevel);
   const shortAddr = `${analysis.tokenAddress.slice(0,6)}...${analysis.tokenAddress.slice(-4)}`;
+  const tokenSymbol = analysis.metadata?.symbol || analysis.dexscreenerData?.pairs?.[0]?.baseToken?.symbol || 'TOKEN';
   
   const embed = new EmbedBuilder()
     .setColor(color)
-    .setTitle(`${messageData.header}`)
-    .setDescription(`**Risk: ${analysis.riskLevel}** (${analysis.riskScore}/100) • ${messageData.age}\n\`${shortAddr}\``)
+    .setTitle(`${messageData.header} • $${tokenSymbol}`)
+    .setDescription(`\`/execute ${analysis.tokenAddress}\`\n\n**Risk: ${analysis.riskLevel}** (${analysis.riskScore}/100) • ${messageData.age}\n\`${shortAddr}\``)
     .setFooter({ text: 'Rug Killer Alpha • Higher score = Safer' })
     .setTimestamp()
     .setThumbnail(`https://dd.dexscreener.com/ds-data/tokens/solana/${analysis.tokenAddress}.png?size=md&t=${Date.now()}`);

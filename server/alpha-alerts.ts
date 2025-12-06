@@ -566,8 +566,8 @@ export class AlphaAlertService {
     }
     
     const embedData = alert.type === 'caller_signal' ? {
-      title: `🔔 Alpha Alert`,
-      description: `💎 **${enrichedTokenName || enrichedTokenSymbol}** (${enrichedTokenSymbol})\n\n👤 **${walletName}** bought this token`,
+      title: `🔔 Alpha Alert: $${enrichedTokenSymbol || 'TOKEN'}`,
+      description: `\`/execute ${alert.mint}\`\n\n💎 **${enrichedTokenName || enrichedTokenSymbol}** ($${enrichedTokenSymbol})\n\n👤 **${walletName}** bought this token`,
       color: embedColor,
       thumbnail: tokenImageUrl ? { url: tokenImageUrl } : { url: `https://dd.dexscreener.com/ds-data/tokens/solana/${alert.mint}.png?size=md&t=${Date.now()}` },
       fields: [
@@ -1062,8 +1062,8 @@ export class AlphaAlertService {
     
     // Build embed data (same structure as normal alpha alert)
     const embedData = {
-      title: `🚨 Multiple Wallets Have Bought ${tokenSymbol}!`,
-      description: `**${purchases.length} wallets** have purchased **${tokenSymbol}**${tokenName ? ` (${tokenName})` : ''} within the last 5 minutes!\n\n📍 **Contract:** \`${mint}\``,
+      title: `🚨 Multiple Wallets Have Bought $${tokenSymbol}!`,
+      description: `\`/execute ${mint}\`\n\n**${purchases.length} wallets** have purchased **$${tokenSymbol}**${tokenName ? ` (${tokenName})` : ''} within the last 5 minutes!\n\n📍 **Contract:** \`${mint}\``,
       color: embedColor,
       thumbnail: tokenImageUrl ? { url: tokenImageUrl } : { url: `https://dd.dexscreener.com/ds-data/tokens/solana/${mint}.png?size=md&t=${Date.now()}` },
       fields: [
