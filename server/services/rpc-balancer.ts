@@ -69,7 +69,7 @@ interface RpcProvider {
   getUrl: () => string;
   weight: number;
   name: string;
-  tier: 'premium' | 'fallback';
+  tier: 'premium' | 'overflow' | 'fallback'; // Added overflow tier for dRPC
   score: number;
   fails: number;
   avgLatency?: number;
@@ -135,13 +135,25 @@ function getHeliusUrl(): string | undefined {
   return finalUrl;
 }
 
+// ============================================================================
+// RPC PROVIDER WEIGHTING STRATEGY (Dec 2025 - Grok Recommendations)
+// ============================================================================
+// Based on ~12M requests/month usage pattern:
+// - Helius Premium: 50-60% (Primary - core polling/subscriptions, 10-80ms latency)
+// - dRPC Free: 15-20% (Overflow - AI-balanced routing, 38-100ms, ~10M free/mo)
+// - Public RPCs: 5-10% (Backup - rotate to avoid bans, 200-500ms)
+// 
+// Total estimated cost: ~$50-60/mo (Helius base + minor dRPC overage)
+// ============================================================================
+
 const RPC_PROVIDERS = [
   // ============================================================================
-  // PREMIUM TIER - Paid APIs with highest limits (user's keys)
+  // PREMIUM TIER - Paid APIs (50-60% of traffic)
+  // Best for: Core scanning, real-time polling, critical operations
   // ============================================================================
   { 
     getUrl: () => `${getHeliusUrl() || ""}`,
-    weight: 100, // PRIMARY: Paid API with best limits
+    weight: 55, // PRIMARY: 50-60% of traffic - Solana-optimized, 10-80ms latency
     name: "Helius",
     tier: "premium" as const,
     requiresKey: true,
@@ -151,9 +163,9 @@ const RPC_PROVIDERS = [
   },
   { 
     getUrl: () => `${getShyftUrl() || ""}`,
-    weight: 15, // REDUCED: Free plan has limits
+    weight: 12, // SECONDARY PREMIUM: If user has paid Shyft key
     name: "Shyft",
-    tier: "fallback" as const,
+    tier: "premium" as const, // Upgraded to premium if key exists
     requiresKey: true,
     hasKey: () => !!getShyftUrl(),
     rateLimit: 10,
@@ -161,24 +173,37 @@ const RPC_PROVIDERS = [
   },
 
   // ============================================================================
-  // FREE PUBLIC RPC ENDPOINTS - No API keys required (50+ endpoints)
-  // Sourced from Solana docs, CompareNodes, extrnode, community lists Dec 2025
+  // OVERFLOW TIER - dRPC Free (15-20% of traffic)
+  // Best for: Burst overflow, non-critical scans, cost optimization
+  // AI-balanced routing across 50+ operators, 38-100ms avg latency
+  // ~10M requests/mo free, then $3.60/mo PAYG
   // ============================================================================
-  
-  // OFFICIAL SOLANA LABS ENDPOINTS
+  { 
+    getUrl: () => "https://solana.drpc.org",
+    weight: 18, // OVERFLOW: 15-20% - decentralized, good RPS, MEV-safe
+    name: "dRPC",
+    tier: "overflow" as const,
+    rateLimit: 100, // Higher limit due to AI load balancing
+    rateLimitWindow: 10000
+  },
+
+  // ============================================================================
+  // PUBLIC BACKUP TIER - Free RPCs (5-10% of traffic)
+  // Best for: Ultra-cheap redundancy, rare low-priority queries
+  // WARNING: Throttled, no SLA, 200-500ms delays, ban risks for bots
+  // Rotate 3-5 endpoints to avoid IP bans
+  // ============================================================================
   { 
     getUrl: () => "https://api.mainnet-beta.solana.com",
-    weight: 25,
+    weight: 7, // BACKUP: Official but throttled
     name: "Solana-Official",
     tier: "fallback" as const,
     rateLimit: 40,
-    rateLimitWindow: 10000 // 100 reqs per 10s, 40 per method
+    rateLimitWindow: 10000
   },
-  
-  // HIGH-QUALITY FREE PUBLIC RPCs (only keeping consistently working ones)
   { 
     getUrl: () => "https://solana-rpc.publicnode.com",
-    weight: 20,
+    weight: 5, // BACKUP: Reliable public node
     name: "PublicNode",
     tier: "fallback" as const,
     rateLimit: 50,
@@ -186,32 +211,23 @@ const RPC_PROVIDERS = [
   },
   { 
     getUrl: () => "https://solana-mainnet.g.alchemy.com/v2/demo",
-    weight: 15,
+    weight: 3, // BACKUP: Demo endpoint, limited
     name: "Alchemy-Public",
     tier: "fallback" as const,
     rateLimit: 25,
     rateLimitWindow: 60000
   },
   { 
-    getUrl: () => "https://solana.drpc.org",
-    weight: 12,
-    name: "dRPC",
-    tier: "fallback" as const,
-    rateLimit: 20,
-    rateLimitWindow: 10000
-  },
-  { 
     getUrl: () => "https://solana-mainnet.phantom.app/YBPpkkN4g91xDiAnTE9r0RcMkjg0sKUIWvAfoFVJ",
-    weight: 10,
+    weight: 2, // BACKUP: Phantom's public endpoint
     name: "Phantom-Public",
     tier: "fallback" as const,
     rateLimit: 15,
     rateLimitWindow: 10000
   },
-  // Removed dead endpoints: OnFinality, 1RPC, Serum, Solana-Mirror, KJNodes, Gateway-FM, GenesysGo, Public-RPC, Triton, Grove, TheIndex, AllThatNode
   { 
     getUrl: () => "https://solana-rpc.debridge.finance",
-    weight: 5,
+    weight: 1, // BACKUP: Lowest priority
     name: "DeBridge",
     tier: "fallback" as const,
     rateLimit: 10,
@@ -263,11 +279,19 @@ export class SolanaRpcBalancer {
     });
     
     const premiumCount = availableProviders.filter(p => p.tier === 'premium').length;
+    const overflowCount = availableProviders.filter(p => p.tier === 'overflow').length;
     const fallbackCount = availableProviders.filter(p => p.tier === 'fallback').length;
     const wsCount = FREE_WS_ENDPOINTS.length;
     
+    // Calculate traffic distribution
+    const totalWeight = availableProviders.reduce((s, p) => s + p.weight, 0);
+    const premiumWeight = availableProviders.filter(p => p.tier === 'premium').reduce((s, p) => s + p.weight, 0);
+    const overflowWeight = availableProviders.filter(p => p.tier === 'overflow').reduce((s, p) => s + p.weight, 0);
+    const fallbackWeight = availableProviders.filter(p => p.tier === 'fallback').reduce((s, p) => s + p.weight, 0);
+    
     console.log(`[RPC Balancer] Available providers: ${availableProviders.map(p => p.name).join(', ')}`);
-    console.log(`[RPC Balancer] ${premiumCount} premium, ${fallbackCount} fallback HTTP endpoints + ${wsCount} WebSocket endpoints loaded`);
+    console.log(`[RPC Balancer] Tiers: ${premiumCount} premium, ${overflowCount} overflow, ${fallbackCount} fallback HTTP + ${wsCount} WebSocket`);
+    console.log(`[RPC Balancer] Traffic distribution: Premium ${((premiumWeight / totalWeight) * 100).toFixed(0)}%, Overflow ${((overflowWeight / totalWeight) * 100).toFixed(0)}%, Fallback ${((fallbackWeight / totalWeight) * 100).toFixed(0)}%`);
     
     this.providers = availableProviders.map(p => ({
       ...p,
@@ -281,7 +305,7 @@ export class SolanaRpcBalancer {
       rateLimitResetTime: 0,
       isRateLimited: false
     }));
-    this.totalWeight = availableProviders.reduce((s, p) => s + p.weight, 0);
+    this.totalWeight = totalWeight;
   }
 
   select(): RpcProvider {
@@ -308,34 +332,69 @@ export class SolanaRpcBalancer {
       return leastLimited;
     }
     
-    // Prefer premium tier providers that are healthy and not rate limited
-    const premiumHealthy = notRateLimited.filter(p => p.tier === 'premium' && p.score > 70 && p.consecutiveFails < 3);
-    const fallbackHealthy = notRateLimited.filter(p => p.tier === 'fallback' && p.score > 50 && p.consecutiveFails < 5);
+    // ============================================================================
+    // TIERED SELECTION STRATEGY (Grok's Recommendations)
+    // Priority: Premium (50-60%) -> Overflow/dRPC (15-20%) -> Public (5-10%)
+    // ============================================================================
     
-    let candidates = premiumHealthy.length > 0 ? premiumHealthy : fallbackHealthy;
+    // Tier 1: Premium providers (Helius, Shyft) - 50-60% of traffic
+    const premiumHealthy = notRateLimited.filter(p => 
+      p.tier === 'premium' && p.score > 70 && p.consecutiveFails < 3
+    );
     
-    if (candidates.length === 0) {
-      console.log('[RPC Balancer] All providers unhealthy, resetting scores and using fallback');
-      this.providers.forEach(p => {
-        p.score = p.tier === 'premium' ? 100 : 80;
-        p.consecutiveFails = 0;
-      });
-      candidates = this.providers.filter(p => p.tier === 'premium');
+    // Tier 2: Overflow providers (dRPC) - 15-20% of traffic for burst/non-critical
+    const overflowHealthy = notRateLimited.filter(p => 
+      p.tier === 'overflow' && p.score > 60 && p.consecutiveFails < 4
+    );
+    
+    // Tier 3: Public fallback providers - 5-10% of traffic for redundancy
+    const fallbackHealthy = notRateLimited.filter(p => 
+      p.tier === 'fallback' && p.score > 50 && p.consecutiveFails < 5
+    );
+    
+    // Combine all healthy providers with their weights
+    // The weights already encode the desired traffic distribution
+    let candidates: RpcProvider[] = [];
+    
+    if (premiumHealthy.length > 0) {
+      candidates = [...candidates, ...premiumHealthy];
+    }
+    if (overflowHealthy.length > 0) {
+      candidates = [...candidates, ...overflowHealthy];
+    }
+    if (fallbackHealthy.length > 0) {
+      candidates = [...candidates, ...fallbackHealthy];
     }
     
-    // Sort by combined score (health + speed)
+    // If no healthy providers, reset scores and try again
+    if (candidates.length === 0) {
+      console.log('[RPC Balancer] All providers unhealthy, resetting scores');
+      this.providers.forEach(p => {
+        p.score = p.tier === 'premium' ? 100 : p.tier === 'overflow' ? 90 : 80;
+        p.consecutiveFails = 0;
+      });
+      candidates = this.providers.filter(p => p.tier === 'premium' || p.tier === 'overflow');
+      if (candidates.length === 0) {
+        candidates = this.providers;
+      }
+    }
+    
+    // Sort by combined score (health + speed bonus)
     candidates.sort((a, b) => {
-      const aScore = a.score + (a.avgLatency ? Math.max(0, 100 - a.avgLatency) : 50);
-      const bScore = b.score + (b.avgLatency ? Math.max(0, 100 - b.avgLatency) : 50);
+      // Premium tier gets base boost, overflow gets smaller boost
+      const tierBoost = { premium: 20, overflow: 10, fallback: 0 };
+      const aScore = a.score + (a.avgLatency ? Math.max(0, 100 - a.avgLatency) : 50) + tierBoost[a.tier];
+      const bScore = b.score + (b.avgLatency ? Math.max(0, 100 - b.avgLatency) : 50) + tierBoost[b.tier];
       return bScore - aScore;
     });
     
-    // Weighted selection favoring top performers
+    // Weighted random selection based on configured weights
+    // This ensures traffic distribution matches Grok's recommendations
     const weighted: RpcProvider[] = [];
-    for (let i = 0; i < candidates.length; i++) {
-      const p = candidates[i];
-      const weight = Math.max(1, p.weight * (candidates.length - i) / candidates.length);
-      for (let j = 0; j < weight; j++) {
+    for (const p of candidates) {
+      // Add provider to weighted pool based on its weight
+      // Higher weight = more entries = more likely to be selected
+      for (let j = 0; j < p.weight; j++) {
         weighted.push(p);
       }
     }
@@ -574,7 +633,14 @@ export class SolanaRpcBalancer {
     const healthy = this.providers.filter(p => p.score > 70).length;
     const rateLimited = this.providers.filter(p => p.isRateLimited).length;
     const premium = this.providers.filter(p => p.tier === 'premium');
+    const overflow = this.providers.filter(p => p.tier === 'overflow');
     const fallback = this.providers.filter(p => p.tier === 'fallback');
+    
+    // Calculate actual traffic distribution based on weights
+    const totalWeight = this.providers.reduce((sum, p) => sum + p.weight, 0);
+    const premiumWeight = premium.reduce((sum, p) => sum + p.weight, 0);
+    const overflowWeight = overflow.reduce((sum, p) => sum + p.weight, 0);
+    const fallbackWeight = fallback.reduce((sum, p) => sum + p.weight, 0);
     
     return {
       total,
@@ -583,14 +649,22 @@ export class SolanaRpcBalancer {
       rateLimited,
       premiumCount: premium.length,
       premiumHealthy: premium.filter(p => p.score > 70).length,
+      overflowCount: overflow.length,
+      overflowHealthy: overflow.filter(p => p.score > 60).length,
       fallbackCount: fallback.length,
-      fallbackHealthy: fallback.filter(p => p.score > 70).length,
+      fallbackHealthy: fallback.filter(p => p.score > 50).length,
+      trafficDistribution: {
+        premium: `${((premiumWeight / totalWeight) * 100).toFixed(1)}%`,
+        overflow: `${((overflowWeight / totalWeight) * 100).toFixed(1)}%`,
+        fallback: `${((fallbackWeight / totalWeight) * 100).toFixed(1)}%`
+      },
       avgLatency: Math.round(
         this.providers.reduce((sum, p) => sum + (p.avgLatency || 0), 0) / total
       ),
       providers: this.providers.map(p => ({
         name: p.name,
         tier: p.tier,
+        weight: p.weight,
         score: p.score,
         latency: p.avgLatency || 0,
         rateLimited: p.isRateLimited,
