@@ -509,6 +509,20 @@ const commands = [
   new SlashCommandBuilder()
     .setName('callstats')
     .setDescription('Show your personal call tracking stats'),
+  new SlashCommandBuilder()
+    .setName('trace')
+    .setDescription('ZachXBT-style on-chain investigation - trace funding, find CEX deposits, expose clusters')
+    .addStringOption(option =>
+      option.setName('wallet')
+        .setDescription('Suspicious wallet address to investigate')
+        .setRequired(true)
+    )
+    .addIntegerOption(option =>
+      option.setName('depth')
+        .setDescription('Trace depth (1-5, default 3)')
+        .setMinValue(1)
+        .setMaxValue(5)
+    ),
 ].map(command => command.toJSON());
 
 // ============================================================================
@@ -548,7 +562,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
     if (!interaction.isChatInputCommand()) return;
     
     // Commands that need immediate deferral to avoid timeout
-    const commandsNeedingDefer = ['execute', 'rugcheck', 'holders', 'first20', 'devaudit', 'whaletrack', 'compare', 'trending', 'pnl', 'leaderboard', 'trackcall', 'taxreport'];
+    const commandsNeedingDefer = ['execute', 'rugcheck', 'holders', 'first20', 'devaudit', 'whaletrack', 'compare', 'trending', 'pnl', 'leaderboard', 'trackcall', 'taxreport', 'trace'];
     const needsDefer = commandsNeedingDefer.includes(interaction.commandName);
     
     // Defer immediately for commands that might take time
@@ -2734,6 +2748,144 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           await interaction.editReply({ embeds: [embed] });
         } catch (error: any) {
           await interaction.editReply({ content: `❌ Failed to fetch stats: ${error?.message || 'Unknown error'}` });
+        }
+      }
+      
+      // ============================================================================
+      // /trace - ZachXBT-STYLE ON-CHAIN INVESTIGATION
+      // ============================================================================
+      else if (interaction.commandName === 'trace') {
+        const walletAddress = interaction.options.getString('wallet', true);
+        const depth = interaction.options.getInteger('depth') ?? 3;
+        
+        await interaction.deferReply();
+        
+        try {
+          console.log(`[Discord /trace] User ${interaction.user.tag} tracing: ${walletAddress} (depth: ${depth})`);
+          
+          // Import tracer dynamically
+          const { onChainTracer } = await import('./services/on-chain-tracer.ts');
+          const { arkhamIntegration } = await import('./services/arkham-integration.ts');
+          
+          // Run full trace
+          const traceResult = await onChainTracer.fullTrace(walletAddress);
+          
+          // Identify entities
+          const clusterWallets = traceResult.cluster?.wallets || [];
+          const arkhamResult = await arkhamIntegration.analyze(clusterWallets);
+          
+          // Build embed
+          const hasCex = traceResult.cexDepositsFound.length > 0;
+          const hasMixer = traceResult.mixerUsage.length > 0;
+          const hasNextRugs = traceResult.nextRugTokens.length > 0;
+          
+          const embedColor = hasCex ? 0x00ff88 : hasMixer ? 0xff3366 : 0xffaa00;
+          
+          const embed = new EmbedBuilder()
+            .setColor(embedColor)
+            .setTitle(`🔍 On-Chain Investigation: ${walletAddress.slice(0, 8)}...`)
+            .setDescription(
+              `\`/trace ${walletAddress}\`\n\n` +
+              `**Investigation Summary**\n` +
+              `Traced ${traceResult.fundingChain.length} hops • ${traceResult.totalTracedSol.toFixed(2)} SOL total flow`
+            )
+            .setTimestamp();
+          
+          // Funding Chain
+          if (traceResult.fundingChain.length > 0) {
+            const chainLines = traceResult.fundingChain.slice(0, 5).map((hop, i) => {
+              const emoji = hop.entityType === 'cex' ? '🏦' : 
+                           hop.entityType === 'mixer' ? '🌀' :
+                           hop.entityType === 'bridge' ? '🌉' :
+                           hop.entityType === 'swap' ? '🔄' : '👛';
+              return `${emoji} Level ${i + 1}: ${hop.amountSol.toFixed(2)} SOL from \`${hop.fromWallet.slice(0, 8)}...\` ${hop.entityName ? `(${hop.entityName})` : ''}`;
+            });
+            embed.addFields({
+              name: '💸 Funding Flow',
+              value: chainLines.join('\n') || 'No significant flows found',
+              inline: false
+            });
+          }
+          
+          // CEX Deposits (KEY FINDING!)
+          if (hasCex) {
+            const cexLines = traceResult.cexDepositsFound.map(c => 
+              `🎯 **${c.exchange}**: \`${c.address.slice(0, 12)}...\` (${c.amount.toFixed(2)} SOL)`
+            );
+            embed.addFields({
+              name: '🏦 CEX DEPOSITS FOUND!',
+              value: cexLines.join('\n') + '\n*This is how devs get deanonymized!*',
+              inline: false
+            });
+          }
+          
+          // Mixer/Bridge Usage (RED FLAG)
+          if (hasMixer || traceResult.bridgeUsage.length > 0) {
+            const usageLines: string[] = [];
+            traceResult.mixerUsage.forEach(m => usageLines.push(`🌀 **${m.mixer}** used`));
+            traceResult.bridgeUsage.forEach(b => usageLines.push(`🌉 **${b.bridge}** bridge`));
+            embed.addFields({
+              name: '⚠️ Evasion Detected',
+              value: usageLines.join('\n'),
+              inline: true
+            });
+          }
+          
+          // Cluster Info
+          if (traceResult.cluster) {
+            embed.addFields({
+              name: '🕸️ Wallet Cluster',
+              value: `**${traceResult.cluster.wallets.length}** connected wallets\n` +
+                     `Total flow: ${traceResult.cluster.totalSolFlow.toFixed(2)} SOL\n` +
+                     `Risk: ${traceResult.cluster.riskScore}/100`,
+              inline: true
+            });
+          }
+          
+          // Next Rugs (PREDICTIVE)
+          if (hasNextRugs) {
+            const rugLines = traceResult.nextRugTokens.slice(0, 5).map(t =>
+              `• \`${t.mint.slice(0, 8)}...\` (${t.holdersCount} holders)`
+            );
+            embed.addFields({
+              name: '🚨 Potential Next Rugs in Cluster',
+              value: rugLines.join('\n') + '\n*New tokens with <100 holders*',
+              inline: false
+            });
+          }
+          
+          // Arkham Entities
+          if (arkhamResult.highRiskConnections.length > 0) {
+            const riskLines = arkhamResult.highRiskConnections.slice(0, 3).map(e =>
+              `⚠️ **${e.name}** (${e.type})`
+            );
+            embed.addFields({
+              name: '🔴 High Risk Connections',
+              value: riskLines.join('\n'),
+              inline: true
+            });
+          }
+          
+          // Links
+          embed.addFields({
+            name: '🔗 Investigation Tools',
+            value: `[Bubblemaps](https://app.bubblemaps.io/solana/address/${walletAddress}) • ` +
+                   `[Solscan](https://solscan.io/account/${walletAddress}) • ` +
+                   `[Arkham](https://platform.arkhamintelligence.com/explorer/address/${walletAddress})`,
+            inline: false
+          });
+          
+          embed.setFooter({ text: 'Rug Killer • ZachXBT-Style Investigation' });
+          
+          await interaction.editReply({ embeds: [embed] });
+          
+        } catch (error: any) {
+          console.error('[Discord /trace] Error:', error);
+          const errorEmbed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle('❌ Investigation Failed')
+            .setDescription(`Error: ${error?.message || 'Unknown error'}\n\nTry a different wallet or check the address.`);
+          await interaction.editReply({ embeds: [errorEmbed] });
         }
       }
       
