@@ -27,6 +27,10 @@ import { fundingAnalyzer } from "./services/funding-source-analyzer.js";
 import { redisCache } from "./services/redis-cache.js";
 import { getBundleMonitor } from "./services/jito-bundle-monitor.js";
 import { AgedWalletDetector } from "./services/aged-wallet-detector.js";
+import { devsNightmareDetector } from "./services/devs-nightmare-detector.js";
+import { serialRuggerDetector } from "./services/serial-rugger-detector.js";
+import { socialRedFlagDetector } from "./services/social-red-flags.js";
+import { syraxMLScorer, type SyraxFeatures } from "./services/syrax-ml-scorer.js";
 
 // Singleton aged wallet detector
 let agedWalletDetector: AgedWalletDetector | null = null;
@@ -333,6 +337,7 @@ export class SolanaTokenAnalyzer {
                   tipAmount: firstBundle.tipAmount,
                   tipAmountSol: firstBundle.tipAmount ? firstBundle.tipAmount / 1e9 : undefined,
                   tipAccount: firstBundle.tipAccount,
+                  tipPayer: firstBundle.tipPayer,
                   slotLanded: firstBundle.slotLanded,
                   validatorIdentity: firstBundle.validatorIdentity,
                   confidence: firstBundle.confidence,
@@ -369,6 +374,45 @@ export class SolanaTokenAnalyzer {
                 detectedAt: Date.now(),
               };
             }
+            
+            // SyraxAI-style bundle transfer detection
+            if (holders && holders.top20Holders.length > 0) {
+              console.log(`[Analyzer] Running SyraxAI-style bundle transfer detection...`);
+              
+              const bundleTransfers = await bundleMonitor.detectBundleTransfers(
+                tokenMintAddress,
+                holders.top20Holders.map(h => ({ address: h.address, percentage: h.percentage })),
+                response.creationDate
+              );
+              
+              if (bundleTransfers.hasBundleTransfers) {
+                console.log(`[Analyzer] 🎯 BUNDLE TRANSFERS DETECTED:`);
+                console.log(`  - Suspicious transfers: ${bundleTransfers.suspiciousTransferCount}`);
+                console.log(`  - Total transferred: ${bundleTransfers.totalTransferredPercent.toFixed(1)}%`);
+                console.log(`  - Risk score: ${bundleTransfers.riskScore}/100`);
+                
+                if (response.jitoBundleData) {
+                  response.jitoBundleData.bundleTransfers = {
+                    hasBundleTransfers: bundleTransfers.hasBundleTransfers,
+                    totalTransferredPercent: bundleTransfers.totalTransferredPercent,
+                    suspiciousTransferCount: bundleTransfers.suspiciousTransferCount,
+                    patterns: bundleTransfers.patterns,
+                    riskScore: bundleTransfers.riskScore,
+                    risks: bundleTransfers.risks,
+                  };
+                }
+                
+                // Add red flag if high risk
+                if (bundleTransfers.riskScore >= 50) {
+                  response.redFlags.push({
+                    type: 'bundle_manipulation',
+                    severity: 'high',
+                    title: '⚠️ Bundle Transfer Detected (SyraxAI-style)',
+                    description: `${bundleTransfers.suspiciousTransferCount} suspicious transfers detected. ${bundleTransfers.totalTransferredPercent.toFixed(1)}% supply moved post-launch. Risk: ${bundleTransfers.riskScore}/100`,
+                  });
+                }
+              }
+            }
           }
         };
         
@@ -384,6 +428,171 @@ export class SolanaTokenAnalyzer {
             console.error('[Analyzer] Jito bundle detection failed:', bundleError.message);
           }
           response.jitoBundleData = undefined;
+        }
+      }
+      
+      // DEVS NIGHTMARE DETECTION - Nova/@badattrading_ style Team/Insider/Sniper analysis
+      if (holders && holders.top20Holders && holders.top20Holders.length > 0 && !options.skipExternal) {
+        const devsNightmareTimeout = isFastMode ? 3000 : 8000;
+        try {
+          console.log(`[Analyzer] Running DevsNightmare-style detection for ${tokenMintAddress}...`);
+          
+          const devsNightmarePromise = devsNightmareDetector.analyze(
+            tokenMintAddress,
+            holders.top20Holders.map(h => ({
+              address: h.address,
+              balance: h.balance,
+              percentage: h.percentage
+            })),
+            {
+              includeWalletAges: !isFastMode, // Only get ages in normal mode
+              includeJitoCheck: false, // Already doing Jito check above
+              priceUsd: response.marketData?.priceUsd || undefined,
+            }
+          );
+          
+          const devsNightmareResult = await Promise.race([
+            devsNightmarePromise,
+            new Promise<null>((_, reject) => setTimeout(() => reject(new Error('DevsNightmare timeout')), devsNightmareTimeout))
+          ]).catch(() => null);
+          
+          if (devsNightmareResult) {
+            response.devsNightmareData = {
+              teamPercent: devsNightmareResult.teamPercent,
+              insidersPercent: devsNightmareResult.insidersPercent,
+              snipersPercent: devsNightmareResult.snipersPercent,
+              cexBreakdown: devsNightmareResult.cexBreakdown,
+              holderDistribution: devsNightmareResult.holderDistribution,
+              bundlingScore: devsNightmareResult.bundlingScore,
+              bundlingScoreBreakdown: devsNightmareResult.bundlingScoreBreakdown,
+              knownBundlerDetected: devsNightmareResult.knownBundlerDetected,
+              knownBundlerNames: devsNightmareResult.knownBundlerNames,
+              knownBundlerPercent: devsNightmareResult.knownBundlerPercent,
+              agedWalletStats: devsNightmareResult.agedWalletStats,
+              risks: devsNightmareResult.risks,
+              verdict: devsNightmareResult.verdict,
+              confidence: devsNightmareResult.confidence,
+            };
+            
+            console.log(`[Analyzer] DevsNightmare: Team ${devsNightmareResult.teamPercent.toFixed(1)}% | Insiders ${devsNightmareResult.insidersPercent.toFixed(1)}% | Snipers ${devsNightmareResult.snipersPercent.toFixed(1)}% | Score: ${devsNightmareResult.bundlingScore}/100 | Verdict: ${devsNightmareResult.verdict}`);
+            
+            // Add red flags from DevsNightmare analysis
+            if (devsNightmareResult.verdict === 'BUNDLED_SCAM' || devsNightmareResult.verdict === 'AVOID') {
+              response.redFlags.push({
+                type: 'bundle_manipulation',
+                severity: 'critical',
+                title: `🚨 ${devsNightmareResult.verdict === 'AVOID' ? 'AVOID - Bundled Scam' : 'BUNDLED SCAM'}`,
+                description: `DevsNightmare Score: ${devsNightmareResult.bundlingScore}/100. Team: ${devsNightmareResult.teamPercent.toFixed(1)}%, Insiders: ${devsNightmareResult.insidersPercent.toFixed(1)}%, Snipers: ${devsNightmareResult.snipersPercent.toFixed(1)}%`,
+              });
+            }
+            
+            if (devsNightmareResult.knownBundlerDetected) {
+              response.redFlags.push({
+                type: 'bundle_manipulation',
+                severity: 'critical',
+                title: '🚨 Known Bundler Detected',
+                description: `Known bundlers: ${devsNightmareResult.knownBundlerNames.join(', ')} (${devsNightmareResult.knownBundlerPercent.toFixed(1)}% of supply)`,
+              });
+            }
+            
+            if (devsNightmareResult.cexBreakdown.risk === 'high') {
+              response.redFlags.push({
+                type: 'bundle_manipulation',
+                severity: 'high',
+                title: '⚠️ Suspicious CEX Funding Pattern',
+                description: `CEX funding: ${devsNightmareResult.cexBreakdown.total.toFixed(1)}% (ideal: 50-60%). ${devsNightmareResult.cexBreakdown.mexc > 20 ? `MEXC: ${devsNightmareResult.cexBreakdown.mexc.toFixed(1)}% (scam signal)` : ''}`,
+              });
+            }
+          }
+        } catch (devsNightmareError: any) {
+          if (devsNightmareError.message === 'DevsNightmare timeout') {
+            console.warn(`[Analyzer] DevsNightmare detection timed out after ${devsNightmareTimeout}ms`);
+          } else {
+            console.error('[Analyzer] DevsNightmare detection failed:', devsNightmareError.message);
+          }
+        }
+        
+        // SERIAL RUGGER DETECTION - Check if deployer or top holders are known ruggers
+        try {
+          console.log(`[Analyzer] Checking for serial ruggers...`);
+          
+          // Get deployer address (first holder with high % is often deployer)
+          const potentialDeployer = holders.top20Holders.find(h => h.percentage > 10)?.address || null;
+          
+          const ruggerCheck = await serialRuggerDetector.checkTokenForRuggers(
+            tokenMintAddress,
+            potentialDeployer,
+            holders.top20Holders.map(h => ({ address: h.address, percentage: h.percentage }))
+          );
+          
+          if (ruggerCheck.isHighRisk) {
+            console.log(`[Analyzer] 🚨 SERIAL RUGGER DETECTED: ${ruggerCheck.verdict}`);
+            
+            response.redFlags.push({
+              type: 'bundle_manipulation',
+              severity: 'critical',
+              title: '🚨 SERIAL RUGGER DETECTED',
+              description: ruggerCheck.verdict,
+            });
+            
+            // Add to analysis data if DevsNightmare data exists
+            if (response.devsNightmareData) {
+              response.devsNightmareData.risks.push(ruggerCheck.verdict);
+              response.devsNightmareData.verdict = 'AVOID';
+            }
+          }
+        } catch (ruggerError: any) {
+          console.error('[Analyzer] Serial rugger check failed:', ruggerError.message);
+        }
+        
+        // SOCIAL RED FLAG DETECTION - Missing socials, casino outflows
+        try {
+          console.log(`[Analyzer] Checking social red flags...`);
+          
+          const devWalletAddress = holders.top20Holders.find(h => h.percentage > 10)?.address;
+          
+          const socialResult = await socialRedFlagDetector.analyze(
+            tokenMintAddress,
+            devWalletAddress,
+            dex
+          );
+          
+          if (socialResult.riskScore > 0) {
+            response.socialRedFlags = {
+              socialPresence: socialResult.socialPresence,
+              hasMissingSocials: socialResult.hasMissingSocials,
+              missingSocialsRisk: socialResult.missingSocialsRisk,
+              hasCasinoOutflows: socialResult.hasCasinoOutflows,
+              totalCasinoOutflows: socialResult.totalCasinoOutflows,
+              suspiciousPatterns: socialResult.suspiciousPatterns,
+              riskScore: socialResult.riskScore,
+              risks: socialResult.risks,
+              verdict: socialResult.verdict,
+            };
+            
+            console.log(`[Analyzer] Social red flags: Risk ${socialResult.riskScore}/100 | Verdict: ${socialResult.verdict}`);
+            
+            // Add red flags
+            if (socialResult.hasMissingSocials && socialResult.missingSocialsRisk === 'high') {
+              response.redFlags.push({
+                type: 'suspicious_transactions',
+                severity: 'high',
+                title: '⚠️ No Socials - Instant Avoid',
+                description: `Token has no website, Twitter, or Telegram. Per Nova: "Check distro, if you don't you give these people free money"`,
+              });
+            }
+            
+            if (socialResult.hasCasinoOutflows) {
+              response.redFlags.push({
+                type: 'suspicious_transactions',
+                severity: 'critical',
+                title: '🎰 Dev Sends Fees to Casino',
+                description: `${socialResult.totalCasinoOutflows.toFixed(2)} SOL sent to gambling sites. Classic scam behavior.`,
+              });
+            }
+          }
+        } catch (socialError: any) {
+          console.error('[Analyzer] Social red flag check failed:', socialError.message);
         }
       }
       
@@ -544,6 +753,79 @@ export class SolanaTokenAnalyzer {
         }
       }
       console.log(`[Analyzer] ⚠️ Funding analysis temporarily disabled (RPC rate limits)`);
+      
+      // SYRAX ML SCORING - SyraxAI-style legitimacy scoring with composite risk
+      if (!options.skipExternal) {
+        try {
+          console.log(`[Analyzer] Running SyraxML scoring...`);
+          
+          // Extract features for SyraxML scorer
+          const top10Percent = response.topHolders?.slice(0, 10)
+            .reduce((sum, h) => sum + (h.percentage || 0), 0) || 0;
+          
+          const cexPercent = response.devsNightmareData?.cexBreakdown?.total || 0;
+          const agedClusterPercent = response.agedWalletData?.totalFakeVolumePercent || 0;
+          
+          // Calculate liquidity ratio (liquidity / market cap)
+          const liquidityUsd = response.liquidityInfo?.poolSize || 0;
+          const marketCap = response.dexscreenerData?.pairs?.[0]?.marketCap || 0;
+          const liquidityRatio = marketCap > 0 ? liquidityUsd / marketCap : 0;
+          
+          const bundleRisk = response.jitoBundleData?.bundleTransfers?.riskScore || 
+            (response.jitoBundleData?.hasBundleActivity ? 50 : 0);
+          
+          const holderCount = response.holderCount || 0;
+          const photonProtected = response.jitoBundleData?.photonProtected || false;
+          
+          const syraxFeatures: SyraxFeatures = {
+            top10Percent,
+            cexPercent,
+            agedClusterPercent,
+            liquidityRatio,
+            bundleRisk,
+            holderCount,
+            photonProtected,
+          };
+          
+          const syraxResult = syraxMLScorer.calculateScore(syraxFeatures);
+          
+          // Calculate composite risk: (bundle_risk * 0.4) + (rug_probability * 0.6)
+          const compositeRisk = syraxMLScorer.calculateCompositeRisk(bundleRisk, syraxResult.rugProbability);
+          
+          response.syraxMLData = {
+            rugProbability: syraxResult.rugProbability,
+            legitimacyScore: syraxResult.legitimacyScore,
+            featureScores: syraxResult.featureScores,
+            recommendation: syraxResult.recommendation,
+            confidenceLevel: syraxResult.confidenceLevel,
+            riskFactors: syraxResult.riskFactors,
+            positiveFactors: syraxResult.positiveFactors,
+            compositeRisk,
+          };
+          
+          console.log(`[Analyzer] SyraxML: Legitimacy ${syraxResult.legitimacyScore}/100, Rug Prob ${syraxResult.rugProbability}%, Composite Risk ${compositeRisk}% | Recommendation: ${syraxResult.recommendation}`);
+          
+          // Add red flag if high rug probability
+          if (syraxResult.rugProbability >= 70) {
+            response.redFlags.push({
+              type: 'ml_high_rug_probability',
+              severity: 'critical',
+              title: '🤖 ML: High Rug Probability',
+              description: `SyraxAI-style ML scoring indicates ${syraxResult.rugProbability}% rug probability. Factors: ${syraxResult.riskFactors.slice(0, 2).join(', ')}`,
+            });
+          } else if (syraxResult.rugProbability >= 50) {
+            response.redFlags.push({
+              type: 'ml_elevated_risk',
+              severity: 'high',
+              title: '⚠️ ML: Elevated Risk',
+              description: `ML scoring indicates ${syraxResult.rugProbability}% rug probability. Exercise caution.`,
+            });
+          }
+          
+        } catch (syraxError: any) {
+          console.error('[Analyzer] SyraxML scoring failed:', syraxError.message);
+        }
+      }
       
       // Run ML scorer for additional risk assessment
       try {

@@ -381,6 +381,7 @@ export interface JitoBundleData {
   tipAmount?: number; // Lamports paid to Jito tip account
   tipAmountSol?: number; // Tip amount in SOL for display
   tipAccount?: string; // Jito tip account address
+  tipPayer?: string; // Wallet that paid for the bundle
   slotLanded?: number; // Slot where bundle landed
   validatorIdentity?: string; // Validator that processed bundle
   confidence: 'HIGH' | 'MEDIUM' | 'LOW';
@@ -394,6 +395,20 @@ export interface JitoBundleData {
     hasBundleActivity: boolean;
     bundleCount: number;
     totalTipAmount: number;
+  };
+  // SyraxAI-style bundle transfer detection
+  bundleTransfers?: {
+    hasBundleTransfers: boolean;
+    totalTransferredPercent: number;
+    suspiciousTransferCount: number;
+    patterns: {
+      consolidationDetected: boolean; // Multiple wallets → single wallet
+      distributionDetected: boolean; // Single wallet → multiple wallets
+      rapidTransfers: boolean; // Transfers within 5 minutes of launch
+      largeTransfers: boolean; // Any transfer >5% supply
+    };
+    riskScore: number;
+    risks: string[];
   };
   detectedAt: number;
 }
@@ -529,7 +544,139 @@ export interface AgedWalletData {
     medium: number; // 180+ days
     low: number; // 90+ days
   };
+  // Nova's fresh wallet analysis (>20% fresh = risk)
+  freshWalletAnalysis?: {
+    freshWalletCount: number; // Wallets <7 days old
+    freshWalletPercent: number; // % of top holders that are fresh
+    isFreshWalletRisk: boolean; // >20% fresh wallets = risk
+    avgFreshWalletAge: number; // Average age of fresh wallets in days
+    fundingSourceBreakdown: Record<string, number>; // e.g., { "Binance": 3, "OKX": 2 }
+  };
   risks: string[];
+}
+
+// DevsNightmare-Style Detection Data (Nova/@badattrading_ methodology)
+export interface DevsNightmareData {
+  // Core metrics (like DevsNightmare bot output)
+  teamPercent: number; // >5% = red flag
+  insidersPercent: number; // >7% = bundled
+  snipersPercent: number; // >10% = farmed
+  
+  // CEX funding breakdown (Nova's method)
+  cexBreakdown: {
+    total: number; // Total % from all CEXes (50-60% ideal)
+    binance: number;
+    coinbase: number;
+    okx: number;
+    mexc: number; // >20% = scam team signal
+    other: number;
+    isLegit: boolean;
+    risk: 'low' | 'medium' | 'high';
+  };
+  
+  // Holder distribution (Nova's thresholds)
+  holderDistribution: {
+    top10Percent: number; // <15% ideal, >20% risky
+    top70Percent: number; // <60% ideal, >70% concentrated
+    holderCount: number;
+    avgBagSizeUsd?: number;
+    isBotPattern: boolean; // avg >$200 with <5k holders
+  };
+  
+  // Unified bundling score (like DeepNets 0-100)
+  bundlingScore: number; // 0-100, >60 = "Bundled Scam"
+  bundlingScoreBreakdown: {
+    bundlingComponent: number; // 40% weight
+    distroComponent: number; // 30% weight
+    cexComponent: number; // 20% weight
+    freshWalletComponent: number; // 10% weight
+  };
+  
+  // Known bundler detection
+  knownBundlerDetected: boolean;
+  knownBundlerNames: string[];
+  knownBundlerPercent: number;
+  
+  // Aged wallet analysis
+  agedWalletStats: {
+    count: number;
+    totalPercent: number;
+    ageTiers: {
+      tier7d: number;  // <7 days old
+      tier21d: number; // 7-21 days
+      tier47d: number; // 21-47 days
+      tier111d: number; // 47-111 days
+      tier169d: number; // 111-169 days
+      tierExtreme: number; // 169+ days
+    };
+    freshAgedMix: boolean; // Mix = money laundering pattern
+  };
+  
+  // Risk signals
+  risks: string[];
+  
+  // Final verdict
+  verdict: 'SAFE' | 'WARNING' | 'BUNDLED_SCAM' | 'AVOID';
+  confidence: number; // 0-100
+}
+
+// Social & Off-Chain Red Flag Detection (Nova methodology)
+export interface SocialRedFlagData {
+  // Social presence
+  socialPresence: {
+    hasWebsite: boolean;
+    websiteUrl?: string;
+    hasTwitter: boolean;
+    twitterHandle?: string;
+    hasTelegram: boolean;
+    telegramUrl?: string;
+    hasDiscord: boolean;
+    discordUrl?: string;
+  };
+  hasMissingSocials: boolean;
+  missingSocialsRisk: 'high' | 'medium' | 'low';
+  
+  // Dev fee outflows
+  hasCasinoOutflows: boolean;
+  totalCasinoOutflows: number; // SOL sent to casinos
+  
+  // Suspicious patterns
+  suspiciousPatterns: string[];
+  
+  // Risk
+  riskScore: number;
+  risks: string[];
+  verdict: 'SAFE' | 'WARNING' | 'AVOID';
+}
+
+// SyraxAI-Style ML Scoring (Dec 2025)
+// Emulates SyraxAI's legitimacy scoring using weighted features
+export interface SyraxMLData {
+  // Core scores
+  rugProbability: number;     // 0-100 (higher = more likely rug)
+  legitimacyScore: number;    // 0-100 (inverse of rug prob)
+  
+  // Feature scores used (0-1 contribution)
+  featureScores: {
+    top10Score: number;
+    cexScore: number;
+    agedScore: number;
+    liquidityScore: number;
+    bundleScore: number;
+    holderScore: number;
+    photonScore: number;
+  };
+  
+  // Recommendation
+  recommendation: 'Safe' | 'Caution' | 'Avoid';
+  confidenceLevel: 'low' | 'medium' | 'high';
+  
+  // Risk factors
+  riskFactors: string[];
+  positiveFactors: string[];
+  
+  // Composite risk score: (bundle_risk * 0.4) + (rug_probability * 0.6)
+  compositeRisk?: number;
 }
 
 // Pump & Dump Detection (NEW)
@@ -775,12 +922,15 @@ export interface TokenAnalysisResponse {
   whaleDetection?: WhaleDetectionData;
   gmgnData?: GMGNData; // GMGN.AI bundle & insider detection
   agedWalletData?: AgedWalletData; // Aged wallet fake volume detection
+  devsNightmareData?: DevsNightmareData; // DevsNightmare-style Team/Insider/Sniper detection (Nova methodology)
   pumpDumpData?: PumpDumpData; // Pump & dump pattern detection
   liquidityMonitor?: LiquidityMonitorData; // Real-time liquidity tracking
   holderTracking?: HolderTrackingData; // Top holder sell-off detection
   fundingAnalysis?: FundingAnalysisData; // Wallet funding source analysis
   jitoBundleData?: JitoBundleData; // NEW: Jito MEV bundle detection
   socialSentiment?: SocialSentimentData; // NEW: Social sentiment from X/Telegram/Discord (FinBERT-Solana)
+  socialRedFlags?: SocialRedFlagData; // NEW: Off-chain red flags (missing socials, casino outflows)
+  syraxMLData?: SyraxMLData; // NEW: SyraxAI-style ML scoring with composite risk
   
   // Temporal GNN Detection (2025)
   tgnResult?: TGNResult; // Temporal graph analysis with 0.958-0.966 F1-score
@@ -1111,6 +1261,52 @@ export const badActorLabels = pgTable("bad_actor_labels", {
 
 export type BadActorLabel = typeof badActorLabels.$inferSelect;
 export type InsertBadActorLabel = typeof badActorLabels.$inferInsert;
+
+// Serial rugger tracking - tracks known scammer patterns
+export const serialRuggers = pgTable("serial_ruggers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  walletAddress: varchar("wallet_address").notNull().unique(),
+  aliasName: varchar("alias_name"), // e.g., "widfiretoad", "FlipG"
+  rugCount: integer("rug_count").notNull().default(0), // Number of confirmed rugs
+  totalStolenSol: varchar("total_stolen_sol"), // Estimated SOL stolen
+  avgTimeBetweenRugs: integer("avg_time_between_rugs"), // Minutes between rugs
+  patternNotes: text("pattern_notes"), // e.g., "rugs 2/3 coins every 2 hours"
+  linkedWallets: jsonb("linked_wallets").$type<string[]>(), // Array of linked wallet addresses
+  lastRugTimestamp: timestamp("last_rug_timestamp"),
+  firstSeenAt: timestamp("first_seen_at"),
+  source: varchar("source").notNull().default("community"), // community, automated, nova
+  twitterHandle: varchar("twitter_handle"), // If known
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_serial_ruggers_wallet").on(table.walletAddress),
+  index("idx_serial_ruggers_alias").on(table.aliasName),
+  index("idx_serial_ruggers_active").on(table.isActive),
+]);
+
+export type SerialRugger = typeof serialRuggers.$inferSelect;
+export type InsertSerialRugger = typeof serialRuggers.$inferInsert;
+
+// Rugged tokens history - tracks tokens rugged by serial ruggers
+export const ruggedTokens = pgTable("rugged_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tokenAddress: varchar("token_address").notNull().unique(),
+  ruggerWallet: varchar("rugger_wallet").notNull().references(() => serialRuggers.walletAddress),
+  tokenSymbol: varchar("token_symbol"),
+  tokenName: varchar("token_name"),
+  peakMarketCapUsd: varchar("peak_market_cap_usd"),
+  rugTimestamp: timestamp("rug_timestamp"),
+  rugMethod: varchar("rug_method"), // "bundle_dump", "lp_pull", "mint_exploit", "dev_sell"
+  estimatedVictimsCount: integer("estimated_victims_count"),
+  estimatedLossSol: varchar("estimated_loss_sol"),
+  evidenceUrl: text("evidence_url"), // Link to proof (Solscan, tweet, etc.)
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_rugged_tokens_token").on(table.tokenAddress),
+  index("idx_rugged_tokens_rugger").on(table.ruggerWallet),
+  index("idx_rugged_tokens_timestamp").on(table.rugTimestamp),
+]);
 
 // Bot configuration table
 export const botConfig = pgTable("bot_config", {

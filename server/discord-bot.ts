@@ -105,147 +105,105 @@ function addSectionField(embed: EmbedBuilder, raw: string | undefined, fallbackL
 function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   const messageData = buildCompactMessage(analysis);
   const color = getRiskColor(analysis.riskLevel);
+  const shortAddr = `${analysis.tokenAddress.slice(0,6)}...${analysis.tokenAddress.slice(-4)}`;
   
   const embed = new EmbedBuilder()
     .setColor(color)
-    .setTitle(`${messageData.header} ⚠️ ${messageData.age}`)
-    .setDescription(`**Risk Level: ${analysis.riskLevel}** (Score: ${analysis.riskScore}/100)\n_Short rule: higher = safer; lower = riskier_`)
-    .setFooter({ text: `Contract: ${analysis.tokenAddress}` })
+    .setTitle(`${messageData.header}`)
+    .setDescription(`**Risk: ${analysis.riskLevel}** (${analysis.riskScore}/100) • ${messageData.age}\n\`${shortAddr}\``)
+    .setFooter({ text: 'Rug Killer Alpha • Higher score = Safer' })
     .setTimestamp()
-    .setImage(`https://dd.dexscreener.com/ds-data/tokens/solana/${analysis.tokenAddress}.png?size=lg&t=${Date.now()}`);
+    .setThumbnail(`https://dd.dexscreener.com/ds-data/tokens/solana/${analysis.tokenAddress}.png?size=md&t=${Date.now()}`);
   
-  // RUG SCORE - Critical metric from SolRPDS research
+  // RUG SCORE (condensed)
   if (messageData.rugScore) {
     const rugScoreLines = messageData.rugScore.split('\n');
     const headerLine = rugScoreLines[0] || '';
-    const bodyLines = rugScoreLines.slice(1).join('\n');
-    // Extract score and classification from header
+    const bodyLines = rugScoreLines.slice(1).join(' | ').replace(/\*\*/g, '');
     const scoreMatch = headerLine.match(/Rug Score:\s*(\d+)/);
     const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
     const scoreEmoji = score < 10 ? '✅' : score < 50 ? '⚠️' : '🚨';
     embed.addFields({
       name: `${scoreEmoji} ${stripBold(headerLine) || 'Rug Score'}`,
-      value: bodyLines.slice(0, 1024) || 'No breakdown available',
+      value: bodyLines.slice(0, 200) || 'No breakdown',
       inline: false
     });
   }
   
-  // AI VERDICT
-  const sanitizedAiVerdict = stripBold(messageData.aiVerdict);
-  if (sanitizedAiVerdict) {
-    embed.addFields({
-      name: '🤖 AI Analysis',
-      value: sanitizedAiVerdict.slice(0, 1024),
-      inline: false
-    });
-  }
-  
-  // CORE METRICS (Security, Holders, Market in columns)
+  // CORE METRICS ROW 1 (Security + Holders + Market)
   const securityContent = messageData.security.split('\n').slice(1).join('\n');
   if (securityContent) {
-    embed.addFields({
-      name: '🔐 Security',
-      value: securityContent.slice(0, 1024),
-      inline: true
-    });
+    embed.addFields({ name: '🔐 Security', value: securityContent.slice(0, 300), inline: true });
   }
   
   const holdersContent = messageData.holders.split('\n').slice(1).join('\n');
   if (holdersContent) {
-    embed.addFields({
-      name: '👥 Holders',
-      value: holdersContent.slice(0, 1024),
-      inline: true
-    });
+    embed.addFields({ name: '👥 Holders', value: holdersContent.slice(0, 300), inline: true });
   }
   
   if (messageData.market) {
     const marketContent = messageData.market.split('\n').slice(1).join('\n');
     if (marketContent) {
-      embed.addFields({
-        name: '💰 Market',
-        value: marketContent.slice(0, 1024),
-        inline: true
-      });
+      embed.addFields({ name: '💰 Market', value: marketContent.slice(0, 300), inline: true });
     }
   }
   
-  // PUMP.FUN
+  // ROW 2: Pump.fun + Jito Bundle + Aged Wallets
   if (messageData.pumpFun) {
     const pumpFunContent = messageData.pumpFun.split('\n').slice(1).join('\n');
     if (pumpFunContent) {
-      embed.addFields({
-        name: '🎯 Pump.fun',
-        value: pumpFunContent.slice(0, 1024),
-        inline: true
-      });
+      embed.addFields({ name: '🎯 Pump.fun', value: pumpFunContent.slice(0, 200), inline: true });
     }
   }
   
-  // JITO BUNDLE DETECTION - Critical MEV metric
-  addSectionField(embed, messageData.bundle, '📦 Jito Bundle Analysis');
-  
-  // AGED WALLET DETECTION - Critical for rug detection (SolRPDS)
-  addSectionField(embed, messageData.agedWallets, '⏰ Aged Wallet Risk');
-  
-  // WALLET AGES - Detailed age breakdown
-  const sanitizedWalletAges = stripBold(messageData.walletAges);
-  if (sanitizedWalletAges) {
-    embed.addFields({
-      name: '👴 Wallet Ages',
-      value: sanitizedWalletAges.slice(0, 1024),
-      inline: true
-    });
+  // Jito Bundle with payer link
+  if (messageData.bundle) {
+    let bundleContent = messageData.bundle.split('\n').slice(1).join('\n');
+    // Add payer link if available
+    if (analysis.jitoBundleData?.tipPayer) {
+      const payer = analysis.jitoBundleData.tipPayer;
+      bundleContent += `\n[Payer](https://solscan.io/account/${payer})`;
+    }
+    embed.addFields({ name: '📦 Jito Bundle', value: bundleContent.slice(0, 250), inline: true });
   }
   
-  // TGN & ML ANALYSIS - Neural network models
+  if (messageData.agedWallets) {
+    const agedContent = messageData.agedWallets.split('\n').slice(1).join('\n');
+    embed.addFields({ name: '⏰ Aged Wallets', value: agedContent.slice(0, 200), inline: true });
+  }
+  
+  // ROW 3: TGN + ML (combined)
+  const tgnMlParts: string[] = [];
   if (messageData.tgnAnalysis) {
-    const tgnContent = messageData.tgnAnalysis.split('\n').slice(1).join('\n');
-    if (tgnContent) {
-      embed.addFields({
-        name: '🧠 Temporal GNN',
-        value: tgnContent.slice(0, 1024),
-        inline: true
-      });
-    }
+    tgnMlParts.push(messageData.tgnAnalysis.split('\n').slice(1).join(' ').slice(0, 150));
   }
-  
   if (messageData.mlAnalysis) {
-    const mlContent = messageData.mlAnalysis.split('\n').slice(1).join('\n');
-    if (mlContent) {
-      embed.addFields({
-        name: '🤖 ML Decision Tree',
-        value: mlContent.slice(0, 1024),
-        inline: true
-      });
-    }
+    tgnMlParts.push(messageData.mlAnalysis.split('\n').slice(1).join(' ').slice(0, 100));
+  }
+  if (tgnMlParts.length > 0) {
+    embed.addFields({ name: '🧠 AI Analysis', value: tgnMlParts.join('\n'), inline: false });
   }
   
-  // ADDITIONAL RISK METRICS
-  addSectionField(embed, messageData.honeypot, '🍯 Honeypot Detection');
-  addSectionField(embed, messageData.funding, '💸 Funding Sources');
-  addSectionField(embed, messageData.whales, '🐋 Whale Activity', true);
-  addSectionField(embed, messageData.network, '🌐 Wallet Network', true);
-  addSectionField(embed, messageData.pumpDump, '🚨 Pump & Dump');
-  addSectionField(embed, messageData.liquidity, '💧 Liquidity Monitor');
-  addSectionField(embed, messageData.holderActivity, '📉 Holder Activity');
-  addSectionField(embed, messageData.floorInfo, '📊 Floor & Support');
-  addSectionField(embed, messageData.gmgn, '📊 GMGN Intel');
+  // AI VERDICT (condensed)
+  const sanitizedAiVerdict = stripBold(messageData.aiVerdict);
+  if (sanitizedAiVerdict) {
+    embed.addFields({ name: '🤖 Verdict', value: sanitizedAiVerdict.slice(0, 400), inline: false });
+  }
   
-  // ADVANCED DETECTION WARNINGS
-  const advancedWarnings: string[] = [...messageData.alerts];
-  if (advancedWarnings.length > 0) {
+  // ALERTS (only if present)
+  if (messageData.alerts.length > 0) {
     embed.addFields({
-      name: '⚠️ Critical Alerts',
-      value: advancedWarnings.join('\n').slice(0, 1024),
+      name: '⚠️ Alerts',
+      value: messageData.alerts.slice(0, 3).join(' • ').slice(0, 300),
       inline: false
     });
   }
   
-  // QUICK LINKS - Trading tools and explorers
+  // QUICK LINKS (single line)
   embed.addFields({
-    name: '🔗 Quick Links',
-    value: messageData.links.split('\n').slice(0, 4).join('\n').slice(0, 1024)
+    name: '🔗 Links',
+    value: `[Pump.fun](https://pump.fun/${analysis.tokenAddress}) • [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress}) • [Solscan](https://solscan.io/token/${analysis.tokenAddress})`,
+    inline: false
   });
   
   embed.setURL(`https://solscan.io/token/${analysis.tokenAddress}`);

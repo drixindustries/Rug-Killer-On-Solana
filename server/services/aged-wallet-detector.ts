@@ -56,6 +56,14 @@ export interface AgedWalletDetectionResult {
     medium: number; // 180+ days
     low: number; // 90+ days
   };
+  // Nova's fresh wallet threshold check
+  freshWalletAnalysis: {
+    freshWalletCount: number; // Wallets <7 days old
+    freshWalletPercent: number; // % of top holders that are fresh
+    isFreshWalletRisk: boolean; // >20% fresh wallets = risk
+    avgFreshWalletAge: number; // Average age of fresh wallets in days
+    fundingSourceBreakdown: Record<string, number>; // e.g., { "Binance": 3, "OKX": 2 }
+  };
   risks: string[];
 }
 
@@ -181,6 +189,35 @@ export class AgedWalletDetector {
         risks.push(`${totalFakeVolumePercent.toFixed(1)}% of supply in aged wallets - significant fake volume`);
       }
       
+      // Nova's fresh wallet analysis (>20% fresh = risk)
+      const validAnalyses = walletAnalyses.filter(w => w !== null);
+      const freshWallets = validAnalyses.filter(w => w && w.exactAgeDays !== undefined && w.exactAgeDays <= 7);
+      const freshWalletCount = freshWallets.length;
+      const freshWalletPercent = validAnalyses.length > 0 
+        ? (freshWalletCount / validAnalyses.length) * 100 
+        : 0;
+      const isFreshWalletRisk = freshWalletPercent > 20;
+      
+      // Build funding source breakdown
+      const fundingSourceBreakdown: Record<string, number> = {};
+      for (const analysis of validAnalyses) {
+        if (analysis?.fundingSourceName) {
+          fundingSourceBreakdown[analysis.fundingSourceName] = 
+            (fundingSourceBreakdown[analysis.fundingSourceName] || 0) + 1;
+        }
+      }
+      
+      // Calculate average fresh wallet age
+      const avgFreshWalletAge = freshWalletCount > 0
+        ? freshWallets.reduce((sum, w) => sum + (w?.exactAgeDays || 0), 0) / freshWalletCount
+        : 0;
+      
+      // Add fresh wallet risk if applicable
+      if (isFreshWalletRisk) {
+        riskScore += 25;
+        risks.push(`>20% of top holders are fresh wallets (${freshWalletPercent.toFixed(1)}%) - bundled scam signal`);
+      }
+      
       return {
         suspiciousAgedWallets,
         agedWalletCount: suspiciousAgedWallets.length,
@@ -188,6 +225,13 @@ export class AgedWalletDetector {
         riskScore: Math.min(100, riskScore),
         patterns,
         ageTiers,
+        freshWalletAnalysis: {
+          freshWalletCount,
+          freshWalletPercent,
+          isFreshWalletRisk,
+          avgFreshWalletAge,
+          fundingSourceBreakdown,
+        },
         risks,
       };
       
@@ -199,6 +243,7 @@ export class AgedWalletDetector {
   
   /**
    * Analyze individual wallet for aged wallet characteristics
+   * Uses accurate first transaction timestamp via getSignaturesForAddress + getBlockTime
    */
   private async analyzeWallet(
     connection: Connection,
@@ -212,51 +257,140 @@ export class AgedWalletDetector {
     buyTimestamp: number;
     hasOnlyBuys: boolean;
     fundingSource?: string;
+    exactAgeDays: number; // Accurate age calculation
+    fundingSourceName?: string; // Identified funding source (Binance, OKX, etc.)
   } | null> {
     try {
       const walletPubkey = new PublicKey(walletAddress);
       
-      // Get signature history for this wallet (limit to reduce RPC load)
-      const signatures = await connection.getSignaturesForAddress(
-        walletPubkey,
-        { limit: 100 },
-        'confirmed'
-      );
+      // Step 1: Get full signature history for accurate first transaction (wallet creation)
+      // We need to paginate to get the oldest transaction
+      let allSignatures: any[] = [];
+      let before: string | undefined;
+      const maxIterations = 3; // Limit to prevent excessive RPC calls
       
-      if (signatures.length === 0) return null;
+      for (let i = 0; i < maxIterations; i++) {
+        const sigs = await connection.getSignaturesForAddress(
+          walletPubkey,
+          { limit: 1000, before },
+          'confirmed'
+        );
+        
+        if (sigs.length === 0) break;
+        
+        allSignatures = allSignatures.concat(sigs);
+        
+        // If we got less than 1000, we've reached the end
+        if (sigs.length < 1000) break;
+        
+        // Set 'before' to the oldest signature for pagination
+        before = sigs[sigs.length - 1].signature;
+        
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
       
-      // First transaction = wallet creation date
-      const firstTx = signatures[signatures.length - 1];
+      if (allSignatures.length === 0) return null;
+      
+      // First transaction = wallet creation date (oldest is at the end)
+      const firstTx = allSignatures[allSignatures.length - 1];
       const firstTransactionDate = (firstTx.blockTime || 0) * 1000;
       
-      // Find token buy transactions (simplified - checks for recent activity)
-      const tokenBuys = signatures.filter((sig, idx) => {
-        // First 20 sigs are most recent - likely token purchases
-        return idx < 20;
-      });
+      // Calculate exact age in days
+      const now = Date.now();
+      const exactAgeDays = Math.floor((now - firstTransactionDate) / (1000 * 60 * 60 * 24));
       
-      const buyTimestamp = tokenBuys[0]?.blockTime 
-        ? tokenBuys[0].blockTime * 1000 
+      // Step 2: Get recent transactions for token interaction analysis
+      const recentSigs = allSignatures.slice(0, 20);
+      const buyTimestamp = recentSigs[0]?.blockTime 
+        ? recentSigs[0].blockTime * 1000 
         : Date.now();
       
-      // Check for funding source (look at last transaction - likely funding)
-      const lastTx = signatures[0];
-      const fundingSource = lastTx?.signature.slice(0, 44); // Simplified
+      // Step 3: Identify funding source by checking early transactions
+      let fundingSource: string | undefined;
+      let fundingSourceName: string | undefined;
+      
+      // Check the first few transactions for funding
+      const earlyTxs = allSignatures.slice(-5); // Oldest 5 transactions
+      for (const sig of earlyTxs) {
+        try {
+          const tx = await connection.getTransaction(sig.signature, {
+            maxSupportedTransactionVersion: 0,
+          });
+          
+          if (tx?.meta?.postBalances && tx.meta.preBalances) {
+            // Check for SOL funding (balance increase)
+            const preBalance = tx.meta.preBalances[0] || 0;
+            const postBalance = tx.meta.postBalances[0] || 0;
+            
+            if (postBalance > preBalance) {
+              // This is likely a funding transaction
+              fundingSource = sig.signature;
+              
+              // Try to identify known exchange funding
+              const accountKeys = tx.transaction?.message?.staticAccountKeys || [];
+              fundingSourceName = this.identifyFundingSource(accountKeys.map((k: any) => k.toString()));
+              
+              if (fundingSourceName) {
+                console.log(`[Aged Wallet Detector] Identified funding: ${walletAddress.slice(0, 8)}... funded by ${fundingSourceName}`);
+              }
+              break;
+            }
+          }
+        } catch {
+          continue; // Skip failed tx fetches
+        }
+      }
+      
+      // Step 4: Check for sells (has the wallet sold tokens?)
+      // This is simplified - would need to check actual token transfers
+      const hasOnlyBuys = true; // TODO: Implement actual sell detection
       
       return {
         wallet: walletAddress,
         firstTransactionDate,
-        totalTransactions: signatures.length,
+        totalTransactions: allSignatures.length,
         buyAmount: 0, // Would need to parse tx data
         buyTimestamp,
-        hasOnlyBuys: true, // Simplified - would need to check for sells
+        hasOnlyBuys,
         fundingSource,
+        exactAgeDays,
+        fundingSourceName,
       };
       
     } catch (error) {
       console.error(`[Aged Wallet Detector] Failed to analyze ${walletAddress}:`, error);
       return null;
     }
+  }
+  
+  /**
+   * Identify funding source from transaction accounts
+   */
+  private identifyFundingSource(accountKeys: string[]): string | undefined {
+    // Known exchange funding addresses
+    const KNOWN_FUNDING_SOURCES: Record<string, string> = {
+      '5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9': 'Binance',
+      '5tzL3DfsF8i36KeUCjtzWP9zqS6zWjYhR76VA4Y5CzzJ': 'Binance',
+      'H8sMJSCQxfKiFTCfDR3DUYexta7Kxymr2gF3LceH44uR': 'Binance',
+      'GJRs4FwHtemZ5ZE9x3FNvJ8TMwitKTh21yxdRPqn7npE': 'Coinbase',
+      'is6MTRHEgyFLNTfYcuV4QBWLjrZBfmhVNYR6ccgr8KV': 'OKX',
+      '2AQdpHJ2JpcEgPiATUXjQxA8QmafFegfQwSLWSprPicm': 'OKX',
+      'ASTyfSima4LLAdDgoFGkgqoKowG1LZFDr9fAQrg7iaJZ': 'MEXC',
+      'AC5RDfQFmDS1deWZos921JfqscXdByf8BKHs5ACWjtW2': 'Bybit',
+      // BullX (instant swap - high risk)
+      'GKvqsuNcnwWqPzzuhLmGi4rzzh55FhJtGizkhHaEJqiV': 'BullX',
+      // Swopshop (high risk)
+      'SwopQn8JfnKTH8qCrKwgWW3kM8JjP5Nt8EkTdmMz8s9': 'Swopshop',
+    };
+    
+    for (const key of accountKeys) {
+      if (KNOWN_FUNDING_SOURCES[key]) {
+        return KNOWN_FUNDING_SOURCES[key];
+      }
+    }
+    
+    return undefined;
   }
   
   /**
@@ -348,6 +482,13 @@ export class AgedWalletDetector {
         high: 0,
         medium: 0,
         low: 0,
+      },
+      freshWalletAnalysis: {
+        freshWalletCount: 0,
+        freshWalletPercent: 0,
+        isFreshWalletRisk: false,
+        avgFreshWalletAge: 0,
+        fundingSourceBreakdown: {},
       },
       risks: [],
     };

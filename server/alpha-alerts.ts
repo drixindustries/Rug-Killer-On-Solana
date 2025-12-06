@@ -611,51 +611,29 @@ export class AlphaAlertService {
             name: '🔐 Security',
             value: (() => {
               const parts: string[] = [];
-              if (analysisMetrics.mintRevoked) parts.push('✅ Mint Revoked');
-              else parts.push('❌ Mint Active');
-              if (analysisMetrics.freezeRevoked) parts.push('✅ Freeze Revoked');
-              else parts.push('❌ Freeze Active');
-              // Handle LP Burn display - show "Not Bonded" for pre-bonded pump.fun tokens
+              parts.push(`${analysisMetrics.mintRevoked ? '✅' : '❌'} Mint ${analysisMetrics.mintRevoked ? 'Revoked' : 'Active'}`);
+              parts.push(`${analysisMetrics.freezeRevoked ? '✅' : '❌'} Freeze ${analysisMetrics.freezeRevoked ? 'Revoked' : 'Active'}`);
               if (analysisMetrics.notBondedYet || (analysisMetrics.isPumpFun && analysisMetrics.bondingCurve < 100)) {
-                parts.push('⏳ LP Burn: Not Bonded');
+                parts.push('⏳ LP: Not Bonded');
               } else if (analysisMetrics.lpBurnPercent !== undefined && analysisMetrics.lpBurnPercent !== null) {
-                const burnEmoji = analysisMetrics.lpBurnPercent >= 95 ? '✅' : analysisMetrics.lpBurnPercent >= 50 ? '⚠️' : '❌';
-                parts.push(`${burnEmoji} LP Burn: ${analysisMetrics.lpBurnPercent.toFixed(1)}%`);
-              } else {
-                parts.push('❓ LP Burn: Unknown');
+                parts.push(`${analysisMetrics.lpBurnPercent >= 95 ? '✅' : '❌'} LP: ${analysisMetrics.lpBurnPercent.toFixed(1)}%`);
               }
-              // Honeypot/Tax info
-              if (analysisMetrics.isHoneypot) {
-                parts.push('🍯 Honeypot: DETECTED');
-              } else if (analysisMetrics.buyTax > 0 || analysisMetrics.sellTax > 0) {
-                parts.push(`💸 Tax: ${analysisMetrics.buyTax}%/${analysisMetrics.sellTax}%`);
-              }
-              return parts.join('\n') || 'No data';
+              return parts.join('\n');
             })(),
             inline: true
           },
           {
             name: '👥 Holders',
             value: (() => {
-              const parts: string[] = [];
-              if (analysisMetrics.holderCount !== undefined && analysisMetrics.holderCount !== null) {
-                parts.push(`**Count:** ${analysisMetrics.holderCount.toLocaleString()}`);
-              } else {
-                parts.push('**Count:** Pending...');
-              }
-              if (analysisMetrics.topHolderConcentration !== undefined && analysisMetrics.topHolderConcentration !== null) {
-                parts.push(`**Top 10:** ${analysisMetrics.topHolderConcentration.toFixed(1)}%`);
-              }
-              // Dev bought percentage for Pump.fun
-              if (analysisMetrics.devBought && analysisMetrics.devBought > 0) {
-                parts.push(`**Dev:** ${analysisMetrics.devBought.toFixed(1)}%`);
-              }
-              return parts.join('\n') || 'No data';
+              const count = analysisMetrics.holderCount?.toLocaleString() || '...';
+              const top10 = analysisMetrics.topHolderConcentration?.toFixed(1) || '...';
+              const dev = analysisMetrics.devBought && analysisMetrics.devBought > 0 ? ` • Dev: ${analysisMetrics.devBought.toFixed(1)}%` : '';
+              return `**Count:** ${count}\n**Top 10:** ${top10}%${dev}`;
             })(),
             inline: true
           },
-          // Market Data
-          ...(analysisMetrics.marketCap || analysisMetrics.volume24h || analysisMetrics.priceUsd ? [{
+          // Market Data (condensed)
+          ...(analysisMetrics.marketCap || analysisMetrics.priceUsd ? [{
             name: '💰 Market',
             value: (() => {
               const parts: string[] = [];
@@ -663,22 +641,17 @@ export class AlphaAlertService {
                 const price = Number(analysisMetrics.priceUsd);
                 parts.push(`**Price:** $${price < 0.000001 ? price.toExponential(2) : price.toFixed(8)}`);
               }
-              if (analysisMetrics.marketCap) {
-                parts.push(`**MCap:** $${Number(analysisMetrics.marketCap).toLocaleString()}`);
-              }
-              if (analysisMetrics.volume24h) {
-                parts.push(`**24h Vol:** $${Number(analysisMetrics.volume24h).toLocaleString()}`);
-              }
+              if (analysisMetrics.marketCap) parts.push(`**MCap:** $${Number(analysisMetrics.marketCap).toLocaleString()}`);
+              if (analysisMetrics.volume24h) parts.push(`**Vol:** $${Number(analysisMetrics.volume24h).toLocaleString()}`);
               if (analysisMetrics.priceChange24h !== undefined) {
                 const change = Number(analysisMetrics.priceChange24h);
-                const changeEmoji = change >= 0 ? '📈' : '📉';
-                parts.push(`${changeEmoji} **24h:** ${change >= 0 ? '+' : ''}${change.toFixed(1)}%`);
+                parts.push(`${change >= 0 ? '📈' : '📉'}**24h:** ${change >= 0 ? '+' : ''}${change.toFixed(1)}%`);
               }
-              return parts.join('\n') || 'No data';
+              return parts.join('\n');
             })(),
             inline: true
           }] : []),
-          // AGED WALLET DETECTION - Critical for rug detection
+          // AGED WALLET DETECTION - Critical for rug detection (condensed)
           ...(analysisMetrics.agedWalletData ? [{
             name: (() => {
               const risk = analysisMetrics.agedWalletRiskScore;
@@ -687,93 +660,65 @@ export class AlphaAlertService {
             })(),
             value: (() => {
               const parts: string[] = [];
-              parts.push(`**Old Wallets:** ${analysisMetrics.agedWalletCount}`);
-              parts.push(`**Fake Volume:** ${analysisMetrics.agedWalletFakeVolume.toFixed(1)}%`);
-              parts.push(`**Risk Score:** ${analysisMetrics.agedWalletRiskScore}/100`);
-              // Show patterns if detected
+              parts.push(`**Old:** ${analysisMetrics.agedWalletCount} • **Fake Vol:** ${analysisMetrics.agedWalletFakeVolume.toFixed(1)}% • **Risk:** ${analysisMetrics.agedWalletRiskScore}/100`);
               if (analysisMetrics.agedWalletData.patterns) {
-                const patterns = analysisMetrics.agedWalletData.patterns;
-                if (patterns.coordinatedBuys) parts.push('⚠️ Coordinated buys');
-                if (patterns.sameFundingSource) parts.push('⚠️ Same funding source');
-                if (patterns.similarBuyAmounts) parts.push('⚠️ Similar buy amounts');
+                const p = analysisMetrics.agedWalletData.patterns;
+                const flags = [p.coordinatedBuys && '⚠️Coord', p.sameFundingSource && '⚠️SameSrc', p.similarBuyAmounts && '⚠️SameAmt'].filter(Boolean);
+                if (flags.length > 0) parts.push(flags.join(' '));
               }
-              return parts.join('\n') || 'No aged wallet data';
+              return parts.join('\n');
             })(),
             inline: true
           }] : [{
             name: '✅ Aged Wallets',
-            value: '**Old Wallets:** 0\n**Fake Volume:** 0%\n**Risk Score:** 0/100',
+            value: 'Old: 0 • Fake Vol: 0% • Risk: 0/100',
             inline: true
           }]),
-          // JITO BUNDLE DETECTION - MEV bundle analysis
+          // JITO BUNDLE DETECTION - MEV bundle analysis (condensed)
           ...(analysisMetrics.hasJitoBundle ? [{
             name: `📦 Jito Bundle ${analysisMetrics.jitoBundleConfidence === 'HIGH' ? '🔴' : '🟡'}`,
             value: (() => {
               const parts: string[] = [];
-              parts.push(`**Status:** ${analysisMetrics.jitoBundleStatus || 'Detected'}`);
-              parts.push(`**Confidence:** ${analysisMetrics.jitoBundleConfidence}`);
-              if (analysisMetrics.jitoBundleCount > 0) {
-                parts.push(`**Bundles Found:** ${analysisMetrics.jitoBundleCount}`);
-              }
-              if (analysisMetrics.jitoBundleTip && analysisMetrics.jitoBundleTip > 0) {
-                parts.push(`**Tip Paid:** ${analysisMetrics.jitoBundleTip.toFixed(6)} SOL`);
+              parts.push(`**Status:** ${analysisMetrics.jitoBundleStatus || 'Detected'} • **Conf:** ${analysisMetrics.jitoBundleConfidence}`);
+              if (analysisMetrics.jitoBundleCount > 0) parts.push(`**Bundles:** ${analysisMetrics.jitoBundleCount}`);
+              if (analysisMetrics.jitoBundleTip && analysisMetrics.jitoBundleTip > 0) parts.push(`**Tip:** ${analysisMetrics.jitoBundleTip.toFixed(6)} SOL`);
+              if (analysisMetrics.jitoBundleData?.tipPayer) {
+                const payer = analysisMetrics.jitoBundleData.tipPayer;
+                parts.push(`**Payer:** [\`${payer.slice(0,4)}...${payer.slice(-4)}\`](https://solscan.io/account/${payer})`);
               }
               return parts.join('\n');
             })(),
             inline: true
           }] : (analysisMetrics.bundleScore >= 20 ? [{
-            name: `📦 Bundle Analysis ${analysisMetrics.bundleScore >= 60 ? '🔴' : analysisMetrics.bundleScore >= 40 ? '🟠' : '🟡'}`,
-            value: (() => {
-              const parts: string[] = [];
-              parts.push(`**Bundle Score:** ${analysisMetrics.bundleScore}/100`);
-              parts.push(`**Bundled Supply:** ${analysisMetrics.bundledSupplyPercent.toFixed(1)}%`);
-              parts.push(`**Suspicious Wallets:** ${analysisMetrics.suspiciousWallets}`);
-              return parts.join('\n');
-            })(),
+            name: `📦 Bundle ${analysisMetrics.bundleScore >= 60 ? '🔴' : '🟡'}`,
+            value: `Score: ${analysisMetrics.bundleScore}/100 • Supply: ${analysisMetrics.bundledSupplyPercent?.toFixed(1) || 0}%`,
             inline: true
           }] : [{
             name: '✅ Jito Bundles',
-            value: '**Status:** None detected\n**Bundle Score:** 0/100',
+            value: 'None detected • Score: 0/100',
             inline: true
           }])),
-          // TGN (Temporal Graph Neural Network) Analysis
-          ...(analysisMetrics.tgnResult ? [{
+          // TGN + ML ANALYSIS (condensed into single field)
+          ...((analysisMetrics.tgnResult || analysisMetrics.mlScore) ? [{
             name: (() => {
-              const prob = analysisMetrics.tgnRugProbability || 0;
-              const emoji = prob > 0.70 ? '🚨' : prob > 0.40 ? '⚠️' : '✅';
+              const tgnProb = analysisMetrics.tgnRugProbability || 0;
+              const mlProb = analysisMetrics.mlScore?.probability || 0;
+              const maxProb = Math.max(tgnProb, mlProb);
+              const emoji = maxProb > 0.70 ? '🚨' : maxProb > 0.40 ? '⚠️' : '✅';
               return `${emoji} TGN Analysis`;
             })(),
             value: (() => {
               const parts: string[] = [];
-              const prob = (analysisMetrics.tgnRugProbability * 100).toFixed(1);
-              parts.push(`**Rug Risk:** ${prob}%`);
-              if (analysisMetrics.tgnConfidence) {
-                parts.push(`**Confidence:** ${(analysisMetrics.tgnConfidence * 100).toFixed(0)}%`);
+              if (analysisMetrics.tgnResult) {
+                const prob = (analysisMetrics.tgnRugProbability * 100).toFixed(1);
+                const graph = analysisMetrics.tgnResult.graphMetrics?.nodeCount || 0;
+                parts.push(`**Rug Risk:** ${prob}% • **Graph:** ${graph} wallets`);
               }
-              if (analysisMetrics.tgnResult.graphMetrics) {
-                parts.push(`**Graph:** ${analysisMetrics.tgnResult.graphMetrics.nodeCount} wallets`);
+              if (analysisMetrics.mlScore) {
+                const mlProb = (analysisMetrics.mlScore.probability * 100).toFixed(1);
+                const conf = (analysisMetrics.mlScore.confidence * 100).toFixed(0);
+                parts.push(`**Confidence:** ${conf}% • **Model:** ${analysisMetrics.mlScore.model || 'v1.0'}`);
               }
-              if (analysisMetrics.tgnPatterns && analysisMetrics.tgnPatterns.length > 0) {
-                const pattern = analysisMetrics.tgnPatterns[0];
-                parts.push(`**Pattern:** ${pattern.type?.replace(/_/g, ' ') || 'Unknown'}`);
-              }
-              return parts.join('\n');
-            })(),
-            inline: true
-          }] : []),
-          // ML Decision Tree Analysis
-          ...(analysisMetrics.mlScore ? [{
-            name: (() => {
-              const prob = analysisMetrics.mlScore.probability || 0;
-              const emoji = prob > 0.70 ? '🚨' : prob > 0.40 ? '⚠️' : '✅';
-              return `${emoji} ML Analysis`;
-            })(),
-            value: (() => {
-              const parts: string[] = [];
-              const prob = (analysisMetrics.mlScore.probability * 100).toFixed(1);
-              parts.push(`**Rug Risk:** ${prob}%`);
-              parts.push(`**Confidence:** ${(analysisMetrics.mlScore.confidence * 100).toFixed(0)}%`);
-              parts.push(`**Model:** ${analysisMetrics.mlScore.model || 'Decision Tree'}`);
               return parts.join('\n');
             })(),
             inline: true
@@ -1231,75 +1176,51 @@ export class AlphaAlertService {
             value: '**Old Wallets:** 0\n**Fake Volume:** 0%\n**Risk Score:** 0/100',
             inline: true
           }]),
-          // JITO BUNDLE DETECTION - MEV bundle analysis
+          // JITO BUNDLE DETECTION - MEV bundle analysis (condensed)
           ...(analysisMetrics.hasJitoBundle ? [{
             name: `📦 Jito Bundle ${analysisMetrics.jitoBundleConfidence === 'HIGH' ? '🔴' : '🟡'}`,
             value: (() => {
               const parts: string[] = [];
-              parts.push(`**Status:** ${analysisMetrics.jitoBundleStatus || 'Detected'}`);
-              parts.push(`**Confidence:** ${analysisMetrics.jitoBundleConfidence}`);
-              if (analysisMetrics.jitoBundleCount > 0) {
-                parts.push(`**Bundles Found:** ${analysisMetrics.jitoBundleCount}`);
-              }
-              if (analysisMetrics.jitoBundleTip && analysisMetrics.jitoBundleTip > 0) {
-                parts.push(`**Tip Paid:** ${analysisMetrics.jitoBundleTip.toFixed(6)} SOL`);
+              parts.push(`**Status:** ${analysisMetrics.jitoBundleStatus || 'Detected'} • **Conf:** ${analysisMetrics.jitoBundleConfidence}`);
+              if (analysisMetrics.jitoBundleCount > 0) parts.push(`**Bundles:** ${analysisMetrics.jitoBundleCount}`);
+              if (analysisMetrics.jitoBundleTip && analysisMetrics.jitoBundleTip > 0) parts.push(`**Tip:** ${analysisMetrics.jitoBundleTip.toFixed(6)} SOL`);
+              if (analysisMetrics.jitoBundleData?.tipPayer) {
+                const payer = analysisMetrics.jitoBundleData.tipPayer;
+                parts.push(`**Payer:** [\`${payer.slice(0,4)}...${payer.slice(-4)}\`](https://solscan.io/account/${payer})`);
               }
               return parts.join('\n');
             })(),
             inline: true
           }] : (analysisMetrics.bundleScore >= 20 ? [{
-            name: `📦 Bundle Analysis ${analysisMetrics.bundleScore >= 60 ? '🔴' : analysisMetrics.bundleScore >= 40 ? '🟠' : '🟡'}`,
-            value: (() => {
-              const parts: string[] = [];
-              parts.push(`**Bundle Score:** ${analysisMetrics.bundleScore}/100`);
-              parts.push(`**Bundled Supply:** ${analysisMetrics.bundledSupplyPercent.toFixed(1)}%`);
-              parts.push(`**Suspicious Wallets:** ${analysisMetrics.suspiciousWallets}`);
-              return parts.join('\n');
-            })(),
+            name: `📦 Bundle ${analysisMetrics.bundleScore >= 60 ? '🔴' : '🟡'}`,
+            value: `Score: ${analysisMetrics.bundleScore}/100 • Supply: ${analysisMetrics.bundledSupplyPercent?.toFixed(1) || 0}%`,
             inline: true
           }] : [{
             name: '✅ Jito Bundles',
-            value: '**Status:** None detected\n**Bundle Score:** 0/100',
+            value: 'None detected • Score: 0/100',
             inline: true
           }])),
-          // TGN (Temporal Graph Neural Network) Analysis
-          ...(analysisMetrics.tgnResult ? [{
+          // TGN + ML ANALYSIS (condensed into single field)
+          ...((analysisMetrics.tgnResult || analysisMetrics.mlScore) ? [{
             name: (() => {
-              const prob = analysisMetrics.tgnRugProbability || 0;
-              const emoji = prob > 0.70 ? '🚨' : prob > 0.40 ? '⚠️' : '✅';
+              const tgnProb = analysisMetrics.tgnRugProbability || 0;
+              const mlProb = analysisMetrics.mlScore?.probability || 0;
+              const maxProb = Math.max(tgnProb, mlProb);
+              const emoji = maxProb > 0.70 ? '🚨' : maxProb > 0.40 ? '⚠️' : '✅';
               return `${emoji} TGN Analysis`;
             })(),
             value: (() => {
               const parts: string[] = [];
-              const prob = (analysisMetrics.tgnRugProbability * 100).toFixed(1);
-              parts.push(`**Rug Risk:** ${prob}%`);
-              if (analysisMetrics.tgnConfidence) {
-                parts.push(`**Confidence:** ${(analysisMetrics.tgnConfidence * 100).toFixed(0)}%`);
+              if (analysisMetrics.tgnResult) {
+                const prob = (analysisMetrics.tgnRugProbability * 100).toFixed(1);
+                const graph = analysisMetrics.tgnResult.graphMetrics?.nodeCount || 0;
+                parts.push(`**Rug Risk:** ${prob}% • **Graph:** ${graph} wallets`);
               }
-              if (analysisMetrics.tgnResult.graphMetrics) {
-                parts.push(`**Graph:** ${analysisMetrics.tgnResult.graphMetrics.nodeCount} wallets`);
+              if (analysisMetrics.mlScore) {
+                const mlProb = (analysisMetrics.mlScore.probability * 100).toFixed(1);
+                const conf = (analysisMetrics.mlScore.confidence * 100).toFixed(0);
+                parts.push(`**Confidence:** ${conf}% • **Model:** ${analysisMetrics.mlScore.model || 'v1.0'}`);
               }
-              if (analysisMetrics.tgnPatterns && analysisMetrics.tgnPatterns.length > 0) {
-                const pattern = analysisMetrics.tgnPatterns[0];
-                parts.push(`**Pattern:** ${pattern.type?.replace(/_/g, ' ') || 'Unknown'}`);
-              }
-              return parts.join('\n');
-            })(),
-            inline: true
-          }] : []),
-          // ML Decision Tree Analysis
-          ...(analysisMetrics.mlScore ? [{
-            name: (() => {
-              const prob = analysisMetrics.mlScore.probability || 0;
-              const emoji = prob > 0.70 ? '🚨' : prob > 0.40 ? '⚠️' : '✅';
-              return `${emoji} ML Analysis`;
-            })(),
-            value: (() => {
-              const parts: string[] = [];
-              const prob = (analysisMetrics.mlScore.probability * 100).toFixed(1);
-              parts.push(`**Rug Risk:** ${prob}%`);
-              parts.push(`**Confidence:** ${(analysisMetrics.mlScore.confidence * 100).toFixed(0)}%`);
-              parts.push(`**Model:** ${analysisMetrics.mlScore.model || 'Decision Tree'}`);
               return parts.join('\n');
             })(),
             inline: true
