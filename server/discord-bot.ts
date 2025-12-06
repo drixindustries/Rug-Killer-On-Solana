@@ -764,9 +764,22 @@ function createDiscordClient(botToken: string, clientId: string): Client {
               });
             }
             if (data.holderCount !== undefined) {
+              // Show holder count - if estimate, indicate with "~" or "+" prefix
+              const rawCount = data.holderCount;
+              const isEstimate = data.holderCountIsEstimate;
+              let countStr = '...';
+              if (rawCount !== undefined && rawCount !== null) {
+                if (isEstimate && rawCount <= 20) {
+                  countStr = `${rawCount}+`; // Show "20+" when limited to top 20
+                } else if (isEstimate) {
+                  countStr = `~${rawCount.toLocaleString()}`; // Approximate
+                } else {
+                  countStr = rawCount.toLocaleString(); // Accurate count
+                }
+              }
               fields.push({ 
                 name: '👥 Holders', 
-                value: `Count: ${data.holderCount?.toLocaleString() || '...'}\nTop 10: ${data.topHolderConcentration?.toFixed(1) || '...'}%`,
+                value: `Count: ${countStr}\nTop 10: ${data.topHolderConcentration?.toFixed(1) || '...'}%`,
                 inline: true 
               });
             }
@@ -3057,10 +3070,22 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           return;
         }
         
+        // Format holder count - show estimate indicator if needed
+        const isEstimate = holders.holderCountIsEstimate;
+        const rawCount = holders.holderCount;
+        let countStr = rawCount.toString();
+        if (isEstimate && rawCount <= 20) {
+          countStr = `${rawCount}+`; // Limited to top 20
+        } else if (isEstimate) {
+          countStr = `~${rawCount.toLocaleString()}`; // Approximate
+        } else {
+          countStr = rawCount.toLocaleString(); // Accurate
+        }
+        
         const embed = new EmbedBuilder()
           .setColor('#3498db')
           .setTitle(`🏆 Top 20 Holders`)
-          .setDescription(`Total Holders: ${holders.holderCount}\nTop 10: ${holders.topHolderConcentration.toFixed(1)}%`)
+          .setDescription(`Total Holders: ${countStr}\nTop 10: ${holders.topHolderConcentration.toFixed(1)}%`)
           .setFooter({ text: `Token: ${tokenAddress}` });
         
         const top20Text = holders.top20Holders.slice(0, 20).map((h, idx) => 
@@ -3282,10 +3307,22 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           `${idx + 1}. ${h.address.slice(0, 4)}...${h.address.slice(-4)} - ${h.percentage.toFixed(2)}%`
         ).join('\n');
         
+        // Format holder count - show estimate indicator if needed
+        const isEstimate = holders.holderCountIsEstimate;
+        const rawCount = holders.holderCount;
+        let countStr = rawCount.toString();
+        if (isEstimate && rawCount <= 20) {
+          countStr = `${rawCount}+`; // Limited to top 20
+        } else if (isEstimate) {
+          countStr = `~${rawCount.toLocaleString()}`; // Approximate
+        } else {
+          countStr = rawCount.toLocaleString(); // Accurate
+        }
+        
         const embed = new EmbedBuilder()
           .setColor('#3498db')
           .setTitle(`👥 Top ${count} Holders`)
-          .setDescription(`Total: ${holders.holderCount}`)
+          .setDescription(`Total: ${countStr}`)
           .addFields({ name: 'Holders', value: holderText, inline: false })
           .setFooter({ text: `Token: ${tokenAddress}` });
         

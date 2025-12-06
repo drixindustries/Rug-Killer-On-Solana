@@ -881,6 +881,7 @@ export interface TokenAnalysisResponse {
   
   // Holder analysis
   holderCount: number;
+  holderCountIsEstimate?: boolean; // True if holderCount is from limited data (top 20 fallback)
   topHolders: HolderInfo[];
   topHolderConcentration: number;
   holderFiltering: HolderFilteringMetadata;

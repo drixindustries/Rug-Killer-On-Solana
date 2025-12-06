@@ -200,6 +200,7 @@ export class SolanaTokenAnalyzer {
         
         // Holder analysis - now using comprehensive holder service
         holderCount: holders?.holderCount || 0,
+        holderCountIsEstimate: holders?.holderCountIsEstimate ?? true, // Assume estimate if not provided
         topHolders: holders?.top20Holders?.map((h, idx) => ({
           rank: idx + 1,
           address: h.address,

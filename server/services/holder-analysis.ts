@@ -50,6 +50,7 @@ export interface HolderDetail {
 export interface HolderAnalysisResult {
   tokenAddress: string;
   holderCount: number;
+  holderCountIsEstimate: boolean; // True if holderCount is from limited data (top 20 only)
   top20Holders: HolderDetail[];
   topHolderConcentration: number; // top 10 percentage
   exchangeHolderCount: number;
@@ -260,6 +261,7 @@ export class HolderAnalysisService {
         return {
           tokenAddress,
           holderCount: 0,
+          holderCountIsEstimate: true,
           top20Holders: [],
           topHolderConcentration: 0,
           exchangeHolderCount: 0,
@@ -267,6 +269,8 @@ export class HolderAnalysisService {
           lpSupplyPercent: 0,
           pumpFunFilteredCount: 0,
           pumpFunFilteredPercent: 0,
+          systemWalletsFiltered: 0,
+          isPreMigration: false,
           source: 'rpc',
           cachedAt: Date.now(),
         };
@@ -422,6 +426,7 @@ export class HolderAnalysisService {
       const result = {
         tokenAddress,
         holderCount: totalHolderCount, // Total holders including filtered ones
+        holderCountIsEstimate: false, // getProgramAccounts gives accurate count
         top20Holders: top20,
         topHolderConcentration: top10Concentration, // Percentage of total supply held by top 10
         exchangeHolderCount: exchangeHolders.length,
@@ -431,6 +436,8 @@ export class HolderAnalysisService {
         pumpFunFilteredPercent,
         meteoraFilteredCount,
         meteoraFilteredPercent,
+        systemWalletsFiltered: pumpFunFilteredCount + meteoraFilteredCount,
+        isPreMigration: false, // Will be calculated if needed
         source: 'rpc' as const,
         cachedAt: Date.now(),
       };
@@ -599,6 +606,7 @@ export class HolderAnalysisService {
       return {
         tokenAddress,
         holderCount: actualHolderCount, // Total holders including filtered ones
+        holderCountIsEstimate: false, // Helius gives accurate count
         top20Holders: top20,
         topHolderConcentration: top10Concentration, // Percentage of total supply held by top 10
         exchangeHolderCount: exchangeHolders.length,
@@ -749,34 +757,92 @@ export class HolderAnalysisService {
       const exchangeHolders = top20.filter(h => h.isExchange);
       const lpHolders = top20.filter(h => h.isLP);
 
-      // Try to get actual holder count from Solscan API as last resort
-      // This should be the TOTAL holder count (all wallets, including filtered ones)
+      // Try MULTIPLE APIs to get actual holder count (not limited to top 20)
       let actualHolderCount = filteredAccounts.length;
+      let holderCountIsEstimate = true; // Assume estimate until proven otherwise
+      
+      // API 1: Try Solscan API
       try {
-        console.log(`[HolderAnalysis DEBUG - RPC Fallback] Fetching holder count from Solscan API...`);
+        console.log(`[HolderAnalysis DEBUG - RPC Fallback] Trying Solscan API for holder count...`);
         const solscanResponse = await fetch(`https://api.solscan.io/v2/token/meta?address=${tokenAddress}`, {
           signal: AbortSignal.timeout(3000),
-          headers: {
-            'Accept': 'application/json',
-          }
+          headers: { 'Accept': 'application/json' }
         });
         
         if (solscanResponse.ok) {
           const solscanData = await solscanResponse.json();
-          if (solscanData?.data?.holder) {
+          if (solscanData?.data?.holder && solscanData.data.holder > 0) {
             actualHolderCount = solscanData.data.holder;
+            holderCountIsEstimate = false;
             console.log(`[HolderAnalysis DEBUG - RPC Fallback] ✅ Got holder count from Solscan: ${actualHolderCount}`);
           }
         }
       } catch (err) {
-        console.log(`[HolderAnalysis DEBUG - RPC Fallback] Solscan API failed, using fallback count`);
+        console.log(`[HolderAnalysis DEBUG - RPC Fallback] Solscan API failed`);
       }
 
-      console.log(`[HolderAnalysis DEBUG - RPC Fallback] Final holder count: ${actualHolderCount}`);
+      // API 2: Try RugCheck API if Solscan failed
+      if (holderCountIsEstimate) {
+        try {
+          console.log(`[HolderAnalysis DEBUG - RPC Fallback] Trying RugCheck API for holder count...`);
+          const rugcheckResponse = await fetch(`https://api.rugcheck.xyz/v1/tokens/${tokenAddress}/report`, {
+            signal: AbortSignal.timeout(3000),
+            headers: { 'Accept': 'application/json' }
+          });
+          
+          if (rugcheckResponse.ok) {
+            const rugcheckData = await rugcheckResponse.json();
+            // RugCheck provides topHolders array - if there are more than 20, we know there are at least that many
+            if (rugcheckData?.topHolders && rugcheckData.topHolders.length > 0) {
+              // Use holderCount if available, otherwise estimate from data
+              if (rugcheckData.holderCount && rugcheckData.holderCount > 0) {
+                actualHolderCount = rugcheckData.holderCount;
+                holderCountIsEstimate = false;
+                console.log(`[HolderAnalysis DEBUG - RPC Fallback] ✅ Got holder count from RugCheck: ${actualHolderCount}`);
+              }
+            }
+          }
+        } catch (err) {
+          console.log(`[HolderAnalysis DEBUG - RPC Fallback] RugCheck API failed`);
+        }
+      }
+
+      // API 3: Try Helius DAS API if others failed
+      if (holderCountIsEstimate && process.env.HELIUS_API_KEY) {
+        try {
+          console.log(`[HolderAnalysis DEBUG - RPC Fallback] Trying Helius DAS API for holder count...`);
+          const heliusResponse = await fetch(`https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`, {
+            method: 'POST',
+            signal: AbortSignal.timeout(3000),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 'holder-count',
+              method: 'getAsset',
+              params: { id: tokenAddress }
+            })
+          });
+          
+          if (heliusResponse.ok) {
+            const heliusData = await heliusResponse.json();
+            // Helius DAS might have token_info.supply_holders
+            if (heliusData?.result?.token_info?.holder_count) {
+              actualHolderCount = heliusData.result.token_info.holder_count;
+              holderCountIsEstimate = false;
+              console.log(`[HolderAnalysis DEBUG - RPC Fallback] ✅ Got holder count from Helius DAS: ${actualHolderCount}`);
+            }
+          }
+        } catch (err) {
+          console.log(`[HolderAnalysis DEBUG - RPC Fallback] Helius DAS API failed`);
+        }
+      }
+
+      console.log(`[HolderAnalysis DEBUG - RPC Fallback] Final holder count: ${actualHolderCount} (estimate: ${holderCountIsEstimate})`);
 
       return {
         tokenAddress,
-        holderCount: actualHolderCount, // Total holders (from Solscan API if available)
+        holderCount: actualHolderCount, // Total holders (from API if available)
+        holderCountIsEstimate, // True if we couldn't get accurate count
         top20Holders: top20,
         topHolderConcentration: top10Concentration, // Percentage of total supply held by top 10
         exchangeHolderCount: exchangeHolders.length,
@@ -798,6 +864,7 @@ export class HolderAnalysisService {
       return {
         tokenAddress,
         holderCount: 0,
+        holderCountIsEstimate: true,
         top20Holders: [],
         topHolderConcentration: 0,
         exchangeHolderCount: 0,
@@ -805,6 +872,8 @@ export class HolderAnalysisService {
         lpSupplyPercent: 0,
         pumpFunFilteredCount: 0,
         pumpFunFilteredPercent: 0,
+        systemWalletsFiltered: 0,
+        isPreMigration: false,
         source: 'rpc',
         cachedAt: Date.now(),
       };

@@ -457,6 +457,7 @@ export class AlphaAlertService {
         riskLevel: tokenAnalysis.riskLevel,
         riskEmoji: getRiskEmoji(tokenAnalysis.riskLevel),
         holderCount: tokenAnalysis.holderCount,
+        holderCountIsEstimate: tokenAnalysis.holderCountIsEstimate ?? true, // Assume estimate if not provided
         topHolderConcentration: tokenAnalysis.topHolderConcentration,
         mintRevoked: !tokenAnalysis.mintAuthority?.hasAuthority,
         freezeRevoked: !tokenAnalysis.freezeAuthority?.hasAuthority,
@@ -633,10 +634,22 @@ export class AlphaAlertService {
           {
             name: '👥 Holders',
             value: (() => {
-              const count = analysisMetrics.holderCount?.toLocaleString() || '...';
+              // Show holder count - if estimate, indicate with "~" prefix
+              const rawCount = analysisMetrics.holderCount;
+              const isEstimate = analysisMetrics.holderCountIsEstimate;
+              let countStr = '...';
+              if (rawCount !== undefined && rawCount !== null) {
+                if (isEstimate && rawCount <= 20) {
+                  countStr = `${rawCount}+`; // Show "20+" when limited to top 20
+                } else if (isEstimate) {
+                  countStr = `~${rawCount.toLocaleString()}`; // Approximate
+                } else {
+                  countStr = rawCount.toLocaleString(); // Accurate count
+                }
+              }
               const top10 = analysisMetrics.topHolderConcentration?.toFixed(1) || '...';
               const dev = analysisMetrics.devBought && analysisMetrics.devBought > 0 ? ` • Dev: ${analysisMetrics.devBought.toFixed(1)}%` : '';
-              return `**Count:** ${count}\n**Top 10:** ${top10}%${dev}`;
+              return `**Count:** ${countStr}\n**Top 10:** ${top10}%${dev}`;
             })(),
             inline: true
           },
@@ -967,6 +980,7 @@ export class AlphaAlertService {
         riskLevel: tokenAnalysis.riskLevel,
         riskEmoji: getRiskEmoji(tokenAnalysis.riskLevel),
         holderCount: tokenAnalysis.holderCount,
+        holderCountIsEstimate: tokenAnalysis.holderCountIsEstimate ?? true, // Assume estimate if not provided
         topHolderConcentration: tokenAnalysis.topHolderConcentration,
         mintRevoked: !tokenAnalysis.mintAuthority?.hasAuthority,
         freezeRevoked: !tokenAnalysis.freezeAuthority?.hasAuthority,
@@ -1126,8 +1140,19 @@ export class AlphaAlertService {
             name: '👥 Holders',
             value: (() => {
               const parts: string[] = [];
-              if (analysisMetrics.holderCount !== undefined && analysisMetrics.holderCount !== null) {
-                parts.push(`**Count:** ${analysisMetrics.holderCount.toLocaleString()}`);
+              // Show holder count - if estimate, indicate with "~" or "+" prefix
+              const rawCount = analysisMetrics.holderCount;
+              const isEstimate = analysisMetrics.holderCountIsEstimate;
+              if (rawCount !== undefined && rawCount !== null) {
+                let countStr: string;
+                if (isEstimate && rawCount <= 20) {
+                  countStr = `${rawCount}+`; // Show "20+" when limited to top 20
+                } else if (isEstimate) {
+                  countStr = `~${rawCount.toLocaleString()}`; // Approximate
+                } else {
+                  countStr = rawCount.toLocaleString(); // Accurate count
+                }
+                parts.push(`**Count:** ${countStr}`);
               } else {
                 parts.push('**Count:** Pending...');
               }
