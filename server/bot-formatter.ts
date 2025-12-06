@@ -4,6 +4,7 @@
  */
 
 import type { TokenAnalysisResponse } from '../shared/schema';
+import { lockDetectionService } from './services/lock-detection-service.js';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -74,6 +75,8 @@ export interface CompactMessageData {
   socialRedFlags?: string; // Off-chain red flags (missing socials, casino outflows)
   alphaScanGrading?: string; // Team/Insider/Sniper detection (formerly DevsNightmare)
   machineLearning?: string; // ML composite risk score (formerly Syrax)
+  lockStatus?: string; // Token lock status (Streamflow, Jupiter, etc.)
+  largeHolders?: string; // Large holder warnings (>10% non-exchange)
   alerts: string[];
   links: string;
 }
@@ -907,6 +910,30 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     }
   }
   
+  // LOCK STATUS - Check for locked tokens
+  let lockStatus: string | undefined;
+  try {
+    const lockSummary = await lockDetectionService.getLockSummary(analysis.tokenAddress);
+    if (lockSummary.isAnyLocked) {
+      const lockEmoji = lockSummary.totalLockedPercent > 50 ? '🔒' : lockSummary.totalLockedPercent > 20 ? '🔐' : '🔓';
+      lockStatus = `${lockEmoji} **Token Locks Detected**\n• ${lockSummary.totalLockedPercent.toFixed(1)}% of supply locked\n• ${lockSummary.lockCount} lock contract(s) found\n• Reduces sell pressure risk`;
+    }
+  } catch (error) {
+    console.warn('[BotFormatter] Error checking lock status:', error);
+  }
+
+  // LARGE HOLDERS - Flag potential team wallets
+  let largeHolders: string | undefined;
+  if (analysis.largeHolders && analysis.largeHolders.length > 0) {
+    const topLargeHolders = analysis.largeHolders.slice(0, 3); // Show top 3
+    largeHolders = `🚨 **Large Holder Alert**\n`;
+    largeHolders += topLargeHolders.map((holder, idx) => {
+      const pct = typeof holder.percentage === 'number' ? holder.percentage.toFixed(2) : holder.percentage;
+      return `${idx + 1}. ${formatAddress(holder.address)} - ${pct}%`;
+    }).join('\n');
+    largeHolders += `\n⚠️ >10% non-exchange holders may indicate team wallets`;
+  }
+
   // CRITICAL ALERTS
   const alerts: string[] = [];
   
@@ -952,6 +979,8 @@ Quick Links → [Solscan](https://solscan.io/token/${analysis.tokenAddress}) •
     socialRedFlags,
     alphaScanGrading,
     machineLearning,
+    lockStatus,
+    largeHolders,
     alerts,
     links
   };
@@ -1053,7 +1082,15 @@ export function toPlainText(data: CompactMessageData): string {
   if (data.machineLearning) {
     message += `${data.machineLearning}\n\n`;
   }
-  
+
+  if (data.lockStatus) {
+    message += `${data.lockStatus}\n\n`;
+  }
+
+  if (data.largeHolders) {
+    message += `${data.largeHolders}\n\n`;
+  }
+
   if (data.alerts.length > 0) {
     message += `⚠️ **ALERTS**\n`;
     data.alerts.forEach(alert => {

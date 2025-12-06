@@ -1,4 +1,5 @@
 import type { GoPlusSecurityData } from "../shared/schema";
+import { multisigDetectionService } from './services/multisig-detection-service.js';
 
 const GOPLUS_API_URL = "https://api.gopluslabs.io/api/v1";
 
@@ -45,18 +46,39 @@ export class GoPlusSecurityService {
         return null;
       }
 
-      return this.parseGoPlusResponse(tokenData);
+      return await this.parseGoPlusResponse(tokenData);
     } catch (error) {
       console.error("GoPlus API error:", error);
       return null;
     }
   }
 
-  private parseGoPlusResponse(result: any): GoPlusSecurityData {
+  private async parseGoPlusResponse(result: any): Promise<GoPlusSecurityData> {
     const securityRisks: string[] = [];
     
     if (result.is_mintable === '1') {
-      securityRisks.push(`Mintable - Authority can create unlimited tokens (${result.mint_authority || 'Unknown'})`);
+      const mintAuthority = result.mint_authority || 'Unknown';
+
+      // Check if mint authority is multisig-controlled
+      let mintableWarning = `Mintable - Authority can create unlimited tokens (${mintAuthority})`;
+
+      if (mintAuthority !== 'Unknown') {
+        try {
+          const multisigInfo = await multisigDetectionService.getMultisigSummary(mintAuthority);
+          if (multisigInfo.isMultisig) {
+            mintableWarning += ` ⚠️ Authority is multisig-controlled (${multisigInfo.program}) - Higher security but slower response to issues`;
+          } else {
+            mintableWarning += ` 🚨 Authority is EOA wallet - High rug risk, can mint instantly`;
+          }
+        } catch (error) {
+          console.warn('[GoPlus] Error checking multisig for mint authority:', error);
+          mintableWarning += ` ⚠️ Could not verify authority type`;
+        }
+      } else {
+        mintableWarning += ` 🚨 Unknown authority - Cannot verify control`;
+      }
+
+      securityRisks.push(mintableWarning);
     }
     
     if (result.is_freezable === '1') {

@@ -45,6 +45,7 @@ export interface HolderDetail {
   isBundled?: boolean;
   isSniper?: boolean;
   isInsider?: boolean;
+  isLargeHolder?: boolean; // True if >10% non-exchange holder (potential team wallet)
 }
 
 export interface HolderAnalysisResult {
@@ -62,6 +63,7 @@ export interface HolderAnalysisResult {
   meteoraFilteredPercent?: number;
   systemWalletsFiltered: number; // Bonding curve + CEX + Raydium authorities
   isPreMigration: boolean; // True if bonding curve is top holder
+  largeHolders: HolderDetail[]; // Holders with >10% supply (non-exchange, potential team wallets)
   source: 'birdeye' | 'gmgn' | 'helius' | 'rpc' | 'mixed';
   cachedAt: number;
 }
@@ -177,8 +179,8 @@ export class HolderAnalysisService {
       const rpcEndpoint = connection.rpcEndpoint;
       console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Using Helius for index methods: ${rpcEndpoint.slice(0, 50)}...`);
       
-      // Add timeout for getProgramAccounts (5 seconds for premium RPCs)
-      const timeoutMs = 5000;
+      // Add timeout for getProgramAccounts (10 seconds for premium RPCs - increased for better accuracy)
+      const timeoutMs = 10000;
       let timeoutId: NodeJS.Timeout | null = null;
       const timeoutPromise = new Promise<null>((_, reject) => {
         timeoutId = setTimeout(() => reject(new Error('getProgramAccounts timeout')), timeoutMs);
@@ -301,6 +303,7 @@ export class HolderAnalysisService {
           pumpFunFilteredPercent: 0,
           systemWalletsFiltered: 0,
           isPreMigration: false,
+          largeHolders: [],
           source: 'rpc',
           cachedAt: Date.now(),
         };
@@ -436,6 +439,7 @@ export class HolderAnalysisService {
             isExchange: labeled.isExchange,
             isLP: labeled.isLP,
             isCreator: labeled.isCreator,
+            isLargeHolder: labeled.isLargeHolder,
           } as HolderDetail;
         })
         .sort((a, b) => b.balance - a.balance);
@@ -459,6 +463,9 @@ export class HolderAnalysisService {
       const exchangeHolders = top20.filter(h => h.isExchange);
       const lpHolders = top20.filter(h => h.isLP);
 
+      // Identify large holders (>10% non-exchange holders - potential team wallets)
+      const largeHolders = list.filter(h => h.isLargeHolder && !h.isExchange);
+
       // holderCount should be TOTAL unique holders (including filtered system wallets)
       // This represents ALL wallets holding the token
       const totalHolderCount = byOwner.size;
@@ -478,6 +485,7 @@ export class HolderAnalysisService {
         meteoraFilteredPercent,
         systemWalletsFiltered: pumpFunFilteredCount + meteoraFilteredCount,
         isPreMigration: false, // Will be calculated if needed
+        largeHolders,
         source: 'rpc' as const,
         cachedAt: Date.now(),
       };
@@ -500,12 +508,201 @@ export class HolderAnalysisService {
 
   /**
    * Fetch holder data from Helius RPC
-   * DISABLED - Using rpcBalancer instead
+   * Enhanced fallback with improved error handling and longer timeout
    */
   private async fetchFromHelius(tokenAddress: string): Promise<HolderAnalysisResult | null> {
-    // DISABLED: Using rpcBalancer for RPC calls
-    console.log(`[HolderAnalysis] fetchFromHelius disabled - using rpcBalancer`);
-    return null;
+    const heliusKey = process.env.HELIUS_API_KEY?.trim();
+    if (!heliusKey) {
+      console.log(`[HolderAnalysis] fetchFromHelius: No Helius API key available`);
+      return null;
+    }
+
+    try {
+      console.log(`[HolderAnalysis] fetchFromHelius: Attempting Helius RPC with API key...`);
+      const connection = new Connection(`https://mainnet.helius-rpc.com/?api-key=${heliusKey}`, 'confirmed');
+
+      // Add timeout for Helius calls (10 seconds for premium API)
+      const timeoutMs = 10000;
+      let timeoutId: NodeJS.Timeout | null = null;
+      const timeoutPromise = new Promise<null>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Helius RPC timeout')), timeoutMs);
+      });
+
+      // Helper to clear timeout
+      const clearTimeoutSafe = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+      };
+
+      const mintPubkey = new PublicKey(tokenAddress);
+
+      // Fetch mint info with timeout protection
+      let mintInfo;
+      try {
+        const mintPromise = getMint(connection, mintPubkey, 'confirmed', TOKEN_PROGRAM_ID)
+          .catch(() => getMint(connection, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID));
+        mintInfo = await Promise.race([mintPromise, timeoutPromise]) as any;
+        clearTimeoutSafe(); // Clear timeout on success
+      } catch (error: any) {
+        clearTimeoutSafe();
+        if (error.message?.includes('timeout')) {
+          console.log(`[HolderAnalysis] fetchFromHelius: Timeout getting mint info`);
+          return null;
+        }
+        throw error;
+      }
+
+      const totalSupplyRaw = Number(mintInfo.supply);
+      const decimals = mintInfo.decimals;
+
+      // Get largest accounts with timeout protection
+      let largestAccounts;
+      try {
+        const largestPromise = connection.getTokenLargestAccounts(mintPubkey, 'confirmed');
+        largestAccounts = await Promise.race([largestPromise, timeoutPromise]) as any;
+        clearTimeoutSafe();
+      } catch (error: any) {
+        clearTimeoutSafe();
+        if (error.message?.includes('timeout')) {
+          console.log(`[HolderAnalysis] fetchFromHelius: Timeout getting largest accounts`);
+          return null;
+        }
+        throw error;
+      }
+
+      const validAccounts = largestAccounts.value.filter((acc: any) => Number(acc.amount) > 0);
+
+      if (validAccounts.length === 0) {
+        console.log(`[HolderAnalysis] fetchFromHelius: No valid accounts found`);
+        return null;
+      }
+
+      // Resolve owner addresses for top accounts
+      const ownerLookup = await this.resolveTokenAccountOwners(
+        connection,
+        validAccounts.slice(0, Math.min(100, validAccounts.length)).map((acc: any) => acc.address)
+      );
+
+      // Process holders with filtering
+      const filteredAccounts: Array<{ owner: string; amountRaw: number }> = [];
+      let pumpFunFilteredCount = 0;
+      let pumpFunFilteredRaw = 0;
+      let meteoraFilteredCount = 0;
+      let meteoraFilteredRaw = 0;
+
+      // Calculate pump.fun bonding curve addresses
+      const bondingCurveAddress = getPumpFunBondingCurveAddress(tokenAddress);
+      const associatedBondingCurveAddress = getPumpFunAssociatedBondingCurveAddress(tokenAddress);
+      const pumpSwapPoolAddress = getPumpSwapAmmPoolAddress(tokenAddress);
+
+      for (const acc of validAccounts) {
+        const amountRaw = Number(acc.amount);
+        const ownerAddress = ownerLookup.get(acc.address.toBase58()) ?? acc.address.toBase58();
+
+        // Filter pump.fun system addresses
+        if ((bondingCurveAddress && ownerAddress === bondingCurveAddress) ||
+            (associatedBondingCurveAddress && ownerAddress === associatedBondingCurveAddress)) {
+          pumpFunFilteredCount += 1;
+          pumpFunFilteredRaw += amountRaw;
+          continue;
+        }
+
+        if (pumpSwapPoolAddress && ownerAddress === pumpSwapPoolAddress) {
+          pumpFunFilteredCount += 1;
+          pumpFunFilteredRaw += amountRaw;
+          continue;
+        }
+
+        if (isPumpFunAmm(ownerAddress)) {
+          pumpFunFilteredCount += 1;
+          pumpFunFilteredRaw += amountRaw;
+          continue;
+        }
+
+        if (isSystemWallet(ownerAddress)) {
+          pumpFunFilteredCount += 1;
+          pumpFunFilteredRaw += amountRaw;
+          continue;
+        }
+
+        if (isMeteoraAmm(ownerAddress)) {
+          meteoraFilteredCount += 1;
+          meteoraFilteredRaw += amountRaw;
+          continue;
+        }
+
+        filteredAccounts.push({ owner: ownerAddress, amountRaw });
+      }
+
+      const effectiveSupplyRaw = Math.max(totalSupplyRaw - pumpFunFilteredRaw - meteoraFilteredRaw, 1);
+      const pumpFunFilteredPercent = totalSupplyRaw > 0 ? (pumpFunFilteredRaw / totalSupplyRaw) * 100 : 0;
+      const meteoraFilteredPercent = totalSupplyRaw > 0 ? (meteoraFilteredRaw / totalSupplyRaw) * 100 : 0;
+
+      const top20: HolderDetail[] = filteredAccounts.slice(0, 20).map(({ owner, amountRaw }) => {
+        const balance = amountRaw / Math.pow(10, decimals);
+        const percentage = (amountRaw / effectiveSupplyRaw) * 100;
+        const labeled = this.labelWallet(owner, percentage);
+        return {
+          address: owner,
+          balance,
+          percentage,
+          uiAmount: balance,
+          label: labeled.label,
+          isExchange: labeled.isExchange,
+          isLP: labeled.isLP,
+          isCreator: labeled.isCreator,
+          isLargeHolder: labeled.isLargeHolder,
+        };
+      });
+
+      // Calculate top 10 concentration
+      const top10TotalSupply = top20.slice(0, 10).reduce((sum, h) => {
+        const holderEntry = filteredAccounts.find(e => e.owner === h.address);
+        if (holderEntry) {
+          return sum + holderEntry.amountRaw;
+        }
+        return sum;
+      }, 0);
+      const top10Concentration = totalSupplyRaw > 0 ? (top10TotalSupply / totalSupplyRaw) * 100 : 0;
+
+      const exchangeHolders = top20.filter(h => h.isExchange);
+      const lpHolders = top20.filter(h => h.isLP);
+
+      // Estimate total holder count from available data
+      const totalUniqueHolders = new Set([
+        ...filteredAccounts.map(a => a.owner),
+        ...Array.from({ length: pumpFunFilteredCount + meteoraFilteredCount }, (_, i) => `filtered_${i}`)
+      ]).size;
+
+      const actualHolderCount = Math.max(totalUniqueHolders, filteredAccounts.length + pumpFunFilteredCount + meteoraFilteredCount);
+
+      console.log(`[HolderAnalysis] fetchFromHelius: SUCCESS - ${actualHolderCount} holders from Helius`);
+
+      return {
+        tokenAddress,
+        holderCount: actualHolderCount,
+        holderCountIsEstimate: true, // Helius gives top accounts, so estimate total
+        top20Holders: top20,
+        topHolderConcentration: top10Concentration,
+        exchangeHolderCount: exchangeHolders.length,
+        exchangeSupplyPercent: exchangeHolders.reduce((sum, h) => sum + h.percentage, 0),
+        lpSupplyPercent: lpHolders.reduce((sum, h) => sum + h.percentage, 0),
+        pumpFunFilteredCount,
+        pumpFunFilteredPercent,
+        meteoraFilteredCount,
+        meteoraFilteredPercent,
+        systemWalletsFiltered: pumpFunFilteredCount + meteoraFilteredCount,
+        isPreMigration: false,
+        largeHolders,
+        source: 'helius',
+        cachedAt: Date.now(),
+      };
+    } catch (error: any) {
+      console.error('[HolderAnalysis] fetchFromHelius: EXCEPTION:', error.message);
+      return null;
+    }
 
     /* DISABLED CODE - All code below is unreachable and commented out
     const heliusKey = process.env.HELIUS_API_KEY?.trim();
@@ -623,6 +820,7 @@ export class HolderAnalysisService {
           isExchange: labeled.isExchange,
           isLP: labeled.isLP,
           isCreator: labeled.isCreator,
+          isLargeHolder: labeled.isLargeHolder,
         };
       });
 
@@ -640,6 +838,9 @@ export class HolderAnalysisService {
       
       const exchangeHolders = top20.filter(h => h.isExchange);
       const lpHolders = top20.filter(h => h.isLP);
+
+      // Identify large holders (>10% non-exchange holders - potential team wallets)
+      const largeHolders = top20.filter(h => h.isLargeHolder && !h.isExchange);
 
       // Count total unique holders (including filtered ones)
       // For Helius method, we need to count all accounts including filtered
@@ -797,6 +998,7 @@ export class HolderAnalysisService {
           isExchange: labeled.isExchange,
           isLP: labeled.isLP,
           isCreator: labeled.isCreator,
+          isLargeHolder: labeled.isLargeHolder,
         };
       });
 
@@ -816,6 +1018,9 @@ export class HolderAnalysisService {
       
       const exchangeHolders = top20.filter(h => h.isExchange);
       const lpHolders = top20.filter(h => h.isLP);
+
+      // Identify large holders (>10% non-exchange holders - potential team wallets)
+      const largeHolders = top20.filter(h => h.isLargeHolder && !h.isExchange);
 
       // Try MULTIPLE APIs to get actual holder count (not limited to top 20)
       let actualHolderCount = filteredAccounts.length;
@@ -961,6 +1166,7 @@ export class HolderAnalysisService {
         meteoraFilteredPercent,
         systemWalletsFiltered: 0, // Not tracked in RPC fallback (limited data)
         isPreMigration: false,
+        largeHolders,
         source: 'rpc',
         cachedAt: Date.now(),
       };
@@ -981,6 +1187,7 @@ export class HolderAnalysisService {
         pumpFunFilteredPercent: 0,
         systemWalletsFiltered: 0,
         isPreMigration: false,
+        largeHolders: [],
         source: 'rpc',
         cachedAt: Date.now(),
       };
@@ -1048,6 +1255,7 @@ export class HolderAnalysisService {
     isExchange: boolean;
     isLP: boolean;
     isCreator: boolean;
+    isLargeHolder: boolean;
   } {
     // CRITICAL: Check system wallets FIRST before any heuristics
     // This prevents Pump.fun AMM wallets from being mislabeled as "Creator/Dev"
@@ -1058,6 +1266,7 @@ export class HolderAnalysisService {
         isExchange: false,
         isLP: true,
         isCreator: false,
+        isLargeHolder: false, // System wallets are filtered out, can't be large holders
       };
     }
 
@@ -1067,6 +1276,7 @@ export class HolderAnalysisService {
         isExchange: false,
         isLP: true,
         isCreator: false,
+        isLargeHolder: false, // AMM wallets are filtered out, can't be large holders
       };
     }
 
@@ -1076,6 +1286,7 @@ export class HolderAnalysisService {
         isExchange: false,
         isLP: true,
         isCreator: false,
+        isLargeHolder: false, // AMM wallets are filtered out, can't be large holders
       };
     }
 
@@ -1087,6 +1298,7 @@ export class HolderAnalysisService {
         isExchange: true,
         isLP: false,
         isCreator: false,
+        isLargeHolder: false, // Exchange wallets are not flagged as team wallets
       };
     }
 
@@ -1099,6 +1311,7 @@ export class HolderAnalysisService {
         isExchange: false,
         isLP: label.toLowerCase().includes('pool') || label.toLowerCase().includes('lp'),
         isCreator: label.toLowerCase().includes('creator') || label.toLowerCase().includes('deployer'),
+        isLargeHolder: false, // Known addresses are typically not large holders
       };
     }
 
@@ -1110,6 +1323,7 @@ export class HolderAnalysisService {
         isExchange: false,
         isLP: true,
         isCreator: false,
+        isLargeHolder: false, // LP pools are not flagged as team wallets
       };
     }
 
@@ -1119,13 +1333,18 @@ export class HolderAnalysisService {
         isExchange: false,
         isLP: false,
         isCreator: true,
+        isLargeHolder: true, // Large holders (>50%) are potential team wallets
       };
     }
+
+    // Check for large holders (>10%) - potential team wallets
+    const isLargeHolder = percentage > 10;
 
     return {
       isExchange: false,
       isLP: false,
       isCreator: false,
+      isLargeHolder,
     };
   }
 
