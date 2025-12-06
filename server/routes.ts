@@ -1,10 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { analyzeTokenSchema, insertWatchlistSchema, smartSignals } from "../shared/schema.js";
+import { analyzeTokenSchema, insertWatchlistSchema, smartSignals, analysisRuns } from "../shared/schema.js";
 import { tokenAnalyzer } from "./solana-analyzer.js";
 import { nameCache } from "./name-cache.js";
 // import { setupAuth, isAuthenticated } from "./replitAuth"; // Disabled for non-Replit deployments
 import { storage } from "./storage.js";
+import { db } from "./db.js";
 import { 
   createWhopCheckout, 
   getWhopMembership, 
@@ -1824,7 +1825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/analytics/market-overview', async (req, res) => {
     try {
       const { priceCache } = await import('./services/price-cache.ts');
-      const { getBlacklist } = await import('./ai-blacklist.ts');
+      const { eq, sql } = await import('drizzle-orm');
       
       // Get trending tokens (top 10)
       const trending = await storage.getTrendingTokens(10);
@@ -1833,9 +1834,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const recentTokens = priceCache.getRecentlyUpdated(60); // Last hour
       const totalAnalyzed = recentTokens.length;
       
-      // Get blacklist count for rugs detected
-      const blacklist = await getBlacklist();
-      const rugsDetected = blacklist.length;
+      // Count CONFIRMED rugs from analysis runs (not just flagged wallets)
+      let rugsDetected = 0;
+      try {
+        const [rugCount] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(analysisRuns)
+          .where(eq(analysisRuns.rugDetected, true));
+        rugsDetected = rugCount?.count || 0;
+      } catch (error) {
+        console.warn('Error counting confirmed rugs:', error);
+      }
       
       // Calculate average risk score from trending tokens
       let avgRiskScore = 0;

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { apiRequest } from "@/lib/queryClient";
 import { Header } from "@/components/header-new";
 import { Footer } from "@/components/footer";
@@ -35,7 +36,9 @@ import { SocialSentimentCard } from "@/components/social-sentiment-card";
 
 export default function Home() {
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [analysis, setAnalysis] = useState<TokenAnalysisResponse | null>(null);
+  const [hasAutoAnalyzed, setHasAutoAnalyzed] = useState(false);
 
   const scrollToAnalyzer = () => {
     const analyzerElement = document.getElementById("token-analyzer");
@@ -68,6 +71,15 @@ export default function Home() {
   const handleAnalyze = (address: string) => {
     mutation.mutate(address);
   };
+
+  // Auto-analyze if token query param is present (from Analytics page "Analyze" buttons)
+  useEffect(() => {
+    const tokenFromUrl = searchParams.get('token');
+    if (tokenFromUrl && !hasAutoAnalyzed && tokenFromUrl.length >= 32 && tokenFromUrl.length <= 44) {
+      setHasAutoAnalyzed(true);
+      mutation.mutate(tokenFromUrl);
+    }
+  }, [searchParams, hasAutoAnalyzed]);
 
   const getRiskColor = (score: number) => {
     if (score >= 80) return "text-red-500";
