@@ -146,23 +146,32 @@ export class HolderAnalysisService {
   private async fetchFromProgramAccounts(tokenAddress: string): Promise<HolderAnalysisResult | null> {
     try {
       console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Starting scan for ${tokenAddress}`);
-      const connection = rpcBalancer.getConnection();
-      const rpcEndpoint = connection.rpcEndpoint;
-      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] RPC endpoint: ${rpcEndpoint}`);
       
-      // Skip if using free RPC endpoints that don't support getProgramAccounts
-      if (rpcEndpoint.includes('mainnet-beta.solana.com') || 
-          rpcEndpoint.includes('alchemy.com/v2/demo') ||
-          rpcEndpoint.includes('publicnode.com')) {
-        console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Skipping - free RPC doesn't support getProgramAccounts`);
+      // getProgramAccounts requires premium RPC (Helius) - don't use free RPCs
+      const heliusConnection = rpcBalancer.getHeliusConnection();
+      if (!heliusConnection) {
+        console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Skipping - Helius not available for index methods`);
         return null;
       }
       
+      const connection = heliusConnection;
+      const rpcEndpoint = connection.rpcEndpoint;
+      console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Using Helius for index methods: ${rpcEndpoint.slice(0, 50)}...`);
+      
       // Add timeout for getProgramAccounts (5 seconds for premium RPCs)
       const timeoutMs = 5000;
-      const timeoutPromise = new Promise<null>((_, reject) => 
-        setTimeout(() => reject(new Error('getProgramAccounts timeout')), timeoutMs)
-      );
+      let timeoutId: NodeJS.Timeout | null = null;
+      const timeoutPromise = new Promise<null>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('getProgramAccounts timeout')), timeoutMs);
+      });
+      
+      // Helper to clear timeout when race completes
+      const clearTimeoutSafe = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+      };
       
       const mintPubkey = new PublicKey(tokenAddress);
 
@@ -219,7 +228,9 @@ export class HolderAnalysisService {
       let all: any[];
       try {
         all = await Promise.race([scanWithTimeout(), timeoutPromise]) as any[];
+        clearTimeoutSafe(); // Clear timeout on success
       } catch (error: any) {
+        clearTimeoutSafe(); // Clear timeout on error too
         if (error.message?.includes('timeout')) {
           console.log(`[HolderAnalysis DEBUG - getProgramAccounts] ⏱️ Timeout after ${timeoutMs}ms, using fallback`);
           return null;

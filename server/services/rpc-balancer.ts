@@ -97,29 +97,28 @@ function getAnkrUrl(): string | undefined {
 }
 
 const RPC_PROVIDERS = [
-  // Helius Premium RPC - DEPRIORITIZED to conserve credits
-  // Use Helius only for critical operations (webhooks, wallet stats)
-  // For general token analysis, holder queries, etc., use Shyft/public RPCs
+  // Helius Premium RPC - PRIMARY (user's paid API)
+  // Higher rate limits and supports index methods (getProgramAccounts)
   { 
     getUrl: () => `${getHeliusUrl() || ""}`,
-    weight: Number(process.env.HELIUS_PRIORITY === 'high' ? '100' : '25'), // REDUCED: Save credits (was 100)
+    weight: 100, // PRIMARY: Paid API with best limits
     name: "Helius",
     tier: "premium" as const,
     requiresKey: true,
     hasKey: () => !!getHeliusUrl(),
-    rateLimit: 30, // Free tier limit per second
+    rateLimit: 50, // Helius paid tier allows more
     rateLimitWindow: 1000
   },
-  // Shyft Free RPC - PROMOTED TO PRIMARY
-  // Good speed/reliability for general usage
+  // Shyft Free RPC - DEPRIORITIZED (free plan has severe limits)
+  // Does NOT support index methods (getProgramAccounts) on free plan
   { 
     getUrl: () => `${getShyftUrl() || ""}`,
-    weight: 100, // PROMOTED: Primary RPC (was 35)
+    weight: 15, // REDUCED: Free plan, limited capabilities
     name: "Shyft",
-    tier: "premium" as const,
+    tier: "fallback" as const, // Downgraded from premium
     requiresKey: true,
     hasKey: () => !!getShyftUrl(),
-    rateLimit: 100, // Conservative for free tier
+    rateLimit: 10, // Very conservative for free tier
     rateLimitWindow: 60000
   },
   // Ankr DISABLED - Free quota exhausted
