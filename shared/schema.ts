@@ -939,6 +939,23 @@ export interface TokenAnalysisResponse {
   migrationDetected?: boolean; // Recently migrated to Raydium
   systemWalletsFiltered?: number; // Count of filtered system wallets
   lpPoolAddress?: string; // LP pool address for TGN graph analysis
+  
+  // Enhanced holder analysis (2025)
+  top20Holders?: HolderInfo[]; // Top 20 holders with labels
+  largeHolders?: HolderInfo[]; // Holders with >10% supply (non-exchange, potential team wallets)
+  
+  // Token lock detection
+  lockData?: {
+    isAnyLocked: boolean;
+    totalLockedPercent: number;
+    lockCount: number;
+    locks?: Array<{
+      protocol: string;
+      lockedAmount: number;
+      totalSupplyPercent: number;
+      unlockDate?: number;
+    }>;
+  };
 }
 
 // Storage schema (not used for in-memory but kept for consistency)

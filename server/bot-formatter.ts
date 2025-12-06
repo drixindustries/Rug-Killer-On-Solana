@@ -4,7 +4,6 @@
  */
 
 import type { TokenAnalysisResponse } from '../shared/schema';
-import { lockDetectionService } from './services/lock-detection-service.js';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -910,16 +909,12 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
     }
   }
   
-  // LOCK STATUS - Check for locked tokens
+  // LOCK STATUS - Display pre-computed lock data from analysis
   let lockStatus: string | undefined;
-  try {
-    const lockSummary = await lockDetectionService.getLockSummary(analysis.tokenAddress);
-    if (lockSummary.isAnyLocked) {
-      const lockEmoji = lockSummary.totalLockedPercent > 50 ? '🔒' : lockSummary.totalLockedPercent > 20 ? '🔐' : '🔓';
-      lockStatus = `${lockEmoji} **Token Locks Detected**\n• ${lockSummary.totalLockedPercent.toFixed(1)}% of supply locked\n• ${lockSummary.lockCount} lock contract(s) found\n• Reduces sell pressure risk`;
-    }
-  } catch (error) {
-    console.warn('[BotFormatter] Error checking lock status:', error);
+  if (analysis.lockData?.isAnyLocked) {
+    const lockData = analysis.lockData;
+    const lockEmoji = lockData.totalLockedPercent > 50 ? '🔒' : lockData.totalLockedPercent > 20 ? '🔐' : '🔓';
+    lockStatus = `${lockEmoji} **Token Locks Detected**\n• ${lockData.totalLockedPercent.toFixed(1)}% of supply locked\n• ${lockData.lockCount} lock contract(s) found\n• Reduces sell pressure risk`;
   }
 
   // LARGE HOLDERS - Flag potential team wallets
