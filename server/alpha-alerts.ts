@@ -64,6 +64,11 @@ export class AlphaAlertService {
   private recentPurchases: Map<string, TokenPurchase[]> = new Map();
   private readonly MULTI_WALLET_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
   private readonly MULTI_WALLET_THRESHOLD = 2; // Trigger when 2+ wallets buy
+  
+  // DEDUPLICATION: Track in-progress token analyses to prevent duplicate RPC calls
+  private analysisInProgress: Map<string, Promise<void>> = new Map();
+  private recentlyAnalyzed: Map<string, number> = new Map(); // mint -> timestamp
+  private readonly ANALYSIS_COOLDOWN_MS = 30 * 1000; // 30 second cooldown between analyses of same token
 
   constructor(rpcUrl?: string, customCallers?: AlphaCallerConfig[]) {
     // Use RPC balancer for intelligent load distribution - NO WebSocket subscriptions
@@ -144,7 +149,7 @@ export class AlphaAlertService {
       
       // The real monitoring happens via:
       // 1. Helius webhook service (token_created events)
-      // 2. Ankr/Helius direct detections via RPC balancer
+      // 2. Helius RPC for direct detections
       // 3. Pump.fun WebSocket (new token launches)
       
       this.lastLogAt = Date.now();
@@ -345,7 +350,9 @@ export class AlphaAlertService {
         }
       }
       
-      summaryLines.push(`${walletEmoji} **${walletName}** ${influenceScore ? `(Influence: ${influenceScore}/100)` : ''}${walletStatsLine}`);
+      // Add influence label based on score
+      const influenceLabel = influenceScore >= 80 ? '🔥 ELITE' : influenceScore >= 60 ? '⭐ TRUSTED' : influenceScore >= 40 ? '👤 MODERATE' : '🆕 NEW';
+      summaryLines.push(`${walletEmoji} **${walletName}** ${influenceScore ? `(${influenceLabel} ${influenceScore}/100)` : ''}${walletStatsLine}`);
       
       summaryLines.push(`📍 CA: \`${alert.mint}\``);
       
@@ -577,7 +584,14 @@ export class AlphaAlertService {
       fields: [
         {
           name: '📍 Wallet',
-          value: `**${alert.data?.walletName || alert.source}** (${alert.data?.influenceScore || 50}/100)\n\`${alert.data?.wallet ? `${alert.data.wallet.slice(0,6)}...${alert.data.wallet.slice(-4)}` : 'Unknown'}\``,
+          value: (() => {
+            const walletDisplayName = alert.data?.walletName || alert.source;
+            const influenceScore = alert.data?.influenceScore || 50;
+            const influenceEmoji = influenceScore >= 80 ? '🔥' : influenceScore >= 60 ? '⭐' : influenceScore >= 40 ? '👤' : '🆕';
+            const influenceLabel = influenceScore >= 80 ? 'ELITE' : influenceScore >= 60 ? 'TRUSTED' : influenceScore >= 40 ? 'MODERATE' : 'NEW';
+            const shortWallet = alert.data?.wallet ? `${alert.data.wallet.slice(0,6)}...${alert.data.wallet.slice(-4)}` : 'Unknown';
+            return `**${walletDisplayName}** ${influenceEmoji} (${influenceScore}/100 ${influenceLabel})\n\`${shortWallet}\``;
+          })(),
           inline: true
         },
         ...(alert.data?.walletStats ? [{
@@ -634,18 +648,20 @@ export class AlphaAlertService {
           {
             name: '👥 Holders',
             value: (() => {
-              // Show holder count - if estimate, indicate with "~" prefix
+              // Show holder count - display accurate count when available
               const rawCount = analysisMetrics.holderCount;
               const isEstimate = analysisMetrics.holderCountIsEstimate;
               let countStr = '...';
-              if (rawCount !== undefined && rawCount !== null) {
-                if (isEstimate && rawCount <= 20) {
-                  countStr = `${rawCount}+`; // Show "20+" when limited to top 20
-                } else if (isEstimate) {
-                  countStr = `~${rawCount.toLocaleString()}`; // Approximate
+              if (rawCount !== undefined && rawCount !== null && rawCount > 0) {
+                if (isEstimate) {
+                  countStr = `${rawCount.toLocaleString()}+`; // Show "X+" when estimate
                 } else {
-                  countStr = rawCount.toLocaleString(); // Accurate count
+                  countStr = rawCount.toLocaleString(); // Accurate count (no +)
                 }
+              } else if (rawCount === 0 && isEstimate) {
+                countStr = '0+'; // Still loading/new token
+              } else if (rawCount === 0) {
+                countStr = '0'; // Actually 0 holders
               }
               const top10 = analysisMetrics.topHolderConcentration?.toFixed(1) || '...';
               const dev = analysisMetrics.devBought && analysisMetrics.devBought > 0 ? ` • Dev: ${analysisMetrics.devBought.toFixed(1)}%` : '';
@@ -775,14 +791,26 @@ export class AlphaAlertService {
               : analysisMetrics.aiVerdict,
             inline: false
           }] : []),
-          // Rug Score Breakdown
+          // Rug Score Breakdown (uses SAME score as Safety Score for consistency)
           ...(analysisMetrics.rugScore ? [{
             name: (() => {
-              const score = Math.round(analysisMetrics.rugScore.totalScore);
-              const emoji = score < 10 ? '✅' : score < 50 ? '⚠️' : '🚨';
-              return `${emoji} Rug Score: ${score}`;
+              // Use the same riskScore as Safety Score for consistency
+              const safetyScore = Math.max(1, Math.min(100, analysisMetrics.riskScore));
+              const emoji = safetyScore >= 80 ? '✅' : safetyScore >= 60 ? '⚠️' : safetyScore >= 40 ? '🟠' : '🚨';
+              const label = safetyScore >= 80 ? 'SAFE' : safetyScore >= 60 ? 'CAUTION' : safetyScore >= 40 ? 'RISKY' : 'DANGER';
+              return `${emoji} Rug Score: ${safetyScore}/100 (${label})`;
             })(),
-            value: `**${analysisMetrics.rugScore.classification}**\nAuth: ${Math.round(analysisMetrics.rugScore.components.authorities.score)} | Holders: ${Math.round(analysisMetrics.rugScore.components.holderDistribution.score)} | Liquidity: ${Math.round(analysisMetrics.rugScore.components.liquidity.score)} | Activity: ${Math.round(analysisMetrics.rugScore.components.marketActivity.score)}`,
+            value: (() => {
+              // Show component breakdown (0-10 scale where higher = safer)
+              const auth = analysisMetrics.mintRevoked && analysisMetrics.freezeRevoked ? 10 : 
+                           analysisMetrics.mintRevoked || analysisMetrics.freezeRevoked ? 5 : 0;
+              const holders = analysisMetrics.topHolderConcentration ? 
+                Math.max(0, Math.round(10 - (analysisMetrics.topHolderConcentration / 10))) : 5;
+              const liquidity = analysisMetrics.lpBurnPercent ? 
+                Math.round(analysisMetrics.lpBurnPercent / 10) : 5;
+              const activity = 10; // Default good activity
+              return `Auth: ${auth} | Holders: ${holders} | Liquidity: ${liquidity} | Activity: ${activity}`;
+            })(),
             inline: false
           }] : []),
           // Social Sentiment (FinBERT-Solana fusion from X/Telegram/Discord)
@@ -1140,22 +1168,22 @@ export class AlphaAlertService {
             name: '👥 Holders',
             value: (() => {
               const parts: string[] = [];
-              // Show holder count - if estimate, indicate with "~" or "+" prefix
+              // Show holder count - display accurate count when available
               const rawCount = analysisMetrics.holderCount;
               const isEstimate = analysisMetrics.holderCountIsEstimate;
-              if (rawCount !== undefined && rawCount !== null) {
-                let countStr: string;
-                if (isEstimate && rawCount <= 20) {
-                  countStr = `${rawCount}+`; // Show "20+" when limited to top 20
-                } else if (isEstimate) {
-                  countStr = `~${rawCount.toLocaleString()}`; // Approximate
+              let countStr = '...';
+              if (rawCount !== undefined && rawCount !== null && rawCount > 0) {
+                if (isEstimate) {
+                  countStr = `${rawCount.toLocaleString()}+`; // Show "X+" when estimate
                 } else {
-                  countStr = rawCount.toLocaleString(); // Accurate count
+                  countStr = rawCount.toLocaleString(); // Accurate count (no +)
                 }
-                parts.push(`**Count:** ${countStr}`);
-              } else {
-                parts.push('**Count:** Pending...');
+              } else if (rawCount === 0 && isEstimate) {
+                countStr = '0+'; // Still loading/new token
+              } else if (rawCount === 0) {
+                countStr = '0'; // Actually 0 holders
               }
+              parts.push(`**Count:** ${countStr}`);
               if (analysisMetrics.topHolderConcentration !== undefined && analysisMetrics.topHolderConcentration !== null) {
                 parts.push(`**Top 10:** ${analysisMetrics.topHolderConcentration.toFixed(1)}%`);
               }
@@ -1294,14 +1322,26 @@ export class AlphaAlertService {
               : analysisMetrics.aiVerdict,
             inline: false
           }] : []),
-          // Rug Score Breakdown
+          // Rug Score Breakdown (uses SAME score as Safety Score for consistency)
           ...(analysisMetrics.rugScore ? [{
             name: (() => {
-              const score = Math.round(analysisMetrics.rugScore.totalScore);
-              const emoji = score < 10 ? '✅' : score < 50 ? '⚠️' : '🚨';
-              return `${emoji} Rug Score: ${score}`;
+              // Use the same riskScore as Safety Score for consistency
+              const safetyScore = Math.max(1, Math.min(100, analysisMetrics.riskScore));
+              const emoji = safetyScore >= 80 ? '✅' : safetyScore >= 60 ? '⚠️' : safetyScore >= 40 ? '🟠' : '🚨';
+              const label = safetyScore >= 80 ? 'SAFE' : safetyScore >= 60 ? 'CAUTION' : safetyScore >= 40 ? 'RISKY' : 'DANGER';
+              return `${emoji} Rug Score: ${safetyScore}/100 (${label})`;
             })(),
-            value: `**${analysisMetrics.rugScore.classification}**\nAuth: ${Math.round(analysisMetrics.rugScore.components.authorities.score)} | Holders: ${Math.round(analysisMetrics.rugScore.components.holderDistribution.score)} | Liquidity: ${Math.round(analysisMetrics.rugScore.components.liquidity.score)} | Activity: ${Math.round(analysisMetrics.rugScore.components.marketActivity.score)}`,
+            value: (() => {
+              // Show component breakdown (0-10 scale where higher = safer)
+              const auth = analysisMetrics.mintRevoked && analysisMetrics.freezeRevoked ? 10 : 
+                           analysisMetrics.mintRevoked || analysisMetrics.freezeRevoked ? 5 : 0;
+              const holders = analysisMetrics.topHolderConcentration ? 
+                Math.max(0, Math.round(10 - (analysisMetrics.topHolderConcentration / 10))) : 5;
+              const liquidity = analysisMetrics.lpBurnPercent ? 
+                Math.round(analysisMetrics.lpBurnPercent / 10) : 5;
+              const activity = 10; // Default good activity
+              return `Auth: ${auth} | Holders: ${holders} | Liquidity: ${liquidity} | Activity: ${activity}`;
+            })(),
             inline: false
           }] : []),
           // Social Sentiment (FinBERT-Solana fusion from X/Telegram/Discord)
@@ -1841,35 +1881,7 @@ export class AlphaAlertService {
         }
       });
 
-      // Listen to Ankr WebSocket events
-      try {
-        const { ankrWebSocket } = await import('./services/ankr-websocket.js');
-        
-        ankrWebSocket.on('token_created', async (event: any) => {
-          console.log('[Alpha Alerts] New token detected via Ankr:', event.mint);
-          // Cache warmer already triggered in ankr-websocket, just check for alpha
-          await this.checkTokenForAlphaWallets(event.mint, 'Ankr WebSocket');
-        });
-
-        ankrWebSocket.on('alpha_wallet_trade', async (event: any) => {
-          const matchedCaller = this.alphaCallers.find(c => c.wallet === event.wallet);
-          if (matchedCaller) {
-            console.log('[Alpha Alerts] Alpha wallet trade via Ankr:', event.wallet.slice(0, 8), '→', event.mint);
-            await this.checkTokenForAlphaWallets(event.mint, 'Ankr Alpha Trade', matchedCaller);
-          }
-        });
-
-        // Subscribe alpha wallet addresses to Ankr WebSocket monitoring
-        const walletAddresses = this.alphaCallers.map(c => c.wallet);
-        if (walletAddresses.length > 0) {
-          await ankrWebSocket.subscribeToAlphaWallets(walletAddresses);
-          console.log(`[Alpha Alerts] Subscribed ${walletAddresses.length} wallets to Ankr WebSocket`);
-        }
-      } catch (ankrError) {
-        console.warn('[Alpha Alerts] Ankr WebSocket unavailable:', ankrError);
-      }
-
-      // Pump.fun tokens are detected via webhooks (no separate WebSocket needed)
+      // Pump.fun tokens are detected via webhooks (Helius) - no Ankr needed
 
       console.log('[Alpha Alerts] ✅ Webhook listeners registered (Helius)');
     } catch (error) {
@@ -1883,6 +1895,52 @@ export class AlphaAlertService {
   private async checkTokenForAlphaWallets(mint: string, source: string, caller?: AlphaCallerConfig, txData?: { amountToken?: number; amountSol?: number; amountUsd?: number; txHash?: string }): Promise<void> {
     try {
       const walletInfo = caller ? `${caller.name} (${caller.wallet.slice(0, 8)}...)` : 'Unknown';
+      
+      // DEDUPLICATION: Check if this token was recently analyzed
+      const lastAnalyzed = this.recentlyAnalyzed.get(mint);
+      const now = Date.now();
+      if (lastAnalyzed && (now - lastAnalyzed) < this.ANALYSIS_COOLDOWN_MS) {
+        console.log(`[Alpha Alerts] ⏭️ Skipping ${mint.slice(0, 8)}... - analyzed ${Math.round((now - lastAnalyzed) / 1000)}s ago`);
+        return;
+      }
+      
+      // DEDUPLICATION: Check if analysis is already in progress for this token
+      const existingAnalysis = this.analysisInProgress.get(mint);
+      if (existingAnalysis) {
+        console.log(`[Alpha Alerts] ⏭️ Skipping ${mint.slice(0, 8)}... - analysis already in progress`);
+        return; // Don't await - just skip
+      }
+      
+      // Mark this token as being analyzed
+      const analysisPromise = this.performTokenAnalysis(mint, source, caller, txData, walletInfo);
+      this.analysisInProgress.set(mint, analysisPromise);
+      
+      try {
+        await analysisPromise;
+      } finally {
+        // Clean up tracking after analysis completes
+        this.analysisInProgress.delete(mint);
+        this.recentlyAnalyzed.set(mint, Date.now());
+        
+        // Cleanup old entries from recentlyAnalyzed (keep last 1000)
+        if (this.recentlyAnalyzed.size > 1000) {
+          const entries = Array.from(this.recentlyAnalyzed.entries());
+          entries.sort((a, b) => a[1] - b[1]);
+          for (let i = 0; i < entries.length - 500; i++) {
+            this.recentlyAnalyzed.delete(entries[i][0]);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[Alpha Alerts] Error in checkTokenForAlphaWallets:', error);
+    }
+  }
+  
+  /**
+   * Perform the actual token analysis (extracted for deduplication)
+   */
+  private async performTokenAnalysis(mint: string, source: string, caller: AlphaCallerConfig | undefined, txData: { amountToken?: number; amountSol?: number; amountUsd?: number; txHash?: string } | undefined, walletInfo: string): Promise<void> {
+    try {
       console.log(`[Alpha Alerts] Checking token ${mint} from ${source} - Wallet: ${walletInfo}`);
       
       // Fetch wallet PNL stats from database or Helius

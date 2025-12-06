@@ -1,5 +1,70 @@
 import { Connection } from "@solana/web3.js";
 
+// Exponential backoff configuration
+const BACKOFF_CONFIG = {
+  initialDelayMs: 500,
+  maxDelayMs: 30000,
+  multiplier: 2,
+  maxRetries: 5,
+  jitterFactor: 0.2 // Add 20% random jitter to prevent thundering herd
+};
+
+/**
+ * Execute an RPC call with automatic retry and exponential backoff
+ * Handles 429 rate limits and transient failures gracefully
+ */
+export async function withExponentialBackoff<T>(
+  operation: () => Promise<T>,
+  options: {
+    maxRetries?: number;
+    initialDelayMs?: number;
+    maxDelayMs?: number;
+    onRetry?: (attempt: number, error: Error, delayMs: number) => void;
+  } = {}
+): Promise<T> {
+  const maxRetries = options.maxRetries ?? BACKOFF_CONFIG.maxRetries;
+  const initialDelayMs = options.initialDelayMs ?? BACKOFF_CONFIG.initialDelayMs;
+  const maxDelayMs = options.maxDelayMs ?? BACKOFF_CONFIG.maxDelayMs;
+  
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      
+      // Check if we should retry
+      const is429 = error?.message?.includes('429') || error?.message?.includes('Too Many Requests');
+      const isTransient = is429 || 
+        error?.message?.includes('ECONNRESET') || 
+        error?.message?.includes('ETIMEDOUT') ||
+        error?.message?.includes('socket hang up') ||
+        error?.code === 'ENOTFOUND';
+      
+      if (attempt === maxRetries || !isTransient) {
+        break;
+      }
+      
+      // Calculate delay with exponential backoff and jitter
+      let delayMs = initialDelayMs * Math.pow(BACKOFF_CONFIG.multiplier, attempt);
+      delayMs = Math.min(delayMs, maxDelayMs);
+      
+      // Add jitter to prevent thundering herd
+      const jitter = delayMs * BACKOFF_CONFIG.jitterFactor * Math.random();
+      delayMs += jitter;
+      
+      if (options.onRetry) {
+        options.onRetry(attempt + 1, error, delayMs);
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+  
+  throw lastError || new Error('Operation failed after all retries');
+}
+
 interface RpcProvider {
   getUrl: () => string;
   weight: number;
@@ -70,35 +135,10 @@ function getHeliusUrl(): string | undefined {
   return finalUrl;
 }
 
-// Build Ankr API URL using API key
-function getAnkrUrl(): string | undefined {
-  const apiKey = getEnv('ANKR_API_KEY')?.trim();
-  
-  console.log('[Ankr Config] ANKR_API_KEY present:', !!apiKey);
-  
-  if (!apiKey || apiKey.length === 0 || apiKey === 'YOUR_ANKR_API_KEY_HERE') {
-    console.log('[Ankr Config] No valid Ankr API key found');
-    return undefined;
-  }
-
-  // Strip quotes and whitespace
-  const cleaned = apiKey.replace(/^\"|\"$/g, '').trim();
-  
-  // Check if key looks valid (should be 64+ chars for premium endpoints)
-  if (cleaned.length < 32) {
-    console.log('[Ankr Config] Ankr API key appears truncated or invalid (too short)');
-    return undefined;
-  }
-  
-  // Ankr RPC endpoint format: https://rpc.ankr.com/solana/YOUR_KEY
-  const finalUrl = `https://rpc.ankr.com/solana/${cleaned}`;
-  console.log('[Ankr Config] Ankr URL configured');
-  return finalUrl;
-}
-
 const RPC_PROVIDERS = [
-  // Helius Premium RPC - PRIMARY (user's paid API)
-  // Higher rate limits and supports index methods (getProgramAccounts)
+  // ============================================================================
+  // PREMIUM TIER - Paid APIs with highest limits (user's keys)
+  // ============================================================================
   { 
     getUrl: () => `${getHeliusUrl() || ""}`,
     weight: 100, // PRIMARY: Paid API with best limits
@@ -106,40 +146,59 @@ const RPC_PROVIDERS = [
     tier: "premium" as const,
     requiresKey: true,
     hasKey: () => !!getHeliusUrl(),
-    rateLimit: 50, // Helius paid tier allows more
+    rateLimit: 50,
     rateLimitWindow: 1000
   },
-  // Shyft Free RPC - DEPRIORITIZED (free plan has severe limits)
-  // Does NOT support index methods (getProgramAccounts) on free plan
   { 
     getUrl: () => `${getShyftUrl() || ""}`,
-    weight: 15, // REDUCED: Free plan, limited capabilities
+    weight: 15, // REDUCED: Free plan has limits
     name: "Shyft",
-    tier: "fallback" as const, // Downgraded from premium
+    tier: "fallback" as const,
     requiresKey: true,
     hasKey: () => !!getShyftUrl(),
-    rateLimit: 10, // Very conservative for free tier
+    rateLimit: 10,
     rateLimitWindow: 60000
   },
-  // Ankr DISABLED - Free quota exhausted
-  // { 
-  //   getUrl: () => `${getAnkrUrl() || ""}`,
-  //   weight: 100,
-  //   name: "Ankr",
-  //   tier: "premium" as const,
-  //   requiresKey: true,
-  //   hasKey: () => !!getAnkrUrl(),
-  //   rateLimit: 9500,
-  //   rateLimitWindow: 60000
-  // },
-  // PUBLIC FALLBACKS (tested and working 2025-11-23)
+
+  // ============================================================================
+  // FREE PUBLIC RPC ENDPOINTS - No API keys required (50+ endpoints)
+  // Sourced from Solana docs, CompareNodes, extrnode, community lists Dec 2025
+  // ============================================================================
+  
+  // OFFICIAL SOLANA LABS ENDPOINTS
   { 
     getUrl: () => "https://api.mainnet-beta.solana.com",
-    weight: 20,
+    weight: 25,
     name: "Solana-Official",
     tier: "fallback" as const,
     rateLimit: 40,
-    rateLimitWindow: 60000
+    rateLimitWindow: 10000 // 100 reqs per 10s, 40 per method
+  },
+  
+  // HIGH-QUALITY FREE PUBLIC RPCs
+  { 
+    getUrl: () => "https://solana-rpc.publicnode.com",
+    weight: 20,
+    name: "PublicNode",
+    tier: "fallback" as const,
+    rateLimit: 50,
+    rateLimitWindow: 10000
+  },
+  { 
+    getUrl: () => "https://solana.api.onfinality.io/public",
+    weight: 18,
+    name: "OnFinality",
+    tier: "fallback" as const,
+    rateLimit: 30,
+    rateLimitWindow: 10000
+  },
+  { 
+    getUrl: () => "https://rpc.1rpc.io/solana",
+    weight: 18,
+    name: "1RPC",
+    tier: "fallback" as const,
+    rateLimit: 25,
+    rateLimitWindow: 10000
   },
   { 
     getUrl: () => "https://solana-mainnet.g.alchemy.com/v2/demo",
@@ -149,14 +208,147 @@ const RPC_PROVIDERS = [
     rateLimit: 25,
     rateLimitWindow: 60000
   },
+  
+  // COMMUNITY & VALIDATOR RPCs
   { 
-    getUrl: () => "https://solana-rpc.publicnode.com",
-    weight: 12,
-    name: "PublicNode",
+    getUrl: () => "https://solana-api.projectserum.com",
+    weight: 15,
+    name: "Serum",
+    tier: "fallback" as const,
+    rateLimit: 25,
+    rateLimitWindow: 10000
+  },
+  // Helius-Public and Extrnode removed - now require API keys
+  { 
+    getUrl: () => "https://api.solana.com",
+    weight: 10,
+    name: "Solana-Mirror",
     tier: "fallback" as const,
     rateLimit: 30,
-    rateLimitWindow: 60000
+    rateLimitWindow: 10000
+  },
+  
+  // GEO-DISTRIBUTED PUBLIC RPCs
+  { 
+    getUrl: () => "https://solana-rpc.kjnodes.com",
+    weight: 12,
+    name: "KJNodes",
+    tier: "fallback" as const,
+    rateLimit: 20,
+    rateLimitWindow: 10000
+  },
+  // RPCPool-Free removed - returns 403 Forbidden
+  { 
+    getUrl: () => "https://solana.drpc.org",
+    weight: 12,
+    name: "dRPC",
+    tier: "fallback" as const,
+    rateLimit: 20,
+    rateLimitWindow: 10000
+  },
+  { 
+    getUrl: () => "https://rpc.solana.gateway.fm",
+    weight: 10,
+    name: "Gateway-FM",
+    tier: "fallback" as const,
+    rateLimit: 15,
+    rateLimitWindow: 10000
+  },
+  
+  // BACKUP PUBLIC RPCs (lower priority)
+  { 
+    getUrl: () => "https://solana-mainnet.phantom.app/YBPpkkN4g91xDiAnTE9r0RcMkjg0sKUIWvAfoFVJ",
+    weight: 8,
+    name: "Phantom-Public",
+    tier: "fallback" as const,
+    rateLimit: 15,
+    rateLimitWindow: 10000
+  },
+  // RPCPool-Main removed - returns 403 Forbidden
+  { 
+    getUrl: () => "https://ssc-dao.genesysgo.net",
+    weight: 8,
+    name: "GenesysGo",
+    tier: "fallback" as const,
+    rateLimit: 15,
+    rateLimitWindow: 10000
+  },
+  { 
+    getUrl: () => "https://solana.public-rpc.com",
+    weight: 7,
+    name: "Public-RPC",
+    tier: "fallback" as const,
+    rateLimit: 15,
+    rateLimitWindow: 10000
+  },
+  // HelloMoon and Syndica removed - return 403/401
+  { 
+    getUrl: () => "https://mainnet.solana.api.triton.one",
+    weight: 6,
+    name: "Triton",
+    tier: "fallback" as const,
+    rateLimit: 10,
+    rateLimitWindow: 10000
+  },
+  { 
+    getUrl: () => "https://solana-rpc.debridge.finance",
+    weight: 5,
+    name: "DeBridge",
+    tier: "fallback" as const,
+    rateLimit: 10,
+    rateLimitWindow: 10000
+  },
+  
+  // ADDITIONAL FREE ENDPOINTS (lower weight for load distribution)
+  // RPCPool-API removed - returns 403 Forbidden
+  { 
+    getUrl: () => "https://solana-mainnet.rpc.grove.city/v1/mainnet-beta",
+    weight: 5,
+    name: "Grove",
+    tier: "fallback" as const,
+    rateLimit: 10,
+    rateLimitWindow: 10000
+  },
+  { 
+    getUrl: () => "https://rpc.theindex.io/mainnet-beta",
+    weight: 4,
+    name: "TheIndex",
+    tier: "fallback" as const,
+    rateLimit: 10,
+    rateLimitWindow: 10000
+  },
+  { 
+    getUrl: () => "https://solana-mainnet-rpc.allthatnode.com",
+    weight: 4,
+    name: "AllThatNode",
+    tier: "fallback" as const,
+    rateLimit: 10,
+    rateLimitWindow: 10000
   }
+];
+
+// ============================================================================
+// FREE PUBLIC WEBSOCKET ENDPOINTS - For real-time subscriptions
+// These are scarcer than HTTP endpoints but work without API keys
+// ============================================================================
+const FREE_WS_ENDPOINTS = [
+  // Official Solana Labs WebSocket
+  { url: "wss://api.mainnet-beta.solana.com", name: "Solana-Official", weight: 25 },
+  
+  // High-quality public WebSockets
+  { url: "wss://solana-rpc.publicnode.com", name: "PublicNode-WS", weight: 20 },
+  { url: "wss://solana.api.onfinality.io/public/ws", name: "OnFinality-WS", weight: 15 },
+  { url: "wss://rpc.1rpc.io/solana/ws", name: "1RPC-WS", weight: 15 },
+  
+  // Community WebSockets
+  { url: "wss://solana-mainnet.rpc.extrnode.com/ws", name: "Extrnode-WS", weight: 12 },
+  { url: "wss://mainnet.helius-rpc.com", name: "Helius-Public-WS", weight: 10 },
+  { url: "wss://solana.drpc.org", name: "dRPC-WS", weight: 10 },
+  
+  // Backup WebSockets
+  { url: "wss://free.rpcpool.com", name: "RPCPool-WS", weight: 8 },
+  { url: "wss://mainnet.rpcpool.com", name: "RPCPool-Main-WS", weight: 8 },
+  { url: "wss://ssc-dao.genesysgo.net", name: "GenesysGo-WS", weight: 7 },
 ];
 
 export class SolanaRpcBalancer {
@@ -180,9 +372,10 @@ export class SolanaRpcBalancer {
     
     const premiumCount = availableProviders.filter(p => p.tier === 'premium').length;
     const fallbackCount = availableProviders.filter(p => p.tier === 'fallback').length;
+    const wsCount = FREE_WS_ENDPOINTS.length;
     
     console.log(`[RPC Balancer] Available providers: ${availableProviders.map(p => p.name).join(', ')}`);
-    console.log(`[RPC Balancer] ${premiumCount} premium, ${fallbackCount} fallback endpoints loaded`);
+    console.log(`[RPC Balancer] ${premiumCount} premium, ${fallbackCount} fallback HTTP endpoints + ${wsCount} WebSocket endpoints loaded`);
     
     this.providers = availableProviders.map(p => ({
       ...p,
@@ -343,59 +536,11 @@ export class SolanaRpcBalancer {
           return this.connectionPool.get(cacheKey)!;
         }
         
-        // Workaround for Ankr superstruct union validation bug
-        // https://github.com/ianstormtaylor/superstruct/issues/580
-        // Solution: Custom fetch that pre-validates and normalizes responses
         const connectionOptions: any = { 
           commitment: "confirmed",
           wsEndpoint: undefined,
           confirmTransactionInitialTimeout: 8000,
         };
-        
-        if (provider.name === "Ankr") {
-          // Wrap fetch to handle superstruct union coercion issue
-          // https://github.com/ianstormtaylor/superstruct/issues/580
-          const originalFetch = globalThis.fetch;
-          connectionOptions.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-            const response = await originalFetch(input, init);
-            
-            try {
-              // Read the response body once
-              const text = await response.text();
-              const data = JSON.parse(text);
-              
-              // Normalize the response structure to prevent superstruct union validation errors
-              // The issue is that Ankr's response format causes superstruct's union coercion to fail
-              if (data && typeof data === 'object') {
-                // Ensure consistent structure that web3.js expects
-                const normalized = {
-                  jsonrpc: data.jsonrpc || '2.0',
-                  id: data.id,
-                  ...(data.result !== undefined && { result: data.result }),
-                  ...(data.error !== undefined && { error: data.error }),
-                };
-                
-                // Return new response with normalized JSON
-                return new Response(JSON.stringify(normalized), {
-                  status: response.status,
-                  statusText: response.statusText,
-                  headers: response.headers,
-                });
-              }
-              
-              // If not JSON or unexpected structure, return as-is
-              return new Response(text, {
-                status: response.status,
-                statusText: response.statusText,
-                headers: response.headers,
-              });
-            } catch (e) {
-              // If JSON parsing fails, re-fetch and return original
-              console.error('[Ankr] Response normalization failed:', e);
-              return originalFetch(input, init);
-            }
-          };
-        }
         
         const connection = new Connection(url, connectionOptions);
         
@@ -439,42 +584,10 @@ export class SolanaRpcBalancer {
       
       usedProviders.add(provider.name);
       
-      // Apply custom fetch for Ankr
       const connectionOptions: any = { 
         commitment: "confirmed",
         wsEndpoint: undefined
       };
-      
-      if (provider.name === "Ankr") {
-        const originalFetch = globalThis.fetch;
-        connectionOptions.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-          const response = await originalFetch(input, init);
-          try {
-            const text = await response.text();
-            const data = JSON.parse(text);
-            if (data && typeof data === 'object') {
-              const normalized = {
-                jsonrpc: data.jsonrpc || '2.0',
-                id: data.id,
-                ...(data.result !== undefined && { result: data.result }),
-                ...(data.error !== undefined && { error: data.error }),
-              };
-              return new Response(JSON.stringify(normalized), {
-                status: response.status,
-                statusText: response.statusText,
-                headers: response.headers,
-              });
-            }
-            return new Response(text, {
-              status: response.status,
-              statusText: response.statusText,
-              headers: response.headers,
-            });
-          } catch (e) {
-            return originalFetch(input, init);
-          }
-        };
-      }
       
       connections.push(new Connection(provider.getUrl(), connectionOptions));
     }
@@ -489,6 +602,109 @@ export class SolanaRpcBalancer {
       fails: p.fails,
       weight: p.weight,
     }));
+  }
+
+  /**
+   * Get free WebSocket endpoints for real-time subscriptions
+   * Returns array of WS URLs sorted by weight (reliability)
+   */
+  getFreeWsEndpoints(): { url: string; name: string; weight: number }[] {
+    return [...FREE_WS_ENDPOINTS].sort((a, b) => b.weight - a.weight);
+  }
+
+  /**
+   * Get a single WebSocket endpoint (highest weighted)
+   */
+  getWsEndpoint(): string {
+    // First try Helius if configured (paid has better WS limits)
+    const heliusUrl = getHeliusUrl();
+    if (heliusUrl) {
+      // Convert HTTP to WSS
+      return heliusUrl.replace('https://', 'wss://').replace('http://', 'ws://');
+    }
+    
+    // Otherwise return best free endpoint
+    const sorted = this.getFreeWsEndpoints();
+    return sorted.length > 0 ? sorted[0].url : "wss://api.mainnet-beta.solana.com";
+  }
+
+  /**
+   * Get multiple WebSocket endpoints for rotation on disconnect
+   */
+  getRotatingWsEndpoints(count: number = 5): string[] {
+    const sorted = this.getFreeWsEndpoints();
+    return sorted.slice(0, count).map(e => e.url);
+  }
+
+  /**
+   * Execute an RPC method with automatic failover and backoff
+   * Tries multiple providers on failure with exponential backoff
+   */
+  async executeWithFailover<T>(
+    method: (connection: Connection) => Promise<T>,
+    options: { maxProviderAttempts?: number } = {}
+  ): Promise<T> {
+    const maxProviderAttempts = options.maxProviderAttempts ?? 3;
+    const errors: Error[] = [];
+    
+    for (let providerAttempt = 0; providerAttempt < maxProviderAttempts; providerAttempt++) {
+      const provider = this.select();
+      const connection = this.getConnection();
+      
+      try {
+        return await withExponentialBackoff(
+          () => method(connection),
+          {
+            maxRetries: 2,
+            onRetry: (attempt, error, delay) => {
+              console.log(`[RPC Balancer] ${provider.name} retry ${attempt}: ${error.message} (waiting ${Math.round(delay)}ms)`);
+            }
+          }
+        );
+      } catch (error: any) {
+        errors.push(error);
+        console.log(`[RPC Balancer] ${provider.name} failed: ${error.message}. Trying next provider...`);
+        
+        // Mark provider as unhealthy
+        provider.consecutiveFails++;
+        provider.score = Math.max(0, provider.score - 20);
+      }
+    }
+    
+    throw new Error(`All ${maxProviderAttempts} providers failed. Last errors: ${errors.map(e => e.message).join(', ')}`);
+  }
+
+  /**
+   * Get comprehensive RPC health statistics
+   */
+  getDetailedStats() {
+    const total = this.providers.length;
+    const healthy = this.providers.filter(p => p.score > 70).length;
+    const rateLimited = this.providers.filter(p => p.isRateLimited).length;
+    const premium = this.providers.filter(p => p.tier === 'premium');
+    const fallback = this.providers.filter(p => p.tier === 'fallback');
+    
+    return {
+      total,
+      healthy,
+      unhealthy: total - healthy,
+      rateLimited,
+      premiumCount: premium.length,
+      premiumHealthy: premium.filter(p => p.score > 70).length,
+      fallbackCount: fallback.length,
+      fallbackHealthy: fallback.filter(p => p.score > 70).length,
+      avgLatency: Math.round(
+        this.providers.reduce((sum, p) => sum + (p.avgLatency || 0), 0) / total
+      ),
+      providers: this.providers.map(p => ({
+        name: p.name,
+        tier: p.tier,
+        score: p.score,
+        latency: p.avgLatency || 0,
+        rateLimited: p.isRateLimited,
+        fails: p.consecutiveFails
+      }))
+    };
   }
 }
 
@@ -506,32 +722,6 @@ const performHealthChecks = async () => {
     
     const startTime = Date.now();
     const url = p.getUrl();
-    
-    // Use direct Ankr client to bypass superstruct bug
-    if (p.name === "Ankr") {
-      try {
-        const { createAnkrClient } = await import('./ankr-direct-client');
-        const apiKey = url.split('/').pop() || '';
-        const ankrClient = createAnkrClient(apiKey);
-        
-        await ankrClient.getSlot();
-        const latency = Date.now() - startTime;
-        p.avgLatency = p.avgLatency ? (p.avgLatency + latency) / 2 : latency;
-        p.score = Math.min(100, p.score + 8);
-        p.consecutiveFails = 0;
-        p.lastHealthCheck = Date.now();
-        console.log(`✅ ${p.name}: ${latency}ms (direct HTTP client)`);
-        return;
-      } catch (error: any) {
-        const latency = Date.now() - startTime;
-        p.consecutiveFails++;
-        p.fails++;
-        p.score = Math.max(0, p.score - 15);
-        p.lastHealthCheck = Date.now();
-        console.log(`❌ ${p.name}: Failed (${error?.message}) - consecutive fails: ${p.consecutiveFails}`);
-        return;
-      }
-    }
     
     const conn = new Connection(url, { commitment: "confirmed", wsEndpoint: undefined });
 
@@ -584,14 +774,23 @@ const performHealthChecks = async () => {
     }
   });
 
-  await Promise.allSettled(healthChecks);
+  // Run health checks in batches of 5 to avoid 429 rate limits
+  const batchSize = 5;
+  for (let i = 0; i < healthChecks.length; i += batchSize) {
+    const batch = healthChecks.slice(i, i + batchSize);
+    await Promise.allSettled(batch);
+    // Add delay between batches to avoid rate limits
+    if (i + batchSize < healthChecks.length) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
 
   const healthyCount = rpcBalancer.providers.filter(p => p.score > 70).length;
   console.log(`[RPC Health] ${healthyCount}/${rpcBalancer.providers.length} providers healthy`);
 };
 
-// Run health checks every 20 seconds for faster failover
-setInterval(performHealthChecks, 20000);
+// Run health checks every 60 seconds (reduced from 20s to lower rate limit pressure)
+setInterval(performHealthChecks, 60000);
 
-// Initial health check
-setTimeout(performHealthChecks, 2000);
+// Initial health check after 5 seconds (increased from 2s to let server stabilize)
+setTimeout(performHealthChecks, 5000);

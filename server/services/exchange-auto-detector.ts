@@ -1,7 +1,7 @@
 /**
  * Exchange Auto-Detection Service
  * 
- * Leverages Helius Enhanced RPC and Ankr metadata APIs to automatically detect
+ * Leverages Helius Enhanced RPC to automatically detect
  * exchange wallets and dynamically add them to the whitelist for accurate holder analysis.
  * 
  * Features:

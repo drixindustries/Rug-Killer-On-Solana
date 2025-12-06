@@ -14,12 +14,18 @@ import { TOKEN_PROGRAM_ID, AccountLayout } from '@solana/spl-token';
 import bs58 from 'bs58';
 
 // Known Pump.fun program IDs and AMM vaults
+// Updated December 2025: Added PumpSwap AMM program (pAMMBay6...)
 const PUMPFUN_PROGRAM_IDS = new Set([
-  '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P', // Pump.fun Program
+  // Original Bonding Curve System
+  '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P', // Pump.fun Bonding Curve Program
   'CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM', // Pump.fun Global
   'Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1', // Pump.fun Event Authority
   '39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg', // Pump.fun Fee Receiver
   '5NknwpvMbNhUY71DEZWDhLHMjCXntvyRSvo4e6tvopbi', // Pump.fun WSOL AMM (CRITICAL - reported 20+ times)
+  
+  // NEW: PumpSwap AMM System (March 2025 - CRITICAL FOR GRADUATED TOKENS)
+  'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA', // PumpSwap AMM Program - holds LP for graduated tokens
+  'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ', // Pump.fun Fees Program
 ]);
 
 // Cache detected AMM wallets (in-memory, resets on server restart)
@@ -182,23 +188,30 @@ async function checkMultipleMintHoldings(
 
 /**
  * Pattern matching based on common Pump.fun AMM wallet characteristics
+ * Updated December 2025: Added PumpSwap AMM patterns (pAMM, pfee)
  */
 function checkWalletPattern(walletAddress: string): AmmDetectionResult {
   // Known patterns in Pump.fun AMM addresses
   const pumpfunPatterns = [
+    // Original Bonding Curve patterns
     /^6EF8/,   // Bonding curve vault prefix
     /^CebN/,   // Global prefix  
     /^39az/,   // Fee receiver prefix
     /^TSLv/,   // Associated token prefix
     /^Ce6T/,   // Event authority prefix
-    /^e4HZ/,   // AMM vault prefix (newly discovered)
+    /^e4HZ/,   // AMM vault prefix
+    /^5Nkn/,   // WSOL AMM vault (CRITICAL)
+    
+    // NEW: PumpSwap AMM patterns (March 2025 - CRITICAL FOR GRADUATED TOKENS)
+    /^pAMM/,   // PumpSwap AMM program - LP pools for graduated tokens
+    /^pfee/,   // Pump.fun fees program
   ];
 
   for (const pattern of pumpfunPatterns) {
     if (pattern.test(walletAddress)) {
       return {
         isPumpFunAmm: true,
-        reason: `Matches Pump.fun address pattern: ${pattern.source}`,
+        reason: `Matches Pump.fun/PumpSwap address pattern: ${pattern.source}`,
         confidence: 'medium'
       };
     }

@@ -182,6 +182,100 @@ export default function Features() {
 
       <section className="mb-16">
         <div className="text-center mb-8">
+          <Badge className="mb-4" data-testid="badge-ai-ml">NEW - AI/ML</Badge>
+          <h2 className="text-3xl font-bold mb-2">Advanced AI Detection</h2>
+          <p className="text-muted-foreground">Temporal GNN, Jito MEV, and SyraxML scoring</p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6 mb-8">
+          <Card data-testid="card-tgn">
+            <CardHeader>
+              <TrendingUp className="h-8 w-8 mb-2 text-purple-500" />
+              <CardTitle>Temporal GNN v2</CardTitle>
+              <CardDescription>10-18% better accuracy</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Graph neural network transaction analysis:
+              </p>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>Star-shaped dump detection</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>Coordinated wallet clusters</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>LP drain pattern recognition</span>
+                </div>
+              </div>
+              <div className="mt-3 p-2 bg-muted rounded text-xs">
+                F1-Score: 0.966 vs 0.912 (heuristics)
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-jito">
+            <CardHeader>
+              <AlertTriangle className="h-8 w-8 mb-2 text-orange-500" />
+              <CardTitle>Jito MEV Detection</CardTitle>
+              <CardDescription>Bundle & sandwich attacks</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                MEV bundle analysis for coordinated attacks:
+              </p>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>Multi-wallet buys in same block</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>Tip amount correlation</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>Bundle timing analysis</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-syraxml">
+            <CardHeader>
+              <Eye className="h-8 w-8 mb-2 text-blue-500" />
+              <CardTitle>SyraxML Scoring</CardTitle>
+              <CardDescription>ML legitimacy assessment</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Machine learning token legitimacy:
+              </p>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>Composite risk scoring</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>Rug probability estimation</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>Buy/Avoid recommendations</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section className="mb-16">
+        <div className="text-center mb-8">
           <Badge className="mb-4" data-testid="badge-ai-blacklist">AI-Powered</Badge>
           <h2 className="text-3xl font-bold mb-2">Automated Blacklist System</h2>
           <p className="text-muted-foreground">6 detection rules analyzing suspicious wallet behavior</p>
@@ -261,37 +355,125 @@ export default function Features() {
 
       <section className="mb-16">
         <div className="text-center mb-8">
+          <Badge className="mb-4" data-testid="badge-infrastructure">NEW - Infrastructure</Badge>
+          <h2 className="text-3xl font-bold mb-2">Distributed RPC Infrastructure</h2>
+          <p className="text-muted-foreground">25+ free public endpoints with intelligent load balancing</p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6">
+          <Card data-testid="card-rpc-endpoints">
+            <CardHeader>
+              <Zap className="h-8 w-8 mb-2 text-yellow-500" />
+              <CardTitle>25+ Free RPC Endpoints</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                No API keys required - works out of the box:
+              </p>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>Solana-Official, Ankr, PublicNode, 1RPC</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>OnFinality, Serum, Extrnode, dRPC</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>Auto-failover on errors</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-rate-limiting">
+            <CardHeader>
+              <Shield className="h-8 w-8 mb-2 text-blue-500" />
+              <CardTitle>Smart Rate Limiting</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Never hit 429 errors again:
+              </p>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>Exponential backoff with jitter</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>Request deduplication</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>20-second health monitoring</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-websocket">
+            <CardHeader>
+              <Bell className="h-8 w-8 mb-2 text-green-500" />
+              <CardTitle>11 WebSocket Endpoints</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Real-time monitoring without API keys:
+              </p>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>wss://api.mainnet-beta.solana.com</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>wss://rpc.ankr.com/solana/ws</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>Auto-reconnect on disconnect</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section className="mb-16">
+        <div className="text-center mb-8">
           <Badge className="mb-4" data-testid="badge-alpha-alerts">Premium</Badge>
           <h2 className="text-3xl font-bold mb-2">Alpha Alerts System</h2>
-          <p className="text-muted-foreground">Real-time monitoring of influential wallets and new launches</p>
+          <p className="text-muted-foreground">39+ smart money wallets tracked in real-time</p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6">
           <Card data-testid="card-alpha-callers">
             <CardHeader>
               <Flame className="h-8 w-8 mb-2 text-orange-500" />
-              <CardTitle>Smart Money Tracking</CardTitle>
+              <CardTitle>39+ Alpha Wallets</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Monitor wallet activity from influential traders:
+                Monitor wallet activity from top traders:
               </p>
               <div className="space-y-2 text-sm">
                 <div className="flex items-start gap-2">
                   <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Configurable wallet watchlist</span>
+                  <span>Win rate & PNL tracking</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Real-time transaction monitoring</span>
+                  <span>Multi-wallet detection (2+ buying same token)</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Instant buy/sell notifications</span>
+                  <span>Influence scoring (60-100)</span>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-3">
-                Auto-pings Discord/Telegram when monitored wallets trade
+                Includes: top1, oracle-90%, Soloxbt, 97%SM, 100%SM...
               </p>
             </CardContent>
           </Card>

@@ -346,31 +346,8 @@ async function startServices() {
       }
     }
 
-    // Ankr WebSocket service - Real-time monitoring via Ankr RPC
-    // Only start if explicitly enabled to avoid 401 spam when quota is exhausted
-    if (process.env.ANKR_API_KEY && process.env.ENABLE_ANKR_WS === 'true') {
-      try {
-        const { ankrWebSocket } = await import('./services/ankr-websocket.ts');
-        await ankrWebSocket.connect();
-        
-        ankrWebSocket.on('token_created', async (event) => {
-          console.log(`[Ankr WebSocket] New token via Ankr: ${event.mint}`);
-        });
-        
-        ankrWebSocket.on('alpha_wallet_trade', async (event) => {
-          console.log(`[Ankr WebSocket] Alpha wallet activity: ${event.wallet.slice(0, 8)}... → ${event.mint}`);
-        });
-        
-        console.log('✅ Ankr WebSocket service started');
-      } catch (err: any) {
-        console.warn('⚠️ Ankr WebSocket service failed:', err.message);
-      }
-    } else if (process.env.ANKR_API_KEY) {
-      console.log('ℹ️ Ankr WebSocket disabled (set ENABLE_ANKR_WS=true to enable)');
-    }
-
-    // Pump.fun WebSocket removed - Helius/Ankr services handle all token detection
+    // Pump.fun WebSocket removed - Helius handles all token detection
   } else {
-    console.log('ℹ️ Webhook services disabled - set HELIUS_API_KEY or ANKR_API_KEY to enable real-time monitoring');
+    console.log('ℹ️ Webhook services disabled - set HELIUS_API_KEY to enable real-time monitoring');
   }
 }

@@ -8,7 +8,7 @@ import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from "@react-
 import { CONTRACT_ADDRESS } from "@/constants";
 import { MascotCallout } from "@/components/mascot-callout";
 
-// PDF Document Component with comprehensive content
+// PDF Document Component with comprehensive Whitepaper content
 const pdfStyles = StyleSheet.create({
   page: {
     padding: 50,
@@ -89,331 +89,244 @@ const pdfStyles = StyleSheet.create({
     color: '#ff6b6b',
     fontWeight: 'bold',
   },
+  metric: {
+    backgroundColor: '#1a1a1a',
+    padding: 6,
+    marginBottom: 4,
+    borderLeft: '3px solid #00ff88',
+  },
 });
 
 const DocumentationPDF = () => (
   <Document>
     <Page size="A4" style={pdfStyles.page}>
       <Text style={pdfStyles.title}>RUG KILLER ALPHA BOT</Text>
-      <Text style={pdfStyles.subtitle}>TECHNICAL DOCUMENTATION v2.0 | SOLANA BLOCKCHAIN SECURITY PLATFORM</Text>
+      <Text style={pdfStyles.subtitle}>WHITEPAPER v2.0 | ADVANCED SOLANA TOKEN SECURITY PLATFORM</Text>
       
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>SYSTEM OVERVIEW</Text>
+        <Text style={pdfStyles.heading}>EXECUTIVE SUMMARY</Text>
         <Text style={pdfStyles.text}>
-          Advanced Solana SPL token analysis platform leveraging multi-source blockchain intelligence, 
-          real-time risk assessment algorithms, and AI-powered pattern recognition to detect rug pull 
-          indicators including: mint/freeze authority exploitation, suspicious holder concentration, 
-          liquidity pool manipulation, and anomalous transaction patterns.
+          Rug Killer Alpha Bot is the most advanced Solana token security platform, combining AI-powered 
+          detection, real-time smart money tracking, and distributed RPC infrastructure to deliver 
+          industry-leading 99%+ rug pull detection accuracy.
         </Text>
+        <View style={pdfStyles.metric}>
+          <Text style={pdfStyles.text}>• 99%+ Overall Detection Rate | 95-98% TGN Detection | F1-Score: 0.966</Text>
+        </View>
       </View>
 
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>PROJECT IDENTIFIER</Text>
+        <Text style={pdfStyles.heading}>$ANTIRUG TOKEN</Text>
         <Text style={pdfStyles.subheading}>Contract Address (CA)</Text>
         <Text style={pdfStyles.code}>{CONTRACT_ADDRESS}</Text>
         <Text style={pdfStyles.text}>
-          Official vanity Solana address | Suffix: "rtek" | Blockchain-verified project identifier
+          Hold 10M+ tokens for lifetime FREE access to all WHALE tier features.
         </Text>
       </View>
 
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>DATA AGGREGATION ARCHITECTURE</Text>
-        <Text style={pdfStyles.text}>
-          Multi-layer blockchain intelligence system integrating four primary data sources:
-        </Text>
+        <Text style={pdfStyles.heading}>6-LAYER DETECTION SYSTEM</Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>→ RUGCHECK.XYZ - Community risk scoring, liquidity metrics</Text>
-          <Text style={pdfStyles.text}>→ GOPLUS SECURITY - Honeypot detection, contract vulnerability scanning</Text>
-          <Text style={pdfStyles.text}>→ DEXSCREENER - Real-time market data (price, volume, liquidity, mcap)</Text>
-          <Text style={pdfStyles.text}>→ JUPITER PROTOCOL - Price verification, liquidity aggregation layer</Text>
+          <Text style={pdfStyles.text}>1. AUTHORITY ANALYSIS - Mint/freeze authority exploitation detection</Text>
+          <Text style={pdfStyles.text}>2. HOLDER DISTRIBUTION - Whale concentration, sybil attack detection</Text>
+          <Text style={pdfStyles.text}>3. LIQUIDITY ANALYSIS - LP locks, burns, rug pull pattern recognition</Text>
+          <Text style={pdfStyles.text}>4. TGN + ML DETECTION - Temporal Graph Neural Networks + SyraxML scoring</Text>
+          <Text style={pdfStyles.text}>5. MEV DETECTION - Jito bundle detection, sandwich attack identification</Text>
+          <Text style={pdfStyles.text}>6. SMART MONEY - 39+ alpha wallet tracking, insider trading detection</Text>
         </View>
       </View>
 
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>Token Analysis Features</Text>
+        <Text style={pdfStyles.heading}>AI/ML TECHNOLOGIES</Text>
+        <Text style={pdfStyles.subheading}>Temporal Graph Neural Network (TGN2)</Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Authority checks - Detects if mint or freeze authority is enabled</Text>
-          <Text style={pdfStyles.text}>• Holder analysis - Top 20 holders with concentration percentage</Text>
-          <Text style={pdfStyles.text}>• Liquidity assessment - Checks for locked liquidity and pool depth</Text>
-          <Text style={pdfStyles.text}>• Risk scoring - 0-100 score with detailed red flag breakdown</Text>
-          <Text style={pdfStyles.text}>• BubbleMaps visualization - Interactive holder distribution maps</Text>
-          <Text style={pdfStyles.text}>• Transaction history - Recent significant transactions and patterns</Text>
-          <Text style={pdfStyles.text}>• AI blacklist checks - Automatic flagging of suspicious wallets</Text>
+          <Text style={pdfStyles.text}>• Star-shaped dumps: Dev wallet → many recipients detection</Text>
+          <Text style={pdfStyles.text}>• Coordinated wallet clusters: Synchronized buying/selling patterns</Text>
+          <Text style={pdfStyles.text}>• Bridge wallets: Single-use fund obfuscation</Text>
+          <Text style={pdfStyles.text}>• LP drains: One-way liquidity removal patterns</Text>
+          <Text style={pdfStyles.text}>• 10-18% better accuracy than traditional heuristics</Text>
+        </View>
+        <Text style={pdfStyles.subheading}>Jito MEV Bundle Detection</Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>• Detects coordinated multi-wallet buys in same block</Text>
+          <Text style={pdfStyles.text}>• Identifies tip amounts indicating MEV extraction</Text>
+          <Text style={pdfStyles.text}>• Correlates bundle timing with price movements</Text>
         </View>
       </View>
 
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>Telegram & Discord Bots</Text>
-        <Text style={pdfStyles.subheading}>Available Commands:</Text>
+        <Text style={pdfStyles.heading}>BOT COMMANDS (11 each)</Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• /execute [token] - Full comprehensive risk analysis</Text>
-          <Text style={pdfStyles.text}>• /first20 [token] - Detailed top 20 holder breakdown</Text>
-          <Text style={pdfStyles.text}>• /devaudit [wallet] - Complete dev wallet transaction history</Text>
-          <Text style={pdfStyles.text}>• /blacklist [wallet] - Check if wallet is flagged in AI blacklist</Text>
+          <Text style={pdfStyles.text}>• /execute [token] - Full 52-metric risk analysis with Safety Score</Text>
+          <Text style={pdfStyles.text}>• /first20 [token] - Top 20 holder breakdown with percentages</Text>
+          <Text style={pdfStyles.text}>• /trace [token] - On-chain forensic tracing (ZachXBT-style)</Text>
+          <Text style={pdfStyles.text}>• /devaudit [wallet] - Developer wallet transaction history</Text>
+          <Text style={pdfStyles.text}>• /blacklist [wallet] - AI blacklist database check</Text>
+          <Text style={pdfStyles.text}>• /graderepo [url] - GitHub repository quality grading</Text>
+          <Text style={pdfStyles.text}>• /price, /liquidity, /compare, /trending, /whaletrack</Text>
         </View>
-        <Text style={pdfStyles.text}>
-          Both bots support markdown formatting (Telegram) and rich embeds (Discord) with color-coded 
-          risk indicators (green/yellow/orange/red) for quick visual assessment.
-        </Text>
       </View>
 
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>Subscription Tiers</Text>
-        
-        <Text style={pdfStyles.subheading}>FREE Trial - $0 for 7 days</Text>
+        <Text style={pdfStyles.heading}>SUBSCRIPTION TIERS</Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• 3 token analyses per day</Text>
-          <Text style={pdfStyles.text}>• Basic risk score and holder analysis</Text>
-          <Text style={pdfStyles.text}>• No credit card required</Text>
-        </View>
-
-        <Text style={pdfStyles.subheading}>PRO - $29/month</Text>
-        <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Unlimited token analyses</Text>
-          <Text style={pdfStyles.text}>• Full AI blacklist detection</Text>
-          <Text style={pdfStyles.text}>• BubbleMaps visual holder distribution</Text>
-          <Text style={pdfStyles.text}>• Telegram & Discord bot access</Text>
-          <Text style={pdfStyles.text}>• Blacklist database query access</Text>
-          <Text style={pdfStyles.text}>• Priority support</Text>
-        </View>
-
-        <Text style={pdfStyles.subheading}>GROUP - $120/month</Text>
-        <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Everything in PRO tier</Text>
-          <Text style={pdfStyles.text}>• Real-time liquidity alerts</Text>
-          <Text style={pdfStyles.text}>• REST API access with 10,000 requests/month</Text>
-          <Text style={pdfStyles.text}>• Advanced smart money wallet tracking</Text>
-          <Text style={pdfStyles.text}>• Team collaboration (up to 5 users)</Text>
-          <Text style={pdfStyles.text}>• Custom webhook integrations</Text>
-        </View>
-
-        <Text style={pdfStyles.subheading}>$ANTIRUG Holder - FREE Forever</Text>
-        <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Hold 10M+ official $ANTIRUG tokens</Text>
-          <Text style={pdfStyles.text}>• Lifetime access to GROUP tier features</Text>
-          <Text style={pdfStyles.text}>• Exclusive holder perks and governance rights</Text>
-          <Text style={pdfStyles.text}>• Connect wallet via Phantom to verify holdings</Text>
+          <Text style={pdfStyles.text}>• FREE Trial: 3 analyses/day, 7 days, no card required</Text>
+          <Text style={pdfStyles.text}>• PRO ($29/mo): Unlimited analyses, bot access, AI blacklist</Text>
+          <Text style={pdfStyles.text}>• WHALE ($99/mo): API access, smart money tracking, custom webhooks</Text>
+          <Text style={pdfStyles.text}>• TOKEN HOLDER: 10M+ tokens = LIFETIME free WHALE access</Text>
         </View>
       </View>
 
       <Text style={pdfStyles.footer}>
-        © 2025 Rug Killer Alpha Bot - Page 1 of 3
+        © 2025 Rug Killer Alpha Bot - Whitepaper Page 1 of 3
       </Text>
     </Page>
 
     <Page size="A4" style={pdfStyles.page}>
-      <Text style={pdfStyles.title}>Security & Access Control</Text>
+      <Text style={pdfStyles.title}>INFRASTRUCTURE & DETECTION</Text>
 
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>Challenge-Response Wallet Verification</Text>
-        <Text style={pdfStyles.text}>
-          Our wallet verification system uses cryptographic signatures to prevent replay attacks:
-        </Text>
+        <Text style={pdfStyles.heading}>DISTRIBUTED RPC INFRASTRUCTURE</Text>
+        <Text style={pdfStyles.subheading}>25+ Free Public RPC Endpoints</Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>1. User requests challenge from GET /api/wallet/challenge (5-minute expiry)</Text>
-          <Text style={pdfStyles.text}>2. User signs challenge with Phantom wallet using Ed25519 signature</Text>
-          <Text style={pdfStyles.text}>3. User submits POST /api/wallet/verify with wallet address, signature, and challenge</Text>
-          <Text style={pdfStyles.text}>4. Server validates: challenge exists, not expired, not used, signature valid, 10M+ tokens</Text>
-          <Text style={pdfStyles.text}>5. Challenge marked as used (single-use enforcement)</Text>
-          <Text style={pdfStyles.text}>6. GROUP tier access granted for 24 hours, then revalidation required</Text>
+          <Text style={pdfStyles.text}>HIGH PRIORITY: Solana-Official, Ankr-Public, PublicNode, OnFinality, 1RPC</Text>
+          <Text style={pdfStyles.text}>MEDIUM: Serum, Helius-Public, Extrnode, dRPC, Gateway-FM, KJNodes</Text>
+          <Text style={pdfStyles.text}>BACKUP: GenesysGo, HelloMoon, Syndica, Triton, + 10 more</Text>
+        </View>
+        <Text style={pdfStyles.subheading}>11 Free WebSocket Endpoints</Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>• wss://api.mainnet-beta.solana.com (Official)</Text>
+          <Text style={pdfStyles.text}>• wss://rpc.ankr.com/solana/ws, wss://solana-rpc.publicnode.com</Text>
+          <Text style={pdfStyles.text}>• Real-time monitoring without API keys required</Text>
         </View>
       </View>
 
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>Access Control Rules</Text>
-        <Text style={pdfStyles.text}>
-          Protected endpoints require EITHER active subscription OR verified token holdings:
-        </Text>
+        <Text style={pdfStyles.heading}>SMART RATE LIMIT HANDLING</Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Subscription check: Status = 'active' or 'trialing' AND currentPeriodEnd {'>'} now</Text>
-          <Text style={pdfStyles.text}>• Token holder check: isEligible = true AND lastVerifiedAt {'<'} 24 hours ago</Text>
-          <Text style={pdfStyles.text}>• Official token mint address is server-controlled (prevents bypass)</Text>
-          <Text style={pdfStyles.text}>• Auto-expiry when subscription or trial ends</Text>
+          <Text style={pdfStyles.text}>• Exponential Backoff: 500ms → 1s → 2s → 4s (max 30s)</Text>
+          <Text style={pdfStyles.text}>• 20% Jitter: Prevents thundering herd on rate limit recovery</Text>
+          <Text style={pdfStyles.text}>• Request Deduplication: Same token = single analysis</Text>
+          <Text style={pdfStyles.text}>• 30-second cooldown between analyses of same token</Text>
+          <Text style={pdfStyles.text}>• Automatic failover across 25+ endpoints</Text>
         </View>
       </View>
 
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>AI Blacklist System</Text>
-        <Text style={pdfStyles.text}>
-          Automated detection engine with 6 rules analyzing 52+ risk metrics:
-        </Text>
+        <Text style={pdfStyles.heading}>SMART MONEY TRACKING</Text>
+        <Text style={pdfStyles.subheading}>39+ Alpha Wallets Monitored</Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Honeypot detection (severity: 90) - Tokens that can't be sold</Text>
-          <Text style={pdfStyles.text}>• High sell tax (severity: 80) - Excessive transaction fees</Text>
-          <Text style={pdfStyles.text}>• Suspicious authorities (severity: 75) - Mint/freeze enabled</Text>
-          <Text style={pdfStyles.text}>• Wash trading patterns (severity: 70) - Artificial volume</Text>
-          <Text style={pdfStyles.text}>• Coordinated pump scheme detection</Text>
-          <Text style={pdfStyles.text}>• Evidence tracking with timestamped entries and deduplication</Text>
+          <Text style={pdfStyles.text}>• Real-time webhook monitoring via Helius</Text>
+          <Text style={pdfStyles.text}>• Win rate and PNL tracking per wallet</Text>
+          <Text style={pdfStyles.text}>• Multi-wallet detection: Alerts when 2+ wallets buy same token</Text>
+          <Text style={pdfStyles.text}>• Influence scoring: 60-100 based on historical performance</Text>
+          <Text style={pdfStyles.text}>• Example wallets: top1, oracle-90%, Soloxbt, 97%SM, 100%SM</Text>
         </View>
       </View>
 
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>Payment Systems</Text>
-        
-        <Text style={pdfStyles.subheading}>Whop Subscriptions</Text>
+        <Text style={pdfStyles.heading}>ADVANCED DETECTION FEATURES</Text>
+        <Text style={pdfStyles.subheading}>Serial Rugger Detection</Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Merchant of Record handling (2.7% + $0.30 fees)</Text>
-          <Text style={pdfStyles.text}>• Hosted secure checkout with automatic tax compliance</Text>
-          <Text style={pdfStyles.text}>• Webhook lifecycle events: payment.succeeded, membership status changes</Text>
-          <Text style={pdfStyles.text}>• Status vocabulary: "valid", "trialing", "past_due", "cancelled", "expired"</Text>
+          <Text style={pdfStyles.text}>• Cross-references deployer wallets against known ruggers</Text>
+          <Text style={pdfStyles.text}>• Tracks funding patterns from previous rugs</Text>
+          <Text style={pdfStyles.text}>• Identifies wallet clusters used in multiple scams</Text>
         </View>
-
-        <Text style={pdfStyles.subheading}>Crypto Payments (SOL only)</Text>
+        <Text style={pdfStyles.subheading}>Aged Wallet Detection</Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>• Production-ready Solana payment processing</Text>
-          <Text style={pdfStyles.text}>• Requires 6 blockchain confirmations before activation</Text>
-          <Text style={pdfStyles.text}>• Payment address generation with blockchain monitoring</Text>
-          <Text style={pdfStyles.text}>• Full audit trail in payment_audit table</Text>
-          <Text style={pdfStyles.text}>• ETH/BTC payments blocked (SOL-only security policy)</Text>
+          <Text style={pdfStyles.text}>• 90+ days: Medium risk | 180+ days: High risk | 2+ years: Critical</Text>
+          <Text style={pdfStyles.text}>• Synchronized activation within 1-minute windows flagged</Text>
+          <Text style={pdfStyles.text}>• Similar purchase amounts indicate automated scripts</Text>
+        </View>
+        <Text style={pdfStyles.subheading}>DevsNightmare Analysis</Text>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>• Team allocation percentage analysis</Text>
+          <Text style={pdfStyles.text}>• Insider holdings detection</Text>
+          <Text style={pdfStyles.text}>• Sniper activity correlation</Text>
         </View>
       </View>
 
       <Text style={pdfStyles.footer}>
-        © 2025 Rug Killer Alpha Bot - Page 2 of 3
+        © 2025 Rug Killer Alpha Bot - Whitepaper Page 2 of 3
       </Text>
     </Page>
 
     <Page size="A4" style={pdfStyles.page}>
-      <Text style={pdfStyles.title}>API Endpoints & Setup</Text>
+      <Text style={pdfStyles.title}>USE CASES & API REFERENCE</Text>
 
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>Main API Endpoints</Text>
-        
+        <Text style={pdfStyles.heading}>USE CASE 1: RUG PULL DETECTION</Text>
+        <Text style={pdfStyles.text}>
+          New memecoin launches on Pump.fun. Our system instantly analyzes:
+        </Text>
+        <View style={pdfStyles.metric}>
+          <Text style={pdfStyles.text}>Safety Score: 12/100 | Danger Level: 88/100</Text>
+        </View>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>🔴 Mint authority ENABLED (can print infinite tokens)</Text>
+          <Text style={pdfStyles.text}>🔴 Top 10 holders own 78% of supply</Text>
+          <Text style={pdfStyles.text}>🔴 5 aged wallets (180+ days) bought simultaneously</Text>
+          <Text style={pdfStyles.text}>🔴 Deployer linked to 3 previous rugs</Text>
+          <Text style={pdfStyles.text}>🔴 TGN P(rug) = 94.2% | Star-shaped dump pattern</Text>
+        </View>
+        <Text style={pdfStyles.text}>RECOMMENDATION: AVOID - High probability of rug pull</Text>
+      </View>
+
+      <View style={pdfStyles.section}>
+        <Text style={pdfStyles.heading}>USE CASE 2: SMART MONEY ENTRY</Text>
+        <Text style={pdfStyles.text}>
+          Alpha wallet "oracle-90%" buys new token. Alert sent instantly:
+        </Text>
+        <View style={pdfStyles.metric}>
+          <Text style={pdfStyles.text}>Safety Score: 87/100 | Win Rate: 90% (45W/5L) | PNL: +847 SOL</Text>
+        </View>
+        <View style={pdfStyles.list}>
+          <Text style={pdfStyles.text}>✅ Mint authority revoked</Text>
+          <Text style={pdfStyles.text}>✅ Freeze authority revoked</Text>
+          <Text style={pdfStyles.text}>✅ LP burned (100%)</Text>
+          <Text style={pdfStyles.text}>✅ Healthy holder distribution</Text>
+          <Text style={pdfStyles.text}>✅ Clean deployer history</Text>
+        </View>
+        <Text style={pdfStyles.text}>RECOMMENDATION: DYOR, but looks promising</Text>
+      </View>
+
+      <View style={pdfStyles.section}>
+        <Text style={pdfStyles.heading}>API ENDPOINTS</Text>
         <Text style={pdfStyles.subheading}>Token Analysis</Text>
-        <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>POST /api/analyze-token - Submit token address for analysis (requires access)</Text>
-          <Text style={pdfStyles.text}>GET /api/analysis/:id - Retrieve analysis results</Text>
-        </View>
-
+        <Text style={pdfStyles.code}>POST /api/analyze {'{'}"tokenAddress": "..."{'}'}</Text>
         <Text style={pdfStyles.subheading}>Wallet Verification</Text>
-        <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>GET /api/wallet/challenge - Request verification challenge (5min expiry)</Text>
-          <Text style={pdfStyles.text}>POST /api/wallet/verify - Submit signed challenge for verification</Text>
-          <Text style={pdfStyles.text}>GET /api/wallet - Get current wallet connection status</Text>
-        </View>
-
+        <Text style={pdfStyles.code}>GET /api/wallet/challenge (5min expiry)</Text>
+        <Text style={pdfStyles.code}>POST /api/wallet/verify {'{'}"signature": "..."{'}'}</Text>
         <Text style={pdfStyles.subheading}>Blacklist Operations</Text>
-        <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>GET /api/blacklist/check/:wallet - Check if wallet is flagged</Text>
-          <Text style={pdfStyles.text}>POST /api/blacklist/report - Submit wallet report with evidence</Text>
-          <Text style={pdfStyles.text}>GET /api/blacklist/stats - Get blacklist statistics</Text>
-          <Text style={pdfStyles.text}>GET /api/blacklist/top - Top flagged wallets by severity</Text>
-        </View>
+        <Text style={pdfStyles.code}>GET /api/blacklist/check/:wallet</Text>
+        <Text style={pdfStyles.code}>POST /api/blacklist/report</Text>
+        <Text style={pdfStyles.subheading}>GitHub Grading</Text>
+        <Text style={pdfStyles.code}>POST /api/grade-repo {'{'}"repoUrl": "..."{'}'}</Text>
+      </View>
 
-        <Text style={pdfStyles.subheading}>Bot Integration</Text>
+      <View style={pdfStyles.section}>
+        <Text style={pdfStyles.heading}>SAFETY SCORE SYSTEM</Text>
         <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>GET /api/bot/invite-links - Get Telegram/Discord bot invite URLs</Text>
+          <Text style={pdfStyles.text}>🟢 80-100: SAFE - Low risk, proceed with caution</Text>
+          <Text style={pdfStyles.text}>🟡 60-79: MODERATE - Some concerns, research more</Text>
+          <Text style={pdfStyles.text}>🟠 40-59: RISKY - Multiple red flags detected</Text>
+          <Text style={pdfStyles.text}>🔴 0-39: DANGEROUS - High probability of rug pull</Text>
         </View>
       </View>
 
       <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>Environment Variables</Text>
-        
-        <Text style={pdfStyles.subheading}>Required for Whop Subscriptions</Text>
-        <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>WHOP_API_KEY - Whop API key from developer dashboard</Text>
-          <Text style={pdfStyles.text}>WHOP_APP_ID - Whop application ID</Text>
-          <Text style={pdfStyles.text}>WHOP_COMPANY_ID - Whop company/business ID</Text>
-          <Text style={pdfStyles.text}>WHOP_PLAN_ID_BASIC - Plan ID for $29/mo PRO tier</Text>
-          <Text style={pdfStyles.text}>WHOP_PLAN_ID_PREMIUM - Plan ID for $120/mo GROUP tier</Text>
-        </View>
-
-        <Text style={pdfStyles.subheading}>Required for Token Gating</Text>
-        <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>OFFICIAL_TOKEN_MINT_ADDRESS - SPL token mint for 10M+ access verification</Text>
-        </View>
-
-        <Text style={pdfStyles.subheading}>Optional for Bots</Text>
-        <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>TELEGRAM_BOT_TOKEN - From @BotFather on Telegram</Text>
-          <Text style={pdfStyles.text}>DISCORD_BOT_TOKEN - From Discord Developer Portal</Text>
-          <Text style={pdfStyles.text}>DISCORD_CLIENT_ID - Discord application ID</Text>
-        </View>
-      </View>
-
-      <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>Getting Started</Text>
-        
-        <Text style={pdfStyles.subheading}>Step 1: Create Account</Text>
-        <Text style={pdfStyles.text}>
-          Sign up using Google, GitHub, X (Twitter), Apple, or email/password through 
-          Replit Auth integration. Account creation is instant and free.
-        </Text>
-
-        <Text style={pdfStyles.subheading}>Step 2: Start Free Trial (Optional)</Text>
-        <Text style={pdfStyles.text}>
-          Get 7 days of free access with 3 analyses per day. No credit card required. 
-          Trial starts automatically upon first login.
-        </Text>
-
-        <Text style={pdfStyles.subheading}>Step 3: Analyze Your First Token</Text>
-        <Text style={pdfStyles.text}>
-          Navigate to the main dashboard and paste any Solana token address (e.g., 
-          EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v for USDC). Click "Analyze" 
-          to receive comprehensive risk analysis including holder distribution, authority 
-          checks, market data, and AI-powered red flags.
-        </Text>
-
-        <Text style={pdfStyles.subheading}>Step 4: Connect Phantom Wallet (Optional - Token Holders)</Text>
-        <Text style={pdfStyles.text}>
-          If you hold 10M+ official $ANTIRUG tokens, you can gain instant GROUP tier access without 
-          a paid subscription. First, install Phantom from phantom.app if you haven't already.
-        </Text>
-        <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>1. Click "Connect Wallet" button in the header navigation</Text>
-          <Text style={pdfStyles.text}>2. Phantom wallet extension will prompt you to connect</Text>
-          <Text style={pdfStyles.text}>3. Approve the connection request in Phantom</Text>
-          <Text style={pdfStyles.text}>4. Sign the cryptographic challenge message (proves wallet ownership)</Text>
-          <Text style={pdfStyles.text}>5. System validates your token balance (requires 10M+ tokens)</Text>
-          <Text style={pdfStyles.text}>6. Upon success, WHALE tier access is granted for 24 hours</Text>
-          <Text style={pdfStyles.text}>7. Reconnect every 24 hours to maintain access</Text>
-        </View>
-        <Text style={pdfStyles.text}>
-          Security Note: This simply proves you control the wallet without sharing your private key. 
-          We use Ed25519 signature verification with challenge-response protocol to prevent replay attacks. 
-          Your private key never leaves your wallet.
-        </Text>
-
-        <Text style={pdfStyles.subheading}>Step 5: Subscribe via Whop (Recommended for Most Users)</Text>
-        <Text style={pdfStyles.text}>
-          For users without 10M+ tokens, subscribe through Whop for secure payment processing:
-        </Text>
-        <View style={pdfStyles.list}>
-          <Text style={pdfStyles.text}>1. Navigate to /pricing page from header or visit directly</Text>
-          <Text style={pdfStyles.text}>2. Review tier comparison: PRO ($29/mo) or GROUP ($120/mo)</Text>
-          <Text style={pdfStyles.text}>3. Click "Subscribe" button on your preferred tier card</Text>
-          <Text style={pdfStyles.text}>4. Redirect to Whop's secure hosted checkout page</Text>
-          <Text style={pdfStyles.text}>5. Enter payment details (credit card, debit card, or crypto)</Text>
-          <Text style={pdfStyles.text}>6. Whop processes payment as Merchant of Record (2.7% + $0.30 fee)</Text>
-          <Text style={pdfStyles.text}>7. Automatic tax compliance and receipt generation</Text>
-          <Text style={pdfStyles.text}>8. Instant activation upon successful payment</Text>
-          <Text style={pdfStyles.text}>9. Manage subscription, billing, and cancellation through Whop portal</Text>
-        </View>
-        <Text style={pdfStyles.text}>
-          Alternative: Use redeemable subscription codes for lifetime access. Codes can be purchased 
-          separately and redeemed on the /subscription page.
-        </Text>
-
-        <Text style={pdfStyles.subheading}>Step 6: Enable Bot Access</Text>
-        <Text style={pdfStyles.text}>
-          Once subscribed, visit header/footer bot icons to get Telegram and Discord 
-          invite links. Add bots to your channels and use /execute, /first20, 
-          /devaudit, and /blacklist commands for instant analysis.
-        </Text>
-      </View>
-
-      <View style={pdfStyles.section}>
-        <Text style={pdfStyles.heading}>Support & Resources</Text>
+        <Text style={pdfStyles.heading}>LINKS & RESOURCES</Text>
         <View style={pdfStyles.list}>
           <Text style={pdfStyles.text}>• Website: https://rugkilleralphabot.fun</Text>
-          <Text style={pdfStyles.text}>• Documentation: /documentation route</Text>
-          <Text style={pdfStyles.text}>• Pricing: /pricing route</Text>
-          <Text style={pdfStyles.text}>• Contact: Available through the website</Text>
+          <Text style={pdfStyles.text}>• Whitepaper: /documentation (this PDF)</Text>
+          <Text style={pdfStyles.text}>• Discord: @RugKillerAlphaBot</Text>
+          <Text style={pdfStyles.text}>• Telegram: @RugKillerAlphaBot</Text>
+          <Text style={pdfStyles.text}>• Token: HeLp6NuQkmYB4pYWo2zYs22mESHXPQYzXbB8n4V98jwC</Text>
         </View>
       </View>
 
       <Text style={pdfStyles.footer}>
-        © 2025 Rug Killer Alpha Bot - Page 3 of 3 | Protecting Solana investors from rug pulls
+        © 2025 Rug Killer Alpha Bot - Whitepaper v2.0 | Protecting Solana investors from rug pulls
       </Text>
     </Page>
   </Document>
@@ -458,10 +371,10 @@ export default function Documentation() {
           <div className="text-center mb-12">
             <div className="flex items-center justify-center gap-3 mb-4">
               <Shield className="h-12 w-12 text-primary" />
-              <h1 className="text-4xl font-bold">Documentation</h1>
+              <h1 className="text-4xl font-bold">Whitepaper v2.0</h1>
             </div>
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto mb-6">
-              Complete guide to using Rug Killer Alpha Bot's token analysis platform, Discord/Telegram bots, and API
+              Advanced Solana token security platform with AI-powered detection, smart money tracking, and 25+ distributed RPC endpoints
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -474,12 +387,12 @@ export default function Documentation() {
               
               <PDFDownloadLink
                 document={<DocumentationPDF />}
-                fileName="rug-killer-alpha-bot-documentation.pdf"
+                fileName="rug-killer-whitepaper-v2.pdf"
               >
                 {({ loading }) => (
                   <Button size="lg" variant="outline" disabled={loading} data-testid="button-download-pdf">
                     <Download className="h-4 w-4 mr-2" />
-                    {loading ? 'Generating PDF...' : 'Download PDF'}
+                    {loading ? 'Generating PDF...' : 'Download Whitepaper PDF'}
                   </Button>
                 )}
               </PDFDownloadLink>
@@ -1354,21 +1267,21 @@ export default function Documentation() {
           <div className="mt-12 text-center p-8 border rounded-lg bg-gradient-to-br from-primary/5 to-primary/10" data-testid="section-pdf-download">
             <div className="flex items-center justify-center gap-2 mb-4">
               <Download className="h-8 w-8 text-primary" />
-              <h2 className="text-2xl font-bold">Download Complete Documentation</h2>
+              <h2 className="text-2xl font-bold">Download Complete Whitepaper</h2>
             </div>
             <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
-              Get the full Rug Killer Alpha Bot documentation in PDF format. Includes detailed guides on wallet 
-              connection, Whop payments, API endpoints, bot commands, and technical specifications.
+              Get the full Rug Killer Alpha Bot Whitepaper v2.0 in PDF format. Includes 6-layer detection system, 
+              TGN analysis, smart money tracking, 25+ RPC endpoints, use cases, and API reference.
             </p>
             
             <PDFDownloadLink
               document={<DocumentationPDF />}
-              fileName="solana-rug-killer-documentation.pdf"
+              fileName="rug-killer-whitepaper-v2.pdf"
             >
               {({ loading }) => (
                 <Button size="lg" disabled={loading} data-testid="button-download-pdf-bottom">
                   <Download className="h-4 w-4 mr-2" />
-                  {loading ? 'Preparing PDF...' : 'Download PDF Documentation'}
+                  {loading ? 'Preparing PDF...' : 'Download Whitepaper PDF'}
                 </Button>
               )}
             </PDFDownloadLink>

@@ -1,7 +1,7 @@
 /**
  * Cache Pre-Warming Service
  * Pre-fetches and caches token data before users request it
- * Triggered by WebSocket events from Ankr/Helius
+ * Triggered by WebSocket events from Helius
  */
 
 import { tokenAnalyzer } from '../solana-analyzer.js';

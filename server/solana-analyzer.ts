@@ -48,6 +48,9 @@ const debugLog = DEBUG ? (...args: any[]) => console.log(...args) : () => {};
 export class SolanaTokenAnalyzer {
   private dexScreener: DexScreenerService;
   private tgnDetector: TemporalGNNDetector | null = null;
+  
+  // DEDUPLICATION: Track in-flight analyses to prevent duplicate RPC calls
+  private inFlightAnalyses: Map<string, Promise<TokenAnalysisResponse>> = new Map();
 
   constructor() {
     this.dexScreener = new DexScreenerService();
@@ -69,8 +72,33 @@ export class SolanaTokenAnalyzer {
   ): Promise<TokenAnalysisResponse> {
     const startTime = Date.now();
     const isFastMode = options.fastMode ?? false;
+    
+    // DEDUPLICATION: Check if analysis is already in progress
+    const existingAnalysis = this.inFlightAnalyses.get(tokenMintAddress);
+    if (existingAnalysis) {
+      console.log(`🔍 [Analyzer] ⏭️ Deduping analysis for ${tokenMintAddress.slice(0, 8)}...`);
+      return existingAnalysis;
+    }
+    
     console.log(`🔍 [Analyzer] Starting analysis for ${tokenMintAddress}${isFastMode ? ' (FAST MODE)' : ''}`);
 
+    // Track this analysis to prevent duplicates
+    const analysisPromise = this.performAnalysis(tokenMintAddress, options, startTime, isFastMode);
+    this.inFlightAnalyses.set(tokenMintAddress, analysisPromise);
+    
+    try {
+      return await analysisPromise;
+    } finally {
+      this.inFlightAnalyses.delete(tokenMintAddress);
+    }
+  }
+  
+  private async performAnalysis(
+    tokenMintAddress: string,
+    options: { skipExternal?: boolean; skipOnChain?: boolean; fastMode?: boolean },
+    startTime: number,
+    isFastMode: boolean
+  ): Promise<TokenAnalysisResponse> {
     try {
       // Check Redis cache first for instant results
       const cached = await redisCache.get<TokenAnalysisResponse>(`token:analysis:${tokenMintAddress}`);

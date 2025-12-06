@@ -45,8 +45,10 @@ function loadWhitelist(): PumpFunWhitelistFile {
 
 // Core Pump.fun addresses that should ALWAYS be filtered
 // These are the most common AMM/system addresses seen in token launches
+// Updated December 2025: Added PumpSwap AMM program addresses
 const CORE_PUMPFUN_ADDRESSES = new Set([
-  '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P', // Pump.fun Program (bonding curve vault)
+  // Original Pump.fun Bonding Curve System
+  '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P', // Pump.fun Bonding Curve Program
   'CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM', // Pump.fun Global
   '39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg', // Pump.fun Fee Receiver
   'TSLvdd1pWpHVjahSpsvCXUbgwsL3JAcvokwaKt1eokM',  // Pump.fun Associated Token Account
@@ -55,11 +57,17 @@ const CORE_PUMPFUN_ADDRESSES = new Set([
   'Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1',  // Pump.fun Event Authority
   'e4HZW81GuZkgDK2YAdPF6PsToQAB6Go6dL3iQpDz2Hy',  // Pump.fun AMM/Liquidity Vault
   '5NknwpvMbNhUY71DEZWDhLHMjCXntvyRSvo4e6tvopbi', // Pump.fun AMM (WSOL) - REPORTED 20+ TIMES - CRITICAL!
+  
+  // NEW: PumpSwap AMM System (March 2025) - CRITICAL FOR GRADUATED TOKENS
+  'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA', // PumpSwap AMM Program - holds LP pools
+  'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ', // Pump.fun Fees Program
 ]);
 
 // Pattern-based detection for Pump.fun AMM wallets
 // These prefixes are used by Pump.fun's address generation
+// Updated December 2025: Added PumpSwap AMM patterns (pAMM, pfee)
 const PUMPFUN_ADDRESS_PATTERNS = [
+  // Original Bonding Curve patterns
   /^6EF8/,   // Bonding curve vault prefix
   /^CebN/,   // Global/system prefix  
   /^39az/,   // Fee receiver prefix
@@ -70,7 +78,13 @@ const PUMPFUN_ADDRESS_PATTERNS = [
   /^DezX/,   // Bonk-style vault clone
   /^4wTV/,   // Legacy vault
   /^CebN5WGQ/, // Pump.fun Global variants
-  /^6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P/, // Full program ID pattern
+  /^6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P/, // Full bonding curve program ID
+  
+  // NEW: PumpSwap AMM patterns (March 2025 - CRITICAL FOR GRADUATED TOKENS)
+  /^pAMM/,   // PumpSwap AMM program prefix - LP pools for graduated tokens
+  /^pfee/,   // Pump.fun fees program prefix
+  /^pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA/, // Full PumpSwap AMM program ID
+  /^pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ/, // Full fees program ID
 ];
 
 /**

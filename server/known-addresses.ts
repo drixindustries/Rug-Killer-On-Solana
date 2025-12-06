@@ -125,8 +125,10 @@ export const PUMPFUN_ADDRESSES: KnownAddress[] = [
   },
 ];
 
-// Pump.fun Program ID for bonding curve derivation
-export const PUMPFUN_PROGRAM_ID = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P';
+// Pump.fun Program IDs for address derivation
+export const PUMPFUN_PROGRAM_ID = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'; // Original bonding curve
+export const PUMPSWAP_AMM_PROGRAM_ID = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'; // PumpSwap AMM (March 2025)
+export const PUMPFUN_FEES_PROGRAM_ID = 'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ'; // Fees program
 
 // Bundler/Volume Bot Known Patterns
 // These are addresses known to be used by bundling services
@@ -239,6 +241,48 @@ export function getPumpFunAssociatedBondingCurveAddress(mintAddress: string): st
     return address;
   } catch (error) {
     console.error(`[Pump.fun PDA] Error calculating associated bonding curve address for ${mintAddress}:`, error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
+// Memoization cache for PumpSwap AMM pool addresses
+const pumpSwapPoolCache = new Map<string, string>();
+
+/**
+ * Calculate the PumpSwap AMM pool address for a graduated token
+ * This is the LP pool created when tokens graduate from bonding curve to PumpSwap
+ * 
+ * PumpSwap uses seeds: ['pool', mint, WSOL_MINT] to derive pool addresses
+ * Results are memoized for performance
+ */
+export function getPumpSwapAmmPoolAddress(mintAddress: string): string | null {
+  // Check cache first
+  if (pumpSwapPoolCache.has(mintAddress)) {
+    return pumpSwapPoolCache.get(mintAddress)!;
+  }
+  
+  try {
+    const mint = new PublicKey(mintAddress);
+    const pumpSwapProgram = new PublicKey(PUMPSWAP_AMM_PROGRAM_ID);
+    const wsolMint = new PublicKey('So11111111111111111111111111111111111111112'); // Wrapped SOL
+    
+    // PumpSwap AMM pool PDA derivation
+    // Note: The exact seeds may vary - this is a common pattern
+    const [poolAddress] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from('pool'),
+        mint.toBuffer(),
+        wsolMint.toBuffer()
+      ],
+      pumpSwapProgram
+    );
+    
+    const address = poolAddress.toString();
+    pumpSwapPoolCache.set(mintAddress, address);
+    console.log(`[PumpSwap PDA] Calculated AMM pool for ${mintAddress}: ${address}`);
+    return address;
+  } catch (error) {
+    console.error(`[PumpSwap PDA] Error calculating AMM pool address for ${mintAddress}:`, error instanceof Error ? error.message : error);
     return null;
   }
 }

@@ -1,20 +1,36 @@
 /**
- * Pump.fun System Wallet Denylist (2025 Updated)
+ * Pump.fun System Wallet Denylist (December 2025 Updated)
  * 
  * These addresses must be excluded from ALL holder-based metrics to avoid false positives:
  * - Bonding curve program vaults (hold 80-100% of supply pre-migration)
+ * - PumpSwap AMM pools (NEW - March 2025, holds LP after graduation)
  * - Raydium AMM/LP authorities
  * - Major CEX deposit wallets
  * 
  * Without filtering these, every Pump.fun token shows "99% held by one wallet" before migration.
  * This causes 95%+ false positive rate on legitimate pre-migration gems.
  * 
- * Updated: November 2025
+ * Updated: December 2025 - Added PumpSwap AMM support
  */
 
 /**
+ * Pump.fun Program IDs (ALL programs, including PumpSwap AMM - December 2025)
+ * CRITICAL: PumpSwap AMM (pAMMBay6...) launched March 2025 for graduated tokens
+ */
+export const PUMPFUN_PROGRAM_IDS = new Set([
+  // Original bonding curve program
+  '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P', // Pump.fun Bonding Curve Program
+  
+  // NEW: PumpSwap AMM Program (March 2025) - CRITICAL FOR GRADUATED TOKENS
+  'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA', // Pump.fun AMM (PumpSwap) - LP pools
+  
+  // NEW: Pump.fun Fees Program
+  'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ', // Pump.fun Fees
+]);
+
+/**
  * Pump.fun bonding curve vaults
- * These hold virtual supply until token migrates to Raydium at ~$69K market cap
+ * These hold virtual supply until token migrates to Raydium/PumpSwap at ~$69K market cap
  */
 export const PUMPFUN_BONDING_CURVE_VAULTS = new Set([
   // Main vault (Nov 2025 - most active)
@@ -34,6 +50,12 @@ export const PUMPFUN_BONDING_CURVE_VAULTS = new Set([
   
   // Migration authority PDA
   '39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg',
+  
+  // NEW: PumpSwap AMM Program (adds LP pools as system wallets)
+  'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA',
+  
+  // Pump.fun Fees receiver
+  'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ',
 ]);
 
 /**
@@ -72,8 +94,12 @@ export const DEX_PROGRAM_IDS = new Set([
   // Lifinity
   'EewxydAPCCVuNEyrVN68PuSYdQ7wKn27V9Gjeoi8dy3S', // Lifinity v2
   
-  // Pump.fun
-  '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P', // Pump.fun program
+  // Pump.fun (Original Bonding Curve)
+  '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P', // Pump.fun Bonding Curve program
+  
+  // Pump.fun PumpSwap AMM (March 2025 - CRITICAL for graduated tokens)
+  'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA', // PumpSwap AMM - holds LP for graduated tokens
+  'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ', // Pump.fun Fees
 ]);
 
 /**

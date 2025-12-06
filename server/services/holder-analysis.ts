@@ -21,7 +21,7 @@ import { getMint, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-to
 import { redisCache } from './redis-cache.js';
 import { rpcBalancer } from './rpc-balancer.js';
 import { EXCHANGE_WALLETS, isExchangeWallet } from '../exchange-whitelist.js';
-import { getKnownAddressInfo, getPumpFunBondingCurveAddress, getPumpFunAssociatedBondingCurveAddress } from '../known-addresses.js';
+import { getKnownAddressInfo, getPumpFunBondingCurveAddress, getPumpFunAssociatedBondingCurveAddress, getPumpSwapAmmPoolAddress } from '../known-addresses.js';
 import { isPumpFunAmm } from '../pumpfun-whitelist.js';
 import { isMeteoraAmm } from '../meteora-whitelist.js';
 import { isSystemWallet, isPumpFunBondingCurve, getSystemWalletType, filterHoldersWithStats, isDexProgramAccount } from '../pumpfun-system-wallets';
@@ -68,17 +68,28 @@ export interface HolderAnalysisResult {
 
 export class HolderAnalysisService {
   private readonly CACHE_TTL = 300; // 5 minutes cache
+  
+  // DEDUPLICATION: Track in-flight requests to prevent duplicate RPC calls
+  private inFlightRequests: Map<string, Promise<HolderAnalysisResult>> = new Map();
 
   /**
    * Get comprehensive holder analysis for a token
    * Uses ONLY accurate on-chain sources (no third-party APIs with inaccurate counts)
    */
   async analyzeHolders(tokenAddress: string): Promise<HolderAnalysisResult> {
+    // DEDUPLICATION: Check if we're already fetching this token
+    const existingRequest = this.inFlightRequests.get(tokenAddress);
+    if (existingRequest) {
+      console.log(`[HolderAnalysis] ⏭️ Deduping request for ${tokenAddress.slice(0, 8)}...`);
+      return existingRequest;
+    }
+    
     const cacheKey = `holder-analysis:v3:${tokenAddress}`;
     debugLog(`\n🔍 [HolderAnalysis DEBUG] Starting analysis for ${tokenAddress}`);
     debugLog(`[HolderAnalysis DEBUG] Cache key: ${cacheKey}`);
 
-    return await redisCache.cacheFetch(
+    // Track this request to prevent duplicates
+    const requestPromise = redisCache.cacheFetch(
       cacheKey,
       async () => {
         debugLog(`[HolderAnalysis DEBUG] Cache MISS - fetching fresh data...`);
@@ -136,6 +147,14 @@ export class HolderAnalysisService {
       });
       return result;
     });
+    
+    // Track in-flight request and ensure cleanup
+    this.inFlightRequests.set(tokenAddress, requestPromise);
+    try {
+      return await requestPromise;
+    } finally {
+      this.inFlightRequests.delete(tokenAddress);
+    }
   }
 
   /**
@@ -292,9 +311,12 @@ export class HolderAnalysisService {
       // Calculate pump.fun bonding curve addresses for this specific token
       const bondingCurveAddress = getPumpFunBondingCurveAddress(tokenAddress);
       const associatedBondingCurveAddress = getPumpFunAssociatedBondingCurveAddress(tokenAddress);
-      console.log(`[HolderAnalysis] Bonding curve addresses for ${tokenAddress}:`, {
+      // NEW: Calculate PumpSwap AMM pool address for graduated tokens
+      const pumpSwapPoolAddress = getPumpSwapAmmPoolAddress(tokenAddress);
+      console.log(`[HolderAnalysis] Pump.fun system addresses for ${tokenAddress}:`, {
         bondingCurve: bondingCurveAddress,
-        associated: associatedBondingCurveAddress
+        associated: associatedBondingCurveAddress,
+        pumpSwapPool: pumpSwapPoolAddress
       });
       
       // Aggregate by owner (some wallets may hold multiple token accounts)
@@ -318,10 +340,17 @@ export class HolderAnalysisService {
           pumpFunFilteredRaw += amountRaw;
           return acc;
         }
-        // Check Pump.fun AMM (includes pattern matching for 5Nkn...)
+        // NEW: Filter PumpSwap AMM pool address (graduated tokens - CRITICAL)
+        if (pumpSwapPoolAddress && address === pumpSwapPoolAddress) {
+          console.log(`[HolderAnalysis] ✅ Filtered PumpSwap AMM pool: ${address.slice(0, 8)}... (${Number(amountRaw) / 1e9} tokens)`);
+          pumpFunFilteredCount += 1;
+          pumpFunFilteredRaw += amountRaw;
+          return acc;
+        }
+        // Check Pump.fun AMM (includes pattern matching for 5Nkn..., pAMM...)
         // CRITICAL: Check this BEFORE system wallets to catch all Pump.fun AMM variants
         if (isPumpFunAmm(address)) {
-          console.log(`[HolderAnalysis] ✅ Filtered Pump.fun AMM: ${address.slice(0, 8)}...${address.slice(-8)} (${Number(amountRaw) / 1e9} tokens)`);
+          console.log(`[HolderAnalysis] ✅ Filtered Pump.fun/PumpSwap AMM: ${address.slice(0, 8)}...${address.slice(-8)} (${Number(amountRaw) / 1e9} tokens)`);
           pumpFunFilteredCount += 1;
           pumpFunFilteredRaw += amountRaw;
           return acc;
@@ -471,11 +500,11 @@ export class HolderAnalysisService {
 
   /**
    * Fetch holder data from Helius RPC
-   * DISABLED - Using Ankr instead
+   * DISABLED - Using rpcBalancer instead
    */
   private async fetchFromHelius(tokenAddress: string): Promise<HolderAnalysisResult | null> {
-    // DISABLED: Using Ankr RPC via rpcBalancer instead of Helius
-    console.log(`[HolderAnalysis] Helius disabled - using Ankr RPC via rpcBalancer`);
+    // DISABLED: Using rpcBalancer for RPC calls
+    console.log(`[HolderAnalysis] fetchFromHelius disabled - using rpcBalancer`);
     return null;
 
     /* DISABLED CODE - All code below is unreachable and commented out
@@ -518,6 +547,8 @@ export class HolderAnalysisService {
       // Calculate pump.fun bonding curve addresses for this specific token
       const bondingCurveAddress = getPumpFunBondingCurveAddress(tokenAddress);
       const associatedBondingCurveAddress = getPumpFunAssociatedBondingCurveAddress(tokenAddress);
+      // NEW: Calculate PumpSwap AMM pool address for graduated tokens
+      const pumpSwapPoolAddress = getPumpSwapAmmPoolAddress(tokenAddress);
       
       let systemWalletsFiltered = 0;
       let systemWalletsFilteredRaw = 0;
@@ -533,6 +564,14 @@ export class HolderAnalysisService {
           pumpFunFilteredCount += 1;
           pumpFunFilteredRaw += amountRaw;
           isPreMigration = true;
+          continue;
+        }
+
+        // NEW: Filter PumpSwap AMM pool address (graduated tokens - CRITICAL)
+        if (pumpSwapPoolAddress && ownerAddress === pumpSwapPoolAddress) {
+          console.log(`[HolderAnalysis] Filtered PumpSwap AMM pool: ${ownerAddress.slice(0, 8)}... (${amountRaw / 1e9} tokens)`);
+          pumpFunFilteredCount += 1;
+          pumpFunFilteredRaw += amountRaw;
           continue;
         }
 
@@ -685,6 +724,8 @@ export class HolderAnalysisService {
       // Calculate pump.fun bonding curve addresses for this specific token
       const bondingCurveAddress = getPumpFunBondingCurveAddress(tokenAddress);
       const associatedBondingCurveAddress = getPumpFunAssociatedBondingCurveAddress(tokenAddress);
+      // NEW: Calculate PumpSwap AMM pool address for graduated tokens
+      const pumpSwapPoolAddress = getPumpSwapAmmPoolAddress(tokenAddress);
 
       const filteredAccounts: Array<{ owner: string; amountRaw: number }> = [];
       let pumpFunFilteredCount = 0;
@@ -704,10 +745,18 @@ export class HolderAnalysisService {
           continue;
         }
 
-        // Check Pump.fun AMM (includes pattern matching for 5Nkn...)
+        // NEW: Filter PumpSwap AMM pool address (graduated tokens - CRITICAL)
+        if (pumpSwapPoolAddress && ownerAddress === pumpSwapPoolAddress) {
+          console.log(`[HolderAnalysis] ✅ Filtered PumpSwap AMM pool: ${ownerAddress.slice(0, 8)}... (${amountRaw / 1e9} tokens)`);
+          pumpFunFilteredCount += 1;
+          pumpFunFilteredRaw += amountRaw;
+          continue;
+        }
+
+        // Check Pump.fun AMM (includes pattern matching for 5Nkn..., pAMM...)
         // CRITICAL: Check this BEFORE system wallets to catch all Pump.fun AMM variants
         if (isPumpFunAmm(ownerAddress)) {
-          console.log(`[HolderAnalysis] ✅ Filtered Pump.fun AMM: ${ownerAddress.slice(0, 8)}...${ownerAddress.slice(-8)} (${amountRaw / 1e9} tokens)`);
+          console.log(`[HolderAnalysis] ✅ Filtered Pump.fun/PumpSwap AMM: ${ownerAddress.slice(0, 8)}...${ownerAddress.slice(-8)} (${amountRaw / 1e9} tokens)`);
           pumpFunFilteredCount += 1;
           pumpFunFilteredRaw += amountRaw;
           continue;
@@ -845,6 +894,53 @@ export class HolderAnalysisService {
           }
         } catch (err) {
           console.log(`[HolderAnalysis DEBUG - RPC Fallback] Helius DAS API failed`);
+        }
+      }
+
+      // API 4: Try GMGN API for holder count
+      if (holderCountIsEstimate) {
+        try {
+          console.log(`[HolderAnalysis DEBUG - RPC Fallback] Trying GMGN API for holder count...`);
+          const gmgnResponse = await fetch(`https://gmgn.ai/defi/quotation/v1/tokens/sol/${tokenAddress}`, {
+            signal: AbortSignal.timeout(3000),
+            headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
+          });
+          
+          if (gmgnResponse.ok) {
+            const gmgnData = await gmgnResponse.json();
+            if (gmgnData?.data?.holder_count && gmgnData.data.holder_count > 0) {
+              actualHolderCount = gmgnData.data.holder_count;
+              holderCountIsEstimate = false;
+              console.log(`[HolderAnalysis DEBUG - RPC Fallback] ✅ Got holder count from GMGN: ${actualHolderCount}`);
+            }
+          }
+        } catch (err) {
+          console.log(`[HolderAnalysis DEBUG - RPC Fallback] GMGN API failed`);
+        }
+      }
+
+      // API 5: Try Birdeye API for holder count
+      if (holderCountIsEstimate && process.env.BIRDEYE_API_KEY) {
+        try {
+          console.log(`[HolderAnalysis DEBUG - RPC Fallback] Trying Birdeye API for holder count...`);
+          const birdeyeResponse = await fetch(`https://public-api.birdeye.so/defi/token_overview?address=${tokenAddress}`, {
+            signal: AbortSignal.timeout(3000),
+            headers: { 
+              'Accept': 'application/json',
+              'X-API-KEY': process.env.BIRDEYE_API_KEY
+            }
+          });
+          
+          if (birdeyeResponse.ok) {
+            const birdeyeData = await birdeyeResponse.json();
+            if (birdeyeData?.data?.holder && birdeyeData.data.holder > 0) {
+              actualHolderCount = birdeyeData.data.holder;
+              holderCountIsEstimate = false;
+              console.log(`[HolderAnalysis DEBUG - RPC Fallback] ✅ Got holder count from Birdeye: ${actualHolderCount}`);
+            }
+          }
+        } catch (err) {
+          console.log(`[HolderAnalysis DEBUG - RPC Fallback] Birdeye API failed`);
         }
       }
 
