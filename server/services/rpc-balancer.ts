@@ -175,29 +175,13 @@ const RPC_PROVIDERS = [
     rateLimitWindow: 10000 // 100 reqs per 10s, 40 per method
   },
   
-  // HIGH-QUALITY FREE PUBLIC RPCs
+  // HIGH-QUALITY FREE PUBLIC RPCs (only keeping consistently working ones)
   { 
     getUrl: () => "https://solana-rpc.publicnode.com",
     weight: 20,
     name: "PublicNode",
     tier: "fallback" as const,
     rateLimit: 50,
-    rateLimitWindow: 10000
-  },
-  { 
-    getUrl: () => "https://solana.api.onfinality.io/public",
-    weight: 18,
-    name: "OnFinality",
-    tier: "fallback" as const,
-    rateLimit: 30,
-    rateLimitWindow: 10000
-  },
-  { 
-    getUrl: () => "https://rpc.1rpc.io/solana",
-    weight: 18,
-    name: "1RPC",
-    tier: "fallback" as const,
-    rateLimit: 25,
     rateLimitWindow: 10000
   },
   { 
@@ -208,36 +192,6 @@ const RPC_PROVIDERS = [
     rateLimit: 25,
     rateLimitWindow: 60000
   },
-  
-  // COMMUNITY & VALIDATOR RPCs
-  { 
-    getUrl: () => "https://solana-api.projectserum.com",
-    weight: 15,
-    name: "Serum",
-    tier: "fallback" as const,
-    rateLimit: 25,
-    rateLimitWindow: 10000
-  },
-  // Helius-Public and Extrnode removed - now require API keys
-  { 
-    getUrl: () => "https://api.solana.com",
-    weight: 10,
-    name: "Solana-Mirror",
-    tier: "fallback" as const,
-    rateLimit: 30,
-    rateLimitWindow: 10000
-  },
-  
-  // GEO-DISTRIBUTED PUBLIC RPCs
-  { 
-    getUrl: () => "https://solana-rpc.kjnodes.com",
-    weight: 12,
-    name: "KJNodes",
-    tier: "fallback" as const,
-    rateLimit: 20,
-    rateLimitWindow: 10000
-  },
-  // RPCPool-Free removed - returns 403 Forbidden
   { 
     getUrl: () => "https://solana.drpc.org",
     weight: 12,
@@ -247,80 +201,18 @@ const RPC_PROVIDERS = [
     rateLimitWindow: 10000
   },
   { 
-    getUrl: () => "https://rpc.solana.gateway.fm",
-    weight: 10,
-    name: "Gateway-FM",
-    tier: "fallback" as const,
-    rateLimit: 15,
-    rateLimitWindow: 10000
-  },
-  
-  // BACKUP PUBLIC RPCs (lower priority)
-  { 
     getUrl: () => "https://solana-mainnet.phantom.app/YBPpkkN4g91xDiAnTE9r0RcMkjg0sKUIWvAfoFVJ",
-    weight: 8,
+    weight: 10,
     name: "Phantom-Public",
     tier: "fallback" as const,
     rateLimit: 15,
     rateLimitWindow: 10000
   },
-  // RPCPool-Main removed - returns 403 Forbidden
-  { 
-    getUrl: () => "https://ssc-dao.genesysgo.net",
-    weight: 8,
-    name: "GenesysGo",
-    tier: "fallback" as const,
-    rateLimit: 15,
-    rateLimitWindow: 10000
-  },
-  { 
-    getUrl: () => "https://solana.public-rpc.com",
-    weight: 7,
-    name: "Public-RPC",
-    tier: "fallback" as const,
-    rateLimit: 15,
-    rateLimitWindow: 10000
-  },
-  // HelloMoon and Syndica removed - return 403/401
-  { 
-    getUrl: () => "https://mainnet.solana.api.triton.one",
-    weight: 6,
-    name: "Triton",
-    tier: "fallback" as const,
-    rateLimit: 10,
-    rateLimitWindow: 10000
-  },
+  // Removed dead endpoints: OnFinality, 1RPC, Serum, Solana-Mirror, KJNodes, Gateway-FM, GenesysGo, Public-RPC, Triton, Grove, TheIndex, AllThatNode
   { 
     getUrl: () => "https://solana-rpc.debridge.finance",
     weight: 5,
     name: "DeBridge",
-    tier: "fallback" as const,
-    rateLimit: 10,
-    rateLimitWindow: 10000
-  },
-  
-  // ADDITIONAL FREE ENDPOINTS (lower weight for load distribution)
-  // RPCPool-API removed - returns 403 Forbidden
-  { 
-    getUrl: () => "https://solana-mainnet.rpc.grove.city/v1/mainnet-beta",
-    weight: 5,
-    name: "Grove",
-    tier: "fallback" as const,
-    rateLimit: 10,
-    rateLimitWindow: 10000
-  },
-  { 
-    getUrl: () => "https://rpc.theindex.io/mainnet-beta",
-    weight: 4,
-    name: "TheIndex",
-    tier: "fallback" as const,
-    rateLimit: 10,
-    rateLimitWindow: 10000
-  },
-  { 
-    getUrl: () => "https://solana-mainnet-rpc.allthatnode.com",
-    weight: 4,
-    name: "AllThatNode",
     tier: "fallback" as const,
     rateLimit: 10,
     rateLimitWindow: 10000
@@ -774,14 +666,14 @@ const performHealthChecks = async () => {
     }
   });
 
-  // Run health checks in batches of 5 to avoid 429 rate limits
-  const batchSize = 5;
+  // Run health checks in batches of 3 to avoid 429 rate limits (reduced from 5)
+  const batchSize = 3;
   for (let i = 0; i < healthChecks.length; i += batchSize) {
     const batch = healthChecks.slice(i, i + batchSize);
     await Promise.allSettled(batch);
-    // Add delay between batches to avoid rate limits
+    // Add 1 second delay between batches to avoid rate limits (increased from 500ms)
     if (i + batchSize < healthChecks.length) {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
   }
 
@@ -789,8 +681,8 @@ const performHealthChecks = async () => {
   console.log(`[RPC Health] ${healthyCount}/${rpcBalancer.providers.length} providers healthy`);
 };
 
-// Run health checks every 60 seconds (reduced from 20s to lower rate limit pressure)
-setInterval(performHealthChecks, 60000);
+// Run health checks every 2 minutes (reduced frequency to lower rate limit pressure)
+setInterval(performHealthChecks, 120000);
 
-// Initial health check after 5 seconds (increased from 2s to let server stabilize)
-setTimeout(performHealthChecks, 5000);
+// Initial health check after 10 seconds (increased to let server fully stabilize)
+setTimeout(performHealthChecks, 10000);

@@ -321,7 +321,6 @@ const DocumentationPDF = () => (
           <Text style={pdfStyles.text}>• Whitepaper: /documentation (this PDF)</Text>
           <Text style={pdfStyles.text}>• Discord: @RugKillerAlphaBot</Text>
           <Text style={pdfStyles.text}>• Telegram: @RugKillerAlphaBot</Text>
-          <Text style={pdfStyles.text}>• Token: HeLp6NuQkmYB4pYWo2zYs22mESHXPQYzXbB8n4V98jwC</Text>
         </View>
       </View>
 

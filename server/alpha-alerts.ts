@@ -791,15 +791,9 @@ export class AlphaAlertService {
               : analysisMetrics.aiVerdict,
             inline: false
           }] : []),
-          // Rug Score Breakdown (uses SAME score as Safety Score for consistency)
+          // Risk Breakdown (component scores only - no separate score, Safety Score is the main score)
           ...(analysisMetrics.rugScore ? [{
-            name: (() => {
-              // Use the same riskScore as Safety Score for consistency
-              const safetyScore = Math.max(1, Math.min(100, analysisMetrics.riskScore));
-              const emoji = safetyScore >= 80 ? '✅' : safetyScore >= 60 ? '⚠️' : safetyScore >= 40 ? '🟠' : '🚨';
-              const label = safetyScore >= 80 ? 'SAFE' : safetyScore >= 60 ? 'CAUTION' : safetyScore >= 40 ? 'RISKY' : 'DANGER';
-              return `${emoji} Rug Score: ${safetyScore}/100 (${label})`;
-            })(),
+            name: '📊 Risk Breakdown',
             value: (() => {
               // Show component breakdown (0-10 scale where higher = safer)
               const auth = analysisMetrics.mintRevoked && analysisMetrics.freezeRevoked ? 10 : 
@@ -1322,15 +1316,9 @@ export class AlphaAlertService {
               : analysisMetrics.aiVerdict,
             inline: false
           }] : []),
-          // Rug Score Breakdown (uses SAME score as Safety Score for consistency)
+          // Risk Breakdown (component scores only - no separate score, Safety Score is the main score)
           ...(analysisMetrics.rugScore ? [{
-            name: (() => {
-              // Use the same riskScore as Safety Score for consistency
-              const safetyScore = Math.max(1, Math.min(100, analysisMetrics.riskScore));
-              const emoji = safetyScore >= 80 ? '✅' : safetyScore >= 60 ? '⚠️' : safetyScore >= 40 ? '🟠' : '🚨';
-              const label = safetyScore >= 80 ? 'SAFE' : safetyScore >= 60 ? 'CAUTION' : safetyScore >= 40 ? 'RISKY' : 'DANGER';
-              return `${emoji} Rug Score: ${safetyScore}/100 (${label})`;
-            })(),
+            name: '📊 Risk Breakdown',
             value: (() => {
               // Show component breakdown (0-10 scale where higher = safer)
               const auth = analysisMetrics.mintRevoked && analysisMetrics.freezeRevoked ? 10 : 

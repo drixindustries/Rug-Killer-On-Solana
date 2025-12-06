@@ -121,13 +121,9 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
     .setTimestamp()
     .setThumbnail(`https://dd.dexscreener.com/ds-data/tokens/solana/${analysis.tokenAddress}.png?size=md&t=${Date.now()}`);
   
-  // RUG SCORE - Convert to Danger Level for clarity
-  if (messageData.rugScore && analysis.rugScoreBreakdown) {
+  // Risk breakdown components (no separate score - Safety Score is the main score)
+  if (analysis.rugScoreBreakdown) {
     const rs = analysis.rugScoreBreakdown;
-    const dangerLevel = Math.min(100, Math.round(rs.totalScore));
-    const dangerEmoji = dangerLevel < 10 ? '✅' : dangerLevel < 30 ? '🟢' : dangerLevel < 50 ? '🟡' : dangerLevel < 70 ? '🟠' : '🔴';
-    const dangerLabel = dangerLevel < 10 ? 'VERY LOW' : dangerLevel < 30 ? 'LOW' : dangerLevel < 50 ? 'MODERATE' : dangerLevel < 70 ? 'HIGH' : 'EXTREME';
-    
     const breakdownParts = [
       `Auth: ${Math.round(rs.components.authorities.score)}`,
       `Holders: ${Math.round(rs.components.holderDistribution.score)}`,
@@ -135,7 +131,7 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
     ];
     
     embed.addFields({
-      name: `${dangerEmoji} Danger Level: ${dangerLevel} (${dangerLabel})`,
+      name: `📊 Risk Breakdown`,
       value: breakdownParts.join(' • '),
       inline: false
     });
@@ -816,7 +812,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           }, 600); // Update every 600ms
           
           const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Analysis timeout after 8 seconds')), 8000)
+            setTimeout(() => reject(new Error('Analysis timeout after 30 seconds')), 30000)
           );
           
           const analysis = await Promise.race([analysisPromise, timeoutPromise]) as any;
@@ -3000,7 +2996,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         }, 500);
         
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Analysis timeout after 8 seconds')), 8000)
+          setTimeout(() => reject(new Error('Analysis timeout after 30 seconds')), 30000)
         );
         
         const analysis = await Promise.race([analysisPromise, timeoutPromise]) as any;

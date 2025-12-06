@@ -113,14 +113,11 @@ export function buildCompactMessage(analysis: TokenAnalysisResponse): CompactMes
   const safetyLabel = safetyScore >= 80 ? 'SAFE' : safetyScore >= 60 ? 'CAUTION' : safetyScore >= 40 ? 'RISKY' : 'DANGER';
   const riskScore = `${safetyEmoji} **Safety Score: ${safetyScore}/100** (${safetyLabel})`;
   
-  // DANGER LEVEL (converted from Rug Score for clarity - lower = safer)
+  // RISK BREAKDOWN (component scores, no separate danger level)
   let rugScoreText: string | undefined;
   if (analysis.rugScoreBreakdown) {
     const rs = analysis.rugScoreBreakdown;
-    const dangerLevel = Math.min(100, Math.round(rs.totalScore));
-    const dangerEmoji = dangerLevel < 10 ? '✅' : dangerLevel < 30 ? '🟢' : dangerLevel < 50 ? '🟡' : dangerLevel < 70 ? '🟠' : '🔴';
-    const dangerLabel = dangerLevel < 10 ? 'VERY LOW' : dangerLevel < 30 ? 'LOW' : dangerLevel < 50 ? 'MODERATE' : dangerLevel < 70 ? 'HIGH' : 'EXTREME';
-    rugScoreText = `${dangerEmoji} **Danger Level:** ${dangerLevel}/100 (${dangerLabel})\n\n**Breakdown:**\n` +
+    rugScoreText = `📊 **Risk Breakdown:**\n` +
       `• Authorities: ${Math.round(rs.components.authorities.score)} pts\n` +
       `• Holder Dist: ${Math.round(rs.components.holderDistribution.score)} pts\n` +
       `• Liquidity: ${Math.round(rs.components.liquidity.score)} pts\n` +
