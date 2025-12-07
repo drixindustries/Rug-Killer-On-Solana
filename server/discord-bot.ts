@@ -18,6 +18,7 @@ import { getAccessControlService } from './services/access-control.js';
 import { getWhopService } from './services/whop-service.js';
 import { pnlTracker, type AccountingMethod } from './services/pnl-tracker.js';
 import { callHitTracker } from './services/call-hit-tracker.js';
+import { isMiningToken, getMiningTokenInfo, getMiningTokenList, addMiningToken, removeMiningToken } from './mining-token-whitelist.js';
 
 // Instantiate shared service singletons needed in command handlers
 const dexScreener = new DexScreenerService();
@@ -457,6 +458,23 @@ const commands = [
     .setName('pumpfun')
     .setDescription('Pump.fun specific view')
     .addStringOption(option => option.setName('address').setDescription('Token address').setRequired(true)),
+  new SlashCommandBuilder()
+    .setName('mining')
+    .setDescription('Mining token whitelist management (admin)')
+    .addSubcommand(sc => sc.setName('list')
+      .setDescription('Show all whitelisted mining tokens'))
+    .addSubcommand(sc => sc.setName('check')
+      .setDescription('Check if a token is a mining token')
+      .addStringOption(o => o.setName('address').setDescription('Token address').setRequired(true)))
+    .addSubcommand(sc => sc.setName('add')
+      .setDescription('Add a mining token to whitelist (admin only)')
+      .addStringOption(o => o.setName('address').setDescription('Token address').setRequired(true))
+      .addStringOption(o => o.setName('name').setDescription('Token name').setRequired(true))
+      .addStringOption(o => o.setName('symbol').setDescription('Token symbol').setRequired(true))
+      .addStringOption(o => o.setName('reason').setDescription('Why is this a mining token?').setRequired(true)))
+    .addSubcommand(sc => sc.setName('remove')
+      .setDescription('Remove a mining token from whitelist (admin only)')
+      .addStringOption(o => o.setName('address').setDescription('Token address').setRequired(true))),
   new SlashCommandBuilder()
     .setName('report')
     .setDescription('Report a suspicious wallet')
@@ -1981,6 +1999,91 @@ function createDiscordClient(botToken: string, clientId: string): Client {
               await interaction.editReply({ content: '❌ Unknown failure adding wallet.' });
             }
         }
+      } else if (interaction.commandName === 'mining') {
+        // Mining token whitelist management (admin only for add/remove)
+        const subcommand = interaction.options.getSubcommand(false) ?? 'list';
+        
+        if (subcommand === 'list') {
+          await interaction.deferReply();
+          const tokens = getMiningTokenList();
+          
+          if (tokens.length === 0) {
+            await interaction.editReply({ content: '⛏️ No mining tokens in whitelist.' });
+            return;
+          }
+          
+          const tokenList = tokens.map((t, i) => 
+            `${i + 1}. **${t.symbol}** (${t.name})\n   \`${t.address}\`\n   _${t.reason}_`
+          ).join('\n\n');
+          
+          const embed = new EmbedBuilder()
+            .setColor(0xffd700)
+            .setTitle('⛏️ Mining Token Whitelist')
+            .setDescription(`**${tokens.length}** mining tokens whitelisted.\n\nThese tokens have mint authority active by design (mining rewards).`)
+            .addFields({ name: 'Tokens', value: tokenList.slice(0, 1024) })
+            .setFooter({ text: 'Mining tokens are not flagged for active mint authority' });
+          
+          await interaction.editReply({ embeds: [embed] });
+          
+        } else if (subcommand === 'check') {
+          await interaction.deferReply({ ephemeral: true });
+          const address = interaction.options.getString('address', true).trim();
+          const info = getMiningTokenInfo(address);
+          
+          const embed = new EmbedBuilder()
+            .setColor(info ? 0x00cc66 : 0xff3366)
+            .setTitle('⛏️ Mining Token Check')
+            .setDescription(`Token: \`${formatAddress(address)}\``)
+            .addFields({
+              name: 'Status',
+              value: info
+                ? `✅ **${info.symbol}** is a whitelisted mining token.\n\n**Reason:** ${info.reason}\n**Added by:** ${info.addedBy}\n**Added:** ${new Date(info.addedAt).toLocaleDateString()}`
+                : '❌ This token is **not** on the mining token whitelist.\n\nIf this is a legitimate mining token, an admin can add it with `/mining add`.',
+            });
+          
+          await interaction.editReply({ embeds: [embed] });
+          
+        } else if (subcommand === 'add') {
+          await interaction.deferReply({ ephemeral: true });
+          
+          // Admin check
+          if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+            await interaction.editReply({ content: '🚫 Only server administrators can add mining tokens.' });
+            return;
+          }
+          
+          const address = interaction.options.getString('address', true).trim();
+          const name = interaction.options.getString('name', true).trim();
+          const symbol = interaction.options.getString('symbol', true).trim().toUpperCase();
+          const reason = interaction.options.getString('reason', true).trim();
+          
+          const result = addMiningToken(address, name, symbol, reason, interaction.user.tag);
+          
+          if (result.success) {
+            await interaction.editReply({ content: `✅ ${result.message}\n\n⛏️ **${symbol}** will no longer be flagged for active mint authority.` });
+          } else {
+            await interaction.editReply({ content: `❌ ${result.message}` });
+          }
+          
+        } else if (subcommand === 'remove') {
+          await interaction.deferReply({ ephemeral: true });
+          
+          // Admin check
+          if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+            await interaction.editReply({ content: '🚫 Only server administrators can remove mining tokens.' });
+            return;
+          }
+          
+          const address = interaction.options.getString('address', true).trim();
+          const result = removeMiningToken(address, interaction.user.tag);
+          
+          if (result.success) {
+            await interaction.editReply({ content: `✅ ${result.message}` });
+          } else {
+            await interaction.editReply({ content: `❌ ${result.message}` });
+          }
+        }
+        
       } else if (interaction.commandName === 'exchanges') {
         const tokenAddress = interaction.options.getString('address', true);
         await interaction.deferReply();

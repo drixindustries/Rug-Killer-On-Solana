@@ -31,6 +31,7 @@ import { devsNightmareDetector } from "./services/devs-nightmare-detector.js";
 import { serialRuggerDetector } from "./services/serial-rugger-detector.js";
 import { socialRedFlagDetector } from "./services/social-red-flags.js";
 import { syraxMLScorer, type SyraxFeatures } from "./services/syrax-ml-scorer.js";
+import { isMiningToken, getMiningTokenInfo } from "./mining-token-whitelist.js";
 
 // Singleton aged wallet detector
 let agedWalletDetector: AgedWalletDetector | null = null;
@@ -294,8 +295,8 @@ export class SolanaTokenAnalyzer {
         // Risk assessment
         riskScore: this.calculateRiskScore(dex, onChain, holders, pumpFun),
         riskLevel: this.determineRiskLevel(dex, onChain, holders, pumpFun),
-        redFlags: this.generateRiskFlags(dex, onChain, holders, pumpFun, null),
-        rugScoreBreakdown: this.calculateRugScore(dex, onChain, holders, creationDate || undefined, pumpFun),
+        redFlags: this.generateRiskFlags(dex, onChain, holders, pumpFun, null, tokenMintAddress),
+        rugScoreBreakdown: this.calculateRugScore(dex, onChain, holders, creationDate || undefined, pumpFun, tokenMintAddress),
         
         // Creation info
         creationDate: creationDate ?? undefined,
@@ -1439,14 +1440,18 @@ export class SolanaTokenAnalyzer {
    * Lower score = safer | Higher score = more dangerous
    * <10 = SAFE | 10-50 = WARNING | >50 = DANGER
    */
-  private calculateRugScore(dex: any, onChain: any, holders?: any, creationDate?: number, pumpFun?: any): import('../shared/schema').RugScoreBreakdown {
+  private calculateRugScore(dex: any, onChain: any, holders?: any, creationDate?: number, pumpFun?: any, tokenAddress?: string): import('../shared/schema').RugScoreBreakdown {
     const breakdown: string[] = [];
     
     // Check if this is a pre-bonded pump.fun token (no LP exists yet)
     const isPreBonded = pumpFun?.isPumpFun && (pumpFun?.bondingCurve < 100) && !pumpFun?.mayhemMode;
     
+    // Check if this is a whitelisted mining token
+    const isWhitelistedMiningToken = tokenAddress ? isMiningToken(tokenAddress) : false;
+    
     // === AUTHORITIES (30-40% weight, up to 125 points) ===
-    const mintAuthorityScore = onChain?.authorities?.mintAuthority ? 80 : 0;
+    // Mining tokens don't get penalized for mint authority (it's intentional)
+    const mintAuthorityScore = (onChain?.authorities?.mintAuthority && !isWhitelistedMiningToken) ? 80 : 0;
     const freezeAuthorityScore = onChain?.authorities?.freezeAuthority ? 40 : 0;
     // Metadata mutable is NORMAL for 85%+ of tokens - only give small penalty
     // Immutable metadata is a BONUS signal for OG collections, not a requirement
@@ -1624,17 +1629,33 @@ export class SolanaTokenAnalyzer {
     };
   }
 
-  private generateRiskFlags(dex: any, onChain: any, holders?: any, pumpFun?: any, bundleData?: any): RiskFlag[] {
+  private generateRiskFlags(dex: any, onChain: any, holders?: any, pumpFun?: any, bundleData?: any, tokenAddress?: string): RiskFlag[] {
     const flags: RiskFlag[] = [];
 
+    // Check if this is a whitelisted mining token (mint authority is expected)
+    const miningTokenInfo = tokenAddress ? getMiningTokenInfo(tokenAddress) : null;
+    const isWhitelistedMiningToken = !!miningTokenInfo;
+
     // RED FLAG #2 & #3: Authority flags (CRITICAL - immediate rug risk)
+    // EXCEPT for whitelisted mining tokens where mint authority is intentional
     if (onChain?.authorities?.mintAuthority) {
-      flags.push({
-        type: "mint_authority",
-        severity: "critical",
-        title: "🚨 Mint Authority NOT Renounced",
-        description: "Dev can mint infinite new tokens anytime. Instant rug capability.",
-      });
+      if (isWhitelistedMiningToken) {
+        // Mining token - don't flag, but add info note
+        console.log(`[Analyzer] ⛏️ Mining token detected: ${miningTokenInfo.symbol} - Mint authority is expected (${miningTokenInfo.reason})`);
+        flags.push({
+          type: "mint_authority",
+          severity: "low",
+          title: "⛏️ Mining Token - Mint Authority Expected",
+          description: `This is a whitelisted mining token (${miningTokenInfo.symbol}). Mint authority is controlled by the mining program and is required for the token to function. Reason: ${miningTokenInfo.reason}`,
+        });
+      } else {
+        flags.push({
+          type: "mint_authority",
+          severity: "critical",
+          title: "🚨 Mint Authority NOT Renounced",
+          description: "Dev can mint infinite new tokens anytime. Instant rug capability.",
+        });
+      }
     }
 
     if (onChain?.authorities?.freezeAuthority) {
