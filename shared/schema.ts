@@ -163,6 +163,12 @@ export interface DexScreenerPair {
   fdv?: number;
   marketCap?: number;
   pairCreatedAt?: number;
+  // Social and website info from DexScreener - CRITICAL for social detection
+  info?: {
+    imageUrl?: string;
+    websites?: Array<{ url: string; label?: string }>;
+    socials?: Array<{ url: string; type: string }>;
+  };
 }
 
 export interface DexScreenerData {

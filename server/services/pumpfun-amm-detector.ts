@@ -116,8 +116,9 @@ export async function isPumpFunAmmWallet(
 }
 
 /**
- * Check account owner using Solscan API (FASTEST method)
+ * Check account owner using Solscan API v2 (FASTEST method)
  * This is the primary method for real-time detection during token scans
+ * Updated Dec 2025: Uses Solscan API v2 format
  */
 async function checkSolscanAccountOwner(walletAddress: string): Promise<AmmDetectionResult> {
   const apiKey = process.env.SOLSCAN_API_KEY;
@@ -127,7 +128,8 @@ async function checkSolscanAccountOwner(walletAddress: string): Promise<AmmDetec
   }
 
   try {
-    const url = `https://pro-api.solscan.io/v1.0/account/${walletAddress}`;
+    // Solscan API v2 endpoint format
+    const url = `https://pro-api.solscan.io/v2.0/account/${walletAddress}`;
     const response = await fetch(url, {
       headers: {
         'token': apiKey.trim(),
@@ -141,15 +143,19 @@ async function checkSolscanAccountOwner(walletAddress: string): Promise<AmmDetec
         // Rate limited - silently fall back to RPC
         return { isPumpFunAmm: false, reason: 'Solscan rate limited', confidence: 'low' };
       }
-      // Other errors - fall back to RPC
-      return { isPumpFunAmm: false, reason: `Solscan API error: ${response.status}`, confidence: 'low' };
+      
+      // Try v1 as fallback if v2 fails
+      console.log(`[PumpFunAmmDetector] Solscan v2 failed (${response.status}), trying v1...`);
+      return checkSolscanAccountOwnerV1(walletAddress, apiKey);
     }
 
     const data = await response.json();
     
-    // Check if account owner is a Pump.fun program
+    // Solscan v2 response format - check for account owner in data field
+    // v2 format: { success: true, data: { owner: '...', ... } }
     const owner = data?.data?.owner || data?.owner;
     if (owner && PUMPFUN_PROGRAM_IDS.has(owner)) {
+      console.log(`[PumpFunAmmDetector] ✅ Solscan v2 detected Pump.fun program: ${walletAddress.slice(0, 8)}...`);
       return {
         isPumpFunAmm: true,
         reason: `Account owned by Pump.fun program: ${owner.slice(0, 8)}...`,
@@ -161,6 +167,7 @@ async function checkSolscanAccountOwner(walletAddress: string): Promise<AmmDetec
     if (owner) {
       for (const programId of PUMPFUN_PROGRAM_IDS) {
         if (owner === programId || owner.startsWith(programId.slice(0, 4))) {
+          console.log(`[PumpFunAmmDetector] ✅ Solscan v2 detected Pump.fun pattern: ${walletAddress.slice(0, 8)}...`);
           return {
             isPumpFunAmm: true,
             reason: `Account owned by Pump.fun program: ${programId.slice(0, 8)}...`,
@@ -169,12 +176,59 @@ async function checkSolscanAccountOwner(walletAddress: string): Promise<AmmDetec
         }
       }
     }
+    
+    // NEW: Check account type field in v2 response
+    // PumpSwap AMM pools have specific account types
+    const accountType = data?.data?.type || data?.data?.accountType;
+    if (accountType && (accountType.includes('pump') || accountType.includes('amm') || accountType.includes('pool'))) {
+      console.log(`[PumpFunAmmDetector] ✅ Solscan v2 detected AMM account type: ${accountType}`);
+      return {
+        isPumpFunAmm: true,
+        reason: `Account type: ${accountType}`,
+        confidence: 'high'
+      };
+    }
 
     return { isPumpFunAmm: false, reason: 'Not owned by Pump.fun program', confidence: 'high' };
 
   } catch (error: any) {
     // Silently fail - fall back to RPC methods
-    return { isPumpFunAmm: false, reason: `Solscan check failed: ${error.message}`, confidence: 'low' };
+    return { isPumpFunAmm: false, reason: `Solscan v2 check failed: ${error.message}`, confidence: 'low' };
+  }
+}
+
+/**
+ * Fallback to Solscan API v1 if v2 fails
+ */
+async function checkSolscanAccountOwnerV1(walletAddress: string, apiKey: string): Promise<AmmDetectionResult> {
+  try {
+    const url = `https://pro-api.solscan.io/v1.0/account/${walletAddress}`;
+    const response = await fetch(url, {
+      headers: {
+        'token': apiKey.trim(),
+        'Accept': 'application/json'
+      },
+      signal: AbortSignal.timeout(5000)
+    });
+
+    if (!response.ok) {
+      return { isPumpFunAmm: false, reason: `Solscan v1 API error: ${response.status}`, confidence: 'low' };
+    }
+
+    const data = await response.json();
+    const owner = data?.data?.owner || data?.owner;
+    
+    if (owner && PUMPFUN_PROGRAM_IDS.has(owner)) {
+      return {
+        isPumpFunAmm: true,
+        reason: `Account owned by Pump.fun program (v1): ${owner.slice(0, 8)}...`,
+        confidence: 'high'
+      };
+    }
+
+    return { isPumpFunAmm: false, reason: 'Not owned by Pump.fun program', confidence: 'high' };
+  } catch (error: any) {
+    return { isPumpFunAmm: false, reason: `Solscan v1 check failed: ${error.message}`, confidence: 'low' };
   }
 }
 
@@ -280,6 +334,7 @@ async function checkTokenAccountOwner(
 
 /**
  * Check if wallet holds tokens from multiple mints (AMM vault pattern)
+ * Updated Dec 2025: Also detects PumpSwap LP pools (2 tokens: base + WSOL)
  */
 async function checkMultipleMintHoldings(
   connection: Connection,
@@ -292,11 +347,33 @@ async function checkMultipleMintHoldings(
       { programId: TOKEN_PROGRAM_ID }
     );
 
+    const nonZeroAccounts = tokenAccounts.value
+      .filter(acc => acc.account.data.parsed.info.tokenAmount.uiAmount > 0);
+    
     const uniqueMints = new Set(
-      tokenAccounts.value
-        .filter(acc => acc.account.data.parsed.info.tokenAmount.uiAmount > 0)
-        .map(acc => acc.account.data.parsed.info.mint)
+      nonZeroAccounts.map(acc => acc.account.data.parsed.info.mint)
     );
+
+    // CRITICAL: Check for PumpSwap LP pool pattern (exactly 2 tokens: base + WSOL)
+    // PumpSwap pools hold the base token and WSOL for the trading pair
+    const WSOL_MINT = 'So11111111111111111111111111111111111111112';
+    if (uniqueMints.size === 2 && uniqueMints.has(WSOL_MINT)) {
+      // Check if it has significant WSOL balance (indicates LP pool)
+      const wsolAccount = nonZeroAccounts.find(
+        acc => acc.account.data.parsed.info.mint === WSOL_MINT
+      );
+      const wsolBalance = wsolAccount?.account.data.parsed.info.tokenAmount.uiAmount || 0;
+      
+      // If holding >1 SOL worth, likely an LP pool
+      if (wsolBalance > 1) {
+        console.log(`[PumpFunAmmDetector] ✅ Detected PumpSwap LP pool: ${walletAddress.slice(0, 8)}... (2 tokens + ${wsolBalance.toFixed(2)} WSOL)`);
+        return {
+          isPumpFunAmm: true,
+          reason: `PumpSwap LP pool pattern: 2 tokens with ${wsolBalance.toFixed(2)} WSOL`,
+          confidence: 'high'
+        };
+      }
+    }
 
     // AMM vaults typically hold 100+ different tokens
     if (uniqueMints.size >= 100) {

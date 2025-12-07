@@ -65,6 +65,12 @@ export class DexScreenerService {
         fdv: pair.fdv ? parseFloat(pair.fdv) : undefined,
         marketCap: pair.marketCap ? parseFloat(pair.marketCap) : undefined,
         pairCreatedAt: pair.pairCreatedAt || undefined,
+        // CRITICAL FIX Dec 2025: Include info field with socials and websites
+        info: pair.info ? {
+          imageUrl: pair.info.imageUrl,
+          websites: pair.info.websites || [],
+          socials: pair.info.socials || [],
+        } : undefined,
       })),
       schemaVersion: raw.schemaVersion || '1.0.0',
     };

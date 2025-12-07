@@ -47,26 +47,30 @@ interface PumpFunWhitelistFile {
 }
 
 export class SolscanPumpFunSync {
-  private apiKey: string;
-  private readonly BASE_URL = 'https://api.solscan.io';
+  public apiKey: string;
+  private readonly BASE_URL = 'https://pro-api.solscan.io/v2.0'; // Updated to v2 API
+  private readonly BASE_URL_V1 = 'https://api.solscan.io'; // Fallback v1 API
   private readonly RATE_LIMIT_DELAY = 100; // 100ms between requests (10 req/sec = 600/min, well under 1000/60s limit)
 
   constructor() {
     const key = process.env.SOLSCAN_API_KEY;
-    if (!key) {
-      throw new Error('SOLSCAN_API_KEY environment variable is required');
-    }
-    this.apiKey = key.trim();
+    // API key is optional - we can use RPC fallback
+    this.apiKey = key?.trim() || '';
   }
 
   /**
-   * Fetch all accounts owned by a Pump.fun program using Solscan API
+   * Fetch all accounts owned by a Pump.fun program using Solscan API v2
+   * Updated Dec 2025: Uses v2 API format with fallback to v1
    */
   private async fetchProgramAccounts(programId: string, page: number = 0, pageSize: number = 100): Promise<string[]> {
+    if (!this.apiKey) {
+      console.log(`[SolscanSync] No API key - skipping Solscan API fetch for ${programId}`);
+      return [];
+    }
+    
     try {
-      // Solscan API endpoint for program accounts
-      // Using account/list endpoint with program filter
-      const url = `${this.BASE_URL}/account/list?programId=${programId}&page=${page}&size=${pageSize}`;
+      // Try Solscan API v2 first
+      const url = `${this.BASE_URL}/account/list?program=${programId}&page=${page}&page_size=${pageSize}`;
       
       const response = await fetch(url, {
         headers: {
@@ -82,21 +86,26 @@ export class SolscanPumpFunSync {
           await new Promise(resolve => setTimeout(resolve, 5000));
           return this.fetchProgramAccounts(programId, page, pageSize);
         }
-        throw new Error(`Solscan API error: ${response.status} ${response.statusText}`);
+        
+        // Try v1 fallback
+        console.log(`[SolscanSync] v2 API failed (${response.status}), trying v1...`);
+        return this.fetchProgramAccountsV1(programId, page, pageSize);
       }
 
-      const data = await response.json() as SolscanAccountResponse;
+      const data = await response.json();
       
-      if (!data.success || !data.data) {
-        console.warn(`[SolscanSync] Invalid response for program ${programId}`);
-        return [];
+      // v2 response format: { success: true, data: [...], total: number }
+      if (!data.success || !Array.isArray(data.data)) {
+        console.warn(`[SolscanSync] Invalid v2 response for program ${programId}`);
+        return this.fetchProgramAccountsV1(programId, page, pageSize);
       }
 
       // Extract account addresses
-      const accounts = data.data.map(item => item.account);
+      const accounts = data.data.map((item: any) => item.account || item.address || item.pubkey);
       
       // If we got a full page, there might be more
-      if (accounts.length === pageSize && data.total > (page + 1) * pageSize) {
+      const total = data.total || 0;
+      if (accounts.length === pageSize && total > (page + 1) * pageSize) {
         // Rate limit: wait before next page
         await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY));
         const nextPage = await this.fetchProgramAccounts(programId, page + 1, pageSize);
@@ -106,6 +115,43 @@ export class SolscanPumpFunSync {
       return accounts;
     } catch (error: any) {
       console.error(`[SolscanSync] Error fetching program ${programId}:`, error.message);
+      return this.fetchProgramAccountsV1(programId, page, pageSize);
+    }
+  }
+  
+  /**
+   * Fallback to Solscan API v1 format
+   */
+  private async fetchProgramAccountsV1(programId: string, page: number = 0, pageSize: number = 100): Promise<string[]> {
+    if (!this.apiKey) {
+      return [];
+    }
+    
+    try {
+      const url = `${this.BASE_URL_V1}/account/list?programId=${programId}&page=${page}&size=${pageSize}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'token': this.apiKey,
+          'Accept': 'application/json'
+        },
+        signal: AbortSignal.timeout(30000)
+      });
+
+      if (!response.ok) {
+        console.error(`[SolscanSync] v1 API also failed: ${response.status}`);
+        return [];
+      }
+
+      const data = await response.json() as SolscanAccountResponse;
+      
+      if (!data.success || !data.data) {
+        return [];
+      }
+
+      return data.data.map(item => item.account);
+    } catch (error: any) {
+      console.error(`[SolscanSync] v1 fallback failed:`, error.message);
       return [];
     }
   }
@@ -249,10 +295,52 @@ export function getSolscanPumpFunSync(): SolscanPumpFunSync {
   if (!syncService) {
     syncService = new SolscanPumpFunSync();
     if (syncService.apiKey) {
-      console.log('[SolscanSync] ✅ Service initialized with SOLSCAN_API_KEY');
+      console.log('[SolscanSync] ✅ Service initialized with SOLSCAN_API_KEY (v2 API)');
     } else {
-      console.log('[SolscanSync] ✅ Service initialized (using standard RPC - no API key needed)');
+      console.log('[SolscanSync] ✅ Service initialized (using RPC fallback - no API key)');
     }
   }
   return syncService;
+}
+
+/**
+ * Check if a specific wallet is a Pump.fun AMM using Solscan v2 API
+ * Called during real-time scans for high-percentage holders
+ */
+export async function checkWalletViaSolscan(walletAddress: string): Promise<{ isPumpFunAmm: boolean; reason: string } | null> {
+  const apiKey = process.env.SOLSCAN_API_KEY?.trim();
+  if (!apiKey) {
+    return null;
+  }
+  
+  try {
+    // Use v2 API endpoint
+    const url = `https://pro-api.solscan.io/v2.0/account/${walletAddress}`;
+    const response = await fetch(url, {
+      headers: {
+        'token': apiKey,
+        'Accept': 'application/json'
+      },
+      signal: AbortSignal.timeout(3000)
+    });
+    
+    if (!response.ok) {
+      return null;
+    }
+    
+    const data = await response.json();
+    const owner = data?.data?.owner;
+    
+    // Check if owned by Pump.fun programs
+    if (owner && PUMPFUN_PROGRAM_IDS.includes(owner)) {
+      return {
+        isPumpFunAmm: true,
+        reason: `Solscan v2: Owned by Pump.fun program ${owner.slice(0, 8)}...`
+      };
+    }
+    
+    return { isPumpFunAmm: false, reason: 'Not a Pump.fun AMM wallet' };
+  } catch (error) {
+    return null;
+  }
 }

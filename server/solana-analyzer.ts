@@ -144,18 +144,45 @@ export class SolanaTokenAnalyzer {
         });
       };
 
-      const [dexData, onChainData, holderData, creationDateData, pumpFunData] = await Promise.all([
-        options.skipExternal ? Promise.resolve({ status: 'fulfilled' as const, value: null }) : 
-          withTimeout(this.dexScreener.getTokenData(tokenMintAddress), TIMEOUTS.dexScreener, 'DexScreener').then(v => ({ status: 'fulfilled' as const, value: v })),
+      // STAGE 1: Fetch DexScreener first to get LP pool addresses
+      const dexData = options.skipExternal 
+        ? { status: 'fulfilled' as const, value: null }
+        : await withTimeout(this.dexScreener.getTokenData(tokenMintAddress), TIMEOUTS.dexScreener, 'DexScreener')
+            .then(v => ({ status: 'fulfilled' as const, value: v }))
+            .catch(reason => ({ status: 'rejected' as const, reason }));
+      
+      // Extract LP pool addresses from DexScreener to pass to holder analysis
+      const knownLpPools: string[] = [];
+      if (dexData.status === 'fulfilled' && dexData.value?.pairs) {
+        for (const pair of dexData.value.pairs) {
+          if (pair.pairAddress) {
+            knownLpPools.push(pair.pairAddress);
+          }
+        }
+        if (knownLpPools.length > 0) {
+          console.log(`[Analyzer] Found ${knownLpPools.length} LP pool addresses from DexScreener to filter`);
+        }
+      }
+      
+      // STAGE 2: Fetch remaining data in parallel (passing LP pools to holder analysis)
+      const [onChainData, holderData, creationDateData, pumpFunData] = await Promise.all([
         options.skipOnChain ? Promise.resolve({ status: 'fulfilled' as const, value: null }) : 
-          withTimeout(this.getOnChainData(tokenAddress), TIMEOUTS.onChain, 'OnChain').then(v => ({ status: 'fulfilled' as const, value: v })),
+          withTimeout(this.getOnChainData(tokenAddress), TIMEOUTS.onChain, 'OnChain')
+            .then(v => ({ status: 'fulfilled' as const, value: v }))
+            .catch(reason => ({ status: 'rejected' as const, reason })),
         options.skipExternal ? Promise.resolve({ status: 'fulfilled' as const, value: null }) : 
-          withTimeout(holderAnalysis.analyzeHolders(tokenMintAddress), TIMEOUTS.holders, 'Holders').then(v => ({ status: 'fulfilled' as const, value: v })),
+          withTimeout(holderAnalysis.analyzeHolders(tokenMintAddress, { knownLpPools }), TIMEOUTS.holders, 'Holders')
+            .then(v => ({ status: 'fulfilled' as const, value: v }))
+            .catch(reason => ({ status: 'rejected' as const, reason })),
         // Skip creation date in fast mode (not critical)
         (options.skipOnChain || isFastMode) ? Promise.resolve({ status: 'fulfilled' as const, value: null }) : 
-          withTimeout(this.getTokenCreationDate(tokenAddress), TIMEOUTS.creationDate, 'CreationDate').then(v => ({ status: 'fulfilled' as const, value: v })),
+          withTimeout(this.getTokenCreationDate(tokenAddress), TIMEOUTS.creationDate, 'CreationDate')
+            .then(v => ({ status: 'fulfilled' as const, value: v }))
+            .catch(reason => ({ status: 'rejected' as const, reason })),
         options.skipExternal ? Promise.resolve({ status: 'fulfilled' as const, value: null }) : 
-          withTimeout(checkPumpFun(tokenMintAddress), TIMEOUTS.pumpFun, 'PumpFun').then(v => ({ status: 'fulfilled' as const, value: v })),
+          withTimeout(checkPumpFun(tokenMintAddress), TIMEOUTS.pumpFun, 'PumpFun')
+            .then(v => ({ status: 'fulfilled' as const, value: v }))
+            .catch(reason => ({ status: 'rejected' as const, reason })),
       ]);
 
       // Log any failures for debugging

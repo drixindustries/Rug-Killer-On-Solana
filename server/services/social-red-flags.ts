@@ -96,36 +96,183 @@ export interface SocialRedFlagResult {
 
 export class SocialRedFlagDetector {
   /**
-   * Check social presence from DexScreener or other sources
+   * Check social presence from DexScreener, pump.fun API, or other sources
+   * Updated Dec 2025: Fixed to check multiple data locations
    */
   async checkSocialPresence(
     tokenAddress: string,
     dexScreenerData?: any
   ): Promise<SocialPresence> {
-    // Extract from DexScreener data if available
-    if (dexScreenerData?.pairs?.[0]) {
-      const pair = dexScreenerData.pairs[0];
-      const info = pair.info || {};
-      
-      return {
-        hasWebsite: !!info.websites?.length,
-        websiteUrl: info.websites?.[0]?.url,
-        hasTwitter: !!info.socials?.find((s: any) => s.type === 'twitter'),
-        twitterHandle: info.socials?.find((s: any) => s.type === 'twitter')?.url,
-        hasTelegram: !!info.socials?.find((s: any) => s.type === 'telegram'),
-        telegramUrl: info.socials?.find((s: any) => s.type === 'telegram')?.url,
-        hasDiscord: !!info.socials?.find((s: any) => s.type === 'discord'),
-        discordUrl: info.socials?.find((s: any) => s.type === 'discord')?.url,
-      };
-    }
-    
-    // Default: no socials found
-    return {
+    let result: SocialPresence = {
       hasWebsite: false,
       hasTwitter: false,
       hasTelegram: false,
       hasDiscord: false,
     };
+    
+    // METHOD 1: Check DexScreener socialLinks (new format from profile API)
+    if (dexScreenerData?.socialLinks) {
+      const links = dexScreenerData.socialLinks;
+      console.log(`[SocialRedFlags] Found DexScreener socialLinks:`, links);
+      
+      result.hasWebsite = !!links.website;
+      result.websiteUrl = links.website;
+      result.hasTwitter = !!links.twitter;
+      result.twitterHandle = links.twitter;
+      result.hasTelegram = !!links.telegram;
+      result.telegramUrl = links.telegram;
+      result.hasDiscord = !!links.discord;
+      result.discordUrl = links.discord;
+      
+      // If we found socials, return early
+      if (result.hasWebsite || result.hasTwitter || result.hasTelegram || result.hasDiscord) {
+        return result;
+      }
+    }
+    
+    // METHOD 2: Check DexScreener pairs[0].info.socials (legacy format)
+    if (dexScreenerData?.pairs?.[0]) {
+      const pair = dexScreenerData.pairs[0];
+      const info = pair.info || {};
+      
+      if (info.websites?.length || info.socials?.length) {
+        console.log(`[SocialRedFlags] Found DexScreener pair info:`, { websites: info.websites, socials: info.socials });
+        
+        result.hasWebsite = !!info.websites?.length;
+        result.websiteUrl = info.websites?.[0]?.url;
+        result.hasTwitter = !!info.socials?.find((s: any) => s.type === 'twitter');
+        result.twitterHandle = info.socials?.find((s: any) => s.type === 'twitter')?.url;
+        result.hasTelegram = !!info.socials?.find((s: any) => s.type === 'telegram');
+        result.telegramUrl = info.socials?.find((s: any) => s.type === 'telegram')?.url;
+        result.hasDiscord = !!info.socials?.find((s: any) => s.type === 'discord');
+        result.discordUrl = info.socials?.find((s: any) => s.type === 'discord')?.url;
+        
+        if (result.hasWebsite || result.hasTwitter || result.hasTelegram || result.hasDiscord) {
+          return result;
+        }
+      }
+    }
+    
+    // METHOD 3: Try pump.fun API directly for pump.fun tokens
+    // This catches tokens that haven't populated DexScreener yet
+    try {
+      const pumpFunSocials = await this.fetchPumpFunSocials(tokenAddress);
+      if (pumpFunSocials) {
+        console.log(`[SocialRedFlags] Found pump.fun socials:`, pumpFunSocials);
+        return pumpFunSocials;
+      }
+    } catch (err) {
+      // Silent fail - pump.fun API may not have this token
+    }
+    
+    // METHOD 4: Try GMGN.ai API as fallback
+    try {
+      const gmgnSocials = await this.fetchGMGNSocials(tokenAddress);
+      if (gmgnSocials) {
+        console.log(`[SocialRedFlags] Found GMGN socials:`, gmgnSocials);
+        return gmgnSocials;
+      }
+    } catch (err) {
+      // Silent fail
+    }
+    
+    console.log(`[SocialRedFlags] No socials found for ${tokenAddress.slice(0, 8)}...`);
+    return result;
+  }
+  
+  /**
+   * Fetch social links directly from pump.fun API
+   * Critical for new pump.fun tokens that haven't populated DexScreener yet
+   */
+  private async fetchPumpFunSocials(tokenAddress: string): Promise<SocialPresence | null> {
+    try {
+      const response = await fetch(`https://frontend-api.pump.fun/coins/${tokenAddress}`, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0',
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      const data = await response.json();
+      
+      // pump.fun stores social links in these fields
+      const hasWebsite = !!data.website;
+      const hasTwitter = !!data.twitter;
+      const hasTelegram = !!data.telegram;
+      const hasDiscord = false; // pump.fun doesn't have discord field
+      
+      // Only return if at least one social exists
+      if (hasWebsite || hasTwitter || hasTelegram) {
+        return {
+          hasWebsite,
+          websiteUrl: data.website || undefined,
+          hasTwitter,
+          twitterHandle: data.twitter || undefined,
+          hasTelegram,
+          telegramUrl: data.telegram || undefined,
+          hasDiscord,
+          discordUrl: undefined,
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+  
+  /**
+   * Fetch social links from GMGN.ai API
+   * Fallback for tokens not on pump.fun or DexScreener
+   */
+  private async fetchGMGNSocials(tokenAddress: string): Promise<SocialPresence | null> {
+    try {
+      const response = await fetch(`https://gmgn.ai/defi/quotation/v1/tokens/sol/${tokenAddress}`, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0',
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      const data = await response.json();
+      const token = data?.data?.token;
+      
+      if (!token) {
+        return null;
+      }
+      
+      const hasWebsite = !!token.website;
+      const hasTwitter = !!token.twitter;
+      const hasTelegram = !!token.telegram;
+      const hasDiscord = !!token.discord;
+      
+      if (hasWebsite || hasTwitter || hasTelegram || hasDiscord) {
+        return {
+          hasWebsite,
+          websiteUrl: token.website || undefined,
+          hasTwitter,
+          twitterHandle: token.twitter || undefined,
+          hasTelegram,
+          telegramUrl: token.telegram || undefined,
+          hasDiscord,
+          discordUrl: token.discord || undefined,
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      return null;
+    }
   }
   
   /**
