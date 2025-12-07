@@ -76,10 +76,126 @@ export class HolderAnalysisService {
   
   // Known LP pool addresses from DexScreener (passed during analysis)
   private knownLpPools: Set<string> = new Set();
+  
+  // Cached holder counts from APIs (survives method failures)
+  private holderCountCache: Map<string, { count: number; source: string; fetchedAt: number }> = new Map();
+
+  /**
+   * AGGRESSIVE: Fetch holder count from ALL available APIs in parallel
+   * This runs FIRST before any RPC calls to ensure we always have the count
+   */
+  private async fetchHolderCountFromAPIs(tokenAddress: string): Promise<{ count: number; source: string } | null> {
+    console.log(`[HolderAnalysis] 🔥 AGGRESSIVE: Fetching holder count from ALL APIs in parallel...`);
+    
+    // Check cache first (5 minute TTL for holder counts)
+    const cached = this.holderCountCache.get(tokenAddress);
+    if (cached && Date.now() - cached.fetchedAt < 300000) {
+      console.log(`[HolderAnalysis] ⚡ Cached holder count: ${cached.count} (from ${cached.source})`);
+      return { count: cached.count, source: cached.source };
+    }
+    
+    const solscanApiKey = process.env.SOLSCAN_API_KEY?.trim();
+    
+    const apiCalls: Promise<{ source: string; count: number } | null>[] = [
+      // Solscan Pro API v2 (MOST RELIABLE if we have API key)
+      solscanApiKey ? fetch(`https://pro-api.solscan.io/v2.0/token/meta?address=${tokenAddress}`, {
+        signal: AbortSignal.timeout(8000),
+        headers: { 'token': solscanApiKey, 'Accept': 'application/json' }
+      }).then(async res => {
+        if (!res.ok) return null;
+        const data = await res.json();
+        const count = data?.data?.holder || data?.data?.holderCount || data?.holder || 0;
+        console.log(`[HolderAnalysis] Solscan Pro v2 response:`, { holder: count });
+        return count > 0 ? { source: 'Solscan-Pro-v2', count } : null;
+      }).catch(e => { console.log(`[HolderAnalysis] Solscan Pro v2 failed:`, e.message); return null; }) : Promise.resolve(null),
+      
+      // Solscan Public API (fallback)
+      fetch(`https://api.solscan.io/v2/token/meta?address=${tokenAddress}`, {
+        signal: AbortSignal.timeout(8000),
+        headers: { 'Accept': 'application/json' }
+      }).then(async res => {
+        if (!res.ok) return null;
+        const data = await res.json();
+        const count = data?.data?.holder || data?.holder || 0;
+        console.log(`[HolderAnalysis] Solscan Public response:`, { holder: count });
+        return count > 0 ? { source: 'Solscan-Public', count } : null;
+      }).catch(e => { console.log(`[HolderAnalysis] Solscan Public failed:`, e.message); return null; }),
+      
+      // RugCheck API
+      fetch(`https://api.rugcheck.xyz/v1/tokens/${tokenAddress}/report`, {
+        signal: AbortSignal.timeout(8000),
+        headers: { 'Accept': 'application/json' }
+      }).then(async res => {
+        if (!res.ok) return null;
+        const data = await res.json();
+        const count = data?.holderCount || data?.token?.holderCount || data?.tokenMeta?.holder || 0;
+        console.log(`[HolderAnalysis] RugCheck response:`, { holderCount: count });
+        return count > 0 ? { source: 'RugCheck', count } : null;
+      }).catch(e => { console.log(`[HolderAnalysis] RugCheck failed:`, e.message); return null; }),
+      
+      // GMGN API
+      fetch(`https://gmgn.ai/defi/quotation/v1/tokens/sol/${tokenAddress}`, {
+        signal: AbortSignal.timeout(8000),
+        headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
+      }).then(async res => {
+        if (!res.ok) return null;
+        const data = await res.json();
+        const count = data?.data?.holder_count || data?.data?.token?.holder_count || 0;
+        console.log(`[HolderAnalysis] GMGN response:`, { holder_count: count });
+        return count > 0 ? { source: 'GMGN', count } : null;
+      }).catch(e => { console.log(`[HolderAnalysis] GMGN failed:`, e.message); return null; }),
+      
+      // Birdeye API (if available)
+      process.env.BIRDEYE_API_KEY ? fetch(`https://public-api.birdeye.so/defi/token_overview?address=${tokenAddress}`, {
+        signal: AbortSignal.timeout(8000),
+        headers: { 'Accept': 'application/json', 'X-API-KEY': process.env.BIRDEYE_API_KEY }
+      }).then(async res => {
+        if (!res.ok) return null;
+        const data = await res.json();
+        const count = data?.data?.holder || 0;
+        console.log(`[HolderAnalysis] Birdeye response:`, { holder: count });
+        return count > 0 ? { source: 'Birdeye', count } : null;
+      }).catch(e => { console.log(`[HolderAnalysis] Birdeye failed:`, e.message); return null; }) : Promise.resolve(null),
+      
+      // Helius DAS API (if available)
+      process.env.HELIUS_API_KEY ? fetch(`https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`, {
+        method: 'POST',
+        signal: AbortSignal.timeout(8000),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getAsset', params: { id: tokenAddress } })
+      }).then(async res => {
+        if (!res.ok) return null;
+        const data = await res.json();
+        const count = data?.result?.token_info?.holder_count || data?.result?.ownership?.total || 0;
+        console.log(`[HolderAnalysis] Helius DAS response:`, { holder_count: count });
+        return count > 0 ? { source: 'Helius-DAS', count } : null;
+      }).catch(e => { console.log(`[HolderAnalysis] Helius DAS failed:`, e.message); return null; }) : Promise.resolve(null),
+    ];
+    
+    const results = await Promise.all(apiCalls);
+    const validResults = results.filter((r): r is { source: string; count: number } => r !== null && r.count > 0);
+    
+    if (validResults.length === 0) {
+      console.log(`[HolderAnalysis] ⚠️ NO APIs returned holder count!`);
+      return null;
+    }
+    
+    // Sort by count descending - take highest (most accurate)
+    validResults.sort((a, b) => b.count - a.count);
+    const best = validResults[0];
+    
+    // Cache the result
+    this.holderCountCache.set(tokenAddress, { count: best.count, source: best.source, fetchedAt: Date.now() });
+    
+    console.log(`[HolderAnalysis] ✅ Best holder count: ${best.count} from ${best.source}`);
+    console.log(`[HolderAnalysis] All results: ${validResults.map(r => `${r.source}:${r.count}`).join(', ')}`);
+    
+    return best;
+  }
 
   /**
    * Get comprehensive holder analysis for a token
-   * Uses ONLY accurate on-chain sources (no third-party APIs with inaccurate counts)
+   * AGGRESSIVE MODE: Fetches holder count from APIs FIRST, then gets holder details
    * 
    * @param tokenAddress - The token mint address to analyze
    * @param options - Optional settings for analysis
@@ -103,7 +219,10 @@ export class HolderAnalysisService {
       this.knownLpPools = new Set();
     }
     
-    const cacheKey = `holder-analysis:v3:${tokenAddress}`;
+    // AGGRESSIVE: Start fetching holder count from APIs immediately (don't wait)
+    const holderCountPromise = this.fetchHolderCountFromAPIs(tokenAddress);
+    
+    const cacheKey = `holder-analysis:v4:${tokenAddress}`;
     debugLog(`\n🔍 [HolderAnalysis DEBUG] Starting analysis for ${tokenAddress}`);
     debugLog(`[HolderAnalysis DEBUG] Cache key: ${cacheKey}`);
 
@@ -113,10 +232,30 @@ export class HolderAnalysisService {
       async () => {
         debugLog(`[HolderAnalysis DEBUG] Cache MISS - fetching fresh data...`);
         
-        // Try direct on-chain scan via getProgramAccounts FIRST (most accurate)
-        debugLog(`[HolderAnalysis DEBUG] Step 1: Attempting on-chain RPC scan via getProgramAccounts...`);
-        const programScan = await this.fetchFromProgramAccounts(tokenAddress);
-        debugLog(`[HolderAnalysis DEBUG] getProgramAccounts result:`, {
+        // AGGRESSIVE: Try getProgramAccounts with RETRIES
+        debugLog(`[HolderAnalysis DEBUG] Step 1: Attempting on-chain RPC scan via getProgramAccounts (with retries)...`);
+        
+        let programScan: HolderAnalysisResult | null = null;
+        const maxRetries = 3;
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          console.log(`[HolderAnalysis] 🔄 getProgramAccounts attempt ${attempt}/${maxRetries}...`);
+          programScan = await this.fetchFromProgramAccounts(tokenAddress);
+          
+          if (programScan && (programScan.holderCount > 0 || programScan.top20Holders.length > 0)) {
+            console.log(`[HolderAnalysis] ✅ SUCCESS on attempt ${attempt}: ${programScan.holderCount} holders`);
+            break;
+          }
+          
+          if (attempt < maxRetries) {
+            // Wait before retry (exponential backoff: 1s, 2s, 4s)
+            const delay = Math.pow(2, attempt - 1) * 1000;
+            console.log(`[HolderAnalysis] ⏳ Retry in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+        
+        debugLog(`[HolderAnalysis DEBUG] getProgramAccounts final result:`, {
           success: !!programScan,
           holderCount: programScan?.holderCount ?? 'null',
           top20Length: programScan?.top20Holders?.length ?? 0,
@@ -124,10 +263,16 @@ export class HolderAnalysisService {
         });
         
         if (programScan && (programScan.holderCount > 0 || programScan.top20Holders.length > 0)) {
-          console.log(`[HolderAnalysis] ✅ SUCCESS: Used on-chain RPC scan for ${tokenAddress} - ${programScan.holderCount} holders`);
+          // AGGRESSIVE: Verify holder count with API data
+          const apiCount = await holderCountPromise;
+          if (apiCount && apiCount.count > programScan.holderCount) {
+            console.log(`[HolderAnalysis] 📊 API reports higher count (${apiCount.count}) than RPC (${programScan.holderCount}), using API count`);
+            programScan.holderCount = apiCount.count;
+            programScan.holderCountIsEstimate = false;
+          }
           return programScan;
         }
-        debugLog(`[HolderAnalysis DEBUG] ⚠️ getProgramAccounts failed or returned no data, trying fallbacks...`);
+        debugLog(`[HolderAnalysis DEBUG] ⚠️ getProgramAccounts failed after ${maxRetries} attempts, trying fallbacks...`);
 
         // Try Helius as backup (requires API key but has accurate counts)
         debugLog(`[HolderAnalysis DEBUG] Step 2: Attempting Helius RPC...`);
@@ -139,20 +284,38 @@ export class HolderAnalysisService {
         });
         
         if (heliusResult && heliusResult.holderCount > 0) {
+          // AGGRESSIVE: Verify holder count with API data
+          const apiCount = await holderCountPromise;
+          if (apiCount && apiCount.count > heliusResult.holderCount) {
+            console.log(`[HolderAnalysis] 📊 API reports higher count (${apiCount.count}), using it`);
+            heliusResult.holderCount = apiCount.count;
+            heliusResult.holderCountIsEstimate = false;
+          }
           console.log(`[HolderAnalysis] ✅ SUCCESS: Used Helius for ${tokenAddress} - ${heliusResult.holderCount} holders`);
           return heliusResult;
         }
         debugLog(`[HolderAnalysis DEBUG] ⚠️ Helius failed or returned no data, using RPC fallback...`);
 
-        // Fallback to basic RPC (top 20 only, limited data but still accurate)
+        // Fallback to basic RPC (top 20 only, but we'll get accurate count from APIs)
         debugLog(`[HolderAnalysis DEBUG] Step 3: Using basic RPC fallback (getTokenLargestAccounts)...`);
         const rpcResult = await this.fetchFromRPC(tokenAddress);
+        
+        // CRITICAL: Use API holder count since RPC only gets top 20
+        const apiCount = await holderCountPromise;
+        if (apiCount && apiCount.count > 0) {
+          console.log(`[HolderAnalysis] 📊 AGGRESSIVE: Using API holder count (${apiCount.count} from ${apiCount.source}) instead of RPC estimate`);
+          rpcResult.holderCount = apiCount.count;
+          rpcResult.holderCountIsEstimate = false;
+        } else {
+          console.log(`[HolderAnalysis] ⚠️ No API returned holder count, RPC result may be inaccurate`);
+        }
+        
         debugLog(`[HolderAnalysis DEBUG] RPC fallback result:`, {
           holderCount: rpcResult.holderCount,
           top20Length: rpcResult.top20Holders.length,
           source: rpcResult.source
         });
-        console.log(`[HolderAnalysis] ⚠️ FALLBACK: Used RPC fallback for ${tokenAddress} (limited to top 20 holders, holderCount=${rpcResult.holderCount})`);
+        console.log(`[HolderAnalysis] ⚠️ FALLBACK: Used RPC fallback for ${tokenAddress} (top 20 holders, total count=${rpcResult.holderCount})`);
         debugLog(`[HolderAnalysis DEBUG] === Analysis complete ===\n`);
         return rpcResult;
       },
@@ -1062,148 +1225,13 @@ export class HolderAnalysisService {
       // Identify large holders (>10% non-exchange holders - potential team wallets)
       const largeHolders = top20.filter(h => h.isLargeHolder && !h.isExchange);
 
-      // CRITICAL: Get accurate holder count by querying multiple APIs IN PARALLEL
-      // This ensures we always have the real count, not just top 20
-      console.log(`[HolderAnalysis DEBUG - RPC Fallback] Fetching holder count from multiple APIs in parallel...`);
+      // NOTE: Holder count will be set by analyzeHolders() from the API call started at the beginning
+      // This is just a placeholder - the real count comes from fetchHolderCountFromAPIs()
+      const actualHolderCount = filteredAccounts.length; // Placeholder, will be overwritten
+      const holderCountIsEstimate = true; // Will be set to false if API succeeds
       
-      const holderCountPromises: Promise<{ source: string; count: number } | null>[] = [];
-      
-      // Solscan API v2 (most reliable)
-      const solscanApiKey = process.env.SOLSCAN_API_KEY?.trim();
-      holderCountPromises.push(
-        fetch(solscanApiKey 
-          ? `https://pro-api.solscan.io/v2.0/token/meta?address=${tokenAddress}`
-          : `https://api.solscan.io/v2/token/meta?address=${tokenAddress}`, {
-          signal: AbortSignal.timeout(5000),
-          headers: solscanApiKey 
-            ? { 'Accept': 'application/json', 'token': solscanApiKey }
-            : { 'Accept': 'application/json' }
-        })
-        .then(async res => {
-          if (!res.ok) return null;
-          const data = await res.json();
-          const count = data?.data?.holder || data?.data?.holderCount || 0;
-          return count > 0 ? { source: 'Solscan', count } : null;
-        })
-        .catch(() => null)
-      );
-      
-      // RugCheck API
-      holderCountPromises.push(
-        fetch(`https://api.rugcheck.xyz/v1/tokens/${tokenAddress}/report`, {
-          signal: AbortSignal.timeout(5000),
-          headers: { 'Accept': 'application/json' }
-        })
-        .then(async res => {
-          if (!res.ok) return null;
-          const data = await res.json();
-          const count = data?.holderCount || data?.markets?.[0]?.holderCount || 0;
-          return count > 0 ? { source: 'RugCheck', count } : null;
-        })
-        .catch(() => null)
-      );
-      
-      // GMGN API
-      holderCountPromises.push(
-        fetch(`https://gmgn.ai/defi/quotation/v1/tokens/sol/${tokenAddress}`, {
-          signal: AbortSignal.timeout(5000),
-          headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
-        })
-        .then(async res => {
-          if (!res.ok) return null;
-          const data = await res.json();
-          const count = data?.data?.holder_count || data?.data?.token?.holder_count || 0;
-          return count > 0 ? { source: 'GMGN', count } : null;
-        })
-        .catch(() => null)
-      );
-      
-      // DexScreener API (for holder count)
-      holderCountPromises.push(
-        fetch(`https://api.dexscreener.com/latest/dex/tokens/${tokenAddress}`, {
-          signal: AbortSignal.timeout(5000),
-          headers: { 'Accept': 'application/json' }
-        })
-        .then(async res => {
-          if (!res.ok) return null;
-          const data = await res.json();
-          // DexScreener doesn't directly provide holder count, but we can check if data exists
-          return null; // DexScreener doesn't have holder count
-        })
-        .catch(() => null)
-      );
-      
-      // Helius DAS API (if available)
-      if (process.env.HELIUS_API_KEY) {
-        holderCountPromises.push(
-          fetch(`https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`, {
-            method: 'POST',
-            signal: AbortSignal.timeout(5000),
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              id: 'holder-count',
-              method: 'getAsset',
-              params: { id: tokenAddress }
-            })
-          })
-          .then(async res => {
-            if (!res.ok) return null;
-            const data = await res.json();
-            const count = data?.result?.token_info?.holder_count || 0;
-            return count > 0 ? { source: 'Helius', count } : null;
-          })
-          .catch(() => null)
-        );
-      }
-      
-      // Birdeye API (if available)
-      if (process.env.BIRDEYE_API_KEY) {
-        holderCountPromises.push(
-          fetch(`https://public-api.birdeye.so/defi/token_overview?address=${tokenAddress}`, {
-            signal: AbortSignal.timeout(5000),
-            headers: { 
-              'Accept': 'application/json',
-              'X-API-KEY': process.env.BIRDEYE_API_KEY
-            }
-          })
-          .then(async res => {
-            if (!res.ok) return null;
-            const data = await res.json();
-            const count = data?.data?.holder || 0;
-            return count > 0 ? { source: 'Birdeye', count } : null;
-          })
-          .catch(() => null)
-        );
-      }
-      
-      // Wait for all API calls in parallel
-      const holderCountResults = await Promise.all(holderCountPromises);
-      const validResults = holderCountResults.filter((r): r is { source: string; count: number } => r !== null);
-      
-      // Take the highest count from reliable sources (they should all be similar)
-      let actualHolderCount = filteredAccounts.length;
-      let holderCountIsEstimate = true;
-      let holderCountSource = 'estimate';
-      
-      if (validResults.length > 0) {
-        // Sort by count descending and take the highest (most accurate)
-        validResults.sort((a, b) => b.count - a.count);
-        const best = validResults[0];
-        actualHolderCount = best.count;
-        holderCountIsEstimate = false;
-        holderCountSource = best.source;
-        console.log(`[HolderAnalysis DEBUG - RPC Fallback] ✅ Got holder count from ${best.source}: ${actualHolderCount}`);
-        
-        // Log all results for debugging
-        console.log(`[HolderAnalysis DEBUG - RPC Fallback] All API results:`, 
-          validResults.map(r => `${r.source}:${r.count}`).join(', '));
-      } else {
-        // If no API returned a count, use the filtered accounts length as minimum
-        console.log(`[HolderAnalysis DEBUG - RPC Fallback] ⚠️ No APIs returned holder count, using filtered accounts length: ${actualHolderCount}`);
-      }
+      console.log(`[HolderAnalysis DEBUG - RPC Fallback] Returning with placeholder count: ${actualHolderCount} (will be updated by API)`);
 
-      console.log(`[HolderAnalysis DEBUG - RPC Fallback] Final holder count: ${actualHolderCount} (source: ${holderCountSource}, estimate: ${holderCountIsEstimate})`);
 
       return {
         tokenAddress,
