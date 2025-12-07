@@ -2639,7 +2639,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           
           const embed = new EmbedBuilder()
             .setColor(color)
-            .setTitle(`📊 GitHub Repository Grade: ${result.grade}`)
+            .setTitle(`🏛️ GitHub Repository Grade: ${result.grade}`)
             .setURL(m.url)
             .setDescription(`**${m.owner}/${m.repo}**\n${result.recommendation}`)
             .addFields(
@@ -2659,14 +2659,25 @@ function createDiscordClient(botToken: string, clientId: string): Client {
                 inline: true
               },
               {
-                name: '📊 Score Breakdown',
+                name: '📋 Score Breakdown',
                 value: 
-                  `🔒 Security: ${result.securityScore}/30\n` +
-                  `⚡ Activity: ${result.activityScore}/25\n` +
-                  `🌟 Popularity: ${result.popularityScore}/20\n` +
-                  `💚 Health: ${result.healthScore}/15` +
-                  (result.solanaScore > 0 ? `\n🚀 Solana: ${result.solanaScore}/10` : ''),
-                inline: false
+                  `🔧 Functionality: ${result.functionalityScore}/30\n` +
+                  `📝 Code Quality: ${result.codeQualityScore}/20\n` +
+                  `📖 Documentation: ${result.documentationScore}/20\n` +
+                  `🧪 Testing: ${result.testingScore}/10\n` +
+                  `📂 Version Control: ${result.vcsScore}/10\n` +
+                  `🗂️ Organization: ${result.organizationScore}/5\n` +
+                  `👥 Community: ${result.communityScore}/5`,
+                inline: true
+              },
+              {
+                name: '🔍 Quality Indicators',
+                value: 
+                  `Tests: ${m.hasTests ? `✅ ${m.testFramework || 'Found'}` : '❌ None'}\n` +
+                  `CI/CD: ${m.hasCICD ? `✅ ${m.cicdPlatforms.join(', ')}` : '❌ None'}\n` +
+                  `Linting: ${m.hasLinterConfig ? `✅ ${m.linterConfigs.join(', ')}` : '❌ None'}\n` +
+                  `License: ${m.hasLicense ? `✅ ${m.licenseType || 'Yes'}` : '❌ Missing'}`,
+                inline: true
               }
             )
             .setTimestamp();
