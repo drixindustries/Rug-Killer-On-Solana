@@ -371,57 +371,11 @@ async function startServices() {
     console.warn('⚠️ Access validation scheduler not available:', err.message);
   }
 
-  // Pump.fun AMM Wallet Sync - Fetch ALL Pump.fun AMM wallets on startup
-  // CRITICAL: This prevents Pump.fun AMM wallets from being marked as "dev wallets"
-  try {
-    const { getSolscanPumpFunSync } = await import('./services/solscan-pumpfun-sync.js');
-    const syncService = getSolscanPumpFunSync();
-    
-    // Run sync immediately on startup (critical for accuracy)
-    console.log('🔄 Starting Pump.fun AMM wallet sync (this prevents false "dev wallet" flags)...');
-    syncService.syncAllPumpFunWallets().then(result => {
-      console.log(`✅ Pump.fun AMM sync complete: ${result.total} wallets whitelisted`);
-      if (result.errors.length > 0) {
-        console.warn(`⚠️ Sync had ${result.errors.length} errors:`, result.errors.slice(0, 3));
-      }
-      console.log('✅ All Pump.fun AMM wallets are now whitelisted and will NOT be marked as dev wallets');
-    }).catch(err => {
-      console.error('❌ Pump.fun AMM sync failed:', err.message);
-      console.warn('⚠️ Some Pump.fun AMM wallets may still be incorrectly flagged as dev wallets');
-    });
-    
-    // Schedule daily sync at 3 AM UTC (off-peak hours) to catch new AMM wallets
-    const runDailySync = () => {
-      const now = new Date();
-      const tomorrow = new Date(now);
-      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-      tomorrow.setUTCHours(3, 0, 0, 0);
-      
-      const msUntil3AM = tomorrow.getTime() - now.getTime();
-      
-      setTimeout(() => {
-        syncService.syncAllPumpFunWallets().then(result => {
-          console.log(`✅ Daily Pump.fun AMM sync: ${result.total} wallets whitelisted`);
-        }).catch(err => {
-          console.error('❌ Daily Pump.fun AMM sync failed:', err.message);
-        });
-        
-        // Schedule next run (24 hours later)
-        setInterval(() => {
-          syncService.syncAllPumpFunWallets().then(result => {
-            console.log(`✅ Daily Pump.fun AMM sync: ${result.total} wallets whitelisted`);
-          }).catch(err => {
-            console.error('❌ Daily Pump.fun AMM sync failed:', err.message);
-          });
-        }, 24 * 60 * 60 * 1000);
-      }, msUntil3AM);
-    };
-    
-    runDailySync();
-    console.log('✅ Pump.fun AMM wallet sync scheduled (runs daily at 3 AM UTC)');
-  } catch (err: any) {
-    console.warn('⚠️ Pump.fun AMM sync not available:', err.message);
-  }
+  // Pump.fun AMM Wallet Detection - DISABLED background sync to save API credits
+  // AMM wallets are now detected in real-time during user scans (only checks TOP holder)
+  // and auto-whitelisted when found. This is more efficient than batch syncing.
+  console.log('ℹ️ Pump.fun AMM detection: Real-time mode (checks TOP holder during scans, auto-whitelists)');
+  console.log('ℹ️ Background Solscan sync DISABLED to conserve API credits');
 
   // Webhook services - real-time blockchain monitoring
   if (process.env.HELIUS_API_KEY || process.env.ANKR_API_KEY) {

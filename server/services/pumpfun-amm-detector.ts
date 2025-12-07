@@ -116,9 +116,9 @@ export async function isPumpFunAmmWallet(
 }
 
 /**
- * Check account owner using Solscan API v2 (FASTEST method)
- * This is the primary method for real-time detection during token scans
- * Updated Dec 2025: Uses Solscan API v2 format
+ * Check account owner using Solscan API v2 ONLY
+ * Used sparingly - only for TOP holder during user scans to conserve API credits
+ * Auto-whitelists detected AMM wallets
  */
 async function checkSolscanAccountOwner(walletAddress: string): Promise<AmmDetectionResult> {
   const apiKey = process.env.SOLSCAN_API_KEY;
@@ -128,34 +128,27 @@ async function checkSolscanAccountOwner(walletAddress: string): Promise<AmmDetec
   }
 
   try {
-    // Solscan API v2 endpoint format
+    // Solscan API v2 ONLY - no v1 fallback to conserve credits
     const url = `https://pro-api.solscan.io/v2.0/account/${walletAddress}`;
     const response = await fetch(url, {
       headers: {
         'token': apiKey.trim(),
         'Accept': 'application/json'
       },
-      signal: AbortSignal.timeout(5000) // 5 second timeout
+      signal: AbortSignal.timeout(5000)
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
-        // Rate limited - silently fall back to RPC
-        return { isPumpFunAmm: false, reason: 'Solscan rate limited', confidence: 'low' };
-      }
-      
-      // Try v1 as fallback if v2 fails
-      console.log(`[PumpFunAmmDetector] Solscan v2 failed (${response.status}), trying v1...`);
-      return checkSolscanAccountOwnerV1(walletAddress, apiKey);
+      // Rate limited or error - silently skip (fall back to pattern matching)
+      return { isPumpFunAmm: false, reason: `Solscan v2 error: ${response.status}`, confidence: 'low' };
     }
 
     const data = await response.json();
     
-    // Solscan v2 response format - check for account owner in data field
-    // v2 format: { success: true, data: { owner: '...', ... } }
+    // Check for account owner in v2 response
     const owner = data?.data?.owner || data?.owner;
     if (owner && PUMPFUN_PROGRAM_IDS.has(owner)) {
-      console.log(`[PumpFunAmmDetector] ✅ Solscan v2 detected Pump.fun program: ${walletAddress.slice(0, 8)}...`);
+      console.log(`[PumpFunAmmDetector] ✅ Solscan v2 detected Pump.fun AMM: ${walletAddress.slice(0, 8)}...`);
       return {
         isPumpFunAmm: true,
         reason: `Account owned by Pump.fun program: ${owner.slice(0, 8)}...`,
@@ -163,22 +156,7 @@ async function checkSolscanAccountOwner(walletAddress: string): Promise<AmmDetec
       };
     }
 
-    // Also check if owner matches any Pump.fun program pattern
-    if (owner) {
-      for (const programId of PUMPFUN_PROGRAM_IDS) {
-        if (owner === programId || owner.startsWith(programId.slice(0, 4))) {
-          console.log(`[PumpFunAmmDetector] ✅ Solscan v2 detected Pump.fun pattern: ${walletAddress.slice(0, 8)}...`);
-          return {
-            isPumpFunAmm: true,
-            reason: `Account owned by Pump.fun program: ${programId.slice(0, 8)}...`,
-            confidence: 'high'
-          };
-        }
-      }
-    }
-    
-    // NEW: Check account type field in v2 response
-    // PumpSwap AMM pools have specific account types
+    // Check account type field for AMM patterns
     const accountType = data?.data?.type || data?.data?.accountType;
     if (accountType && (accountType.includes('pump') || accountType.includes('amm') || accountType.includes('pool'))) {
       console.log(`[PumpFunAmmDetector] ✅ Solscan v2 detected AMM account type: ${accountType}`);
@@ -192,43 +170,8 @@ async function checkSolscanAccountOwner(walletAddress: string): Promise<AmmDetec
     return { isPumpFunAmm: false, reason: 'Not owned by Pump.fun program', confidence: 'high' };
 
   } catch (error: any) {
-    // Silently fail - fall back to RPC methods
-    return { isPumpFunAmm: false, reason: `Solscan v2 check failed: ${error.message}`, confidence: 'low' };
-  }
-}
-
-/**
- * Fallback to Solscan API v1 if v2 fails
- */
-async function checkSolscanAccountOwnerV1(walletAddress: string, apiKey: string): Promise<AmmDetectionResult> {
-  try {
-    const url = `https://pro-api.solscan.io/v1.0/account/${walletAddress}`;
-    const response = await fetch(url, {
-      headers: {
-        'token': apiKey.trim(),
-        'Accept': 'application/json'
-      },
-      signal: AbortSignal.timeout(5000)
-    });
-
-    if (!response.ok) {
-      return { isPumpFunAmm: false, reason: `Solscan v1 API error: ${response.status}`, confidence: 'low' };
-    }
-
-    const data = await response.json();
-    const owner = data?.data?.owner || data?.owner;
-    
-    if (owner && PUMPFUN_PROGRAM_IDS.has(owner)) {
-      return {
-        isPumpFunAmm: true,
-        reason: `Account owned by Pump.fun program (v1): ${owner.slice(0, 8)}...`,
-        confidence: 'high'
-      };
-    }
-
-    return { isPumpFunAmm: false, reason: 'Not owned by Pump.fun program', confidence: 'high' };
-  } catch (error: any) {
-    return { isPumpFunAmm: false, reason: `Solscan v1 check failed: ${error.message}`, confidence: 'low' };
+    // Silently fail - fall back to RPC/pattern methods
+    return { isPumpFunAmm: false, reason: `Solscan check failed: ${error.message}`, confidence: 'low' };
   }
 }
 

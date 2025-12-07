@@ -91,33 +91,11 @@ export class HolderAnalysisService {
       return { count: cached.count, source: cached.source };
     }
     
-    const solscanApiKey = process.env.SOLSCAN_API_KEY?.trim();
+    // REMOVED: Solscan API calls - they were hammering the public API
+    // Now only using RugCheck, GMGN, Helius DAS, and Birdeye for holder counts
+    // Solscan is reserved for TOP wallet AMM detection only
     
     const apiCalls: Promise<{ source: string; count: number } | null>[] = [
-      // Solscan Pro API v2 (MOST RELIABLE if we have API key)
-      solscanApiKey ? fetch(`https://pro-api.solscan.io/v2.0/token/meta?address=${tokenAddress}`, {
-        signal: AbortSignal.timeout(8000),
-        headers: { 'token': solscanApiKey, 'Accept': 'application/json' }
-      }).then(async res => {
-        if (!res.ok) return null;
-        const data = await res.json();
-        const count = data?.data?.holder || data?.data?.holderCount || data?.holder || 0;
-        console.log(`[HolderAnalysis] Solscan Pro v2 response:`, { holder: count });
-        return count > 0 ? { source: 'Solscan-Pro-v2', count } : null;
-      }).catch(e => { console.log(`[HolderAnalysis] Solscan Pro v2 failed:`, e.message); return null; }) : Promise.resolve(null),
-      
-      // Solscan Public API (fallback)
-      fetch(`https://api.solscan.io/v2/token/meta?address=${tokenAddress}`, {
-        signal: AbortSignal.timeout(8000),
-        headers: { 'Accept': 'application/json' }
-      }).then(async res => {
-        if (!res.ok) return null;
-        const data = await res.json();
-        const count = data?.data?.holder || data?.holder || 0;
-        console.log(`[HolderAnalysis] Solscan Public response:`, { holder: count });
-        return count > 0 ? { source: 'Solscan-Public', count } : null;
-      }).catch(e => { console.log(`[HolderAnalysis] Solscan Public failed:`, e.message); return null; }),
-      
       // RugCheck API
       fetch(`https://api.rugcheck.xyz/v1/tokens/${tokenAddress}/report`, {
         signal: AbortSignal.timeout(8000),
@@ -584,17 +562,18 @@ export class HolderAnalysisService {
         : 0;
 
       // Additional async check for high-percentage holders that might be Pump.fun AMM wallets
-      // This catches edge cases where pattern matching didn't work
+      // OPTIMIZED: Only check TOP 1 holder with Solscan to conserve API credits
+      // This catches the main edge case (PumpSwap AMM pool as top holder)
       const suspiciousHighPercentageHolders = nonSystemEntries
         .filter(({ address, amountRaw }) => {
           const percentage = Number(amountRaw) / effectiveSupply * 100;
-          // Check holders with >10% that weren't caught by pattern matching
-          return percentage > 10 && !isPumpFunAmm(address) && !isSystemWallet(address);
+          // Only check holders with >15% that weren't caught by pattern matching
+          return percentage > 15 && !isPumpFunAmm(address) && !isSystemWallet(address);
         })
-        .slice(0, 5); // Only check top 5 suspicious holders to avoid performance issues
+        .slice(0, 1); // ONLY check TOP 1 holder to save Solscan API credits
 
-      // Async check for Pump.fun AMM wallets (non-blocking, runs in parallel)
-      // CRITICAL: This uses Solscan API for real-time detection and auto-whitelisting
+      // Async check for Pump.fun AMM wallets (only TOP holder)
+      // Uses Solscan v2 API sparingly - auto-whitelists if detected
       const ammChecks = suspiciousHighPercentageHolders.map(async ({ address, amountRaw }) => {
         try {
           const detection = await isPumpFunAmmWallet(connection, address, tokenAddress);
