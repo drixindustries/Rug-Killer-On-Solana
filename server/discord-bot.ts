@@ -2912,7 +2912,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
               .addFields(
                 { name: '💰 Entry Price', value: `$${call.initialPrice.toFixed(8)}`, inline: true },
                 { name: '🎯 Target', value: '+20% gain', inline: true },
-                { name: '⏱️ Expires', value: '24 hours', inline: true }
+                { name: '⏱️ Tracking', value: 'Forever ∞', inline: true }
               )
               .setFooter({ text: `Contract: ${contract}` })
               .setTimestamp();

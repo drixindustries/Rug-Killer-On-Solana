@@ -39,8 +39,22 @@ async function getTokenData(mint: string): Promise<TokenData> {
   return { price: 0, mcap: 0 };
 }
 
-async function getPrice(mint: string): Promise<number> {
+async function getPrice(mint: string, useCache: boolean = false): Promise<number> {
+  // Check cache first (for batch checking to save API credits)
+  if (useCache) {
+    const cached = priceCache.get(mint);
+    if (cached && Date.now() - cached.fetchedAt < PRICE_CACHE_TTL) {
+      return cached.price;
+    }
+  }
+  
   const data = await getTokenData(mint);
+  
+  // Cache the result
+  if (data.price > 0) {
+    priceCache.set(mint, { price: data.price, fetchedAt: Date.now() });
+  }
+  
   return data.price;
 }
 
@@ -85,8 +99,12 @@ const activeCalls: Map<string, Call> = new Map();
 const callerStats: Map<string, CallerStats> = new Map();
 const HIT_THRESHOLD = 0.20; // 20% gain
 const PUMP_ALERT_THRESHOLDS = [20, 50, 100, 200, 500]; // Alert at these % gains
-const CHECK_INTERVAL = 60000; // Check every minute
-const CALL_EXPIRY = 24 * 60 * 60 * 1000; // Calls expire after 24 hours
+const CHECK_INTERVAL = 4 * 60 * 60 * 1000; // Check every 4 hours (was 1 min - saves API credits)
+// REMOVED: Calls no longer expire - they stay in system forever until they hit or token dies
+
+// Price cache to minimize DexScreener API calls
+const priceCache: Map<string, { price: number; fetchedAt: number }> = new Map();
+const PRICE_CACHE_TTL = 30 * 60 * 1000; // 30 min cache for prices during batch checks
 
 // PNL Alert channels per guild
 const pnlChannels: Map<string, string> = new Map(); // guildId -> channelId
@@ -163,16 +181,26 @@ export async function registerCall(
 
 /**
  * Check all active calls for gains and send pump alerts
+ * Uses caching to minimize API calls - checks every 4 hours
  */
 export async function checkCalls(): Promise<Call[]> {
   const hits: Call[] = [];
   const now = Date.now();
   
+  console.log(`[CallTracker] Checking ${activeCalls.size} active calls...`);
+  
   for (const [callId, call] of activeCalls.entries()) {
-    // Expire old calls
-    if (now - call.calledAt > CALL_EXPIRY) {
+    // NO EXPIRATION - calls stay forever until they hit target
+    // Only skip if token has no price for 7+ days (dead token)
+    const daysSinceCall = (now - call.calledAt) / (24 * 60 * 60 * 1000);
+    
+    // Check current price (use cache for batch checks to save API credits)
+    const currentPrice = await getPrice(call.contractAddress, true);
+    
+    // If token has no price data for 7+ days, mark as dead and remove
+    if (currentPrice <= 0 && daysSinceCall > 7) {
+      console.log(`[CallTracker] Removing dead token call: ${call.symbol || call.contractAddress.slice(0, 8)} (no price for 7+ days)`);
       if (!call.hitTarget) {
-        // Update caller stats as miss
         const stats = callerStats.get(call.userId);
         if (stats) {
           stats.misses++;
@@ -184,8 +212,6 @@ export async function checkCalls(): Promise<Call[]> {
       continue;
     }
     
-    // Check current price
-    const currentPrice = await getPrice(call.contractAddress);
     if (currentPrice <= 0) continue;
     
     call.currentPrice = currentPrice;
