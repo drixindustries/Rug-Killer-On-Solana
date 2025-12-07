@@ -126,14 +126,13 @@ export interface RepoGradeResult {
   confidenceScore: number; // 0-100
   grade: 'A+' | 'A' | 'B' | 'C' | 'D' | 'F' | 'N/A';
   
-  // NEW: Component scores (Grok-style weights)
+  // Component scores (Grok-style weights - 100 total)
   functionalityScore: number; // 0-30 (tests, CI, builds)
   codeQualityScore: number; // 0-20 (linters, complexity)
   documentationScore: number; // 0-20 (README quality)
-  testingScore: number; // 0-10 (test coverage)
   vcsScore: number; // 0-10 (commit quality, branching)
-  organizationScore: number; // 0-5 (structure, .gitignore)
-  communityScore: number; // 0-5 (stars, contributors)
+  organizationScore: number; // 0-10 (structure, .gitignore, license)
+  communityScore: number; // 0-10 (stars, contributors, activity)
   
   // Legacy scores (for backward compatibility)
   securityScore: number;
@@ -311,14 +310,13 @@ export class GitHubRepoAnalyzer {
       found: false,
       confidenceScore: 0,
       grade: 'N/A',
-      // New Grok-style scores
-      functionalityScore: 0,
-      codeQualityScore: 0,
-      documentationScore: 0,
-      testingScore: 0,
-      vcsScore: 0,
-      organizationScore: 0,
-      communityScore: 0,
+      // Grok-style scores (100 total)
+      functionalityScore: 0,   // 30
+      codeQualityScore: 0,     // 20
+      documentationScore: 0,   // 20
+      vcsScore: 0,             // 10
+      organizationScore: 0,    // 10
+      communityScore: 0,       // 10
       // Legacy scores
       securityScore: 0,
       activityScore: 0,
@@ -351,14 +349,13 @@ export class GitHubRepoAnalyzer {
         // Commit quality is already in metrics
         result.commitQuality = metrics.commitMessageQuality;
         
-        // Calculate NEW Grok-style component scores
-        result.functionalityScore = this.calculateFunctionalityScore(metrics);
-        result.codeQualityScore = this.calculateCodeQualityScore(metrics);
-        result.documentationScore = this.calculateDocumentationScore(metrics, result.readmeQuality);
-        result.testingScore = this.calculateTestingScore(metrics);
-        result.vcsScore = this.calculateVCSScore(metrics);
-        result.organizationScore = this.calculateOrganizationScore(metrics);
-        result.communityScore = this.calculateCommunityScore(metrics);
+        // Calculate Grok-style component scores (100 total)
+        result.functionalityScore = this.calculateFunctionalityScore(metrics);   // 30
+        result.codeQualityScore = this.calculateCodeQualityScore(metrics);       // 20
+        result.documentationScore = this.calculateDocumentationScore(metrics, result.readmeQuality); // 20
+        result.vcsScore = this.calculateVCSScore(metrics);                       // 10
+        result.organizationScore = this.calculateOrganizationScore(metrics);     // 10
+        result.communityScore = this.calculateCommunityScore(metrics);           // 10
         
         // Legacy scores (for backward compatibility)
         result.securityScore = this.calculateSecurityScore(metrics);
@@ -367,15 +364,14 @@ export class GitHubRepoAnalyzer {
         result.healthScore = this.calculateHealthScore(metrics);
         result.solanaScore = this.calculateSolanaScore(metrics);
         
-        // Total confidence score (NEW weights)
+        // Total confidence score (Grok weights)
         result.confidenceScore = Math.min(100, Math.round(
-          result.functionalityScore +    // 30
+          result.functionalityScore +    // 30 (includes tests, CI/CD)
           result.codeQualityScore +      // 20
           result.documentationScore +    // 20
-          result.testingScore +          // 10
           result.vcsScore +              // 10
-          result.organizationScore +     // 5
-          result.communityScore          // 5
+          result.organizationScore +     // 10
+          result.communityScore          // 10
         ));
         
         // Assign letter grade
@@ -1002,35 +998,6 @@ export class GitHubRepoAnalyzer {
   }
   
   /**
-   * Testing Score (0-10 points)
-   * - Test directories exist
-   * - Test framework detected
-   * - Multiple test types
-   */
-  private calculateTestingScore(metrics: GitHubRepoMetrics): number {
-    let score = 0;
-    
-    if (!metrics.hasTests) {
-      return 0;
-    }
-    
-    // Has test directories - 5 points
-    score += 5;
-    
-    // Has test framework config - 3 points
-    if (metrics.testFramework) {
-      score += 3;
-    }
-    
-    // Multiple test directories (unit, e2e, etc) - 2 points
-    if (metrics.testDirectories.length > 1) {
-      score += 2;
-    }
-    
-    return Math.min(10, score);
-  }
-  
-  /**
    * Version Control Score (0-10 points)
    * - Commit message quality
    * - Commit frequency
@@ -1056,27 +1023,26 @@ export class GitHubRepoAnalyzer {
   }
   
   /**
-   * Organization Score (0-5 points)
-   * - .gitignore
-   * - License
-   * - File structure
+   * Organization Score (0-10 points) - Repository Best Practices
+   * - .gitignore, license, file structure
+   * - Security policy, code of conduct
    */
   private calculateOrganizationScore(metrics: GitHubRepoMetrics): number {
     let score = 0;
     
-    // Has .gitignore - 1 point
+    // Has .gitignore - 2 points
     if (metrics.hasGitignore) {
-      score += 1;
-    }
-    
-    // Has license - 2 points
-    if (metrics.hasLicense) {
       score += 2;
     }
     
-    // Proper structure - 1 point
+    // Has license - 3 points
+    if (metrics.hasLicense) {
+      score += 3;
+    }
+    
+    // Proper structure (src/, lib/, etc) - 2 points
     if (metrics.hasProperStructure) {
-      score += 1;
+      score += 2;
     }
     
     // Not archived - 1 point
@@ -1084,30 +1050,49 @@ export class GitHubRepoAnalyzer {
       score += 1;
     }
     
-    return Math.min(5, score);
+    // Has security policy - 1 point
+    if (metrics.hasSecurityPolicy) {
+      score += 1;
+    }
+    
+    // Has code of conduct or contributing guide - 1 point
+    if (metrics.hasCodeOfConduct || metrics.hasContributing) {
+      score += 1;
+    }
+    
+    return Math.min(10, score);
   }
   
   /**
-   * Community Score (0-5 points)
-   * - Stars and forks
-   * - Contributors
-   * - Issue activity
+   * Community Score (0-10 points) - Collaboration & Activity
+   * - Stars, forks, contributors
+   * - Recent activity
    */
   private calculateCommunityScore(metrics: GitHubRepoMetrics): number {
     let score = 0;
     
-    // Stars (0-2 points)
-    if (metrics.stars > 100) score += 2;
+    // Stars (0-3 points)
+    if (metrics.stars > 1000) score += 3;
+    else if (metrics.stars > 100) score += 2;
     else if (metrics.stars > 10) score += 1;
     
-    // Contributors (0-2 points)
-    if (metrics.contributors > 10) score += 2;
-    else if (metrics.contributors > 2) score += 1;
+    // Contributors (0-3 points)
+    if (metrics.contributors > 20) score += 3;
+    else if (metrics.contributors > 5) score += 2;
+    else if (metrics.contributors > 1) score += 1;
     
-    // Forks (0-1 point)
-    if (metrics.forks > 10) score += 1;
+    // Forks (0-2 points)
+    if (metrics.forks > 100) score += 2;
+    else if (metrics.forks > 10) score += 1;
     
-    return Math.min(5, score);
+    // Recent activity (0-2 points)
+    if (metrics.lastCommitDate) {
+      const days = (Date.now() - metrics.lastCommitDate.getTime()) / (1000 * 60 * 60 * 24);
+      if (days < 30) score += 2;
+      else if (days < 90) score += 1;
+    }
+    
+    return Math.min(10, score);
   }
   
   // ==========================================================================
@@ -1394,15 +1379,14 @@ export class GitHubRepoAnalyzer {
     output += `${m.language || 'Mixed'} ${m.isSolanaProject ? '(Solana)' : ''}\n`;
     output += `${m.commits.toLocaleString()} commits | Last: ${m.lastCommitDate?.toLocaleDateString() || 'Unknown'}\n\n`;
     
-    // NEW: Score breakdown (Grok-style)
+    // Score breakdown (Grok-style)
     output += `📋 **Score Breakdown**\n`;
     output += `🔧 Functionality: ${result.functionalityScore}/30\n`;
     output += `📝 Code Quality: ${result.codeQualityScore}/20\n`;
     output += `📖 Documentation: ${result.documentationScore}/20\n`;
-    output += `🧪 Testing: ${result.testingScore}/10\n`;
     output += `📂 Version Control: ${result.vcsScore}/10\n`;
-    output += `🗂️ Organization: ${result.organizationScore}/5\n`;
-    output += `👥 Community: ${result.communityScore}/5\n\n`;
+    output += `🗂️ Organization: ${result.organizationScore}/10\n`;
+    output += `👥 Community: ${result.communityScore}/10\n\n`;
     
     // Detailed indicators
     output += `🔍 **Detailed Analysis**\n`;

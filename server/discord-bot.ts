@@ -2664,10 +2664,9 @@ function createDiscordClient(botToken: string, clientId: string): Client {
                   `🔧 Functionality: ${result.functionalityScore}/30\n` +
                   `📝 Code Quality: ${result.codeQualityScore}/20\n` +
                   `📖 Documentation: ${result.documentationScore}/20\n` +
-                  `🧪 Testing: ${result.testingScore}/10\n` +
                   `📂 Version Control: ${result.vcsScore}/10\n` +
-                  `🗂️ Organization: ${result.organizationScore}/5\n` +
-                  `👥 Community: ${result.communityScore}/5`,
+                  `🗂️ Organization: ${result.organizationScore}/10\n` +
+                  `👥 Community: ${result.communityScore}/10`,
                 inline: true
               },
               {
