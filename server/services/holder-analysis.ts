@@ -74,9 +74,6 @@ export class HolderAnalysisService {
   // DEDUPLICATION: Track in-flight requests to prevent duplicate RPC calls
   private inFlightRequests: Map<string, Promise<HolderAnalysisResult>> = new Map();
   
-  // Known LP pool addresses from DexScreener (passed during analysis)
-  private knownLpPools: Set<string> = new Set();
-  
   // Cached holder counts from APIs (survives method failures)
   private holderCountCache: Map<string, { count: number; source: string; fetchedAt: number }> = new Map();
 
@@ -211,12 +208,14 @@ export class HolderAnalysisService {
       return existingRequest;
     }
     
-    // Store known LP pools in class for use in filtering
-    if (options?.knownLpPools?.length) {
-      console.log(`[HolderAnalysis] 📋 Known LP pools from DexScreener: ${options.knownLpPools.join(', ')}`);
-      this.knownLpPools = new Set(options.knownLpPools);
-    } else {
-      this.knownLpPools = new Set();
+    // CRITICAL: Store LP pools locally in request scope to avoid race conditions
+    // (Class-level storage would be overwritten by concurrent requests)
+    const knownLpPools: Set<string> = options?.knownLpPools?.length 
+      ? new Set(options.knownLpPools) 
+      : new Set();
+    
+    if (knownLpPools.size > 0) {
+      console.log(`[HolderAnalysis] 📋 Known LP pools from DexScreener: ${Array.from(knownLpPools).join(', ')}`);
     }
     
     // AGGRESSIVE: Start fetching holder count from APIs immediately (don't wait)
@@ -240,7 +239,7 @@ export class HolderAnalysisService {
         
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
           console.log(`[HolderAnalysis] 🔄 getProgramAccounts attempt ${attempt}/${maxRetries}...`);
-          programScan = await this.fetchFromProgramAccounts(tokenAddress);
+          programScan = await this.fetchFromProgramAccounts(tokenAddress, knownLpPools);
           
           if (programScan && (programScan.holderCount > 0 || programScan.top20Holders.length > 0)) {
             console.log(`[HolderAnalysis] ✅ SUCCESS on attempt ${attempt}: ${programScan.holderCount} holders`);
@@ -346,7 +345,7 @@ export class HolderAnalysisService {
    * 
    * CRITICAL: This is the ONLY method that gets ALL holders - must not fail!
    */
-  private async fetchFromProgramAccounts(tokenAddress: string): Promise<HolderAnalysisResult | null> {
+  private async fetchFromProgramAccounts(tokenAddress: string, knownLpPools: Set<string> = new Set()): Promise<HolderAnalysisResult | null> {
     try {
       console.log(`[HolderAnalysis DEBUG - getProgramAccounts] Starting scan for ${tokenAddress}`);
       
@@ -541,7 +540,7 @@ export class HolderAnalysisService {
           return acc;
         }
         // CRITICAL: Filter known LP pools from DexScreener (catches PumpSwap pair addresses)
-        if (this.knownLpPools.has(address)) {
+        if (knownLpPools.has(address)) {
           console.log(`[HolderAnalysis] ✅ Filtered DexScreener LP pool: ${address.slice(0, 8)}... (${Number(amountRaw) / 1e9} tokens)`);
           pumpFunFilteredCount += 1;
           pumpFunFilteredRaw += amountRaw;
