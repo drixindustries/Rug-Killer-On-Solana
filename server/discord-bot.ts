@@ -958,8 +958,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       } else if (interaction.commandName === 'first20') {
         const tokenAddress = interaction.options.getString('address', true);
         
-        await interaction.deferReply();
-        
+        // Note: Already deferred by global handler
         const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
         try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
         
@@ -1103,8 +1102,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       } else if (interaction.commandName === 'whaletrack') {
         const tokenAddress = interaction.options.getString('address', true);
         
-        await interaction.deferReply();
-        
+        // Note: Already deferred by global handler
         const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
         try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
         const holderAddresses = analysis.topHolders.map(h => h.address);
@@ -1289,8 +1287,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       } else if (interaction.commandName === 'rugcheck') {
         const tokenAddress = interaction.options.getString('address', true);
         
-        await interaction.deferReply();
-        
+        // Note: Already deferred by global handler
         const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
         try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
         
@@ -1515,8 +1512,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         const token1 = interaction.options.getString('token1', true);
         const token2 = interaction.options.getString('token2', true);
         
-        await interaction.deferReply();
-        
+        // Note: Already deferred by global handler
         const [analysis1, analysis2] = await Promise.all([
           tokenAnalyzer.analyzeToken(token1),
           tokenAnalyzer.analyzeToken(token2)
@@ -1613,7 +1609,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         await interaction.editReply({ embeds: [embed] });
       
       } else if (interaction.commandName === 'trending') {
-        await interaction.deferReply();
+        // Note: Already deferred by global handler
         
         // Fetch top Solana pairs by volume from DexScreener
         const response = await fetch('https://api.dexscreener.com/latest/dex/search?q=SOL', {
@@ -1683,7 +1679,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       } else if (interaction.commandName === 'holders') {
         const tokenAddress = interaction.options.getString('address', true);
         const n = interaction.options.getInteger('n') ?? 20;
-        await interaction.deferReply();
+        // Note: Already deferred by global handler
         const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
         try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
         const embed = new EmbedBuilder()
@@ -2791,7 +2787,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           const walletAddress = interaction.options.getString('address', true);
           const method = (interaction.options.getString('method') || 'FIFO') as AccountingMethod;
           
-          await interaction.deferReply();
+          // Note: Already deferred by global handler for 'pnl' command
           
           try {
             const pnl = await pnlTracker.calculatePnL(walletAddress, method);
@@ -2871,8 +2867,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       }
       
       else if (interaction.commandName === 'leaderboard') {
-        await interaction.deferReply();
-        
+        // Note: Already deferred by global handler
         try {
           const leaderboard = callHitTracker.getLeaderboard(10);
           const embedData = callHitTracker.formatLeaderboardEmbed(leaderboard);
@@ -2897,8 +2892,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         const contract = interaction.options.getString('contract', true);
         const symbol = interaction.options.getString('symbol') || undefined;
         
-        await interaction.deferReply();
-        
+        // Note: Already deferred by global handler
         try {
           const call = await callHitTracker.registerCall(
             contract,
@@ -2937,8 +2931,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         const year = interaction.options.getInteger('year') || undefined;
         const method = (interaction.options.getString('method') || 'FIFO') as AccountingMethod;
         
-        await interaction.deferReply();
-        
+        // Note: Already deferred by global handler
         try {
           const report = await pnlTracker.generateTaxReport(walletAddress, year, method);
           
@@ -3106,8 +3099,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
         const walletAddress = interaction.options.getString('wallet', true);
         const depth = interaction.options.getInteger('depth') ?? 3;
         
-        await interaction.deferReply();
-        
+        // Note: Already deferred by global handler
         try {
           console.log(`[Discord /trace] User ${interaction.user.tag} tracing: ${walletAddress} (depth: ${depth})`);
           
