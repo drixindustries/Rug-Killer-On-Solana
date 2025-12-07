@@ -168,6 +168,12 @@ export interface DexScreenerPair {
 export interface DexScreenerData {
   pairs: DexScreenerPair[];
   schemaVersion: string;
+  socialLinks?: {
+    website?: string;
+    twitter?: string;
+    discord?: string;
+    telegram?: string;
+  };
 }
 
 // Jupiter Price Data

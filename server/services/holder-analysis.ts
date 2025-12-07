@@ -352,6 +352,7 @@ export class HolderAnalysisService {
         }
         // Check Pump.fun AMM (includes pattern matching for 5Nkn..., pAMM...)
         // CRITICAL: Check this BEFORE system wallets to catch all Pump.fun AMM variants
+        // Note: Real-time Solscan API detection happens async for suspicious holders below
         if (isPumpFunAmm(address)) {
           console.log(`[HolderAnalysis] ✅ Filtered Pump.fun/PumpSwap AMM: ${address.slice(0, 8)}...${address.slice(-8)} (${Number(amountRaw) / 1e9} tokens)`);
           pumpFunFilteredCount += 1;
@@ -397,11 +398,13 @@ export class HolderAnalysisService {
         .slice(0, 5); // Only check top 5 suspicious holders to avoid performance issues
 
       // Async check for Pump.fun AMM wallets (non-blocking, runs in parallel)
+      // CRITICAL: This uses Solscan API for real-time detection and auto-whitelisting
       const ammChecks = suspiciousHighPercentageHolders.map(async ({ address, amountRaw }) => {
         try {
           const detection = await isPumpFunAmmWallet(connection, address, tokenAddress);
           if (detection.isPumpFunAmm && detection.confidence === 'high') {
-            console.log(`[HolderAnalysis] ✅ Async-detected Pump.fun AMM: ${address.slice(0, 8)}... (${detection.reason})`);
+            console.log(`[HolderAnalysis] ✅ Async-detected & whitelisted Pump.fun AMM: ${address.slice(0, 8)}... (${detection.reason})`);
+            // Wallet is automatically whitelisted by isPumpFunAmmWallet() - no action needed here
             return { address, isAmm: true };
           }
         } catch (error) {

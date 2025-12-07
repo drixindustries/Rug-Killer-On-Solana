@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { analyzeTokenSchema, insertWatchlistSchema, smartSignals, analysisRuns } from "../shared/schema.js";
+import { analyzeTokenSchema, insertWatchlistSchema, smartSignals, analysisRuns, walletConnections } from "../shared/schema.js";
 import { tokenAnalyzer } from "./solana-analyzer.js";
 import { nameCache } from "./name-cache.js";
 // import { setupAuth, isAuthenticated } from "./replitAuth"; // Disabled for non-Replit deployments
@@ -23,7 +23,7 @@ import { streamMetrics, normalizeSolanaWebhook } from "./services/stream-metrics
 import crypto from 'crypto';
 import { tokenMetrics } from './services/token-metrics.js';
 import getRawBody from 'raw-body';
-import { gte, sql } from "drizzle-orm";
+import { gte, sql, eq, desc } from "drizzle-orm";
 import webhookRoutes from "./webhook-routes.js";
 import adminRoutes from "./admin-routes.js";
 
@@ -436,9 +436,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const timeframe = (req.query.timeframe as '1h' | '6h' | '24h' | '7d') || '24h';
       const platform = req.query.platform as 'discord' | 'telegram' | undefined;
       
-      const calls = trendingCallsTracker.getTrendingCalls(timeframe, platform);
+      const calls = trendingCallsTracker.getTrendingCalls(timeframe, platform, 1); // Lower minMentions to 1
       
-      // If no tracked calls, fallback to DexScreener trending tokens
+      // Always try to enrich with DexScreener data if available
+      let enrichedCalls = calls;
+      
+      // If we have tracked calls, use them; otherwise fallback to DexScreener
       if (calls.length === 0) {
         try {
           const dexResponse = await fetch('https://api.dexscreener.com/token-boosts/top/v1', {
@@ -450,38 +453,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const dexData = await dexResponse.json() as any[];
             const solanaTokens = dexData
               .filter((t: any) => t.chainId === 'solana')
-              .slice(0, 10);
+              .slice(0, 20);
             
-            const fallbackCalls = solanaTokens.map((t: any, idx: number) => ({
-              id: t.tokenAddress,
-              symbol: t.description?.split(' ')[0] || 'Unknown',
-              contractAddress: t.tokenAddress,
-              platform: 'discord' as const,
-              channelName: 'DexScreener Trending',
-              mentions: 10 - idx,
-              uniqueUsers: Math.max(1, 5 - idx),
-              firstSeen: Date.now() - (idx * 60000),
-              lastSeen: Date.now(),
-              sentiment: 'bullish' as const,
-              riskScore: undefined,
-            }));
+            // Enrich with risk scores from recent analyses
+            const enriched = await Promise.all(
+              solanaTokens.map(async (t: any, idx: number) => {
+                // Try to get risk score from recent analysis
+                let riskScore: number | undefined;
+                try {
+                  const recentAnalysis = await db
+                    .select({ riskScore: analysisRuns.riskScore })
+                    .from(analysisRuns)
+                    .where(eq(analysisRuns.tokenAddress, t.tokenAddress))
+                    .orderBy(desc(analysisRuns.createdAt))
+                    .limit(1);
+                  
+                  if (recentAnalysis.length > 0) {
+                    riskScore = recentAnalysis[0].riskScore;
+                  }
+                } catch (err) {
+                  // Ignore errors
+                }
+                
+                return {
+                  id: t.tokenAddress,
+                  symbol: t.description?.split(' ')[0] || t.tokenAddress.slice(0, 8),
+                  contractAddress: t.tokenAddress,
+                  platform: 'discord' as const,
+                  channelName: 'DexScreener Trending',
+                  mentions: Math.max(1, 20 - idx),
+                  uniqueUsers: Math.max(1, 10 - Math.floor(idx / 2)),
+                  firstSeen: Date.now() - (idx * 60000),
+                  lastSeen: Date.now(),
+                  sentiment: 'bullish' as const,
+                  riskScore,
+                };
+              })
+            );
             
-            return res.json(fallbackCalls);
+            enrichedCalls = enriched;
           }
         } catch (dexError) {
           console.warn('[TrendingCalls] DexScreener fallback failed:', dexError);
         }
+      } else {
+        // Enrich tracked calls with risk scores
+        enrichedCalls = await Promise.all(
+          calls.map(async (call) => {
+            if (call.riskScore !== undefined) {
+              return call;
+            }
+            
+            // Try to get risk score from recent analysis
+            try {
+              const recentAnalysis = await db
+                .select({ riskScore: analysisRuns.riskScore })
+                .from(analysisRuns)
+                .where(eq(analysisRuns.tokenAddress, call.contractAddress))
+                .orderBy(desc(analysisRuns.createdAt))
+                .limit(1);
+              
+              if (recentAnalysis.length > 0) {
+                call.riskScore = recentAnalysis[0].riskScore;
+              }
+            } catch (err) {
+              // Ignore errors
+            }
+            
+            return call;
+          })
+        );
       }
       
       // Convert Sets to arrays for JSON serialization
-      const serializedCalls = calls.map(call => ({
+      const serializedCalls = enrichedCalls.map(call => ({
         id: call.id,
         symbol: call.symbol,
         contractAddress: call.contractAddress,
         platform: call.platform,
-        channelName: call.channelNames[0] || 'Unknown',
+        channelName: Array.isArray(call.channelNames) ? call.channelNames[0] : (call as any).channelName || 'Unknown',
         mentions: call.mentions,
-        uniqueUsers: call.uniqueUsers.size,
+        uniqueUsers: typeof call.uniqueUsers === 'number' ? call.uniqueUsers : call.uniqueUsers.size,
         firstSeen: call.firstSeen,
         lastSeen: call.lastSeen,
         sentiment: call.sentiment,
@@ -2958,13 +3010,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SOCIAL FEATURES - USER PROFILES API
   // ========================================
   
-  // GET /api/profile/:userId - Get profile
+  // GET /api/profile/:userId - Get profile (supports "me" for current user)
   app.get('/api/profile/:userId', async (req, res) => {
     try {
-      const { userId } = req.params;
+      let { userId } = req.params;
+      
+      // Handle "me" route - try to get from session or query param
+      if (userId === 'me') {
+        // Try to get from session first
+        if (req.session?.userId) {
+          userId = req.session.userId;
+        } else if (req.query.discordId) {
+          // Map Discord ID to user ID
+          userId = `discord:${req.query.discordId}`;
+        } else if (req.query.telegramId) {
+          // Map Telegram ID to user ID
+          userId = `telegram:${req.query.telegramId}`;
+        } else {
+          return res.status(400).json({ message: 'Please provide discordId or telegramId query parameter, or sign in' });
+        }
+      }
+      
       const profile = await storage.getUserProfile(userId);
       
       if (!profile) {
+        // Auto-create profile if it doesn't exist (for Discord/Telegram users)
+        if (userId.startsWith('discord:') || userId.startsWith('telegram:')) {
+          const newProfile = await storage.createUserProfile({
+            userId,
+            username: null,
+            bio: null,
+            visibility: 'public',
+            reputationScore: 0,
+            contributionCount: 0,
+          });
+          return res.json(newProfile);
+        }
         return res.status(404).json({ message: 'Profile not found' });
       }
       
@@ -2972,6 +3053,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching profile:', error);
       res.status(500).json({ message: 'Failed to fetch profile' });
+    }
+  });
+  
+  // GET /api/profile/:userId/stats - Get user stats (PNL, calls, etc.)
+  app.get('/api/profile/:userId/stats', async (req, res) => {
+    try {
+      let { userId } = req.params;
+      
+      // Handle "me" route
+      if (userId === 'me') {
+        if (req.session?.userId) {
+          userId = req.session.userId;
+        } else if (req.query.discordId) {
+          userId = `discord:${req.query.discordId}`;
+        } else if (req.query.telegramId) {
+          userId = `telegram:${req.query.telegramId}`;
+        } else {
+          return res.status(400).json({ message: 'Please provide discordId or telegramId query parameter' });
+        }
+      }
+      
+      // Get wallet address from user profile or linked wallets
+      const profile = await storage.getUserProfile(userId);
+      if (!profile) {
+        return res.status(404).json({ message: 'Profile not found' });
+      }
+      
+      // Try to find linked wallet (check wallet_connections table)
+      let walletAddress: string | null = null;
+      try {
+        const connections = await db
+          .select()
+          .from(walletConnections)
+          .where(eq(walletConnections.userId, userId))
+          .limit(1);
+        walletAddress = connections.length > 0 ? connections[0].walletAddress : null;
+      } catch (error) {
+        console.warn('[Profile Stats] Wallet connection lookup failed:', error);
+      }
+      
+      const stats: any = {
+        profile: {
+          reputationScore: profile.reputationScore,
+          contributionCount: profile.contributionCount,
+        },
+        pnl: null,
+        calls: null,
+      };
+      
+      // Get PNL stats if wallet is linked
+      if (walletAddress) {
+        try {
+          const { pnlTracker } = await import('./services/pnl-tracker.js');
+          const pnl = await pnlTracker.calculatePnL(walletAddress, 'FIFO');
+          stats.pnl = {
+            totalPnlSol: pnl.totalPnlSol,
+            totalPnlUsd: pnl.totalPnlUsd,
+            roiPct: pnl.roiPct,
+            winRatePct: pnl.winRatePct,
+            totalTrades: pnl.totalTrades,
+            realizedPnlSol: pnl.realizedPnlSol,
+            unrealizedPnlSol: pnl.unrealizedPnlSol,
+          };
+        } catch (error) {
+          console.warn('[Profile Stats] PNL calculation failed:', error);
+        }
+      }
+      
+      // Get call stats from call-hit-tracker
+      try {
+        const { callHitTracker } = await import('./services/call-hit-tracker.js');
+        // Extract Discord/Telegram ID from userId
+        let platformUserId: string | null = null;
+        if (userId.startsWith('discord:')) {
+          platformUserId = userId.replace('discord:', '');
+        } else if (userId.startsWith('telegram:')) {
+          platformUserId = userId.replace('telegram:', '');
+        }
+        
+        if (platformUserId) {
+          const callerStats = callHitTracker.getCallerStats(platformUserId);
+          if (callerStats) {
+            stats.calls = {
+              totalCalls: callerStats.totalCalls,
+              hits: callerStats.hits,
+              hitRate: callerStats.hitRate,
+              bestGain: callerStats.bestGain,
+              avgGain: callerStats.avgGain,
+            };
+          }
+        }
+      } catch (error) {
+        console.warn('[Profile Stats] Call stats failed:', error);
+      }
+      
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching profile stats:', error);
+      res.status(500).json({ message: 'Failed to fetch profile stats' });
     }
   });
   
@@ -3590,6 +3770,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error syncing external wallets:", error);
       res.status(500).json({ message: "Failed to sync external wallets" });
+    }
+  });
+
+  // ============================================================================
+  // ACCESS CONTROL ROUTES (Wallet-based access portal)
+  // ============================================================================
+  
+  // GET /api/access/status - Check access status by wallet address
+  app.get('/api/access/status', async (req, res) => {
+    try {
+      const { walletAddress } = req.query;
+      
+      if (!walletAddress || typeof walletAddress !== 'string') {
+        return res.status(400).json({ message: 'Wallet address is required' });
+      }
+
+      const { getAccessControlService } = await import('./services/access-control.js');
+      const accessControl = getAccessControlService();
+      const accessCheck = await accessControl.checkAccessByWallet(walletAddress);
+      
+      res.json(accessCheck);
+    } catch (error: any) {
+      console.error('Error checking access status:', error);
+      res.status(500).json({ message: 'Failed to check access status', error: error.message });
+    }
+  });
+
+  // POST /api/access/start-trial - Start 7-day free trial for wallet
+  app.post('/api/access/start-trial', async (req, res) => {
+    try {
+      const { walletAddress } = req.body;
+      
+      if (!walletAddress || typeof walletAddress !== 'string') {
+        return res.status(400).json({ message: 'Wallet address is required' });
+      }
+
+      const { getAccessControlService } = await import('./services/access-control.js');
+      const accessControl = getAccessControlService();
+      const result = await accessControl.startTrialForWallet(walletAddress);
+      
+      if (!result.success) {
+        return res.status(400).json({ message: result.error || 'Failed to start trial' });
+      }
+
+      res.json({
+        success: true,
+        trialEndsAt: result.trialEndsAt,
+        message: `7-day free trial started. Expires on ${result.trialEndsAt?.toLocaleDateString()}`
+      });
+    } catch (error: any) {
+      console.error('Error starting trial:', error);
+      res.status(500).json({ message: 'Failed to start trial', error: error.message });
+    }
+  });
+
+  // GET /api/access/validate - Daily validation endpoint (call via cron)
+  app.get('/api/access/validate', async (req, res) => {
+    try {
+      // Optional: Add admin check or API key check for security
+      const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+      const expectedKey = process.env.ACCESS_VALIDATION_API_KEY;
+      
+      if (expectedKey && apiKey !== expectedKey) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      const { getAccessControlService } = await import('./services/access-control.js');
+      const accessControl = getAccessControlService();
+      const result = await accessControl.validateAllAccess();
+      
+      res.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        ...result
+      });
+    } catch (error: any) {
+      console.error('Error validating access:', error);
+      res.status(500).json({ message: 'Failed to validate access', error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // PUMP.FUN AMM WALLET SYNC ROUTES
+  // ============================================================================
+  
+  // POST /api/admin/pumpfun/sync - Manually trigger Pump.fun AMM wallet sync
+  app.post('/api/admin/pumpfun/sync', isAdmin, async (req, res) => {
+    try {
+      const { getSolscanPumpFunSync } = await import('./services/solscan-pumpfun-sync.js');
+      const syncService = getSolscanPumpFunSync();
+      
+      res.json({ message: 'Pump.fun AMM sync started', status: 'running' });
+      
+      // Run in background
+      syncService.syncAllPumpFunWallets().then(result => {
+        console.log(`[Admin] Pump.fun AMM sync complete: ${result.total} wallets`);
+      }).catch(err => {
+        console.error('[Admin] Pump.fun AMM sync failed:', err);
+      });
+    } catch (error: any) {
+      console.error("Error starting Pump.fun sync:", error);
+      res.status(500).json({ message: "Failed to start sync", error: error.message });
+    }
+  });
+
+  // GET /api/admin/pumpfun/stats - Get Pump.fun whitelist stats
+  app.get('/api/admin/pumpfun/stats', isAdmin, async (req, res) => {
+    try {
+      const { getPumpFunWhitelistStats } = await import('./pumpfun-whitelist.js');
+      const stats = getPumpFunWhitelistStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Error fetching Pump.fun stats:", error);
+      res.status(500).json({ message: "Failed to fetch stats", error: error.message });
     }
   });
 

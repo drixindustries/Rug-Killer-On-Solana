@@ -844,7 +844,17 @@ export class AlphaAlertService {
         ] : []),
         {
           name: '🔗 Quick Links',
-          value: `[Pump.fun](https://pump.fun/${alert.mint}) • [DexScreener](https://dexscreener.com/solana/${alert.mint}) • [Axiom](https://axiom.trade/t/${alert.mint}/sol) • [GMGN](https://gmgn.ai/sol/token/${alert.mint}) • [Padre](https://padre.fun/token/${alert.mint}) • [Solscan](https://solscan.io/token/${alert.mint})${alert.data?.txHash ? ` • [Tx](https://solscan.io/tx/${alert.data.txHash})` : ''}`,
+          value: (() => {
+            const socialLinks = tokenAnalysis.dexscreenerData?.socialLinks;
+            const socialParts: string[] = [];
+            if (socialLinks?.website) socialParts.push(`[🌐 Website](${socialLinks.website})`);
+            if (socialLinks?.twitter) socialParts.push(`[🐦 Twitter](${socialLinks.twitter})`);
+            if (socialLinks?.discord) socialParts.push(`[💬 Discord](${socialLinks.discord})`);
+            if (socialLinks?.telegram) socialParts.push(`[✈️ Telegram](${socialLinks.telegram})`);
+            
+            const socialText = socialParts.length > 0 ? `**Social:** ${socialParts.join(' • ')}\n` : '';
+            return `${socialText}[Pump.fun](https://pump.fun/${alert.mint}) • [DexScreener](https://dexscreener.com/solana/${alert.mint}) • [Axiom](https://axiom.trade/t/${alert.mint}/sol) • [GMGN](https://gmgn.ai/sol/token/${alert.mint}) • [Padre](https://padre.fun/token/${alert.mint}) • [Solscan](https://solscan.io/token/${alert.mint})${alert.data?.txHash ? ` • [Tx](https://solscan.io/tx/${alert.data.txHash})` : ''}`;
+          })(),
           inline: false
         }
       ],

@@ -227,7 +227,7 @@ export default function SubscriptionPage() {
                 <Zap className="w-6 h-6 text-primary" />
               </div>
               <div className="mb-4">
-                <span className="text-4xl font-bold" data-testid="text-price-basic">$20</span>
+                <span className="text-4xl font-bold" data-testid="text-price-basic">$29</span>
                 <span className="text-muted-foreground">/month</span>
               </div>
               <CardDescription>Perfect for individual traders and investors</CardDescription>
@@ -288,7 +288,7 @@ export default function SubscriptionPage() {
                 <Users className="w-6 h-6 text-primary" />
               </div>
               <div className="mb-4">
-                <span className="text-4xl font-bold" data-testid="text-price-premium">$100</span>
+                <span className="text-4xl font-bold" data-testid="text-price-premium">$129</span>
                 <span className="text-muted-foreground">/month</span>
               </div>
               <CardDescription>For teams and serious crypto traders</CardDescription>

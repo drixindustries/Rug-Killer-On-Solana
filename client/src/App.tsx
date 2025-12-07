@@ -29,6 +29,7 @@ import LiveScans from "@/pages/live-scans";
 import TrendingCalls from "@/pages/trending-calls";
 import Moderation from "@/pages/admin/moderation";
 import Rugs from "@/pages/rugs";
+import Access from "@/pages/access";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -47,10 +48,12 @@ function Router() {
       <Route path="/compare" component={Comparison} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/profile/:userId" component={Profile} />
+      <Route path="/profile/me" component={Profile} />
       <Route path="/leaderboard" component={Leaderboard} />
       <Route path="/live-scans" component={LiveScans} />
       <Route path="/trending-calls" component={TrendingCalls} />
       <Route path="/rugs" component={Rugs} />
+      <Route path="/access" component={Access} />
       <Route path="/admin/moderation" component={Moderation} />
       <Route path="/documentation" component={Documentation} />
       <Route path="/about" component={About} />

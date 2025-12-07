@@ -222,13 +222,12 @@ export function Header({ onNewAnalysis }: HeaderProps) {
               <Button 
                 variant="outline"
                 size="sm"
-                onClick={connectWallet}
-                disabled={isConnecting}
+                onClick={() => window.location.href = '/access'}
                 className="hidden md:inline-flex"
                 data-testid="button-connect-wallet"
               >
                 <Wallet className="h-4 w-4 mr-1" />
-                {isConnecting ? "Connecting..." : "Connect"}
+                Connect
               </Button>
             )}
 

@@ -233,7 +233,17 @@ function createAnalysisEmbed(analysis: TokenAnalysisResponse): EmbedBuilder {
   // QUICK LINKS (all trading tools)
   embed.addFields({
     name: '🔗 Links',
-    value: `[Pump.fun](https://pump.fun/${analysis.tokenAddress}) • [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress}) • [Axiom](https://axiom.trade/t/${analysis.tokenAddress}/sol) • [GMGN](https://gmgn.ai/sol/token/${analysis.tokenAddress}) • [Padre](https://padre.fun/token/${analysis.tokenAddress}) • [Solscan](https://solscan.io/token/${analysis.tokenAddress})`,
+    value: (() => {
+      const socialLinks = analysis.dexscreenerData?.socialLinks;
+      const socialParts: string[] = [];
+      if (socialLinks?.website) socialParts.push(`[🌐 Website](${socialLinks.website})`);
+      if (socialLinks?.twitter) socialParts.push(`[🐦 Twitter](${socialLinks.twitter})`);
+      if (socialLinks?.discord) socialParts.push(`[💬 Discord](${socialLinks.discord})`);
+      if (socialLinks?.telegram) socialParts.push(`[✈️ Telegram](${socialLinks.telegram})`);
+      
+      const socialText = socialParts.length > 0 ? `**Social:** ${socialParts.join(' • ')}\n` : '';
+      return `${socialText}[Pump.fun](https://pump.fun/${analysis.tokenAddress}) • [DexScreener](https://dexscreener.com/solana/${analysis.tokenAddress}) • [Axiom](https://axiom.trade/t/${analysis.tokenAddress}/sol) • [GMGN](https://gmgn.ai/sol/token/${analysis.tokenAddress}) • [Padre](https://padre.fun/token/${analysis.tokenAddress}) • [Solscan](https://solscan.io/token/${analysis.tokenAddress})`;
+    })(),
     inline: false
   });
   
@@ -552,6 +562,25 @@ const commands = [
   new SlashCommandBuilder()
     .setName('callstats')
     .setDescription('Show your personal call tracking stats'),
+  new SlashCommandBuilder()
+    .setName('profile')
+    .setDescription('Create or update your profile')
+    .addSubcommand(sc => sc
+      .setName('create')
+      .setDescription('Create your profile')
+      .addStringOption(option => option.setName('username').setDescription('Your username (optional)'))
+      .addStringOption(option => option.setName('bio').setDescription('Your bio (optional)'))
+    )
+    .addSubcommand(sc => sc
+      .setName('update')
+      .setDescription('Update your profile')
+      .addStringOption(option => option.setName('username').setDescription('Your username'))
+      .addStringOption(option => option.setName('bio').setDescription('Your bio'))
+    )
+    .addSubcommand(sc => sc
+      .setName('view')
+      .setDescription('View your profile stats (PNL, calls, etc.)')
+    ),
   new SlashCommandBuilder()
     .setName('trace')
     .setDescription('ZachXBT-style on-chain investigation - trace funding, find CEX deposits, expose clusters')
@@ -2105,8 +2134,16 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             inline: false
           });
           
-          // Quick links
+          // Quick links (with social links if available)
+          const socialLinks = analysis.dexscreenerData?.socialLinks;
+          const socialParts: string[] = [];
+          if (socialLinks?.website) socialParts.push(`[🌐 Website](${socialLinks.website})`);
+          if (socialLinks?.twitter) socialParts.push(`[🐦 Twitter](${socialLinks.twitter})`);
+          if (socialLinks?.discord) socialParts.push(`[💬 Discord](${socialLinks.discord})`);
+          if (socialLinks?.telegram) socialParts.push(`[✈️ Telegram](${socialLinks.telegram})`);
+          
           const links = [
+            ...(socialParts.length > 0 ? [`**Social:** ${socialParts.join(' • ')}`] : []),
             `[Pump.fun](https://pump.fun/${tokenAddress})`,
             `[GMGN](https://gmgn.ai/sol/token/${tokenAddress})`,
             `[Padre](https://padre.fun/token/${tokenAddress})`,
@@ -2687,7 +2724,8 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           const guildId = interaction.guildId;
           
           if (!guildId) {
-            await interaction.reply({ content: '❌ This command must be used in a server.', ephemeral: true });
+            // Use editReply since interaction was already deferred
+            await interaction.editReply({ content: '❌ This command must be used in a server.' });
             return;
           }
           
@@ -2706,7 +2744,8 @@ function createDiscordClient(botToken: string, clientId: string): Client {
               `🌙 +500% pump`)
             .setFooter({ text: 'Use /trackcall to start tracking token calls' });
           
-          await interaction.reply({ embeds: [embed] });
+          // Use editReply since interaction was already deferred
+          await interaction.editReply({ embeds: [embed] });
         }
         
         else if (subcommand === 'status') {
@@ -2724,7 +2763,8 @@ function createDiscordClient(botToken: string, clientId: string): Client {
             )
             .setFooter({ text: 'Use /pnl setchannel to configure alerts' });
           
-          await interaction.reply({ embeds: [embed] });
+          // Use editReply since interaction was already deferred
+          await interaction.editReply({ embeds: [embed] });
         }
       }
       
@@ -2853,6 +2893,107 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           await interaction.editReply({ embeds: [embed] });
         } catch (error: any) {
           await interaction.editReply({ content: `❌ Failed to fetch stats: ${error?.message || 'Unknown error'}` });
+        }
+      }
+      
+      // ============================================================================
+      // /profile - PROFILE MANAGEMENT
+      // ============================================================================
+      else if (interaction.commandName === 'profile') {
+        const subcommand = interaction.options.getSubcommand();
+        const discordUserId = interaction.user.id;
+        const userId = `discord:${discordUserId}`;
+        
+        if (subcommand === 'create' || subcommand === 'update') {
+          await interaction.deferReply({ ephemeral: true });
+          
+          const username = interaction.options.getString('username');
+          const bio = interaction.options.getString('bio');
+          
+          try {
+            // Create or update profile
+            let profile = await storage.getUserProfile(userId);
+            
+            if (!profile) {
+              profile = await storage.createUserProfile({
+                userId,
+                username: username || null,
+                bio: bio || null,
+                visibility: 'public',
+                reputationScore: 0,
+                contributionCount: 0,
+              });
+              
+              await interaction.editReply({
+                content: `✅ Profile created! View it at: https://rugkilleralphabot.fun/profile/${userId}\n\nUse \`/profile view\` to see your stats.`
+              });
+            } else {
+              profile = await storage.updateUserProfile(userId, {
+                username: username || undefined,
+                bio: bio || undefined,
+              });
+              
+              await interaction.editReply({
+                content: `✅ Profile updated! View it at: https://rugkilleralphabot.fun/profile/${userId}`
+              });
+            }
+          } catch (error: any) {
+            await interaction.editReply({
+              content: `❌ Failed to ${subcommand} profile: ${error?.message || 'Unknown error'}`
+            });
+          }
+        } else if (subcommand === 'view') {
+          await interaction.deferReply({ ephemeral: true });
+          
+          try {
+            // Get profile
+            let profile = await storage.getUserProfile(userId);
+            if (!profile) {
+              await interaction.editReply({
+                content: `❌ Profile not found. Use \`/profile create\` to create your profile first.`
+              });
+              return;
+            }
+            
+            // Get stats
+            const statsUrl = `https://rugkilleralphabot.fun/api/profile/${userId}/stats?discordId=${discordUserId}`;
+            const statsRes = await fetch(statsUrl);
+            const stats = statsRes.ok ? await statsRes.json() : null;
+            
+            const embed = new EmbedBuilder()
+              .setColor(0x8B5CF6)
+              .setTitle(`👤 ${profile.username || 'Anonymous'}'s Profile`)
+              .setDescription(profile.bio || 'No bio set')
+              .setURL(`https://rugkilleralphabot.fun/profile/${userId}`)
+              .addFields(
+                { name: '🏆 Reputation', value: `${profile.reputationScore}`, inline: true },
+                { name: '📊 Contributions', value: `${profile.contributionCount}`, inline: true }
+              );
+            
+            if (stats?.pnl) {
+              embed.addFields(
+                { name: '💰 Total PnL', value: `${stats.pnl.totalPnlSol >= 0 ? '+' : ''}${stats.pnl.totalPnlSol.toFixed(4)} SOL`, inline: true },
+                { name: '📈 ROI', value: `${stats.pnl.roiPct >= 0 ? '+' : ''}${stats.pnl.roiPct.toFixed(1)}%`, inline: true },
+                { name: '🎯 Win Rate', value: `${stats.pnl.winRatePct.toFixed(1)}%`, inline: true }
+              );
+            }
+            
+            if (stats?.calls) {
+              embed.addFields(
+                { name: '📞 Total Calls', value: `${stats.calls.totalCalls}`, inline: true },
+                { name: '✅ Hits', value: `${stats.calls.hits}`, inline: true },
+                { name: '🎯 Hit Rate', value: `${stats.calls.hitRate.toFixed(1)}%`, inline: true }
+              );
+            }
+            
+            embed.setFooter({ text: 'View full profile on the website' });
+            
+            await interaction.editReply({ embeds: [embed] });
+          } catch (error: any) {
+            await interaction.editReply({
+              content: `❌ Failed to fetch profile: ${error?.message || 'Unknown error'}`
+            });
+          }
         }
       }
       

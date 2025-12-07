@@ -32,6 +32,7 @@ import MLAnalysisCard from "@/components/ml-analysis-card";
 import RugScoreBreakdownCard from "@/components/rug-score-breakdown-card";
 import JitoBundleCard from "@/components/jito-bundle-card";
 import { SocialSentimentCard } from "@/components/social-sentiment-card";
+import { SocialLinksCard } from "@/components/social-links-card";
 
 export default function Home() {
   const { toast } = useToast();
@@ -121,6 +122,14 @@ export default function Home() {
         {/* Analysis Results */}
         {analysis && (
           <div className="space-y-6">
+            {/* Social Links - Display under ticker/risk area */}
+            {analysis.dexscreenerData?.socialLinks && (
+              <SocialLinksCard 
+                socialLinks={analysis.dexscreenerData.socialLinks}
+                tokenAddress={analysis.tokenAddress}
+              />
+            )}
+
             {/* Risk Score Card */}
             <RiskScoreCard 
               score={analysis.riskScore} 

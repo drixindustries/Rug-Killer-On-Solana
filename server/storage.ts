@@ -22,6 +22,7 @@ import {
   watchlistFollowers,
   tokenReports,
   userActivities,
+  analysisRuns,
   type User,
   type UpsertUser,
   type SubscriptionCode,
@@ -1036,13 +1037,85 @@ export class DatabaseStorage implements IStorage {
   async getRiskStatistics(windowDays: number): Promise<RiskStatistic | undefined> {
     const windowStart = new Date();
     windowStart.setDate(windowStart.getDate() - windowDays);
+    const windowEnd = new Date();
 
+    // Find stats where the window overlaps with the requested period
+    // The stored window should contain or overlap with the requested window
     const [stats] = await db
       .select()
       .from(riskStatistics)
-      .where(sql`${riskStatistics.windowStart} >= ${windowStart}`)
+      .where(
+        and(
+          sql`${riskStatistics.windowStart} <= ${windowEnd}`,
+          sql`${riskStatistics.windowEnd} >= ${windowStart}`
+        )
+      )
       .orderBy(desc(riskStatistics.windowEnd))
       .limit(1);
+
+    // If no stats found, calculate on-the-fly from analysisRuns table
+    if (!stats) {
+      try {
+        const analysisCount = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(analysisRuns)
+          .where(
+            and(
+              sql`${analysisRuns.createdAt} >= ${windowStart}`,
+              sql`${analysisRuns.createdAt} <= ${windowEnd}`
+            )
+          );
+        
+        const rugCount = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(analysisRuns)
+          .where(
+            and(
+              eq(analysisRuns.rugDetected, true),
+              sql`${analysisRuns.createdAt} >= ${windowStart}`,
+              sql`${analysisRuns.createdAt} <= ${windowEnd}`
+            )
+          );
+
+        const totalAnalyzed = analysisCount[0]?.count || 0;
+        const rugDetected = rugCount[0]?.count || 0;
+
+        // Get common flags from recent analyses
+        const recentAnalyses = await db
+          .select({ riskFlags: analysisRuns.riskFlags })
+          .from(analysisRuns)
+          .where(
+            and(
+              sql`${analysisRuns.createdAt} >= ${windowStart}`,
+              sql`${analysisRuns.createdAt} <= ${windowEnd}`
+            )
+          )
+          .limit(1000);
+
+        const flagCounts: Record<string, number> = {};
+        for (const analysis of recentAnalyses) {
+          if (analysis.riskFlags && Array.isArray(analysis.riskFlags)) {
+            for (const flag of analysis.riskFlags) {
+              flagCounts[flag] = (flagCounts[flag] || 0) + 1;
+            }
+          }
+        }
+
+        return {
+          id: 'computed',
+          windowStart,
+          windowEnd,
+          totalAnalyzed,
+          rugDetected,
+          falsePositives: 0,
+          commonFlags: flagCounts,
+          updatedAt: new Date(),
+        } as RiskStatistic;
+      } catch (error) {
+        console.error('[getRiskStatistics] Error computing stats:', error);
+        return undefined;
+      }
+    }
 
     return stats;
   }

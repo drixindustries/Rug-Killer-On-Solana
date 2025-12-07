@@ -331,6 +331,98 @@ async function startServices() {
     console.warn('⚠️ Social worker not available:', err.message);
   }
 
+  // Daily access validation - runs every 24 hours to check trial/subscription expiration
+  try {
+    const { getAccessControlService } = await import('./services/access-control.js');
+    const accessControl = getAccessControlService();
+    
+    // Run validation immediately on startup (to catch any expired access)
+    accessControl.validateAllAccess().catch(err => {
+      console.warn('⚠️ Initial access validation failed:', err);
+    });
+    
+    // Then run daily at midnight UTC
+    const runDailyValidation = () => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+      tomorrow.setUTCHours(0, 0, 0, 0);
+      
+      const msUntilMidnight = tomorrow.getTime() - now.getTime();
+      
+      setTimeout(() => {
+        // Run validation
+        accessControl.validateAllAccess().catch(err => {
+          console.error('❌ Daily access validation failed:', err);
+        });
+        
+        // Schedule next run (24 hours later)
+        setInterval(() => {
+          accessControl.validateAllAccess().catch(err => {
+            console.error('❌ Daily access validation failed:', err);
+          });
+        }, 24 * 60 * 60 * 1000); // 24 hours
+      }, msUntilMidnight);
+    };
+    
+    runDailyValidation();
+    console.log('✅ Daily access validation scheduled (runs at midnight UTC)');
+  } catch (err: any) {
+    console.warn('⚠️ Access validation scheduler not available:', err.message);
+  }
+
+  // Pump.fun AMM Wallet Sync - Fetch ALL Pump.fun AMM wallets on startup
+  // CRITICAL: This prevents Pump.fun AMM wallets from being marked as "dev wallets"
+  try {
+    const { getSolscanPumpFunSync } = await import('./services/solscan-pumpfun-sync.js');
+    const syncService = getSolscanPumpFunSync();
+    
+    // Run sync immediately on startup (critical for accuracy)
+    console.log('🔄 Starting Pump.fun AMM wallet sync (this prevents false "dev wallet" flags)...');
+    syncService.syncAllPumpFunWallets().then(result => {
+      console.log(`✅ Pump.fun AMM sync complete: ${result.total} wallets whitelisted`);
+      if (result.errors.length > 0) {
+        console.warn(`⚠️ Sync had ${result.errors.length} errors:`, result.errors.slice(0, 3));
+      }
+      console.log('✅ All Pump.fun AMM wallets are now whitelisted and will NOT be marked as dev wallets');
+    }).catch(err => {
+      console.error('❌ Pump.fun AMM sync failed:', err.message);
+      console.warn('⚠️ Some Pump.fun AMM wallets may still be incorrectly flagged as dev wallets');
+    });
+    
+    // Schedule daily sync at 3 AM UTC (off-peak hours) to catch new AMM wallets
+    const runDailySync = () => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+      tomorrow.setUTCHours(3, 0, 0, 0);
+      
+      const msUntil3AM = tomorrow.getTime() - now.getTime();
+      
+      setTimeout(() => {
+        syncService.syncAllPumpFunWallets().then(result => {
+          console.log(`✅ Daily Pump.fun AMM sync: ${result.total} wallets whitelisted`);
+        }).catch(err => {
+          console.error('❌ Daily Pump.fun AMM sync failed:', err.message);
+        });
+        
+        // Schedule next run (24 hours later)
+        setInterval(() => {
+          syncService.syncAllPumpFunWallets().then(result => {
+            console.log(`✅ Daily Pump.fun AMM sync: ${result.total} wallets whitelisted`);
+          }).catch(err => {
+            console.error('❌ Daily Pump.fun AMM sync failed:', err.message);
+          });
+        }, 24 * 60 * 60 * 1000);
+      }, msUntil3AM);
+    };
+    
+    runDailySync();
+    console.log('✅ Pump.fun AMM wallet sync scheduled (runs daily at 3 AM UTC)');
+  } catch (err: any) {
+    console.warn('⚠️ Pump.fun AMM sync not available:', err.message);
+  }
+
   // Webhook services - real-time blockchain monitoring
   if (process.env.HELIUS_API_KEY || process.env.ANKR_API_KEY) {
     console.log('🔔 Starting webhook services...');

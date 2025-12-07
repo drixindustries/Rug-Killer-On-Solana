@@ -21,7 +21,7 @@ function loadWhitelist(): PumpFunWhitelistFile {
     if (!fs.existsSync(DATA_PATH)) {
       if (!missingFileLogged) {
         console.log(
-          "[PumpFunWhitelist] pumpfun-amm.json not found (optional). Run `npm run pumpfun:sync` only if Pump.fun AMM filtering is required."
+          "[PumpFunWhitelist] pumpfun-amm.json not found. Auto-syncing from Solscan on startup..."
         );
         missingFileLogged = true;
       }
@@ -36,6 +36,11 @@ function loadWhitelist(): PumpFunWhitelistFile {
       );
       return { addresses: [] };
     }
+    
+    if (parsed.addresses && parsed.addresses.length > 0) {
+      console.log(`[PumpFunWhitelist] Loaded ${parsed.addresses.length} Pump.fun AMM wallets from ${parsed.source || 'file'} (fetched: ${parsed.fetchedAt || 'unknown'})`);
+    }
+    
     return parsed;
   } catch (error) {
     console.warn("[PumpFunWhitelist] Failed to read pumpfun-amm.json:", error);
@@ -95,25 +100,46 @@ function matchesPumpFunPattern(address: string): boolean {
   return PUMPFUN_ADDRESS_PATTERNS.some(pattern => pattern.test(address));
 }
 
-const fileContents = loadWhitelist();
-const normalizedAddresses = new Set([
+// Load whitelist on module init
+let fileContents = loadWhitelist();
+let normalizedAddresses = new Set([
   ...CORE_PUMPFUN_ADDRESSES, // Always include core addresses
   ...(fileContents.addresses || [])
     .map(address => address.trim())
     .filter(address => address.length > 0)
 ]);
 
+// Function to reload whitelist (called after sync)
+export function reloadPumpFunWhitelist(): void {
+  fileContents = loadWhitelist();
+  // Clear and rebuild the Set
+  normalizedAddresses.clear();
+  CORE_PUMPFUN_ADDRESSES.forEach(addr => normalizedAddresses.add(addr));
+  (fileContents.addresses || []).forEach(addr => normalizedAddresses.add(addr.trim()));
+  console.log(`[PumpFunWhitelist] ✅ Reloaded: ${normalizedAddresses.size} total wallets (${fileContents.addresses?.length || 0} from file + ${CORE_PUMPFUN_ADDRESSES.size} core)`);
+}
+
+// Getter function that always returns current Set
+export function getPumpFunAmmWallets(): Set<string> {
+  return normalizedAddresses;
+}
+
+// Export for backwards compatibility
 export const PUMPFUN_AMM_WALLETS = normalizedAddresses;
 
 export function isPumpFunAmm(address: string): boolean {
+  const normalized = address.trim();
+  
   // Check hardcoded addresses first (fastest)
-  if (normalizedAddresses.has(address)) {
+  if (normalizedAddresses.has(normalized)) {
     return true;
   }
   
   // Then check pattern matching (catches new AMM wallets automatically)
-  if (matchesPumpFunPattern(address)) {
-    console.log(`[PumpFunWhitelist] Auto-detected AMM wallet via pattern: ${address.slice(0, 8)}...`);
+  if (matchesPumpFunPattern(normalized)) {
+    // Auto-add to whitelist when pattern matches (so we don't miss it next time)
+    normalizedAddresses.add(normalized);
+    console.log(`[PumpFunWhitelist] ✅ Auto-detected & whitelisted AMM wallet via pattern: ${normalized.slice(0, 8)}...`);
     return true;
   }
   

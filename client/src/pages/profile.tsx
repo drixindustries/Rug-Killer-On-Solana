@@ -28,22 +28,53 @@ import type { UserProfile, UserActivity } from "@shared/schema";
 
 export default function Profile() {
   const { toast } = useToast();
+  const [matchMe, paramsMe] = useRoute("/profile/me");
   const [, params] = useRoute("/profile/:userId");
-  const userId = params?.userId || "";
+  const userId = matchMe ? "me" : (params?.userId || "");
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [isPublic, setIsPublic] = useState(true);
 
+  // Handle "me" route - try to get from URL params or localStorage
+  const resolvedUserId = userId === 'me' 
+    ? (new URLSearchParams(window.location.search).get('discordId') 
+        ? `discord:${new URLSearchParams(window.location.search).get('discordId')}`
+        : new URLSearchParams(window.location.search).get('telegramId')
+        ? `telegram:${new URLSearchParams(window.location.search).get('telegramId')}`
+        : userId)
+    : userId;
+
   const { data: profile, isLoading } = useQuery<UserProfile>({
-    queryKey: ["/api/profile", userId],
-    enabled: !!userId,
+    queryKey: ["/api/profile", resolvedUserId],
+    enabled: !!resolvedUserId,
+    queryFn: async () => {
+      const url = resolvedUserId === 'me' 
+        ? `/api/profile/me${new URLSearchParams(window.location.search).toString() ? '&' + new URLSearchParams(window.location.search).toString() : ''}`
+        : `/api/profile/${resolvedUserId}`;
+      const res = await apiRequest("GET", url);
+      if (!res.ok) throw new Error('Profile not found');
+      return await res.json();
+    },
   });
 
   const { data: activities = [] } = useQuery<UserActivity[]>({
-    queryKey: ["/api/profile", userId, "activities"],
-    enabled: !!userId,
+    queryKey: ["/api/profile", resolvedUserId, "activities"],
+    enabled: !!resolvedUserId && !!profile,
+  });
+
+  const { data: stats } = useQuery<any>({
+    queryKey: ["/api/profile", resolvedUserId, "stats"],
+    enabled: !!resolvedUserId && !!profile,
+    queryFn: async () => {
+      const url = resolvedUserId === 'me'
+        ? `/api/profile/me/stats${new URLSearchParams(window.location.search).toString() ? '&' + new URLSearchParams(window.location.search).toString() : ''}`
+        : `/api/profile/${resolvedUserId}/stats`;
+      const res = await apiRequest("GET", url);
+      if (!res.ok) return null;
+      return await res.json();
+    },
   });
 
   const updateProfileMutation = useMutation({
@@ -298,6 +329,72 @@ export default function Profile() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* PNL Stats Card */}
+              {stats?.pnl && (
+                <Card data-testid="card-pnl-stats">
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Trophy className="w-4 h-4" />
+                      PnL Performance
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Total PnL</span>
+                      <span className={`font-semibold ${stats.pnl.totalPnlSol >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        {stats.pnl.totalPnlSol >= 0 ? '+' : ''}{stats.pnl.totalPnlSol.toFixed(4)} SOL
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">ROI</span>
+                      <span className={`font-semibold ${stats.pnl.roiPct >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        {stats.pnl.roiPct >= 0 ? '+' : ''}{stats.pnl.roiPct.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Win Rate</span>
+                      <span className="font-semibold">{stats.pnl.winRatePct.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Total Trades</span>
+                      <span className="font-semibold">{stats.pnl.totalTrades}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Call Stats Card */}
+              {stats?.calls && (
+                <Card data-testid="card-call-stats">
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Activity className="w-4 h-4" />
+                      Call Performance
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Total Calls</span>
+                      <span className="font-semibold">{stats.calls.totalCalls}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Hits</span>
+                      <span className="font-semibold text-green-500">{stats.calls.hits}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Hit Rate</span>
+                      <span className="font-semibold">{stats.calls.hitRate.toFixed(1)}%</span>
+                    </div>
+                    {stats.calls.bestGain && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Best Gain</span>
+                        <span className="font-semibold text-green-500">+{stats.calls.bestGain.toFixed(1)}%</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Right Column - Activity Feed */}

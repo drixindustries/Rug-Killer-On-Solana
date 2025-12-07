@@ -2,11 +2,12 @@
  * Pump.fun AMM Wallet Auto-Detection
  * 
  * Dynamically identifies Pump.fun AMM/system wallets by checking on-chain characteristics:
- * 1. Token account owner is a known Pump.fun program
+ * 1. Token account owner is a known Pump.fun program (via Solscan API)
  * 2. Wallet holds tokens for multiple different mints (liquidity vault pattern)
  * 3. Recent activity matches AMM swap patterns
  * 
  * This allows filtering ALL Pump.fun AMM wallets without maintaining a static list.
+ * NEW: Uses Solscan API for real-time detection and auto-whitelisting.
  */
 
 import { Connection, PublicKey } from '@solana/web3.js';
@@ -45,6 +46,7 @@ export interface AmmDetectionResult {
 
 /**
  * Check if a wallet is a Pump.fun AMM vault by analyzing on-chain data
+ * NEW: Uses Solscan API for real-time detection and auto-whitelisting
  */
 export async function isPumpFunAmmWallet(
   connection: Connection,
@@ -62,23 +64,35 @@ export async function isPumpFunAmmWallet(
   }
 
   try {
-    // Method 1: Check if the token account is owned by a Pump.fun program
+    // Method 1: Solscan API check (FASTEST & MOST RELIABLE) - Check if account owner is Pump.fun program
+    const solscanResult = await checkSolscanAccountOwner(walletAddress);
+    if (solscanResult.isPumpFunAmm) {
+      // Auto-whitelist this wallet immediately
+      await autoWhitelistPumpFunWallet(walletAddress, solscanResult.reason);
+      cacheResult(walletAddress, true, solscanResult.reason);
+      return solscanResult;
+    }
+
+    // Method 2: Check if the token account is owned by a Pump.fun program (RPC fallback)
     const tokenAccountResult = await checkTokenAccountOwner(connection, walletAddress, tokenMint);
     if (tokenAccountResult.isPumpFunAmm) {
+      await autoWhitelistPumpFunWallet(walletAddress, tokenAccountResult.reason);
       cacheResult(walletAddress, true, tokenAccountResult.reason);
       return tokenAccountResult;
     }
 
-    // Method 2: Check if wallet holds tokens from multiple mints (AMM pattern)
+    // Method 3: Check if wallet holds tokens from multiple mints (AMM pattern)
     const multiMintResult = await checkMultipleMintHoldings(connection, walletAddress);
     if (multiMintResult.isPumpFunAmm) {
+      await autoWhitelistPumpFunWallet(walletAddress, multiMintResult.reason);
       cacheResult(walletAddress, true, multiMintResult.reason);
       return multiMintResult;
     }
 
-    // Method 3: Pattern matching - common Pump.fun AMM wallet patterns
+    // Method 4: Pattern matching - common Pump.fun AMM wallet patterns
     const patternResult = checkWalletPattern(walletAddress);
     if (patternResult.isPumpFunAmm) {
+      await autoWhitelistPumpFunWallet(walletAddress, patternResult.reason);
       cacheResult(walletAddress, true, patternResult.reason);
       return patternResult;
     }
@@ -102,7 +116,130 @@ export async function isPumpFunAmmWallet(
 }
 
 /**
- * Check if the token account owner is a Pump.fun program
+ * Check account owner using Solscan API (FASTEST method)
+ * This is the primary method for real-time detection during token scans
+ */
+async function checkSolscanAccountOwner(walletAddress: string): Promise<AmmDetectionResult> {
+  const apiKey = process.env.SOLSCAN_API_KEY;
+  if (!apiKey) {
+    // Skip if no API key - fall back to RPC methods
+    return { isPumpFunAmm: false, reason: 'Solscan API key not configured', confidence: 'low' };
+  }
+
+  try {
+    const url = `https://pro-api.solscan.io/v1.0/account/${walletAddress}`;
+    const response = await fetch(url, {
+      headers: {
+        'token': apiKey.trim(),
+        'Accept': 'application/json'
+      },
+      signal: AbortSignal.timeout(5000) // 5 second timeout
+    });
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        // Rate limited - silently fall back to RPC
+        return { isPumpFunAmm: false, reason: 'Solscan rate limited', confidence: 'low' };
+      }
+      // Other errors - fall back to RPC
+      return { isPumpFunAmm: false, reason: `Solscan API error: ${response.status}`, confidence: 'low' };
+    }
+
+    const data = await response.json();
+    
+    // Check if account owner is a Pump.fun program
+    const owner = data?.data?.owner || data?.owner;
+    if (owner && PUMPFUN_PROGRAM_IDS.has(owner)) {
+      return {
+        isPumpFunAmm: true,
+        reason: `Account owned by Pump.fun program: ${owner.slice(0, 8)}...`,
+        confidence: 'high'
+      };
+    }
+
+    // Also check if owner matches any Pump.fun program pattern
+    if (owner) {
+      for (const programId of PUMPFUN_PROGRAM_IDS) {
+        if (owner === programId || owner.startsWith(programId.slice(0, 4))) {
+          return {
+            isPumpFunAmm: true,
+            reason: `Account owned by Pump.fun program: ${programId.slice(0, 8)}...`,
+            confidence: 'high'
+          };
+        }
+      }
+    }
+
+    return { isPumpFunAmm: false, reason: 'Not owned by Pump.fun program', confidence: 'high' };
+
+  } catch (error: any) {
+    // Silently fail - fall back to RPC methods
+    return { isPumpFunAmm: false, reason: `Solscan check failed: ${error.message}`, confidence: 'low' };
+  }
+}
+
+/**
+ * Auto-whitelist a Pump.fun AMM wallet immediately
+ * This prevents it from being marked as a dev wallet in future scans
+ */
+async function autoWhitelistPumpFunWallet(walletAddress: string, reason: string): Promise<void> {
+  try {
+    // Import whitelist functions
+    const { reloadPumpFunWhitelist } = await import('../pumpfun-whitelist.js');
+    
+    // Read current whitelist file
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const whitelistPath = path.resolve(__dirname, '../../generated/pumpfun-amm.json');
+    
+    // Load existing whitelist
+    let whitelistData: any = { addresses: [], fetchedAt: new Date().toISOString(), source: 'auto-detected' };
+    if (fs.existsSync(whitelistPath)) {
+      try {
+        const raw = fs.readFileSync(whitelistPath, 'utf8');
+        whitelistData = JSON.parse(raw);
+      } catch (err) {
+        // File exists but invalid - start fresh
+      }
+    }
+    
+    // Ensure addresses array exists
+    if (!Array.isArray(whitelistData.addresses)) {
+      whitelistData.addresses = [];
+    }
+    
+    // Add wallet if not already present
+    const normalized = walletAddress.trim();
+    if (!whitelistData.addresses.includes(normalized)) {
+      whitelistData.addresses.push(normalized);
+      whitelistData.addresses.sort(); // Keep sorted
+      
+      // Ensure directory exists
+      const dir = path.dirname(whitelistPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      
+      // Save updated whitelist
+      fs.writeFileSync(whitelistPath, JSON.stringify(whitelistData, null, 2));
+      
+      // Reload in-memory whitelist
+      reloadPumpFunWhitelist();
+      
+      console.log(`[PumpFunAmmDetector] ✅ Auto-whitelisted new Pump.fun AMM wallet: ${normalized.slice(0, 8)}... (${reason})`);
+    }
+  } catch (error: any) {
+    // Don't throw - whitelisting is best-effort
+    console.warn(`[PumpFunAmmDetector] Failed to auto-whitelist ${walletAddress}:`, error.message);
+  }
+}
+
+/**
+ * Check if the token account owner is a Pump.fun program (RPC fallback method)
  */
 async function checkTokenAccountOwner(
   connection: Connection,

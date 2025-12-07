@@ -337,8 +337,8 @@ export default function Analytics() {
                               #{token.rank}
                             </Badge>
                           </td>
-                          <td className="py-3 px-4 font-mono text-sm" data-testid={`text-trending-token-${index}`}>
-                            {token.tokenAddress.slice(0, 8)}...{token.tokenAddress.slice(-8)}
+                          <td className="py-3 px-4 font-mono text-xs" data-testid={`text-trending-token-${index}`}>
+                            {token.tokenAddress}
                           </td>
                           <td className="py-3 px-4 text-right">
                             <Badge variant="outline" data-testid={`badge-risk-${index}`}>
@@ -661,8 +661,8 @@ export default function Analytics() {
                             </Badge>
                           )}
                         </div>
-                        <CardTitle className="text-sm font-mono truncate" data-testid={`text-hot-token-name-${token.rank}`}>
-                          {token.tokenAddress.slice(0, 12)}...
+                        <CardTitle className="text-xs font-mono break-all" data-testid={`text-hot-token-name-${token.rank}`}>
+                          {token.tokenAddress}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-2">

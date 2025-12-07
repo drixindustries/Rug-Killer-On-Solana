@@ -24,13 +24,16 @@ const pricingTiers = [
     icon: Flame,
     price: "$0",
     period: "7 days",
-    description: "Get started with basic token analysis",
+    description: "Get started with basic token analysis - Wallet connection required",
     features: [
       "3 token analyses per day",
-      "Basic risk score",
-      "Top 20 holder analysis",
-      "Authority checks",
-      "7-day trial period"
+      "Basic risk score & holder analysis",
+      "Top 20 holder distribution",
+      "Authority & liquidity checks",
+      "Mintable token detection",
+      "7-day trial period (wallet required)",
+      "Access to website & bot commands",
+      "Basic analytics dashboard"
     ],
     cta: "Start Free Trial",
     ctaVariant: "outline" as const,
@@ -44,13 +47,21 @@ const pricingTiers = [
     icon: Coins,
     price: "$29",
     period: "per month",
-    description: "DM-only access for personal token scanning",
+    description: "DM-only access for personal token scanning & tracking",
     features: [
       "DM bot access only (personal use)",
       "Unlimited token scans & grading",
-      "Basic risk score analysis",
-      "Holder distribution checks",
-      "Authority & liquidity checks",
+      "Advanced risk score analysis",
+      "Enhanced holder analysis (Helius fallback)",
+      "Large holder detection (>10%)",
+      "Token creator identification",
+      "Lock detection (Streamflow, Jupiter Lock)",
+      "Multisig authority detection",
+      "PnL tracking (FIFO/LIFO accounting)",
+      "Call tracking for 20%+ gains",
+      "Personal profile with stats",
+      "Historical metrics (7-90 days)",
+      "Risk insights & performance metrics",
       "DexScreener market data",
       "Blacklist database access",
       "Standard support"
@@ -73,10 +84,16 @@ const pricingTiers = [
       "Everything in Individual tier",
       "Real-time alpha alerts & notifications",
       "Smart money wallet tracking",
-      "Advanced bundling detection",
+      "Advanced bundling detection (Jito)",
+      "Trending calls tracking (Discord/Telegram mentions)",
+      "Community leaderboard & profiles",
       "BubbleMaps visualization",
       "Custom watchlists & API access",
       "Historical data (90 days)",
+      "Advanced analytics dashboard",
+      "Risk insights & common flags",
+      "Performance metrics tracking",
+      "Group PnL alerts (20%, 50%, 100%+ gains)",
       "Priority white-glove support"
     ],
     cta: "Subscribe to GROUP",
@@ -95,10 +112,12 @@ const pricingTiers = [
     features: [
       "Everything in GROUP tier",
       "Lifetime access (no monthly fees)",
-      "Exclusive holder perks (To Be Announced)",
+      "Exclusive holder perks",
       "Early access to new features",
       "Governance voting rights",
-      "VIP Discord channel"
+      "VIP Discord channel",
+      "Priority feature requests",
+      "Beta testing access"
     ],
     cta: "Connect Wallet",
     ctaVariant: "outline" as const,
@@ -145,15 +164,13 @@ export default function Pricing() {
   };
 
   const handleWalletConnect = () => {
-    // Trigger wallet connection modal (if implemented)
-    toast({
-      title: "Connect Wallet",
-      description: "Please connect your Phantom wallet from the header menu to verify your $ANTIRUG token holdings.",
-    });
+    // Redirect to access portal for wallet connection and bot download
+    window.location.href = '/access';
   };
 
   const handleFreeTrial = () => {
-    window.location.href = '/';
+    // Redirect to access portal for wallet connection
+    window.location.href = '/access';
   };
 
   const handleSubscribe = (tier: 'individual' | 'group') => {

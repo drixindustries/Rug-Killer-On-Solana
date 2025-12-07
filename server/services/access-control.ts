@@ -160,8 +160,18 @@ export class AccessControlService {
     // 1. Check if user is in trial period or has existing access
     const accessRecord = await this.getOrCreateAccessRecord(identifier, isGroup);
     
-    // 2. Check if trial is still valid
+    // 2. Check if trial is still valid (with wallet requirement)
     if (accessRecord.trialEndsAt && new Date() < accessRecord.trialEndsAt) {
+      // For free trial, wallet connection is MANDATORY
+      if (!isGroup && !accessRecord.walletAddress) {
+        return {
+          hasAccess: false,
+          reason: 'Wallet connection required. Connect your wallet at https://rugkilleralphabot.fun/access to start your 7-day free trial.',
+          accessType: 'denied',
+          upgradeUrl: 'https://rugkilleralphabot.fun/access'
+        };
+      }
+      
       return {
         hasAccess: true,
         reason: `Trial period (ends ${accessRecord.trialEndsAt.toLocaleDateString()})`,
@@ -170,23 +180,44 @@ export class AccessControlService {
       };
     }
 
-    // 3. Check Whop membership (paid access)
+    // 3. Check if paid membership is still valid (check membershipExpiresAt)
+    if (accessRecord.membershipExpiresAt && new Date() < accessRecord.membershipExpiresAt) {
+      if (accessRecord.accessType === 'paid') {
+        return {
+          hasAccess: true,
+          reason: `Paid membership (expires ${accessRecord.membershipExpiresAt.toLocaleDateString()})`,
+          accessType: 'paid_member'
+        };
+      }
+    }
+
+    // 4. Check Whop membership (paid access) - refresh if needed
     const whopService = getWhopService();
     if (whopService.isConfigured() && !isGroup) {
       const membership = await whopService.checkMembership(userId, platform);
       if (membership && ['active', 'trialing'].includes(membership.status)) {
-        // Update access record
-        await this.updateAccessRecord(identifier, 'paid', membership.validUntil);
+        // Update access record with new expiration
+        const validUntil = membership.validUntil ? new Date(membership.validUntil) : undefined;
+        await this.updateAccessRecord(identifier, 'paid', validUntil);
         
         return {
           hasAccess: true,
           reason: 'Active Whop membership',
           accessType: 'paid_member'
         };
+      } else if (accessRecord.accessType === 'paid' && accessRecord.membershipExpiresAt && new Date() >= accessRecord.membershipExpiresAt) {
+        // Membership expired - revoke access
+        await this.updateAccessRecord(identifier, 'denied');
+        return {
+          hasAccess: false,
+          reason: 'Subscription expired. Please renew to continue.',
+          accessType: 'denied',
+          upgradeUrl: whopService.isConfigured() ? await whopService.createCheckoutLink(userId, platform, process.env.WHOP_PLAN_ID || '') : undefined
+        };
       }
     }
 
-    // 4. Check token holdings (if wallet is linked)
+    // 5. Check token holdings (if wallet is linked)
     if (accessRecord.walletAddress && this.TOKEN_MINT) {
       const hasTokens = await this.checkTokenBalance(accessRecord.walletAddress);
       if (hasTokens) {
@@ -201,7 +232,7 @@ export class AccessControlService {
       }
     }
 
-    // 5. Trial expired and no valid access method
+    // 6. Trial expired and no valid access method
     const whopPlanId = process.env.WHOP_PLAN_ID || '';
     const upgradeUrl = whopService.isConfigured() && !isGroup
       ? await whopService.createCheckoutLink(userId, platform, whopPlanId)
@@ -332,6 +363,223 @@ export class AccessControlService {
         .where(sql`${userAccessControl.identifier} = ${identifier}`);
     } catch (error) {
       console.error('[AccessControl] Error updating access record:', error);
+    }
+  }
+
+  /**
+   * Check access by wallet address (for access portal)
+   */
+  async checkAccessByWallet(walletAddress: string): Promise<AccessCheck & { userId?: string; platform?: string }> {
+    try {
+      // Find all access records linked to this wallet
+      const records = await db
+        .select()
+        .from(userAccessControl)
+        .where(sql`${userAccessControl.walletAddress} = ${walletAddress}`)
+        .orderBy(sql`${userAccessControl.updatedAt} DESC`)
+        .limit(1);
+
+      if (records.length === 0) {
+        return {
+          hasAccess: false,
+          reason: 'No access record found. Connect your wallet to start your trial.',
+          accessType: 'denied',
+          upgradeUrl: 'https://rugkilleralphabot.fun/access'
+        };
+      }
+
+      const record = records[0];
+      const now = new Date();
+
+      // Check trial
+      if (record.trialEndsAt && now < record.trialEndsAt) {
+        return {
+          hasAccess: true,
+          reason: `Trial period (ends ${record.trialEndsAt.toLocaleDateString()})`,
+          accessType: 'trial',
+          trialEndsAt: record.trialEndsAt
+        };
+      }
+
+      // Check paid membership
+      if (record.membershipExpiresAt && now < record.membershipExpiresAt && record.accessType === 'paid') {
+        return {
+          hasAccess: true,
+          reason: `Paid membership (expires ${record.membershipExpiresAt.toLocaleDateString()})`,
+          accessType: 'paid_member'
+        };
+      }
+
+      // Check token holder
+      if (this.TOKEN_MINT) {
+        const hasTokens = await this.checkTokenBalance(walletAddress);
+        if (hasTokens) {
+          await this.updateAccessRecord(record.identifier, 'token_holder');
+          return {
+            hasAccess: true,
+            reason: `Holding ${this.MIN_TOKEN_BALANCE.toLocaleString()}+ tokens`,
+            accessType: 'token_holder'
+          };
+        }
+      }
+
+      // Expired
+      return {
+        hasAccess: false,
+        reason: record.trialEndsAt && now >= record.trialEndsAt 
+          ? 'Trial expired. Please upgrade to continue.'
+          : 'Access expired. Please renew your subscription.',
+        accessType: 'denied',
+        upgradeUrl: 'https://rugkilleralphabot.fun/pricing'
+      };
+    } catch (error) {
+      console.error('[AccessControl] Error checking access by wallet:', error);
+      return {
+        hasAccess: false,
+        reason: 'Error checking access status',
+        accessType: 'denied'
+      };
+    }
+  }
+
+  /**
+   * Start free trial for a wallet (called from access portal)
+   */
+  async startTrialForWallet(walletAddress: string): Promise<{ success: boolean; trialEndsAt?: Date; error?: string }> {
+    try {
+      // Check if wallet already has an access record
+      const existing = await db
+        .select()
+        .from(userAccessControl)
+        .where(sql`${userAccessControl.walletAddress} = ${walletAddress}`)
+        .limit(1);
+
+      if (existing.length > 0 && existing[0].trialEndsAt && new Date() < existing[0].trialEndsAt) {
+        return {
+          success: true,
+          trialEndsAt: existing[0].trialEndsAt,
+        };
+      }
+
+      // Create trial (will be linked when user connects via Discord/Telegram)
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + this.TRIAL_DAYS);
+
+      // Create a temporary identifier for wallet-based trial
+      const identifier = `wallet:${walletAddress}`;
+      
+      const [record] = await db
+        .insert(userAccessControl)
+        .values({
+          identifier,
+          isGroup: false,
+          walletAddress,
+          trialEndsAt,
+          accessType: 'trial',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          lastValidatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: userAccessControl.identifier,
+          set: {
+            walletAddress,
+            trialEndsAt,
+            accessType: 'trial',
+            updatedAt: new Date(),
+            lastValidatedAt: new Date(),
+          }
+        })
+        .returning();
+
+      console.log(`[AccessControl] Trial started for wallet ${walletAddress.slice(0, 8)}... (ends ${trialEndsAt.toLocaleDateString()})`);
+
+      return {
+        success: true,
+        trialEndsAt: record.trialEndsAt || trialEndsAt,
+      };
+    } catch (error: any) {
+      console.error('[AccessControl] Error starting trial:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to start trial'
+      };
+    }
+  }
+
+  /**
+   * Daily validation job - checks all access records and updates expired ones
+   */
+  async validateAllAccess(): Promise<{ validated: number; expired: number; errors: number }> {
+    let validated = 0;
+    let expired = 0;
+    let errors = 0;
+
+    try {
+      // Get all access records that need validation
+      const records = await db
+        .select()
+        .from(userAccessControl)
+        .where(
+          sql`${userAccessControl.accessType} IN ('trial', 'paid')`
+        );
+
+      const now = new Date();
+      const whopService = getWhopService();
+
+      for (const record of records) {
+        try {
+          let shouldExpire = false;
+
+          // Check trial expiration
+          if (record.trialEndsAt && now >= record.trialEndsAt && record.accessType === 'trial') {
+            shouldExpire = true;
+          }
+
+          // Check paid membership expiration
+          if (record.membershipExpiresAt && now >= record.membershipExpiresAt && record.accessType === 'paid') {
+            // For paid members, check Whop to see if subscription was renewed
+            if (!record.isGroup && whopService.isConfigured()) {
+              // Extract platform and userId from identifier
+              const parts = record.identifier.split(':');
+              if (parts.length >= 2) {
+                const platform = parts[0] as 'discord' | 'telegram';
+                const userId = parts.slice(1).join(':');
+                const membership = await whopService.checkMembership(userId, platform);
+                
+                if (membership && ['active', 'trialing'].includes(membership.status) && membership.validUntil) {
+                  // Subscription renewed - update expiration
+                  await this.updateAccessRecord(record.identifier, 'paid', new Date(membership.validUntil));
+                  validated++;
+                  continue;
+                }
+              }
+            }
+            shouldExpire = true;
+          }
+
+          if (shouldExpire) {
+            await this.updateAccessRecord(record.identifier, 'denied');
+            expired++;
+          } else {
+            // Update last validated timestamp
+            await db
+              .update(userAccessControl)
+              .set({ lastValidatedAt: now, updatedAt: now })
+              .where(sql`${userAccessControl.identifier} = ${record.identifier}`);
+            validated++;
+          }
+        } catch (error) {
+          console.error(`[AccessControl] Error validating record ${record.identifier}:`, error);
+          errors++;
+        }
+      }
+
+      console.log(`[AccessControl] Daily validation complete: ${validated} validated, ${expired} expired, ${errors} errors`);
+      return { validated, expired, errors };
+    } catch (error) {
+      console.error('[AccessControl] Error in daily validation:', error);
+      return { validated, expired, errors: errors + 1 };
     }
   }
 }

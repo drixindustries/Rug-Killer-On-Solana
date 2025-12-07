@@ -86,15 +86,56 @@ export class DexScreenerService {
       return cached.data;
     }
     try {
-      const response = await fetch(`${DEXSCREENER_API_URL}/latest/dex/tokens/${tokenAddress}`, { signal: AbortSignal.timeout(10_000) });
-      if (!response.ok) {
-        console.error(`DexScreener API error: ${response.status} ${response.statusText}`);
+      // Fetch both token data and profile data (for social links)
+      const [tokenResponse, profileResponse] = await Promise.allSettled([
+        fetch(`${DEXSCREENER_API_URL}/latest/dex/tokens/${tokenAddress}`, { signal: AbortSignal.timeout(10_000) }),
+        fetch(`https://api.dexscreener.com/token-profiles/latest/v1/${tokenAddress}`, { signal: AbortSignal.timeout(10_000) })
+      ]);
+
+      let raw: any = null;
+      let profileData: any = null;
+
+      if (tokenResponse.status === 'fulfilled' && tokenResponse.value.ok) {
+        raw = await tokenResponse.value.json();
+      } else {
+        console.error(`DexScreener API error: ${tokenResponse.status === 'fulfilled' ? tokenResponse.value.status : 'failed'}`);
         const entry: CacheEntry = { data: null, fetchedAt: now };
         CACHE.set(tokenAddress, entry);
         return null;
       }
-      const raw = await response.json();
+
+      // Try to get profile data for social links
+      if (profileResponse.status === 'fulfilled' && profileResponse.value.ok) {
+        try {
+          profileData = await profileResponse.value.json();
+        } catch (err) {
+          console.warn('[DexScreener] Failed to parse profile data:', err);
+        }
+      }
+
       const parsed = this.buildData(raw);
+      
+      // Extract social links from profile data
+      if (parsed && profileData) {
+        const socialLinks: any = {};
+        if (profileData.links && Array.isArray(profileData.links)) {
+          for (const link of profileData.links) {
+            if (link.type === 'website' && link.url) {
+              socialLinks.website = link.url;
+            } else if (link.type === 'twitter' && link.url) {
+              socialLinks.twitter = link.url;
+            } else if (link.type === 'discord' && link.url) {
+              socialLinks.discord = link.url;
+            } else if (link.type === 'telegram' && link.url) {
+              socialLinks.telegram = link.url;
+            }
+          }
+        }
+        if (Object.keys(socialLinks).length > 0) {
+          parsed.socialLinks = socialLinks;
+        }
+      }
+
       CACHE.set(tokenAddress, { data: parsed, fetchedAt: now });
       
       // Cache in Redis for 3 minutes (180 seconds)

@@ -1164,7 +1164,15 @@ function createTelegramBot(botToken: string): Telegraf {
         if (pf.devBought) message += `• Dev Bought: ${pf.devBought}%\n`;
         if (pf.mayhemMode) message += `• Mayhem Mode active\n`;
         if (pf.king) message += `• King: \`${formatAddress(pf.king.address)}\` (${pf.king.percentage.toFixed(2)}%)\n`;
-        message += `\nLinks: https://pump.fun/${tokenAddress} • https://gmgn.ai/sol/token/${tokenAddress}`;
+        // Add social links if available
+        const socialLinks = analysis.dexscreenerData?.socialLinks;
+        const socialParts: string[] = [];
+        if (socialLinks?.website) socialParts.push(`🌐 ${socialLinks.website}`);
+        if (socialLinks?.twitter) socialParts.push(`🐦 ${socialLinks.twitter}`);
+        if (socialLinks?.discord) socialParts.push(`💬 ${socialLinks.discord}`);
+        if (socialLinks?.telegram) socialParts.push(`✈️ ${socialLinks.telegram}`);
+        const socialText = socialParts.length > 0 ? `\n**Social:** ${socialParts.join(' • ')}\n` : '';
+        message += `${socialText}\nLinks: https://pump.fun/${tokenAddress} • https://gmgn.ai/sol/token/${tokenAddress}`;
       } else {
         message += 'Not identified as a pump.fun token.';
       }
@@ -2024,7 +2032,15 @@ export async function startTelegramBot() {
           });
           const analysis = evt.analysis ? `\nRisk: ${evt.analysis.riskScore} | Holders: ${evt.analysis.holderCount} | Top10: ${evt.analysis.topConcentration?.toFixed?.(2) ?? evt.analysis.topConcentration}% | AgedRisk: ${evt.analysis.agedWalletRisk} | Funding: ${evt.analysis.suspiciousFundingPct?.toFixed?.(1) ?? evt.analysis.suspiciousFundingPct}% | Bundled: ${evt.analysis.bundled ? 'Yes' : 'No'}` : '';
           const legend = 'Directives: PRIORITY WATCH > HIGH WATCH > ACCUMULATION SIGNAL > EARLY WATCH > INFO';
-          const links = `[Pump.fun](https://pump.fun/${evt.tokenMint}) | [Dexscreener](https://dexscreener.com/solana/${evt.tokenMint}) | [Solscan](https://solscan.io/token/${evt.tokenMint})`;
+          // Add social links if available from analysis
+          const socialLinks = evt.analysis?.dexscreenerData?.socialLinks;
+          const socialParts: string[] = [];
+          if (socialLinks?.website) socialParts.push(`[🌐 Website](${socialLinks.website})`);
+          if (socialLinks?.twitter) socialParts.push(`[🐦 Twitter](${socialLinks.twitter})`);
+          if (socialLinks?.discord) socialParts.push(`[💬 Discord](${socialLinks.discord})`);
+          if (socialLinks?.telegram) socialParts.push(`[✈️ Telegram](${socialLinks.telegram})`);
+          const socialText = socialParts.length > 0 ? `**Social:** ${socialParts.join(' • ')}\n` : '';
+          const links = `${socialText}[Pump.fun](https://pump.fun/${evt.tokenMint}) | [Dexscreener](https://dexscreener.com/solana/${evt.tokenMint}) | [Solscan](https://solscan.io/token/${evt.tokenMint})`;
           const message = [header, ageLine, '', 'Elite Wallets:', ...walletLines, analysis, '', legend, '', links].join('\n');
 
           for (const chatId of targetChatIds) {
