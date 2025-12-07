@@ -3852,6 +3852,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================================================
+  // ADMIN ACCESS GRANT ROUTES
+  // ============================================================================
+  
+  // POST /api/admin/grant-access - Grant permanent access to a user (admin only)
+  app.post('/api/admin/grant-access', isAdmin, async (req, res) => {
+    try {
+      const { userId, platform } = req.body;
+      
+      if (!userId || !platform) {
+        return res.status(400).json({ message: 'userId and platform are required' });
+      }
+      
+      if (platform !== 'discord' && platform !== 'telegram') {
+        return res.status(400).json({ message: 'platform must be "discord" or "telegram"' });
+      }
+      
+      const { getAccessControlService } = await import('./services/access-control.js');
+      const accessControl = getAccessControlService();
+      const result = await accessControl.grantPermanentAccess(userId, platform, false);
+      
+      if (result.success) {
+        res.json({ message: result.message, success: true });
+      } else {
+        res.status(500).json({ message: result.message, success: false });
+      }
+    } catch (error: any) {
+      console.error("Error granting permanent access:", error);
+      res.status(500).json({ message: "Failed to grant access", error: error.message });
+    }
+  });
+
+  // ============================================================================
   // PUMP.FUN AMM WALLET SYNC ROUTES
   // ============================================================================
   

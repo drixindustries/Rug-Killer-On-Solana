@@ -63,6 +63,67 @@ export class AccessControlService {
   }
 
   /**
+   * Grant permanent admin access to a user (bypass all checks)
+   * This is for owner/admin use only
+   */
+  async grantPermanentAccess(userId: string, platform: 'discord' | 'telegram', isGroup: boolean = false): Promise<{ success: boolean; message: string }> {
+    try {
+      const identifier = isGroup ? `${platform}_group:${userId}` : `${platform}:${userId}`;
+      const permanentExpiry = new Date('2099-12-31');
+      
+      // Check if user already has a record
+      const existing = await db
+        .select()
+        .from(userAccessControl)
+        .where(sql`${userAccessControl.identifier} = ${identifier}`)
+        .limit(1);
+
+      if (existing.length > 0) {
+        // Update existing record
+        await db
+          .update(userAccessControl)
+          .set({
+            accessType: 'paid',
+            membershipExpiresAt: permanentExpiry,
+            trialEndsAt: permanentExpiry,
+            whopMembershipId: 'ADMIN_PERMANENT',
+            lastValidatedAt: new Date(),
+            updatedAt: new Date()
+          })
+          .where(sql`${userAccessControl.identifier} = ${identifier}`);
+      } else {
+        // Create new record
+        await db
+          .insert(userAccessControl)
+          .values({
+            identifier,
+            isGroup,
+            accessType: 'paid',
+            membershipExpiresAt: permanentExpiry,
+            trialEndsAt: permanentExpiry,
+            whopMembershipId: 'ADMIN_PERMANENT',
+            lastValidatedAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+      }
+
+      console.log(`[AccessControl] Permanent admin access granted to ${identifier}`);
+
+      return {
+        success: true,
+        message: '✅ Permanent admin access granted! You will never be locked out.'
+      };
+    } catch (error) {
+      console.error('[AccessControl] Error granting permanent access:', error);
+      return {
+        success: false,
+        message: 'Error granting access. Please try again.'
+      };
+    }
+  }
+
+  /**
    * Redeem a one-time master access code (admin bypass)
    */
   async redeemAccessCode(userId: string, platform: 'discord' | 'telegram', code: string, isGroup: boolean = false): Promise<{ success: boolean; message: string }> {

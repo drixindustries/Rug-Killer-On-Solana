@@ -981,8 +981,7 @@ function createDiscordClient(botToken: string, clientId: string): Client {
       } else if (interaction.commandName === 'devaudit') {
         const tokenAddress = interaction.options.getString('address', true);
         
-        await interaction.deferReply();
-        
+        // Interaction is already deferred by the global handler, no need to defer again
         try {
           const analysis = await tokenAnalyzer.analyzeToken(tokenAddress);
           try { nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any); } catch {}
@@ -3752,6 +3751,58 @@ function createDiscordClient(botToken: string, clientId: string): Client {
           await message.reply(contextualResponse.message);
           return;
         }
+      }
+    }
+    
+    // ===================================================================
+    // PRIORITY 3: Handle direct token address pasting (no command prefix)
+    // ===================================================================
+    
+    // Detect when user pastes a Solana token address directly (32-44 char base58)
+    // Pattern: Standalone address (whole message is just the address, with optional whitespace)
+    const directAddressMatch = text.match(/^\s*([1-9A-HJ-NP-Za-km-z]{32,44})\s*$/);
+    
+    if (directAddressMatch) {
+      const tokenAddress = directAddressMatch[1];
+      
+      // Throttle to prevent spam (10 seconds per address per channel)
+      const throttleKey = `${message.channelId}:${tokenAddress}`;
+      const now = Date.now();
+      const last = lastResponded.get(throttleKey) || 0;
+      if (now - last < 10_000) {
+        return; // prevent spam within 10s for same address in channel
+      }
+      
+      console.log(`[Discord Direct Address] User ${message.author.tag} pasted address: ${tokenAddress}`);
+      
+      const loadingMsg = await message.reply('🔍 Analyzing token...');
+      
+      try {
+        await message.channel.sendTyping();
+        const analysis = await tokenAnalyzer.analyzeToken(tokenAddress, { fastMode: true });
+        
+        try {
+          nameCache.remember(tokenAddress, analysis?.metadata?.symbol, analysis?.metadata?.name as any);
+        } catch {}
+        
+        const embed = createAnalysisEmbed(analysis);
+        const riskComment = rally.getRiskCommentary(analysis.riskScore, analysis.riskLevel);
+        
+        await loadingMsg.edit({ content: riskComment.message, embeds: [embed] });
+        lastResponded.set(throttleKey, now);
+        return;
+      } catch (error: any) {
+        console.error(`[Discord Direct Address] Error for ${tokenAddress}:`, error.message);
+        
+        let errorType: 'invalid_address' | 'not_found' | 'network_error' | 'rate_limit' | 'generic' = 'generic';
+        if (error.message.includes('Invalid') || error.message.includes('not valid')) errorType = 'invalid_address';
+        else if (error.message.includes('not found')) errorType = 'not_found';
+        else if (error.message.includes('timeout') || error.message.includes('network')) errorType = 'network_error';
+        else if (error.message.includes('rate limit')) errorType = 'rate_limit';
+        
+        const errorResponse = rally.getErrorResponse(errorType);
+        await loadingMsg.edit({ content: errorResponse.message });
+        return;
       }
     }
     
